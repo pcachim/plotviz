@@ -4,7 +4,7 @@ This file is part of this project and is licensed under the MIT License.
 You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://opensource.org/licenses/MIT.
 
-ui/plot_engine.py  –  xd-chart
+ui/plot_engine.py  –  plotviz
 Mixin providing all matplotlib plotting, decorating, preview and export methods.
 """
 import traceback

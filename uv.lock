@@ -1179,7 +1179,7 @@ wheels = [
 ]
 
 [[package]]
-name = "xd-chart"
+name = "plotviz"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },

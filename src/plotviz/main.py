@@ -6,10 +6,10 @@ of this repository or at https://opensource.org/licenses/MIT.
 """
 #!/usr/bin/env python3
 """
-main.py — xd-chart entry point (dev + PyInstaller bundle).
+main.py — plotviz entry point (dev + PyInstaller bundle).
 
 Run from source:
-    cd ~/xd-chart && uv run python src/xd-chart/main.py
+    cd ~/plotviz && uv run python src/plotviz/main.py
 """
 
 import sys
@@ -33,7 +33,7 @@ if getattr(sys, 'frozen', False):
         os.environ['MATPLOTLIBDATA'] = _mpl_data
 
     _mpl_cache = os.path.expanduser(
-        '~/Library/Application Support/xd-chart/matplotlib'
+        '~/Library/Application Support/plotviz/matplotlib'
     )
     os.makedirs(_mpl_cache, exist_ok=True)
     os.environ['MPLCONFIGDIR'] = _mpl_cache
@@ -66,12 +66,12 @@ from ui.main_window import ChartStudioApp
 
 
 def _app_icon() -> QIcon:
-    """Locate assets/xd-chart.icns whether running from source or frozen bundle."""
+    """Locate assets/plotviz.icns whether running from source or frozen bundle."""
     if getattr(sys, 'frozen', False):
         base = Path(sys._MEIPASS)           # type: ignore[attr-defined]
     else:
-        base = Path(__file__).parent.parent.parent  # repo root (~/xd-chart/)
-    icon_path = base / 'assets' / 'xd-chart.icns'
+        base = Path(__file__).parent.parent.parent  # repo root (~/plotviz/)
+    icon_path = base / 'assets' / 'plotviz.icns'
     if icon_path.exists():
         return QIcon(str(icon_path))
     return QIcon()
@@ -79,10 +79,10 @@ def _app_icon() -> QIcon:
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName('xd-chart')
-    app.setApplicationDisplayName('xd-chart')
-    app.setOrganizationName('xd-chart')
-    app.setOrganizationDomain('com.xdchart.app')
+    app.setApplicationName('plotviz')
+    app.setApplicationDisplayName('plotviz')
+    app.setOrganizationName('plotviz')
+    app.setOrganizationDomain('com.plotviz.app')
     app.setStyle('Fusion')
     app.setWindowIcon(_app_icon())
     window = ChartStudioApp()

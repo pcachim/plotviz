@@ -4,7 +4,7 @@ This file is part of this project and is licensed under the MIT License.
 You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://opensource.org/licenses/MIT.
 
-ui/serialization.py  –  xd-chart
+ui/serialization.py  –  plotviz
 Mixin providing settings collection/apply, series meta, and project save/load.
 """
 import json, zipfile, os, tempfile
@@ -29,7 +29,7 @@ class SerializationMixin:
 
         s = {}
         # Format header
-        s['_app']     = 'xd-chart'
+        s['_app']     = 'plotviz'
         s['_version'] = '1.2'  # 1.1 added tick/formatter fields; 1.2 adds palette + color_locked
 
         s['chart_type'] = self.chart_type_combo.currentText()
@@ -581,7 +581,7 @@ class SerializationMixin:
 
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # .xdchart SAVE / LOAD  (zip containing settings.json + data.json + images/)
+    # .plotviz SAVE / LOAD  (zip containing settings.json + data.json + images/)
     # ═══════════════════════════════════════════════════════════════════════════
 
     def _collect_annotations_meta(self):
@@ -604,13 +604,13 @@ class SerializationMixin:
         return out
 
     def _export_palette_bundle(self):
-        """Save a .xdchartx file containing only the custom colour palettes."""
+        """Save a .plotvizx file containing only the custom colour palettes."""
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Export Palette Bundle', _get_dir(),
-            'XDChart Palette Bundle (*.xdchartx);;All Files (*)')
+            'plotviz Palette Bundle (*.plotvizx);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
-        if not fp.endswith('.xdchartx'): fp += '.xdchartx'
+        if not fp.endswith('.plotvizx'): fp += '.plotvizx'
         try:
             custom_pal_json = self._custom_palettes_json()
             with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -620,10 +620,10 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _import_palette_bundle(self):
-        """Load a .xdchartx palette bundle file."""
+        """Load a .plotvizx palette bundle file."""
         fp, _ = QFileDialog.getOpenFileName(
             self, 'Import Palette Bundle', _get_dir(),
-            'XDChart Palette Bundle (*.xdchartx);;All Files (*)')
+            'plotviz Palette Bundle (*.plotvizx);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
         import config.settings as _cfg
@@ -633,7 +633,7 @@ class SerializationMixin:
         self._load_project_inner(fp)
 
     def _load_project_inner(self, fp: str):
-        """Core logic for loading a .xdchart archive — no dialogs."""
+        """Core logic for loading a .plotviz archive — no dialogs."""
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 if 'palette.json' not in zf.namelist():
@@ -644,13 +644,13 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _save_template(self):
-        """Save a .xdchartt that contains only settings (no data, no annotations)."""
+        """Save a .plotvizt that contains only settings (no data, no annotations)."""
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Save Template', _get_dir(),
-            'XDChart Template (*.xdchartt);;All Files (*)')
+            'plotviz Template (*.plotvizt);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
-        if not fp.endswith('.xdchartt'): fp += '.xdchartt'
+        if not fp.endswith('.plotvizt'): fp += '.plotvizt'
         try:
             settings = self._collect_settings()
             settings['_file_type'] = 'template'
@@ -661,9 +661,9 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_template(self):
-        """Load a .xdchartt template (settings only — no data required)."""
+        """Load a .plotvizt template (settings only — no data required)."""
         fp, _ = QFileDialog.getOpenFileName(
-            self, 'Load Template', _get_dir(), 'XDChart Template (*.xdchartt);;All Files (*)')
+            self, 'Load Template', _get_dir(), 'plotviz Template (*.plotvizt);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
         import config.settings as _cfg
@@ -673,7 +673,7 @@ class SerializationMixin:
         self._load_project_inner(fp)
 
     def _load_project_inner(self, fp: str):
-        """Core logic for loading a .xdchart archive — no dialogs."""
+        """Core logic for loading a .plotviz archive — no dialogs."""
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 names = zf.namelist()
@@ -688,7 +688,7 @@ class SerializationMixin:
 
     def _save_project(self):
         """
-        Save a full .xdchart:
+        Save a full .plotviz:
           settings.json  -- appearance/config (no column names)
           series.json    -- series table + subplot column assignments
           data.json      -- datasets (all or used-only, per user choice)
@@ -696,10 +696,10 @@ class SerializationMixin:
         """
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Save Chart', _get_dir(),
-            'XDChart File (*.xdchart);;All Files (*)')
+            'plotviz File (*.plotviz);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
-        if not fp.endswith('.xdchart'): fp += '.xdchart'
+        if not fp.endswith('.plotviz'): fp += '.plotviz'
 
         # ── Ask which columns to save ─────────────────────────────────────────
         dlg = QMessageBox(self)
@@ -781,16 +781,16 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_project_from_path(self, fp: str):
-        """Load a .xdchart directly from *fp* (no file dialog — used by recent-files list)."""
+        """Load a .plotviz directly from *fp* (no file dialog — used by recent-files list)."""
         import config.settings as _cfg
         _cfg.add_recent_file(fp)
         _cfg.remember_dir(fp)
         self._load_project_inner(fp)
 
     def _load_project(self):
-        """Load a full .xdchart: restore datasets, settings, series and annotations."""
+        """Load a full .plotviz: restore datasets, settings, series and annotations."""
         fp, _ = QFileDialog.getOpenFileName(
-            self, 'Open Chart', _get_dir(), 'XDChart File (*.xdchart);;All Files (*)')
+            self, 'Open Chart', _get_dir(), 'plotviz File (*.plotviz);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
         import config.settings as _cfg
@@ -800,7 +800,7 @@ class SerializationMixin:
         self._load_project_inner(fp)
 
     def _load_project_inner(self, fp: str):
-        """Core logic for loading a .xdchart archive — no dialogs."""
+        """Core logic for loading a .plotviz archive — no dialogs."""
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 names = zf.namelist()
@@ -839,7 +839,7 @@ class SerializationMixin:
                                 self.datasets[k] = np.array(v, dtype=object)
                 else:
                     self.datasets = {}
-                img_dir = tempfile.mkdtemp(prefix='xdchart_imgs_')
+                img_dir = tempfile.mkdtemp(prefix='plotviz_imgs_')
                 for name in names:
                     if name.startswith('images/') and name != 'images/':
                         bname = os.path.basename(name)

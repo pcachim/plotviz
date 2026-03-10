@@ -7,7 +7,7 @@ cd "$ROOT_DIR"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "   xd-chart macOS package builder"
+echo "   plotviz macOS package builder"
 echo "   Root : $ROOT_DIR"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
@@ -24,7 +24,7 @@ echo "   Python : $(uv run python --version)"
 # ── Read version from the single source of truth ─────────────────────────────
 VERSION=$(uv run python - <<'EOF'
 import sys, pathlib
-sys.path.insert(0, str(pathlib.Path("src/xd-chart")))
+sys.path.insert(0, str(pathlib.Path("src/plotviz")))
 from config._version import __version__
 print(__version__)
 EOF
@@ -33,11 +33,11 @@ EOF
 echo "   Version: $VERSION"
 
 # ── Config ───────────────────────────────────────────────────────────────────
-APP_NAME="xd-chart"
-SPEC_FILE="xd-chart.spec"
+APP_NAME="plotviz"
+SPEC_FILE="plotviz.spec"
 DIST_DIR="dist"
 ASSETS_DIR="assets"
-ICON="$ASSETS_DIR/xd-chart.icns"
+ICON="$ASSETS_DIR/plotviz.icns"
 APP="$DIST_DIR/$APP_NAME.app"
 DMG="$DIST_DIR/${APP_NAME}-${VERSION}.dmg"
 

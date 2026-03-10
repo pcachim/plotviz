@@ -4,11 +4,11 @@ This file is part of this project and is licensed under the MIT License.
 You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://opensource.org/licenses/MIT.
 
-config/settings.py  –  xd-chart
+config/settings.py  –  plotviz
 Persistent user preferences stored in the platform config directory:
-  macOS   ~/Library/Application Support/xd-chart/settings.json
-  Linux   ~/.config/xd-chart/settings.json
-  Windows %APPDATA%\\xd-chart\\settings.json
+  macOS   ~/Library/Application Support/plotviz/settings.json
+  Linux   ~/.config/plotviz/settings.json
+  Windows %APPDATA%\\plotviz\\settings.json
 
 All reads and writes go through get() / set() / save().
 The module-level `settings` dict is the live in-memory state.
@@ -22,10 +22,10 @@ from pathlib import Path
 
 try:
     from platformdirs import user_config_dir
-    _CFG_DIR = Path(user_config_dir('xd-chart'))
+    _CFG_DIR = Path(user_config_dir('plotviz'))
 except ImportError:
     # Fallback if platformdirs is not installed yet (first run before pip)
-    _CFG_DIR = Path.home() / '.config' / 'xd-chart'
+    _CFG_DIR = Path.home() / '.config' / 'plotviz'
 
 CFG_FILE = _CFG_DIR / 'settings.json'
 
@@ -44,7 +44,7 @@ DEFAULTS: dict = {
                         if (Path.home() / 'Documents').is_dir()
                         else str(Path.home()),
 
-    # Recently opened .xdchart files  (newest first)
+    # Recently opened .plotviz files  (newest first)
     'recent_files':     [],
 
     # Window geometry  [x, y, width, height]

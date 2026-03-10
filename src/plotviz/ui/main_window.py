@@ -4,7 +4,7 @@ This file is part of this project and is licensed under the MIT License.
 You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://opensource.org/licenses/MIT.
 
-ui/main_window.py  –  xd-chart
+ui/main_window.py  –  plotviz
 Core application class. Tab UI, helpers, and event handlers.
 Tab building, plot engine and serialization live in their own mixin modules.
 """
@@ -13,11 +13,11 @@ import os
 import sys
 
 # ── Path bootstrap ────────────────────────────────────────────────────────────
-# Ensure src/xd-chart/ is on sys.path regardless of how this module is loaded.
+# Ensure src/plotviz/ is on sys.path regardless of how this module is loaded.
 # main.py does this first when launching normally; this guard covers every other
 # case (pytest, direct `python ui/main_window.py`, PyInstaller, etc.).
 _HERE = os.path.dirname(os.path.abspath(__file__))   # …/ui/
-_PKG  = os.path.dirname(_HERE)                       # …/src/xd-chart/
+_PKG  = os.path.dirname(_HERE)                       # …/src/plotviz/
 if _PKG not in sys.path:
     sys.path.insert(0, _PKG)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -562,7 +562,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
     def __init__(self):
         super().__init__()
         from config._version import __version__
-        self.setWindowTitle(f'xd-chart {__version__} – Publication-Quality Chart Generator')
+        self.setWindowTitle(f'plotviz {__version__} – Publication-Quality Chart Generator')
 
         # ── Restore window geometry from settings ──────────────────────────────
         geom = settings.get('window_geometry')   # [x, y, w, h]
@@ -1421,9 +1421,9 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         """Display the About dialog."""
         from config._version import __version__
         dlg = QMessageBox(self)
-        dlg.setWindowTitle('About xd-chart')
+        dlg.setWindowTitle('About plotviz')
         dlg.setText(
-            f'<h2>xd-chart&nbsp;{__version__}</h2>'
+            f'<h2>plotviz&nbsp;{__version__}</h2>'
             '<p>Publication-quality chart generator.</p>'
             '<p>Copyright &copy; 2026 Paulo Cachim<br>'
             'Licensed under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>'

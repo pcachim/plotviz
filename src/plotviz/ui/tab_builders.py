@@ -5,7 +5,7 @@ You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://opensource.org/licenses/MIT.
 """
 """
-ui/tab_builders.py  –  xd-chart
+ui/tab_builders.py  –  plotviz
 Mixin that provides all create_*_tab() methods for ChartStudioApp.
 """
 import numpy as np
@@ -94,7 +94,7 @@ COLOR_PALETTES = {
                     '#f0f0f0'],
 }
 
-# Runtime-added custom palettes (loaded from palette.json in .xdchartx or user prefs)
+# Runtime-added custom palettes (loaded from palette.json in .plotvizx or user prefs)
 _CUSTOM_PALETTES: dict = {}
 
 
@@ -136,7 +136,7 @@ class TabBuildersMixin:
         # ── Open row ──────────────────────────────────────────────────────────
         open_row = QHBoxLayout(); open_row.setSpacing(4)
         self._open_combo = QComboBox()
-        self._open_combo.addItems(['Open Chart  (.xdchart)', 'Load Template  (.xdchartt)'])
+        self._open_combo.addItems(['Open Chart  (.plotviz)', 'Load Template  (.plotvizt)'])
         open_row.addWidget(self._open_combo, 1)
         btn_open_go = QPushButton('📂 Open')
         btn_open_go.setFixedWidth(80)
@@ -158,7 +158,7 @@ class TabBuildersMixin:
         # ── Save row ──────────────────────────────────────────────────────────
         save_row = QHBoxLayout(); save_row.setSpacing(4)
         self._save_combo = QComboBox()
-        self._save_combo.addItems(['Save Chart  (.xdchart)', 'Save Template  (.xdchartt)'])
+        self._save_combo.addItems(['Save Chart  (.plotviz)', 'Save Template  (.plotvizt)'])
         save_row.addWidget(self._save_combo, 1)
         btn_save_go = QPushButton('💾 Save')
         btn_save_go.setFixedWidth(80)
@@ -222,11 +222,11 @@ class TabBuildersMixin:
         # Palette bundle import/export
         pal_io_row = QHBoxLayout(); pal_io_row.setSpacing(4)
         btn_import_pal = QPushButton('📥 Import palettes…')
-        btn_import_pal.setToolTip('Load a .xdchartx palette bundle')
+        btn_import_pal.setToolTip('Load a .plotvizx palette bundle')
         btn_import_pal.clicked.connect(self._import_palette_bundle)
         pal_io_row.addWidget(btn_import_pal)
         btn_export_pal = QPushButton('📤 Export palettes…')
-        btn_export_pal.setToolTip('Save custom palettes as a .xdchartx bundle')
+        btn_export_pal.setToolTip('Save custom palettes as a .plotvizx bundle')
         btn_export_pal.clicked.connect(self._export_palette_bundle)
         pal_io_row.addWidget(btn_export_pal)
         pal_io_row.addStretch()

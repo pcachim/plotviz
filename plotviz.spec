@@ -1,10 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-xd-chart.spec — PyInstaller spec for macOS .app bundle
-Location: ~/xd-chart/xd-chart.spec  (repo root)
+plotviz.spec — PyInstaller spec for macOS .app bundle
+Location: ~/plotviz/plotviz.spec  (repo root)
 
 Build:
-    cd ~/xd-chart
+    cd ~/plotviz
     bash build_macos.sh
 """
 
@@ -13,14 +13,14 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import importlib.util as _ilu
 
 # Read version from the single source of truth
-_vspec = Path(SPECPATH) / 'src' / 'xd-chart' / 'config' / '_version.py'  # noqa: F821
+_vspec = Path(SPECPATH) / 'src' / 'plotviz' / 'config' / '_version.py'  # noqa: F821
 _vmod  = _ilu.spec_from_file_location('_version', _vspec)
 _vm    = _ilu.module_from_spec(_vmod); _vmod.loader.exec_module(_vm)
 APP_VERSION = _vm.__version__
 
-# SPECPATH = ~/xd-chart/ (where this spec lives)
+# SPECPATH = ~/plotviz/ (where this spec lives)
 ROOT_DIR = Path(SPECPATH)                          # noqa: F821
-PKG_DIR  = ROOT_DIR / 'src' / 'xd-chart'          # where ui/, data/, styling/ live
+PKG_DIR  = ROOT_DIR / 'src' / 'plotviz'          # where ui/, data/, styling/ live
 
 hidden_imports = [
     # Qt
@@ -116,7 +116,7 @@ pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
-    name='xd-chart',
+    name='plotviz',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -125,32 +125,32 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,   # set to 'entitlements.plist' when signing
-    icon=str(ROOT_DIR / 'assets' / 'xd-chart.icns') if (ROOT_DIR / 'assets' / 'xd-chart.icns').exists() else None,
+    icon=str(ROOT_DIR / 'assets' / 'plotviz.icns') if (ROOT_DIR / 'assets' / 'plotviz.icns').exists() else None,
 )
 
 coll = COLLECT(
     exe, a.binaries, a.zipfiles, a.datas,
     strip=False, upx=False, upx_exclude=[],
-    name='xd-chart',
+    name='plotviz',
 )
 
 app = BUNDLE(
     coll,
-    name='xd-chart.app',
-    icon=str(ROOT_DIR / 'assets' / 'xd-chart.icns') if (ROOT_DIR / 'assets' / 'xd-chart.icns').exists() else None,
-    bundle_identifier='com.xdchart.app',
+    name='plotviz.app',
+    icon=str(ROOT_DIR / 'assets' / 'plotviz.icns') if (ROOT_DIR / 'assets' / 'plotviz.icns').exists() else None,
+    bundle_identifier='com.plotviz.app',
     version=APP_VERSION,
     info_plist={
-        'CFBundleName':               'xd-chart',
-        'CFBundleDisplayName':        'xd-chart',
+        'CFBundleName':               'plotviz',
+        'CFBundleDisplayName':        'plotviz',
         'CFBundleShortVersionString': APP_VERSION,
         'CFBundleVersion':            APP_VERSION,
-        'CFBundleIdentifier':         'com.xdchart.app',
-        'CFBundleExecutable':         'xd-chart',
+        'CFBundleIdentifier':         'com.plotviz.app',
+        'CFBundleExecutable':         'plotviz',
         'CFBundlePackageType':        'APPL',
         'CFBundleDocumentTypes': [{
-            'CFBundleTypeName':       'xd-chart Document',
-            'CFBundleTypeExtensions': ['xdchart'],
+            'CFBundleTypeName':       'plotviz Document',
+            'CFBundleTypeExtensions': ['plotviz'],
             'CFBundleTypeRole':       'Editor',
             'LSHandlerRank':          'Owner',
         }],
@@ -159,10 +159,10 @@ app = BUNDLE(
         'NSHighResolutionCapable':    True,
         'NSSupportsAutomaticGraphicsSwitching': True,
         'NSDocumentsFolderUsageDescription':
-            'xd-chart needs access to open and save chart files.',
+            'plotviz needs access to open and save chart files.',
         'NSDownloadsFolderUsageDescription':
-            'xd-chart needs access to open files from Downloads.',
+            'plotviz needs access to open files from Downloads.',
         'NSDesktopFolderUsageDescription':
-            'xd-chart needs access to files on the Desktop.',
+            'plotviz needs access to files on the Desktop.',
     },
 )

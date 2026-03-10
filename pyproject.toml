@@ -1,6 +1,6 @@
 [project]
-name = "xd-chart"
-# Version is defined in src/xd-chart/config/_version.py — change it there.
+name = "plotviz"
+# Version is defined in src/plotviz/config/_version.py — change it there.
 dynamic = ["version"]
 description = "Publication-Quality Chart Generator"
 requires-python = ">=3.10"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-xd-chart = "main:main"
+plotviz = "main:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -23,10 +23,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 # Single source of truth — bump __version__ in this file to release.
-path = "src/xd-chart/config/_version.py"
+path = "src/plotviz/config/_version.py"
 
 [tool.hatch.build.targets.wheel]
-sources = ["src/xd-chart"]
+sources = ["src/plotviz"]
 packages = ["ui", "data", "styling", "config"]
 
 [dependency-groups]

@@ -1,4 +1,4 @@
-# xd-chart
+# plotviz
 
 Publication-quality chart generator built with Python, matplotlib, and PyQt6.
 
@@ -7,7 +7,7 @@ Publication-quality chart generator built with Python, matplotlib, and PyQt6.
 ### Ad-hoc sign (run on your own machine only)
 
 ```bash
-codesign --force --deep --sign - dist/xd-chart.app
+codesign --force --deep --sign - dist/plotviz.app
 ```
 
 ### Developer ID sign + notarize (distribute to others)
@@ -22,20 +22,20 @@ codesign \
     --options runtime \
     --sign "$IDENTITY" \
     --entitlements entitlements.plist \
-    dist/xd-chart.app
+    dist/plotviz.app
 
 # Zip for upload
-ditto -c -k --keepParent dist/xd-chart.app dist/xd-chart.zip
+ditto -c -k --keepParent dist/plotviz.app dist/plotviz.zip
 
 # Notarize
-xcrun notarytool submit dist/xd-chart.zip \
+xcrun notarytool submit dist/plotviz.zip \
     --apple-id "you@example.com" \
     --team-id  "YOURTEAMID" \
     --password "@keychain:AC_PASSWORD" \
     --wait
 
 # Staple
-xcrun stapler staple dist/xd-chart.app
+xcrun stapler staple dist/plotviz.app
 ```
 
 ### Package as DMG
@@ -44,13 +44,13 @@ xcrun stapler staple dist/xd-chart.app
 brew install create-dmg
 
 create-dmg \
-    --volname "xd-chart" \
+    --volname "plotviz" \
     --window-size 600 400 \
     --icon-size 100 \
-    --icon "xd-chart.app" 175 190 \
+    --icon "plotviz.app" 175 190 \
     --app-drop-link 425 190 \
-    "dist/xd-chart-1.3.0.dmg" \
-    "dist/xd-chart.app"
+    "dist/plotviz-1.3.0.dmg" \
+    "dist/plotviz.app"
 ```
 
 ---
@@ -68,7 +68,7 @@ create-dmg \
    iconutil -c icns icon.iconset -o assets/icon.icns
    rm -r icon.iconset
    ```
-3. In `xd-chart.spec`, set both `icon=None` lines to `icon='assets/icon.icns'`
+3. In `plotviz.spec`, set both `icon=None` lines to `icon='assets/icon.icns'`
 
 ---
 
@@ -76,9 +76,9 @@ create-dmg \
 
 | Symptom | Fix |
 |---|---|
-| `"can't be opened because Apple cannot check it"` | `xattr -cr dist/xd-chart.app` |
+| `"can't be opened because Apple cannot check it"` | `xattr -cr dist/plotviz.app` |
 | Axes / fonts not rendering after double-click | Rebuild — `main.py` sets `MATPLOTLIBDATA` at launch |
-| `ImportError: No module named 'X'` | Add `'X'` to `hiddenimports` in `xd-chart.spec` and rebuild |
-| App crashes silently | Run `./dist/xd-chart.app/Contents/MacOS/xd-chart` in terminal to see traceback |
+| `ImportError: No module named 'X'` | Add `'X'` to `hiddenimports` in `plotviz.spec` and rebuild |
+| App crashes silently | Run `./dist/plotviz.app/Contents/MacOS/plotviz` in terminal to see traceback |
 | Build fails with `OSError: Readme file does not exist` | Ensure `README.md` exists at repo root |
 | Crash on Apple Silicon | Check Python slice: `file $(uv run python -c "import sys;print(sys.executable)")` |
