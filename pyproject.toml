@@ -1,0 +1,35 @@
+[project]
+name = "xd-chart"
+# Version is defined in src/xd-chart/config/_version.py — change it there.
+dynamic = ["version"]
+description = "Publication-Quality Chart Generator"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.7",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "PyQt6>=6.5",
+    "openpyxl>=3.1",
+    "platformdirs>=3.0",
+]
+
+[project.scripts]
+xd-chart = "main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+# Single source of truth — bump __version__ in this file to release.
+path = "src/xd-chart/config/_version.py"
+
+[tool.hatch.build.targets.wheel]
+sources = ["src/xd-chart"]
+packages = ["ui", "data", "styling", "config"]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.3",
+]
