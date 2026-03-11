@@ -10,7 +10,7 @@ Publication-quality chart generator built with Python, matplotlib, and PyQt6.
 - Curve fitting (linear, polynomial, exponential, logarithmic, power, sinusoidal)
 - Custom colour palettes with per-series overrides
 - Chart export: PNG, PDF, SVG, EPS at any DPI
-- Save/load chart sessions as `.plotviz` files (JSON + series metadata)
+- Save/load chart sessions as `.pviz` files (JSON + series metadata)
 
 ---
 

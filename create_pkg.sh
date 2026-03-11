@@ -49,6 +49,25 @@ uv sync
 echo ""
 echo "▶ PyInstaller $(uv run pyinstaller --version)"
 
+# ── Generate file-type icons ──────────────────────────────────────────────────
+# Produces assets/pviz_icon.png, pvizt_icon.png, pvizx_icon.png
+# echo ""
+# echo "▶ Generating file-type icons..."
+# uv run python make_file_icons.py
+
+# Converts PNGs → assets/pviz.icns, pvizt.icns, pvizx.icns
+# echo "▶ Converting file-type icons to .icns..."
+# bash make_file_icns.sh
+
+# Verify all three icns files were produced
+for _ft in pviz pvizt pvizx; do
+    if [ ! -f "$ASSETS_DIR/${_ft}.icns" ]; then
+        echo "❌ Missing $ASSETS_DIR/${_ft}.icns — icon generation failed"
+        exit 1
+    fi
+done
+echo "   pviz.icns / pvizt.icns / pvizx.icns  ✓"
+
 # ── Clean previous builds ─────────────────────────────────────────────────────
 echo ""
 echo "▶ Cleaning previous build..."
@@ -74,6 +93,17 @@ if [ ! -d "$APP" ]; then
 fi
 
 SIZE=$(du -sh "$APP" | cut -f1)
+
+# ── Copy file-type icons into Resources (belt-and-suspenders) ────────────────
+# PyInstaller puts datas mapped to '.' into Contents/Resources/.
+# We also copy explicitly here in case the spec mapping differs on some versions.
+echo ""
+echo "▶ Installing file-type icons into bundle Resources..."
+RESOURCES="$APP/Contents/Resources"
+for _ft in pviz pvizt pvizx; do
+    cp "$ASSETS_DIR/${_ft}.icns" "$RESOURCES/${_ft}.icns"
+    echo "   ${_ft}.icns  →  Resources/"
+done
 
 # ── Code signing ──────────────────────────────────────────────────────────────
 echo ""
@@ -121,6 +151,7 @@ if ! command -v create-dmg &>/dev/null; then
 else
     create-dmg \
         --volname "$APP_NAME" \
+        --volicon "$ICON" \
         --window-pos 200 120 \
         --window-size 600 400 \
         --icon-size 120 \
@@ -130,6 +161,27 @@ else
         --background "$ASSETS_DIR/background.png" \
         "$DMG" \
         "$APP"
+
+    # ── Stamp the app icon onto the .dmg file itself ──────────────────────────
+    # create-dmg sets the volume icon (sidebar) but not the Finder file icon.
+    # We convert the .icns to a temp PNG and use osascript to write it as the
+    # custom icon resource — no extra tools required.
+    if [ -f "$DMG" ] && [ -f "$ICON" ]; then
+        echo ""
+        echo "▶ Stamping icon onto DMG file..."
+        _TMP_ICON=$(mktemp /tmp/dmg_icon_XXXXXX.png)
+        sips -s format png "$ICON" --out "$_TMP_ICON" > /dev/null 2>&1
+        osascript << APPLESCRIPT
+use framework "Foundation"
+use framework "AppKit"
+set iconPath to "$_TMP_ICON"
+set dmgPath  to "$DMG"
+set img to current application's NSImage's alloc()'s initWithContentsOfFile:iconPath
+current application's NSWorkspace's sharedWorkspace()'s setIcon:img forFile:dmgPath options:0
+APPLESCRIPT
+        rm -f "$_TMP_ICON"
+        echo "   Icon stamped."
+    fi
 fi
 
 # ── Final report ──────────────────────────────────────────────────────────────

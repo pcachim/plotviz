@@ -45,6 +45,13 @@ class SerializationMixin:
         def _ser(d): return {str(k): v for k, v in d.items()}
         s['sp_titles']             = _ser(self.sp_titles)
         s['subplot_title_show']    = _ser(self.subplot_title_show)
+        s['subplot_title_font']    = _ser(self.subplot_title_font)
+        s['subplot_title_size']    = _ser(self.subplot_title_size)
+        s['subplot_title_color']   = _ser(self.subplot_title_color)
+        s['title_x']      = self.title_x.value() if hasattr(self, 'title_x') else 0.5
+        s['title_y']      = self.title_y.value() if hasattr(self, 'title_y') else 0.97
+        s['sp_hspace']    = self.sp_hspace.value() if hasattr(self, 'sp_hspace') else 0.35
+        s['sp_wspace']    = self.sp_wspace.value() if hasattr(self, 'sp_wspace') else 0.35
         s['subplot_xlabels']       = _ser(self.subplot_xlabels)
         s['subplot_xlabel_show']   = _ser(self.subplot_xlabel_show)
         s['subplot_ylabels']       = _ser(self.subplot_ylabels)
@@ -351,6 +358,13 @@ class SerializationMixin:
             return {int(k): (tuple(v) if v else None) for k, v in s.get(key, {}).items()}
         self.sp_titles             = _di('sp_titles', {'0': ''})
         self.subplot_title_show    = _di('subplot_title_show', {'0': True})
+        self.subplot_title_font    = _di('subplot_title_font', {'0': 'sans-serif'})
+        self.subplot_title_size    = _di('subplot_title_size', {'0': 11})
+        self.subplot_title_color   = _di('subplot_title_color', {'0': '#000000'})
+        if hasattr(self, 'title_x'): self.title_x.setValue(s.get('title_x', 0.5))
+        if hasattr(self, 'title_y'): self.title_y.setValue(s.get('title_y', s.get('title_y_offset', 0.97) + 0.97 if s.get('title_y_offset', 0) != 0 else 0.97))
+        if hasattr(self, 'sp_hspace'): self.sp_hspace.setValue(s.get('sp_hspace', 0.35))
+        if hasattr(self, 'sp_wspace'): self.sp_wspace.setValue(s.get('sp_wspace', 0.35))
         self.subplot_xlabels       = _di('subplot_xlabels', {'0': ''})
         self.subplot_xlabel_show   = _di('subplot_xlabel_show', {'0': True})
         self.subplot_ylabels       = _di('subplot_ylabels', {'0': ''})
@@ -581,7 +595,7 @@ class SerializationMixin:
 
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # .plotviz SAVE / LOAD  (zip containing settings.json + data.json + images/)
+    # .pviz SAVE / LOAD  (zip containing settings.json + data.json + images/)
     # ═══════════════════════════════════════════════════════════════════════════
 
     def _collect_annotations_meta(self):
@@ -604,13 +618,13 @@ class SerializationMixin:
         return out
 
     def _export_palette_bundle(self):
-        """Save a .plotvizx file containing only the custom colour palettes."""
+        """Save a .pvizx file containing only the custom colour palettes."""
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Export Palette Bundle', _get_dir(),
-            'plotviz Palette Bundle (*.plotvizx);;All Files (*)')
+            'plotviz Palette Bundle (*.pvizx);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
-        if not fp.endswith('.plotvizx'): fp += '.plotvizx'
+        if not fp.endswith('.pvizx'): fp += '.pvizx'
         try:
             custom_pal_json = self._custom_palettes_json()
             with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -620,20 +634,33 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _import_palette_bundle(self):
-        """Load a .plotvizx palette bundle file."""
+        """Load a .pvizx palette bundle file (via file dialog)."""
         fp, _ = QFileDialog.getOpenFileName(
             self, 'Import Palette Bundle', _get_dir(),
-            'plotviz Palette Bundle (*.plotvizx);;All Files (*)')
+            'plotviz Palette Bundle (*.pvizx);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
+        self._import_palette_bundle_from_path(fp)
+
+    def _import_palette_bundle_from_path(self, fp: str):
+        """Load a .pvizx palette bundle directly from *fp* (no dialog)."""
         import config.settings as _cfg
-        _cfg.add_recent_file(fp)
-        if hasattr(self, '_rebuild_recent_files_ui'):
-            self._rebuild_recent_files_ui()
-        self._load_project_inner(fp)
+        _cfg.remember_dir(fp)
+        self._import_palette_bundle_inner(fp)
+
+    def _import_palette_bundle_inner(self, fp: str):
+        """Core logic for importing a .pvizx palette bundle — no dialogs."""
+        try:
+            with zipfile.ZipFile(fp, 'r') as zf:
+                if 'palette.json' not in zf.namelist():
+                    QMessageBox.warning(self, 'Invalid', 'No palette.json in file.'); return
+                self._load_custom_palettes_json(zf.read('palette.json').decode())
+            QMessageBox.information(self, 'Imported', 'Palette bundle imported.')
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', str(e))
 
     def _load_project_inner(self, fp: str):
-        """Core logic for loading a .plotviz archive — no dialogs."""
+        """Core logic for loading a .pviz archive — no dialogs."""
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 if 'palette.json' not in zf.namelist():
@@ -644,13 +671,13 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _save_template(self):
-        """Save a .plotvizt that contains only settings (no data, no annotations)."""
+        """Save a .pvizt that contains only settings (no data, no annotations)."""
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Save Template', _get_dir(),
-            'plotviz Template (*.plotvizt);;All Files (*)')
+            'plotviz Template (*.pvizt);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
-        if not fp.endswith('.plotvizt'): fp += '.plotvizt'
+        if not fp.endswith('.pvizt'): fp += '.pvizt'
         try:
             settings = self._collect_settings()
             settings['_file_type'] = 'template'
@@ -661,45 +688,36 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_template(self):
-        """Load a .plotvizt template (settings only — no data required)."""
+        """Load a .pvizt template (settings only — no data required)."""
         fp, _ = QFileDialog.getOpenFileName(
-            self, 'Load Template', _get_dir(), 'plotviz Template (*.plotvizt);;All Files (*)')
+            self, 'Load Template', _get_dir(), 'plotviz Template (*.pvizt);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
         import config.settings as _cfg
-        _cfg.add_recent_file(fp)
-        if hasattr(self, '_rebuild_recent_files_ui'):
-            self._rebuild_recent_files_ui()
-        self._load_project_inner(fp)
-
-    def _load_project_inner(self, fp: str):
-        """Core logic for loading a .plotviz archive — no dialogs."""
-        try:
-            with zipfile.ZipFile(fp, 'r') as zf:
-                names = zf.namelist()
-                if 'settings.json' not in names:
-                    QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.'); return
-                settings = json.loads(zf.read('settings.json'))
-            self._apply_settings(settings)
-            self.update_preview()
-            QMessageBox.information(self, 'Loaded', 'Template applied.')
-        except Exception as e:
-            QMessageBox.critical(self, 'Error', str(e))
+        _cfg.remember_dir(fp)
+        self._load_template_inner(fp)
 
     def _save_project(self):
         """
-        Save a full .plotviz:
+        Save a full .pviz:
           settings.json  -- appearance/config (no column names)
           series.json    -- series table + subplot column assignments
           data.json      -- datasets (all or used-only, per user choice)
           images/<n>     -- any image files used in annotations
         """
+        import os as _os
+        _default_dir = _get_dir()
+        if getattr(self, '_current_filepath', None):
+            _stem = _os.path.splitext(_os.path.basename(self._current_filepath))[0]
+            _default_dir = _os.path.join(_os.path.dirname(self._current_filepath), _stem)
         fp, _ = QFileDialog.getSaveFileName(
-            self, 'Save Chart', _get_dir(),
-            'plotviz File (*.plotviz);;All Files (*)')
+            self, 'Save Chart', _default_dir,
+            'plotviz File (*.pviz);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
-        if not fp.endswith('.plotviz'): fp += '.plotviz'
+        if not fp.endswith('.pviz'): fp += '.pviz'
+        self._current_filepath = fp
+        self._is_dirty = False
 
         # ── Ask which columns to save ─────────────────────────────────────────
         dlg = QMessageBox(self)
@@ -781,26 +799,50 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_project_from_path(self, fp: str):
-        """Load a .plotviz directly from *fp* (no file dialog — used by recent-files list)."""
+        """Load a .pviz directly from *fp* (no file dialog — used by recent-files list and Finder open)."""
         import config.settings as _cfg
         _cfg.add_recent_file(fp)
         _cfg.remember_dir(fp)
+        if hasattr(self, '_rebuild_recent_files_ui'):
+            self._rebuild_recent_files_ui()
+        self._current_filepath = fp
         self._load_project_inner(fp)
 
+    def _load_template_from_path(self, fp: str):
+        """Load a .pvizt directly from *fp* (no file dialog — used by Finder open)."""
+        import config.settings as _cfg
+        _cfg.remember_dir(fp)
+        self._load_template_inner(fp)
+
+    def _load_template_inner(self, fp: str):
+        """Core logic for loading a .pvizt archive — no dialogs."""
+        try:
+            with zipfile.ZipFile(fp, 'r') as zf:
+                names = zf.namelist()
+                if 'settings.json' not in names:
+                    QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.'); return
+                settings = json.loads(zf.read('settings.json'))
+            self._apply_settings(settings)
+            self.update_preview()
+            QMessageBox.information(self, 'Loaded', 'Template applied.')
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', str(e))
+
     def _load_project(self):
-        """Load a full .plotviz: restore datasets, settings, series and annotations."""
+        """Load a full .pviz: restore datasets, settings, series and annotations."""
         fp, _ = QFileDialog.getOpenFileName(
-            self, 'Open Chart', _get_dir(), 'plotviz File (*.plotviz);;All Files (*)')
+            self, 'Open Chart', _get_dir(), 'plotviz File (*.pviz);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
         import config.settings as _cfg
         _cfg.add_recent_file(fp)
         if hasattr(self, '_rebuild_recent_files_ui'):
             self._rebuild_recent_files_ui()
+        self._current_filepath = fp
         self._load_project_inner(fp)
 
     def _load_project_inner(self, fp: str):
-        """Core logic for loading a .plotviz archive — no dialogs."""
+        """Core logic for loading a .pviz archive — no dialogs."""
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 names = zf.namelist()
@@ -898,6 +940,14 @@ class SerializationMixin:
                     a['filepath'] = os.path.join(img_dir, bname)
 
             self.update_preview()
+            # Fresh start: clear undo history so first undo from here is the loaded state
+            if hasattr(self, '_undo_stack'):
+                self._undo_stack.clear()
+                self._redo_stack.clear()
+                if hasattr(self, '_snapshot'):
+                    self._snapshot()
+                self._update_undo_buttons()
+            self._is_dirty = False
             QMessageBox.information(self, 'Loaded', 'Chart loaded successfully.')
         except Exception as e:
             QMessageBox.critical(self, 'Error', str(e))

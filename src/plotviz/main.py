@@ -60,9 +60,15 @@ freeze_support()
 
 # ── 6. Application ────────────────────────────────────────────────────────────
 from pathlib import Path
+from PyQt6.QtCore import QEvent
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 from ui.main_window import ChartStudioApp
+
+# File extensions this app owns
+_CHART_EXT    = '.pviz'
+_TEMPLATE_EXT = '.pvizt'
+_PALETTE_EXT  = '.pvizx'
 
 
 def _app_icon() -> QIcon:
@@ -77,16 +83,61 @@ def _app_icon() -> QIcon:
     return QIcon()
 
 
+class PlotVizApp(QApplication):
+    """QApplication subclass that handles macOS QFileOpenEvent.
+
+    When the user double-clicks a .pviz or .pvizt file in Finder while the
+    app is already running, macOS sends a QFileOpenEvent rather than spawning
+    a new process.  We forward it to the main window.
+    """
+
+    def __init__(self, argv):
+        super().__init__(argv)
+        self._window: ChartStudioApp | None = None
+
+    def set_window(self, window: ChartStudioApp) -> None:
+        self._window = window
+
+    def event(self, e: QEvent) -> bool:
+        if e.type() == QEvent.Type.FileOpen and self._window is not None:
+            fp = e.file()                           # type: ignore[attr-defined]
+            if fp.endswith(_CHART_EXT):
+                self._window._load_project_from_path(fp)
+            elif fp.endswith(_TEMPLATE_EXT):
+                self._window._load_template_from_path(fp)
+            elif fp.endswith(_PALETTE_EXT):
+                self._window._import_palette_bundle_from_path(fp)
+            return True
+        return super().event(e)
+
+
 def main():
-    app = QApplication(sys.argv)
+    app = PlotVizApp(sys.argv)
     app.setApplicationName('plotviz')
     app.setApplicationDisplayName('plotviz')
     app.setOrganizationName('plotviz')
-    app.setOrganizationDomain('com.plotviz.app')
+    app.setOrganizationDomain('com.pviz.app')
     app.setStyle('Fusion')
     app.setWindowIcon(_app_icon())
+
     window = ChartStudioApp()
+    app.set_window(window)
     window.show()
+
+    # ── Cold-launch: file passed as command-line argument ─────────────────────
+    # macOS passes the file path in argv when the app is launched by opening a
+    # document from Finder (and the app was not already running).
+    for arg in sys.argv[1:]:
+        if arg.endswith(_CHART_EXT) and Path(arg).is_file():
+            window._load_project_from_path(arg)
+            break
+        if arg.endswith(_TEMPLATE_EXT) and Path(arg).is_file():
+            window._load_template_from_path(arg)
+            break
+        if arg.endswith(_PALETTE_EXT) and Path(arg).is_file():
+            window._import_palette_bundle_from_path(arg)
+            break
+
     sys.exit(app.exec())
 
 

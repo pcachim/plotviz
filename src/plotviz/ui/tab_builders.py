@@ -94,7 +94,7 @@ COLOR_PALETTES = {
                     '#f0f0f0'],
 }
 
-# Runtime-added custom palettes (loaded from palette.json in .plotvizx or user prefs)
+# Runtime-added custom palettes (loaded from palette.json in .pvizx or user prefs)
 _CUSTOM_PALETTES: dict = {}
 
 
@@ -107,15 +107,7 @@ def add_custom_palette(name: str, colors: list):
     """Register a custom palette at runtime."""
     _CUSTOM_PALETTES[name] = colors[:16]
 
-_FONTS = [
-    'sans-serif', 'serif', 'monospace',
-    'DejaVu Sans', 'DejaVu Serif', 'DejaVu Sans Mono',
-    'Liberation Sans', 'Liberation Serif', 'Liberation Mono',
-    'Latin Modern Roman', 'Latin Modern Sans', 'Latin Modern Mono',
-    'TeX Gyre Termes', 'TeX Gyre Pagella', 'TeX Gyre Heros',
-    'TeX Gyre Bonum', 'TeX Gyre Schola', 'TeX Gyre Cursor',
-    'Lora', 'Poppins', 'STIXGeneral', 'FreeSans', 'FreeSerif', 'FreeMono',
-]
+_FONTS = ['sans-serif', 'serif', 'monospace']
 
 
 class TabBuildersMixin:
@@ -123,20 +115,41 @@ class TabBuildersMixin:
         widget = QWidget(); scroll = QScrollArea(); scroll.setWidgetResizable(True)
         content = QWidget(); layout = QVBoxLayout(content); layout.setSpacing(6)
 
-        # ── Appearance (Dark / Light / System) ───────────────────────────────
+        # ── Appearance (Dark / Light / System) + Undo / Redo ────────────────
         app_row = QHBoxLayout(); app_row.setSpacing(6)
         app_row.addWidget(QLabel('Appearance:'))
         self.colour_scheme_combo = QComboBox()
         self.colour_scheme_combo.addItems(['System', 'Light', 'Dark'])
         self.colour_scheme_combo.currentTextChanged.connect(self._apply_colour_scheme)
-        app_row.addWidget(self.colour_scheme_combo); app_row.addStretch()
+        app_row.addWidget(self.colour_scheme_combo)
+
+        # Separator
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken); sep.setFixedWidth(10)
+        app_row.addWidget(sep)
+
+        btn_undo = QPushButton('↩ Undo')
+        btn_undo.setToolTip('Undo last change (Ctrl+Z)')
+        btn_undo.clicked.connect(self._undo)
+        btn_undo.setFixedWidth(72)
+        app_row.addWidget(btn_undo)
+        self._btn_undo = btn_undo
+
+        btn_redo = QPushButton('↪ Redo')
+        btn_redo.setToolTip('Redo (Ctrl+Y)')
+        btn_redo.clicked.connect(self._redo)
+        btn_redo.setFixedWidth(72)
+        app_row.addWidget(btn_redo)
+        self._btn_redo = btn_redo
+
+        app_row.addStretch()
         layout.addLayout(app_row)
         layout.addWidget(self._hline())
 
         # ── Open row ──────────────────────────────────────────────────────────
         open_row = QHBoxLayout(); open_row.setSpacing(4)
         self._open_combo = QComboBox()
-        self._open_combo.addItems(['Open Chart  (.plotviz)', 'Load Template  (.plotvizt)'])
+        self._open_combo.addItems(['Open Chart  (.pviz)', 'Load Template  (.pvizt)'])
         open_row.addWidget(self._open_combo, 1)
         btn_open_go = QPushButton('📂 Open')
         btn_open_go.setFixedWidth(80)
@@ -158,7 +171,7 @@ class TabBuildersMixin:
         # ── Save row ──────────────────────────────────────────────────────────
         save_row = QHBoxLayout(); save_row.setSpacing(4)
         self._save_combo = QComboBox()
-        self._save_combo.addItems(['Save Chart  (.plotviz)', 'Save Template  (.plotvizt)'])
+        self._save_combo.addItems(['Save Chart  (.pviz)', 'Save Template  (.pvizt)'])
         save_row.addWidget(self._save_combo, 1)
         btn_save_go = QPushButton('💾 Save')
         btn_save_go.setFixedWidth(80)
@@ -184,55 +197,6 @@ class TabBuildersMixin:
             lambda: self.export_chart(self._export_fmt_combo.currentText().lower()))
         exp_row.addWidget(btn_export_go)
         layout.addLayout(exp_row)
-
-        layout.addWidget(self._hline())
-
-        # ── Colour palette ────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Colour Palette'))
-        pal_row = QHBoxLayout(); pal_row.setSpacing(6)
-        self.palette_combo = QComboBox()
-        self.palette_combo.addItems(list(COLOR_PALETTES.keys()))
-        self.palette_combo.currentTextChanged.connect(self._on_palette_changed)
-        pal_row.addWidget(self.palette_combo)
-        pal_row.addStretch()
-        layout.addLayout(pal_row)
-        # Swatch strip — 16 small colour squares (matches Qt custom colour slots)
-        self._palette_swatch_row = QHBoxLayout(); self._palette_swatch_row.setSpacing(2)
-        self._palette_swatches = []
-        for _ in range(16):
-            sw = QLabel()
-            sw.setFixedSize(18, 14)
-            sw.setStyleSheet('background:#ccc; border:1px solid #aaa;')
-            self._palette_swatches.append(sw)
-            self._palette_swatch_row.addWidget(sw)
-        self._palette_swatch_row.addStretch()
-        layout.addLayout(self._palette_swatch_row)
-        # Palette action buttons
-        pal_btn_row = QHBoxLayout(); pal_btn_row.setSpacing(4)
-        btn_edit_pal = QPushButton('✏️ Edit palette…')
-        btn_edit_pal.setToolTip('Create or edit a custom colour palette')
-        btn_edit_pal.clicked.connect(self._open_palette_editor)
-        pal_btn_row.addWidget(btn_edit_pal)
-        btn_reset_locks = QPushButton('↺ Reset colors')
-        btn_reset_locks.setToolTip('Remove manual color locks from all series and re-apply the active palette')
-        btn_reset_locks.clicked.connect(self._reset_all_color_locks)
-        pal_btn_row.addWidget(btn_reset_locks)
-        pal_btn_row.addStretch()
-        layout.addLayout(pal_btn_row)
-        # Palette bundle import/export
-        pal_io_row = QHBoxLayout(); pal_io_row.setSpacing(4)
-        btn_import_pal = QPushButton('📥 Import palettes…')
-        btn_import_pal.setToolTip('Load a .plotvizx palette bundle')
-        btn_import_pal.clicked.connect(self._import_palette_bundle)
-        pal_io_row.addWidget(btn_import_pal)
-        btn_export_pal = QPushButton('📤 Export palettes…')
-        btn_export_pal.setToolTip('Save custom palettes as a .plotvizx bundle')
-        btn_export_pal.clicked.connect(self._export_palette_bundle)
-        pal_io_row.addWidget(btn_export_pal)
-        pal_io_row.addStretch()
-        layout.addLayout(pal_io_row)
-        # Initialise swatches from default palette
-        self._refresh_palette_swatches()
 
         layout.addWidget(self._hline())
 
@@ -275,11 +239,60 @@ class TabBuildersMixin:
 
         layout.addWidget(self._hline())
 
+        # ── Colour palette ────────────────────────────────────────────────────
+        layout.addWidget(self._sec_label('Colour Palette'))
+        pal_row = QHBoxLayout(); pal_row.setSpacing(6)
+        self.palette_combo = QComboBox()
+        self.palette_combo.addItems(list(COLOR_PALETTES.keys()))
+        self.palette_combo.currentTextChanged.connect(self._on_palette_changed)
+        pal_row.addWidget(self.palette_combo)
+        pal_row.addStretch()
+        layout.addLayout(pal_row)
+        self._palette_swatch_row = QHBoxLayout(); self._palette_swatch_row.setSpacing(2)
+        self._palette_swatches = []
+        for _ in range(16):
+            sw = QLabel()
+            sw.setFixedSize(18, 14)
+            sw.setStyleSheet('background:#ccc; border:1px solid #aaa;')
+            self._palette_swatches.append(sw)
+            self._palette_swatch_row.addWidget(sw)
+        self._palette_swatch_row.addStretch()
+        layout.addLayout(self._palette_swatch_row)
+        pal_btn_row = QHBoxLayout(); pal_btn_row.setSpacing(4)
+        btn_edit_pal = QPushButton('✏️ Edit palette…')
+        btn_edit_pal.setToolTip('Create or edit a custom colour palette')
+        btn_edit_pal.clicked.connect(self._open_palette_editor)
+        pal_btn_row.addWidget(btn_edit_pal)
+        btn_reset_locks = QPushButton('↺ Reset colors')
+        btn_reset_locks.setToolTip('Remove manual color locks from all series and re-apply the active palette')
+        btn_reset_locks.clicked.connect(self._reset_all_color_locks)
+        pal_btn_row.addWidget(btn_reset_locks)
+        pal_btn_row.addStretch()
+        layout.addLayout(pal_btn_row)
+        pal_io_row = QHBoxLayout(); pal_io_row.setSpacing(4)
+        btn_import_pal = QPushButton('📥 Import palettes…')
+        btn_import_pal.setToolTip('Load a .pvizx palette bundle')
+        btn_import_pal.clicked.connect(self._import_palette_bundle)
+        pal_io_row.addWidget(btn_import_pal)
+        btn_export_pal = QPushButton('📤 Export palettes…')
+        btn_export_pal.setToolTip('Save custom palettes as a .pvizx bundle')
+        btn_export_pal.clicked.connect(self._export_palette_bundle)
+        pal_io_row.addWidget(btn_export_pal)
+        pal_io_row.addStretch()
+        layout.addLayout(pal_io_row)
+        self._refresh_palette_swatches()
+
+        layout.addWidget(self._hline())
+
         bottom_row = QHBoxLayout(); bottom_row.setSpacing(4)
-        btn_reset = QPushButton('🔄  Reset App')
-        btn_reset.setToolTip('Clear all data and reset to defaults')
+        btn_reset = QPushButton('🗋  New Plot')
+        btn_reset.setToolTip('Clear all data and start a new plot')
         btn_reset.clicked.connect(self._reset_app)
         bottom_row.addWidget(btn_reset)
+        btn_settings = QPushButton('⚙  Settings…')
+        btn_settings.setToolTip('App settings and configuration paths')
+        btn_settings.clicked.connect(self._open_app_settings_dialog)
+        bottom_row.addWidget(btn_settings)
         btn_about = QPushButton('ℹ️  About…')
         btn_about.clicked.connect(self._show_about)
         bottom_row.addWidget(btn_about)
@@ -666,18 +679,35 @@ class TabBuildersMixin:
 
         layout.addWidget(self._hline())
 
-        # ── Title ─────────────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Title'))
+        # ── Title (hidden when n==1 — chart title is controlled from Style tab) ──
+        self._axes_title_section = QWidget()
+        _ts_lay = QVBoxLayout(self._axes_title_section); _ts_lay.setContentsMargins(0,0,0,0); _ts_lay.setSpacing(4)
+        _ts_lay.addWidget(self._sec_label('Subplot Title'))
         title_row = QHBoxLayout()
         self.title_show_check = QCheckBox('Show title'); self.title_show_check.setChecked(True)
         self.title_show_check.stateChanged.connect(self._on_sp_title_show_changed)
         title_row.addWidget(self.title_show_check); title_row.addStretch()
-        layout.addLayout(title_row)
-        self.sp_title_input = QLineEdit(); self.sp_title_input.setPlaceholderText('Title text (optional)')
+        _ts_lay.addLayout(title_row)
+        self.sp_title_input = QLineEdit(); self.sp_title_input.setPlaceholderText('Subplot 1')
         self.sp_title_input.editingFinished.connect(self._on_sp_title_changed)
-        layout.addWidget(self.sp_title_input)
-
-        layout.addWidget(self._hline())
+        _ts_lay.addWidget(self.sp_title_input)
+        sp_tf_row = QHBoxLayout(); sp_tf_row.setSpacing(4)
+        self.sp_title_font = QComboBox(); self.sp_title_font.addItems(_FONTS)
+        self.sp_title_font.currentTextChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_tf_row.addWidget(self.sp_title_font)
+        self.sp_title_size = QSpinBox(); self.sp_title_size.setRange(6, 32); self.sp_title_size.setValue(11)
+        self.sp_title_size.setFixedWidth(46)
+        self.sp_title_size.valueChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_tf_row.addWidget(self.sp_title_size)
+        self.sp_title_color = '#000000'
+        self.sp_title_color_label = QLabel('■'); self.sp_title_color_label.setStyleSheet('color:#000000;font-size:16px;')
+        btn_sp_tc = QPushButton('Color'); btn_sp_tc.setFixedWidth(46)
+        btn_sp_tc.clicked.connect(lambda: self._pick_sp_title_color())
+        sp_tf_row.addWidget(self.sp_title_color_label); sp_tf_row.addWidget(btn_sp_tc)
+        sp_tf_row.addStretch(); _ts_lay.addLayout(sp_tf_row)
+        _ts_lay.addWidget(self._hline())
+        layout.addWidget(self._axes_title_section)
+        self._axes_title_section.setVisible(False)  # shown only when n > 1
 
         # ── X Axis ───────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('X Axis'))
@@ -944,7 +974,7 @@ class TabBuildersMixin:
         title_row = QHBoxLayout()
         self.title_check = QCheckBox('Show Title'); self.title_check.setChecked(True)
         self.title_check.stateChanged.connect(self.update_preview); title_row.addWidget(self.title_check)
-        self.title_input = QLineEdit(); self.title_input.setPlaceholderText('Chart')
+        self.title_input = QLineEdit(); self.title_input.setPlaceholderText('Main title')
         self.title_input.editingFinished.connect(self.update_preview)
         title_row.addWidget(self.title_input); layout.addLayout(title_row)
         tfont_row = QHBoxLayout(); tfont_row.addWidget(QLabel('Font:'))
@@ -957,6 +987,24 @@ class TabBuildersMixin:
         self.title_color_label = QLabel('■'); self.title_color_label.setStyleSheet('color:#000000;font-size:16px;')
         tfont_row.addWidget(self.title_color_label); self.title_color = '#000000'
         tfont_row.addStretch(); layout.addLayout(tfont_row)
+
+        # Chart title X / Y position (figure-normalised coords)
+        tpos_row = QHBoxLayout(); tpos_row.setSpacing(4)
+        tpos_row.addWidget(QLabel('X:'))
+        self.title_x = QDoubleSpinBox(); self.title_x.setRange(0.0, 1.0)
+        self.title_x.setSingleStep(0.01); self.title_x.setDecimals(2); self.title_x.setValue(0.5)
+        self.title_x.setFixedWidth(66); self.title_x.valueChanged.connect(self.update_preview)
+        self.title_x.setToolTip('Horizontal position (0=left, 0.5=centre, 1=right)')
+        tpos_row.addWidget(self.title_x)
+        tpos_row.addWidget(QLabel('Y:'))
+        self.title_y = QDoubleSpinBox(); self.title_y.setRange(0.50, 1.00)
+        self.title_y.setSingleStep(0.01); self.title_y.setDecimals(2); self.title_y.setValue(0.97)
+        self.title_y.setFixedWidth(66); self.title_y.valueChanged.connect(self.update_preview)
+        self.title_y.setToolTip('Vertical position in figure (0.97 = near top, inside drawing zone)')
+        tpos_row.addWidget(self.title_y)
+        tpos_row.addStretch(); layout.addLayout(tpos_row)
+        # Keep title_y_offset as hidden alias for serialization compat
+        self.title_y_offset = self.title_y
 
         layout.addWidget(self._hline())
 
@@ -981,17 +1029,13 @@ class TabBuildersMixin:
         pr.addWidget(self.fig_preset_combo); pr.addStretch()
         layout.addLayout(pr)
 
-        # Unit selector
-        sz_unit_row = QHBoxLayout(); sz_unit_row.setSpacing(6)
-        sz_unit_row.addWidget(QLabel('Units:'))
+        # Units + W + H on one row
+        sz_row = QHBoxLayout(); sz_row.setSpacing(6)
+        sz_row.addWidget(QLabel('Units:'))
         self.fig_unit = QComboBox(); self.fig_unit.addItems(['cm', 'inches', 'pixels'])
         self.fig_unit.setFixedWidth(70)
         self.fig_unit.currentTextChanged.connect(self._on_fig_unit_changed)
-        sz_unit_row.addWidget(self.fig_unit); sz_unit_row.addStretch()
-        layout.addLayout(sz_unit_row)
-
-        # Width / Height on one row
-        sz_row = QHBoxLayout(); sz_row.setSpacing(6)
+        sz_row.addWidget(self.fig_unit)
         sz_row.addWidget(QLabel('W:'))
         self.fig_width = QDoubleSpinBox(); self.fig_width.setDecimals(1)
         self.fig_width.setRange(2, 200); self.fig_width.setValue(20.0)
@@ -1026,6 +1070,20 @@ class TabBuildersMixin:
         margins_grid.addLayout(left_col); margins_grid.addLayout(right_col)
         margins_grid.addStretch(); layout.addLayout(margins_grid)
 
+        # Subplot spacing (hspace / wspace)
+        sp_row = QHBoxLayout(); sp_row.setSpacing(6)
+        sp_row.addWidget(QLabel('H spacing:'))
+        self.sp_hspace = QDoubleSpinBox(); self.sp_hspace.setRange(0.0, 1.0)
+        self.sp_hspace.setSingleStep(0.05); self.sp_hspace.setDecimals(2); self.sp_hspace.setValue(0.35)
+        self.sp_hspace.setFixedWidth(66); self.sp_hspace.setToolTip('Vertical gap between subplot rows')
+        self.sp_hspace.valueChanged.connect(self.update_preview); sp_row.addWidget(self.sp_hspace)
+        sp_row.addWidget(QLabel('W spacing:'))
+        self.sp_wspace = QDoubleSpinBox(); self.sp_wspace.setRange(0.0, 1.0)
+        self.sp_wspace.setSingleStep(0.05); self.sp_wspace.setDecimals(2); self.sp_wspace.setValue(0.35)
+        self.sp_wspace.setFixedWidth(66); self.sp_wspace.setToolTip('Horizontal gap between subplot columns')
+        self.sp_wspace.valueChanged.connect(self.update_preview); sp_row.addWidget(self.sp_wspace)
+        sp_row.addStretch(); layout.addLayout(sp_row)
+
         layout.addWidget(self._hline())
 
         # Dummy preset_combo to keep _collect_settings/_apply_settings happy
@@ -1056,6 +1114,12 @@ class TabBuildersMixin:
         self.curve_select.currentIndexChanged.connect(self.load_curve_style)
         row('Curve:', self.curve_select)
 
+        # Line style
+        self.curve_linestyle = QComboBox(); self.curve_linestyle.addItems(['-','--','-.', ':','none'])
+        self.curve_linestyle.setCurrentIndex(0)
+        self.curve_linestyle.currentTextChanged.connect(lambda _: self.save_curve_style())
+        row('Line style:', self.curve_linestyle)
+
         # Curve color inline
         cr = QHBoxLayout(); cr.setSpacing(6)
         lbl_cc = QLabel('Color:'); lbl_cc.setFixedWidth(90); cr.addWidget(lbl_cc)
@@ -1070,15 +1134,10 @@ class TabBuildersMixin:
         btn_unlock.clicked.connect(self._unlock_curve_color); cr.addWidget(btn_unlock)
         cr.addStretch(); layout.addLayout(cr)
 
-        self.curve_linestyle = QComboBox(); self.curve_linestyle.addItems(['-','--','-.', ':','none'])
-        self.curve_linestyle.setCurrentText('default')
-        self.curve_linestyle.currentTextChanged.connect(self.save_curve_style)
-        row('Line style:', self.curve_linestyle)
-
         self.curve_marker = QComboBox()
         self.curve_marker.addItems(['None','o','s','^','v','D','*','+','x'])
-        self.curve_marker.setCurrentText('default')
-        self.curve_marker.currentTextChanged.connect(self.save_curve_style)
+        self.curve_marker.setCurrentIndex(0)
+        self.curve_marker.currentTextChanged.connect(lambda _: self.save_curve_style())
         row('Marker:', self.curve_marker)
 
         self.curve_linewidth = QDoubleSpinBox(); self.curve_linewidth.setRange(0.5,5.0)
@@ -1089,20 +1148,17 @@ class TabBuildersMixin:
         self.curve_markersize.setValue(6); self.curve_markersize.setSingleStep(0.5)
         self.curve_markersize.editingFinished.connect(self.save_curve_style)
 
-        # Width + marker size side by side
-        cwm = QHBoxLayout(); cwm.setSpacing(4)
-        cwm.addWidget(QLabel('W:')); cwm.addWidget(self.curve_linewidth)
-        cwm.addWidget(QLabel('MkSz:')); cwm.addWidget(self.curve_markersize)
-        cwm.addStretch(); layout.addLayout(cwm)
-
-        # Marker color inline
-        mr = QHBoxLayout(); mr.setSpacing(6)
-        lbl_mc = QLabel('Mkr color:'); lbl_mc.setFixedWidth(90); mr.addWidget(lbl_mc)
-        self.curve_marker_color_label = QLabel('■ #1f77b4'); mr.addWidget(self.curve_marker_color_label)
+        # W + Size (renamed) + Mkr Color (renamed, same line)
+        self.curve_marker_color_label = QLabel('■ #1f77b4')
         self.curve_marker_color = '#1f77b4'
         btn_mc = QPushButton('…'); btn_mc.setFixedWidth(28)
-        btn_mc.clicked.connect(lambda: self.pick_color('curve_marker')); mr.addWidget(btn_mc)
-        mr.addStretch(); layout.addLayout(mr)
+        btn_mc.clicked.connect(lambda: self.pick_color('curve_marker'))
+        cwm = QHBoxLayout(); cwm.setSpacing(4)
+        cwm.addWidget(QLabel('W:')); cwm.addWidget(self.curve_linewidth)
+        cwm.addWidget(QLabel('Size:')); cwm.addWidget(self.curve_markersize)
+        cwm.addWidget(QLabel('Color:')); cwm.addWidget(self.curve_marker_color_label)
+        cwm.addWidget(btn_mc)
+        cwm.addStretch(); layout.addLayout(cwm)
 
         layout.addWidget(self._hline())
 
@@ -1177,21 +1233,6 @@ class TabBuildersMixin:
         grid_row.addWidget(min_box)
 
         layout.addLayout(grid_row)
-
-        # Legend
-        leg_row = QHBoxLayout()
-        self.legend_check = QCheckBox('Show Legend'); self.legend_check.setChecked(True)
-        self.legend_check.stateChanged.connect(self.update_preview); leg_row.addWidget(self.legend_check)
-        leg_row.addWidget(QLabel('Position:'))
-        self.legend_pos = QComboBox()
-        self.legend_pos.addItems([
-            'best', 'upper right', 'upper left', 'upper center',
-            'lower right', 'lower left', 'lower center',
-            'center right', 'center left', 'center',
-        ])
-        self.legend_pos.currentTextChanged.connect(self.update_preview)
-        leg_row.addWidget(self.legend_pos)
-        leg_row.addStretch(); layout.addLayout(leg_row)
 
         layout.addStretch()
         scroll.setWidget(content); mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
@@ -1507,7 +1548,7 @@ class TabBuildersMixin:
         self.fit_results_text = QPlainTextEdit()
         self.fit_results_text.setReadOnly(True)
         self.fit_results_text.setMinimumHeight(220)
-        self.fit_results_text.setFont(QFont('Courier', 9))
+        self.fit_results_text.setFont(QFont('Courier New' if __import__('sys').platform == 'win32' else 'Menlo' if __import__('sys').platform == 'darwin' else 'monospace', 9))
         self.fit_results_text.setPlainText('Run a fit to see results.')
         # Keep backwards-compat aliases
         self.fit_eq_label = QLabel(''); self.fit_eq_label.setVisible(False)

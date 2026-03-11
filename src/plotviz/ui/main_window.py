@@ -562,7 +562,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
     def __init__(self):
         super().__init__()
         from config._version import __version__
-        self.setWindowTitle(f'plotviz {__version__} – Publication-Quality Chart Generator')
+        self.setWindowTitle(f'plotviz {__version__}')
 
         # ── Restore window geometry from settings ──────────────────────────────
         geom = settings.get('window_geometry')   # [x, y, w, h]
@@ -581,6 +581,9 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.subplot_chart_types  = {0: 'Line'}
         self.sp_titles            = {0: ''}
         self.subplot_title_show   = {0: True}
+        self.subplot_title_font   = {0: 'sans-serif'}
+        self.subplot_title_size   = {0: 11}
+        self.subplot_title_color  = {0: '#000000'}
         self.subplot_xlabels      = {0: ''}
         self.subplot_xlabel_show  = {0: True}
         self.subplot_ylabels      = {0: ''}
@@ -619,6 +622,27 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
         self.init_ui()
 
+        # ── Dirty-state tracking (unsaved changes) ────────────────────────────
+        self._is_dirty = False
+
+        # ── Undo/redo stack ────────────────────────────────────────────────────
+        self._undo_stack   = []   # list of (settings_dict, series_meta_dict, datasets_copy)
+        self._redo_stack   = []
+        self._undo_suspended = False  # set True while applying a snapshot
+        self._MAX_UNDO = 50
+
+        # ── Current open file (used as Save default name) ─────────────────────
+        self._current_filepath = None
+
+        # ── Keyboard shortcuts ────────────────────────────────────────────────
+        from PyQt6.QtGui import QShortcut, QKeySequence
+        QShortcut(QKeySequence('Ctrl+Z'), self).activated.connect(self._undo)
+        QShortcut(QKeySequence('Ctrl+Y'), self).activated.connect(self._redo)
+        QShortcut(QKeySequence('Ctrl+Shift+Z'), self).activated.connect(self._redo)
+
+        # Undo/redo buttons start disabled
+        self._update_undo_buttons()
+
         # ── Apply saved preferences to freshly-built widgets ──────────────────
         self._restore_prefs_from_settings()
 
@@ -634,6 +658,20 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
                 pass
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._on_canvas_resized()
+
+    def _on_canvas_resized(self):
+        """Debounced redraw triggered by splitter moves or window resize."""
+        if not hasattr(self, '_resize_timer'):
+            from PyQt6.QtCore import QTimer
+            self._resize_timer = QTimer(self)
+            self._resize_timer.setSingleShot(True)
+            self._resize_timer.timeout.connect(self.update_preview)
+        self._resize_timer.start(80)   # 80 ms debounce
+
     def closeEvent(self, event):
         """Persist window state and prefs before closing."""
         geo = self.geometry()
@@ -739,7 +777,9 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.tabs)
         splitter.addWidget(cv_widget)
-        splitter.setSizes([550, 1450])
+        splitter.setSizes([520, 1480])
+        splitter.splitterMoved.connect(lambda: self._on_canvas_resized())
+        self._main_splitter = splitter
         main_layout.addWidget(splitter)
 
         self._sync_ann_style()
@@ -1417,6 +1457,109 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
     # ═══════════════════════════════════════════════════════════════════════════
     # DATA
     # ═══════════════════════════════════════════════════════════════════════════
+    def _open_app_settings_dialog(self):
+        """App-level settings dialog: paths, defaults, UI options."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                                     QDialogButtonBox, QPushButton, QGroupBox,
+                                     QFormLayout, QLineEdit, QCheckBox, QSpinBox,
+                                     QFrame)
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        import config.settings as _cfg
+        from config._version import __version__
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle('Settings')
+        dlg.setMinimumWidth(520)
+        lay = QVBoxLayout(dlg); lay.setSpacing(12)
+
+        # ── Config paths ─────────────────────────────────────────────────────
+        grp_paths = QGroupBox('Configuration files')
+        paths_form = QFormLayout(grp_paths); paths_form.setSpacing(6)
+
+        def _path_row(label, path_str):
+            row = QHBoxLayout(); row.setSpacing(4)
+            le = QLineEdit(path_str); le.setReadOnly(True)
+            le.setToolTip(path_str)
+            btn = QPushButton('📂'); btn.setFixedWidth(32)
+            btn.setToolTip('Open containing folder')
+            import os as _os
+            folder = _os.path.dirname(path_str)
+            btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(folder)))
+            row.addWidget(le, 1); row.addWidget(btn)
+            paths_form.addRow(label, row)
+
+        _path_row('Settings file:', str(_cfg.CFG_FILE))
+        _path_row('Config folder:', str(_cfg.CFG_FILE.parent))
+
+        lay.addWidget(grp_paths)
+
+        # ── UI defaults ──────────────────────────────────────────────────────
+        grp_ui = QGroupBox('Defaults')
+        ui_form = QFormLayout(grp_ui); ui_form.setSpacing(6)
+
+        chk_toolbar = QCheckBox()
+        chk_toolbar.setChecked(_cfg.get('show_toolbar', True))
+        chk_toolbar.setToolTip('Show the navigation toolbar below the chart canvas')
+        ui_form.addRow('Show navigation toolbar:', chk_toolbar)
+
+        max_recent_spin = QSpinBox(); max_recent_spin.setRange(1, 30)
+        max_recent_spin.setValue(_cfg.MAX_RECENT)
+        max_recent_spin.setFixedWidth(60)
+        ui_form.addRow('Max recent files:', max_recent_spin)
+
+        lay.addWidget(grp_ui)
+
+        # ── Maintenance ──────────────────────────────────────────────────────
+        grp_maint = QGroupBox('Maintenance')
+        maint_lay = QVBoxLayout(grp_maint); maint_lay.setSpacing(6)
+
+        recent_row = QHBoxLayout()
+        lbl_recent = QLabel(f'{len(_cfg.get_recent_files())} recent file(s) stored')
+        btn_clear_recent = QPushButton('Clear recent files')
+        def _clear_recent():
+            _cfg.set('recent_files', [])
+            lbl_recent.setText('0 recent file(s) stored')
+            if hasattr(self, '_rebuild_recent_files_ui'):
+                self._rebuild_recent_files_ui()
+        btn_clear_recent.clicked.connect(_clear_recent)
+        recent_row.addWidget(lbl_recent); recent_row.addStretch(); recent_row.addWidget(btn_clear_recent)
+        maint_lay.addLayout(recent_row)
+
+        btn_reset_settings = QPushButton('Reset all settings to defaults…')
+        btn_reset_settings.setToolTip('Resets settings.json to factory defaults (does not affect chart data)')
+        def _reset_settings():
+            from PyQt6.QtWidgets import QMessageBox
+            if QMessageBox.question(dlg, 'Reset settings',
+                'Reset all app settings to defaults?\nThis cannot be undone.',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            ) == QMessageBox.StandardButton.Yes:
+                _cfg.save(_cfg.DEFAULTS.copy())
+                _cfg.settings.update(_cfg.DEFAULTS.copy())
+                QMessageBox.information(dlg, 'Done', 'Settings reset. Some changes take effect on next launch.')
+        btn_reset_settings.clicked.connect(_reset_settings)
+        maint_lay.addWidget(btn_reset_settings)
+
+        lay.addWidget(grp_maint)
+
+        # ── Buttons ──────────────────────────────────────────────────────────
+        bbox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                QDialogButtonBox.StandardButton.Cancel)
+        bbox.accepted.connect(dlg.accept)
+        bbox.rejected.connect(dlg.reject)
+        lay.addWidget(bbox)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        # Apply changes
+        _cfg.set('show_toolbar', chk_toolbar.isChecked())
+        if hasattr(self, 'canvas') and hasattr(self.canvas, 'toolbar'):
+            tb = self.canvas.toolbar
+            if tb:
+                tb.setVisible(chk_toolbar.isChecked())
+        _cfg.MAX_RECENT = max_recent_spin.value()
+
     def _show_about(self):
         """Display the About dialog."""
         from config._version import __version__
@@ -1431,59 +1574,192 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         dlg.setIconPixmap(QApplication.windowIcon().pixmap(64, 64))
         dlg.exec()
 
-    def _reset_app(self):
-        """Clear all data and reset UI to defaults."""
-        if QMessageBox.question(self, 'Reset', 'Clear all data and reset to defaults?',
-                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                                ) != QMessageBox.StandardButton.Yes:
+    # ── Undo / Redo ─────────────────────────────────────────────────────────────
+    def _snapshot(self):
+        """Capture current full state for undo.  Called by update_preview."""
+        if not hasattr(self, '_undo_suspended') or self._undo_suspended:
             return
+        if not hasattr(self, '_collect_settings') or not hasattr(self, 'datasets'):
+            return
+        if not hasattr(self, '_undo_stack'):
+            return
+        import copy
+        snap = (
+            self._collect_settings(),
+            self._collect_series_meta(),
+            copy.deepcopy(self.datasets),
+        )
+        # Avoid duplicate consecutive snapshots
+        if self._undo_stack and self._undo_stack[-1][0] == snap[0]                 and self._undo_stack[-1][1] == snap[1]:
+            return
+        self._undo_stack.append(snap)
+        if len(self._undo_stack) > self._MAX_UNDO:
+            self._undo_stack.pop(0)
+        self._redo_stack.clear()
+        self._update_undo_buttons()
+
+    def _restore_snapshot(self, snap):
+        """Apply a (settings, series_meta, datasets) snapshot without pushing to undo."""
+        import copy
+        self._undo_suspended = True
+        try:
+            settings_d, series_d, datasets_d = snap
+            self.datasets = copy.deepcopy(datasets_d)
+            self.update_lists(keep_selections=False)
+            self._apply_settings(settings_d)
+            self._apply_series_meta(series_d)
+            self.update_preview()
+        finally:
+            self._undo_suspended = False
+        self._update_undo_buttons()
+
+    def _undo(self):
+        if len(self._undo_stack) < 2:
+            return
+        # Current state is at top; pop it to redo, restore the one before it
+        current = self._undo_stack.pop()
+        self._redo_stack.append(current)
+        self._restore_snapshot(self._undo_stack[-1])
+
+    def _redo(self):
+        if not self._redo_stack:
+            return
+        snap = self._redo_stack.pop()
+        self._undo_stack.append(snap)
+        self._restore_snapshot(snap)
+
+    def _update_undo_buttons(self):
+        if hasattr(self, '_btn_undo'):
+            self._btn_undo.setEnabled(len(self._undo_stack) >= 2)
+        if hasattr(self, '_btn_redo'):
+            self._btn_redo.setEnabled(bool(self._redo_stack))
+
+    def _default_settings(self) -> dict:
+        """Return a settings dict matching widget construction defaults — used by New Plot."""
+        def _ser(d): return {str(k): v for k, v in d.items()}
+        s = {
+            '_app': 'plotviz', '_version': '1.3',
+            'chart_type':       'Line',
+            'title_show':       True,  'title_text':  '',
+            'title_font':       'sans-serif', 'title_size': 14, 'title_color': '#000000',
+            'title_x':          0.5,   'title_y':     0.97,
+            'sp_hspace':        0.35,  'sp_wspace':   0.35,
+            'sp_titles':             _ser({0: ''}),
+            'subplot_title_show':    _ser({0: True}),
+            'subplot_title_font':    _ser({0: 'sans-serif'}),
+            'subplot_title_size':    _ser({0: 11}),
+            'subplot_title_color':   _ser({0: '#000000'}),
+            'subplot_xlabels':       _ser({0: ''}),
+            'subplot_xlabel_show':   _ser({0: True}),
+            'subplot_ylabels':       _ser({0: ''}),
+            'subplot_ylabel_show':   _ser({0: True}),
+            'subplot_y2labels':      _ser({0: ''}),
+            'subplot_y2label_show':  _ser({0: True}),
+            'subplot_legends':       _ser({0: True}),
+            'subplot_legend_locs':   _ser({0: 'best'}),
+            'subplot_xlims':         _ser({0: None}),
+            'subplot_ylims':         _ser({0: None}),
+            'subplot_y2lims':        _ser({0: None}),
+            'subplot_xscales':       _ser({0: 'linear'}),
+            'subplot_yscales':       _ser({0: 'linear'}),
+            'subplot_xtick_sizes':   _ser({0: 9}),
+            'subplot_ytick_sizes':   _ser({0: 9}),
+            'subplot_xtick_dir':     _ser({0: 'out'}),
+            'subplot_ytick_dir':     _ser({0: 'out'}),
+            'subplot_xtick_minor':   _ser({0: False}),
+            'subplot_ytick_minor':   _ser({0: False}),
+            'subplot_xtick_rotation':_ser({0: 0}),
+            'subplot_ytick_rotation':_ser({0: 0}),
+            'subplot_xtick_step':    _ser({0: 0.0}),
+            'subplot_ytick_step':    _ser({0: 0.0}),
+            'subplot_x_formatter':   _ser({0: 'auto'}),
+            'subplot_y_formatter':   _ser({0: 'auto'}),
+            'subplot_xticks_show':   _ser({0: True}),
+            'subplot_yticks_show':   _ser({0: True}),
+            'subplot_ann_visible':   _ser({0: True}),
+            'xlabel_font': 'sans-serif', 'xlabel_size': 11, 'xlabel_color': '#000000',
+            'ylabel_font': 'sans-serif', 'ylabel_size': 11, 'ylabel_color': '#000000',
+            'y2label_font':'sans-serif', 'y2label_size':11, 'y2label_color':'#000000',
+            'color_palette':    'Matplotlib',
+            'preset':           'Default',
+            'chart_bg_color':   '#ffffff',
+            'chart_fg_color':   '#000000',
+            'plot_bg_color':    '#ffffff',
+            'border_top':    True, 'border_bottom': True,
+            'border_left':   True, 'border_right':  True,
+            'curve_styles':     {},
+            'fig_preset':    '20 × 15 cm',
+            'fig_unit':      'cm',
+            'fig_width':     20.0, 'fig_height': 15.0,
+            'fig_left':      0.10, 'fig_right':  0.95,
+            'fig_bottom':    0.10, 'fig_top':    0.95,
+            'grid_on':        True,  'grid_color': '#cccccc',
+            'grid_linestyle': '--',  'grid_linewidth': 0.5, 'grid_alpha': 0.4,
+            'minor_grid_on':  False, 'minor_grid_color': '#e8e8e8',
+            'minor_grid_linestyle': ':', 'minor_grid_linewidth': 0.3, 'minor_grid_alpha': 0.2,
+            'dpi':           300,
+            'fit_color':     '#ff7f0e', 'fit_linestyle': '--',
+            'fit_linewidth': 1.5,  'fit_ci_index': 0, 'fit_pi_index': 0, 'fit_ci_alpha': 0.25,
+            'fit_result':    None,
+            'subplot_rows':  1,    'subplot_cols': 1,
+            'subplot_mosaic':None, 'sp_sharex':    False, 'sp_sharey': False,
+            'hist_bins':     20,   'hist_density':  False,
+            'bar_width':     0.8,  'bar_stacked':   False, 'bar_horizontal': False,
+            'scatter_size':  20,   'scatter_alpha': 0.8,
+            'err_capsize':   4,    'cmap':          'viridis',
+            'contour_levels':10,   'heat_colorbar': True,
+            'pie_autopct':   True, 'pie_shadow':    False,
+            'area_alpha':    0.4,  'area_stacked':  False,
+            'violin_show_means':   True, 'violin_show_medians': True,
+            'ann_fontcolor': '#000000', 'ann_fontsize': 10,
+            'ann_font':      'sans-serif', 'ann_bgcolor': '#ffffcc',
+            'ann_bg_alpha':  0.9,  'ann_edgecolor': '#aaaaaa',
+            'line_default_style':  '-',    'line_default_marker': 'None',
+            'line_default_lw':     1.5,    'line_default_markersize': 6.0,
+        }
+        return s
+
+    def _reset_app(self):
+        """Clear all data and start a new plot."""
+        if getattr(self, '_is_dirty', False):
+            mb = QMessageBox(self)
+            mb.setWindowTitle('New Plot')
+            mb.setText('You have unsaved changes.')
+            mb.setInformativeText('Do you want to save before starting a new plot?')
+            btn_save   = mb.addButton('Save',    QMessageBox.ButtonRole.AcceptRole)
+            btn_discard = mb.addButton('Discard', QMessageBox.ButtonRole.DestructiveRole)
+            mb.addButton('Cancel', QMessageBox.ButtonRole.RejectRole)
+            mb.exec()
+            clicked = mb.clickedButton()
+            if clicked is btn_save:
+                self._save_project()
+            elif clicked is not btn_discard:
+                return  # Cancel
+        else:
+            if QMessageBox.question(self, 'New Plot', 'Start a new plot?',
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                                    ) != QMessageBox.StandardButton.Yes:
+                return
+        self._current_filepath = None
+        self._is_dirty = False
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self._update_undo_buttons()
         self.datasets.clear()
         self.curve_styles.clear()
         self.canvas.annotations.clear()
-        self.subplot_chart_types  = {0: 'Line'}
-        self.sp_titles            = {0: ''}
-        self.subplot_title_show   = {0: True}
-        self.subplot_xlabels      = {0: ''}
-        self.subplot_xlabel_show  = {0: True}
-        self.subplot_ylabels      = {0: ''}
-        self.subplot_ylabel_show  = {0: True}
-        self.subplot_y2labels     = {0: ''}
-        self.subplot_y2label_show = {0: True}
-        self.subplot_legends      = {0: True}
-        self.subplot_legend_locs  = {0: 'best'}
-        self.subplot_xlims        = {0: None}
-        self.subplot_ylims        = {0: None}
-        self.subplot_y2lims       = {0: None}
-        self.subplot_xscales      = {0: 'linear'}
-        self.subplot_yscales      = {0: 'linear'}
-        self.subplot_xtick_sizes  = {0: 9}
-        self.subplot_ytick_sizes  = {0: 9}
-        # Tick formatting (new per-subplot state)
-        self.subplot_xtick_dir      = {0: 'out'}
-        self.subplot_ytick_dir      = {0: 'out'}
-        self.subplot_xtick_minor    = {0: False}
-        self.subplot_ytick_minor    = {0: False}
-        self.subplot_xtick_rotation = {0: 0}
-        self.subplot_ytick_rotation = {0: 0}
-        self.subplot_xtick_step     = {0: 0.0}   # 0 = auto
-        self.subplot_ytick_step     = {0: 0.0}
-        self.subplot_x_formatter    = {0: 'auto'}
-        self.subplot_y_formatter    = {0: 'auto'}
-        self.subplot_xticks_show    = {0: True}
-        self.subplot_yticks_show    = {0: True}
+        self._last_fit = None
         self._subplot_mosaic = None
-        self._color_palette = 'Matplotlib'
-        self.subplot_ann_visible  = {0: True}
-        # Reset subplot layout spinboxes — triggers on_subplot_layout_changed via signal
-        self.sp_rows.blockSignals(True); self.sp_cols.blockSignals(True)
-        self.sp_rows.setValue(1);        self.sp_cols.setValue(1)
-        self.sp_rows.blockSignals(False); self.sp_cols.blockSignals(False)
-        self.subplot_rows = 1;           self.subplot_cols = 1
-        self.on_subplot_layout_changed()
-        self.update_lists()
+        # Reset all UI widgets to fresh defaults via _apply_settings
+        self._undo_suspended = True
+        try:
+            self._apply_settings(self._default_settings())
+        finally:
+            self._undo_suspended = False
         self.series_table.setRowCount(0)
         self._refresh_curve_select()
-        # Redraw canvas with current layout and styles (no data = blank styled axes)
+        self.update_lists()
+        self.on_subplot_layout_changed()
         self.update_preview()
         self.refresh_annotation_list()
 
@@ -1691,6 +1967,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         if idx_y >= 0: cb_y.setCurrentIndex(idx_y)
         cb_y.blockSignals(False)
         cb_y.currentIndexChanged.connect(self.update_preview)
+        cb_y.currentIndexChanged.connect(lambda _: self._update_label_placeholders())
         self.series_table.setCellWidget(row, 1, cb_y)
 
         # Label
@@ -2035,35 +2312,21 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         return x_cols, y_cols, y2_cols
 
     def _update_label_placeholders(self):
-        """Set placeholder text on all empty title/label inputs to show
-        the auto-derived defaults for the currently active subplot."""
+        """Update placeholder text on Axes tab inputs to reflect auto-derived defaults.
+        Never writes into stored dicts — user values are empty string = auto."""
         if not hasattr(self, 'sp_title_input') or not hasattr(self, 'sp_active'):
             return
         idx = self.sp_active.currentIndex()
         if idx < 0: idx = 0
         x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
 
-        # Subplot title: use joined Y column names, or 'Chart' as last resort
-        default_title = ', '.join(y_cols) if y_cols else ('Chart' if not self.sp_titles.get(idx) else '')
-        self.sp_title_input.setPlaceholderText(default_title or 'Title text (optional)')
+        # Subplot title placeholder: "Subplot N"
+        self.sp_title_input.setPlaceholderText(f'Subplot {idx+1}')
 
-        # X label: first X column name
-        default_xl = x_cols[0] if x_cols else ''
-        self.xlabel_input.setPlaceholderText(default_xl or 'X label (optional)')
-
-        # Y label: joined primary Y column names
-        default_yl = ', '.join(y_cols) if y_cols else ''
-        self.ylabel_input.setPlaceholderText(default_yl or 'Y label (optional)')
-
-        # Y2 label: joined Y2 column names
-        default_y2l = ', '.join(y2_cols) if y2_cols else ''
-        self.y2label_input.setPlaceholderText(default_y2l or 'Y2 label (optional)')
-
-        # Global chart title (Style tab) — show first subplot's Y cols or 'Chart'
-        if hasattr(self, 'title_input'):
-            if not self.title_input.text():
-                self.title_input.setPlaceholderText(
-                    ', '.join(y_cols) if y_cols else 'Chart')
+        # X/Y label placeholders: derived from column names
+        self.xlabel_input.setPlaceholderText(x_cols[0] if x_cols else 'X label')
+        self.ylabel_input.setPlaceholderText(', '.join(y_cols) if y_cols else 'Y label')
+        self.y2label_input.setPlaceholderText(', '.join(y2_cols) if y2_cols else 'Y2 label')
 
     def on_subplot_layout_changed(self, n_override=None):
         r, c = self.sp_rows.value(), self.sp_cols.value()
@@ -2077,6 +2340,9 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self.subplot_chart_types.setdefault(i, 'Line')
             self.sp_titles.setdefault(i, '')
             self.subplot_title_show.setdefault(i, True)
+            self.subplot_title_font.setdefault(i, 'sans-serif')
+            self.subplot_title_size.setdefault(i, 11)
+            self.subplot_title_color.setdefault(i, '#000000')
             self.subplot_xlabels.setdefault(i, '')
             self.subplot_xlabel_show.setdefault(i, True)
             self.subplot_ylabels.setdefault(i, '')
@@ -2107,6 +2373,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self.subplot_ann_visible.setdefault(i, True)
         # Prune entries beyond current grid
         all_dicts = (self.subplot_chart_types, self.sp_titles, self.subplot_title_show,
+                     self.subplot_title_font, self.subplot_title_size, self.subplot_title_color,
                      self.subplot_xlabels, self.subplot_xlabel_show,
                      self.subplot_ylabels, self.subplot_ylabel_show,
                      self.subplot_y2labels, self.subplot_y2label_show,
@@ -2139,6 +2406,20 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             combo.setCurrentIndex(0)
             widget = getattr(self, vis_attr, None)
             if widget: widget.setVisible(n > 1)
+        if hasattr(self, '_axes_title_section'):
+            _was_single = not self._axes_title_section.isVisible()
+            self._axes_title_section.setVisible(n > 1)
+            # Switching 1 → many: promote the single-subplot title to the main chart title
+            if _was_single and n > 1 and hasattr(self, 'title_input'):
+                existing = self.title_input.text().strip()
+                if not existing:
+                    # Use whatever the user had typed as the subplot title (subplot 0)
+                    single_title = self.sp_titles.get(0, '').strip()
+                    if not single_title:
+                        single_title = self.title_input.placeholderText() or 'Main title'
+                    self.title_input.setText(single_title)
+                    if hasattr(self, 'title_check'):
+                        self.title_check.setChecked(True)
         self.on_active_subplot_changed()
         # Sync ann visibility checkbox for subplot 0
         if hasattr(self, 'ann_subplot_visible'):
@@ -2175,6 +2456,12 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         # Title
         _load(self.title_show_check, self.subplot_title_show.get(idx, True))
         _load(self.sp_title_input, self.sp_titles.get(idx, ''))
+        _load(self.sp_title_font, self.subplot_title_font.get(idx, 'sans-serif'))
+        _load(self.sp_title_size, self.subplot_title_size.get(idx, 11))
+        sp_tc = self.subplot_title_color.get(idx, '#000000')
+        self.sp_title_color = sp_tc
+        if hasattr(self, 'sp_title_color_label'):
+            self.sp_title_color_label.setStyleSheet(f'color:{sp_tc};font-size:16px;')
         # X axis
         _load(self.xlabel_show_check, self.subplot_xlabel_show.get(idx, True))
         _load(self.xlabel_input,      self.subplot_xlabels.get(idx, ''))
@@ -2229,6 +2516,9 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         if idx < 0: idx = 0
         self.sp_titles[idx]            = self.sp_title_input.text().strip()
         self.subplot_title_show[idx]   = self.title_show_check.isChecked()
+        self.subplot_title_font[idx]   = self.sp_title_font.currentText()
+        self.subplot_title_size[idx]   = self.sp_title_size.value()
+        self.subplot_title_color[idx]  = self.sp_title_color
         self.subplot_xlabels[idx]      = self.xlabel_input.text().strip()
         self.subplot_xlabel_show[idx]  = self.xlabel_show_check.isChecked()
         self.subplot_ylabels[idx]      = self.ylabel_input.text().strip()
@@ -2265,7 +2555,16 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.subplot_chart_types[idx] = ct
         self.update_preview()
 
-    def _on_sp_title_changed(self):       self._save_axes_state()
+    def _pick_sp_title_color(self):
+        cur = getattr(self, 'sp_title_color', '#000000')
+        col = PaletteColorDialog.getColor(QColor(cur), self, palette_colors=self._active_palette_colors())
+        if col.isValid():
+            self.sp_title_color = col.name()
+            self.sp_title_color_label.setStyleSheet(f'color:{col.name()};font-size:16px;')
+            self._save_axes_state()
+            self.update_preview()
+
+    def _on_sp_title_changed(self):       self._save_axes_state(); self.update_preview()
     def _on_sp_title_show_changed(self):  self._save_axes_state()
     def _on_sp_xlabel_changed(self):      self._save_axes_state()
     def _on_sp_xlabel_show_changed(self): self._save_axes_state()
@@ -2374,27 +2673,55 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             return w
 
         selected_preset = [0]
-        btn_group = []
+        card_group = []   # list of (preview_btn, label_btn) pairs
 
         per_row = 5
         grid_w = QWidget(); grid = QGridLayout(grid_w); grid.setSpacing(10)
 
-        def _make_picker(i):
-            def _pick(_=False):
-                selected_preset[0] = i
-                for j, ob in enumerate(btn_group):
-                    ob.setChecked(j == i)
-            return _pick
+        SELECTED_BORDER = '2px solid #3378ff'
+        NORMAL_BORDER   = '1px solid #aaa'
+        SELECTED_BG     = '#e8f0ff'
+        NORMAL_BG       = 'transparent'
+
+        def _select_preset(i):
+            selected_preset[0] = i
+            for j, (pb, lb) in enumerate(card_group):
+                sel = (j == i)
+                border = SELECTED_BORDER if sel else NORMAL_BORDER
+                bg     = SELECTED_BG     if sel else NORMAL_BG
+                pb.setStyleSheet(
+                    f'QPushButton{{background:{bg};border:{border};border-radius:4px;padding:2px;}}'
+                    f'QPushButton:hover{{background:#ddeeff;}}')
+                lb.setStyleSheet(
+                    f'QPushButton{{background:{bg};border:{border};border-radius:4px;'
+                    f'font-size:10px;padding:2px;}}'
+                    f'QPushButton:hover{{background:#ddeeff;}}')
 
         for i, (name, rows, cols, mosaic) in enumerate(LAYOUTS):
             cell = QWidget()
-            cly = QVBoxLayout(cell); cly.setSpacing(3); cly.setContentsMargins(0,0,0,0)
-            cly.addWidget(_make_preview(rows, cols, mosaic))
-            btn = QPushButton(name); btn.setCheckable(True); btn.setFixedHeight(36)
-            btn.clicked.connect(_make_picker(i)); btn_group.append(btn); cly.addWidget(btn)
+            cly = QVBoxLayout(cell); cly.setSpacing(2); cly.setContentsMargins(0,0,0,0)
+            cly.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+            # Clickable preview container
+            prev_widget = _make_preview(rows, cols, mosaic)
+            prev_btn = QPushButton()
+            prev_btn.setFixedSize(96, 68)
+            prev_btn.setFlat(True)
+            inner = QVBoxLayout(prev_btn); inner.setContentsMargins(4,4,4,4)
+            inner.addWidget(prev_widget)
+            prev_btn.clicked.connect(lambda _, idx=i: _select_preset(idx))
+
+            # Label button below
+            lbl_btn = QPushButton(name)
+            lbl_btn.setFixedHeight(36)
+            lbl_btn.clicked.connect(lambda _, idx=i: _select_preset(idx))
+
+            card_group.append((prev_btn, lbl_btn))
+            cly.addWidget(prev_btn, alignment=Qt.AlignmentFlag.AlignHCenter)
+            cly.addWidget(lbl_btn)
             grid.addWidget(cell, i // per_row, i % per_row)
 
-        btn_group[0].setChecked(True)
+        _select_preset(0)
         scroll_presets = QScrollArea(); scroll_presets.setWidgetResizable(True)
         scroll_presets.setWidget(grid_w)
         presets_lay.addWidget(scroll_presets)

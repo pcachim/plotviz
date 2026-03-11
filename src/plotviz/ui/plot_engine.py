@@ -654,18 +654,25 @@ class PlotEngineMixin:
         """Apply titles, labels, limits, scale, legend for one subplot panel."""
         ct = self.chart_type_combo.currentText()
         # ── Title ──
-        title_txt  = self.sp_titles.get(subplot_idx, '')
-        show_title = self.subplot_title_show.get(subplot_idx, True)
-        if show_title:
-            # Default: global title_input text → Y column names → 'Chart'
-            global_title = self.title_input.text().strip()
-            default_title = (global_title
-                             or ', '.join(yd.keys())
-                             or 'Chart')
-            ax.set_title(title_txt or default_title,
-                         fontsize=self.title_size.value(),
-                         color=self.title_color,
-                         fontfamily=self.title_font.currentText())
+        # n==1: chart title = ax title, controlled from Style tab (title_input)
+        # n>1: per-subplot title from Axes tab (sp_titles[idx])
+        _n_subplots = self.subplot_rows * self.subplot_cols
+        if _n_subplots == 1:
+            title_txt = self.title_input.text().strip() or self.title_input.placeholderText()
+            show_title = self.title_check.isChecked()
+            if show_title and title_txt:
+                ax.set_title(title_txt,
+                             fontsize=self.title_size.value(),
+                             color=self.title_color,
+                             fontfamily=self.title_font.currentText())
+        else:
+            title_txt = self.sp_titles.get(subplot_idx, '') or f'Subplot {subplot_idx+1}'
+            show_title = self.subplot_title_show.get(subplot_idx, True)
+            if show_title and title_txt:
+                ax.set_title(title_txt,
+                             fontsize=self.subplot_title_size.get(subplot_idx, 11),
+                             color=self.subplot_title_color.get(subplot_idx, '#000000'),
+                             fontfamily=self.subplot_title_font.get(subplot_idx, 'sans-serif'))
         # ── X label ──
         if self.subplot_xlabel_show.get(subplot_idx, True) and ct not in _NO_X_TYPES:
             xl = self.subplot_xlabels.get(subplot_idx, '') or xc
@@ -765,6 +772,12 @@ class PlotEngineMixin:
             # Guard: bail silently if core widgets aren't built yet
             if not hasattr(self, 'canvas') or not hasattr(self, 'chart_type_combo'):
                 return
+            # Capture undo snapshot before rendering
+            if hasattr(self, '_snapshot'):
+                self._snapshot()
+            # Mark dirty (unsaved changes)
+            if hasattr(self, '_undo_stack') and not getattr(self, '_undo_suspended', False):
+                self._is_dirty = True
             # Refresh placeholder text so it always reflects the current series columns
             if hasattr(self, '_update_label_placeholders'):
                 self._update_label_placeholders()
@@ -825,10 +838,11 @@ class PlotEngineMixin:
                                 self._apply_canvas_style(ax2, idx)
                             t = self.sp_titles.get(idx,'')
                             show_title = self.subplot_title_show.get(idx, True)
-                            title_text = (t if t else f'Subplot {idx+1}') if show_title else ''
+                            title_text = (t or f'Subplot {idx+1}') if show_title else ''
                             if title_text: ax.set_title(title_text,
-                                fontfamily=self.title_font.currentText(),
-                                fontsize=self.title_size.value(), color=self.title_color)
+                                fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
+                                fontsize=self.subplot_title_size.get(idx, 11),
+                                color=self.subplot_title_color.get(idx, '#000000'))
                             if self.subplot_xlabel_show.get(idx, True):
                                 xl = self.subplot_xlabels.get(idx,'') or ', '.join(x_cols)
                                 if xl: ax.set_xlabel(xl, fontsize=self.xlabel_size.value(),
@@ -901,12 +915,11 @@ class PlotEngineMixin:
                                 self._apply_canvas_style(ax2, idx)
                             t = self.sp_titles.get(idx, '')
                             show_title = self.subplot_title_show.get(idx, True)
-                            title_text = t if show_title else ''
-                            if not title_text and show_title:
-                                title_text = f'Subplot {idx+1}'
+                            title_text = (t or f'Subplot {idx+1}') if show_title else ''
                             if title_text: ax.set_title(title_text,
-                                fontfamily=self.title_font.currentText(),
-                                fontsize=self.title_size.value(), color=self.title_color)
+                                fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
+                                fontsize=self.subplot_title_size.get(idx, 11),
+                                color=self.subplot_title_color.get(idx, '#000000'))
                             _horiz_bar = (sub_ct == 'Bar' and self.bar_horizontal.isChecked())
                             _default_xl_eff  = default_yl if _horiz_bar else default_xl
                             _default_yl_eff  = default_xl if _horiz_bar else default_yl
@@ -993,22 +1006,38 @@ class PlotEngineMixin:
                 adj_bottom = box_bottom + ub * box_h
                 adj_top    = box_bottom + ut * box_h
 
-                _global_title_text = (self.title_input.text().strip()
-                                      or self.title_input.placeholderText())
-                if n > 1 and self.title_check.isChecked() and _global_title_text:
-                    suptitle_frac = (self.title_size.value() * 2.2) / (screen_h * 72)
-                    suptitle_frac = max(suptitle_frac, 0.04)
-                    title_y  = adj_top
-                    adj_top  = adj_top - suptitle_frac
-                    adj_top  = max(adj_top, adj_bottom + 0.05)
-                    self.canvas.figure.suptitle(_global_title_text,
-                        fontsize=self.title_size.value(), color=self.title_color,
-                        fontfamily=self.title_font.currentText(),
-                        y=title_y)
+                _n_sp = self.subplot_rows * self.subplot_cols
 
+                # ── n==1: ax.set_title already handled in _decorate; no suptitle ──
+                # ── n>1: suptitle placed at user-controlled y, subplots shrunk to fit ──
+                _show_sup  = _n_sp > 1 and self.title_check.isChecked()
+                _sup_text  = self.title_input.text().strip() if _show_sup else ''
+                _title_y_fig = getattr(self, 'title_y', self.title_y_offset if hasattr(self, 'title_y_offset') else None)
+                _ty = _title_y_fig.value() if _title_y_fig else 0.97
+
+                if _show_sup and _sup_text:
+                    # Convert figure-coord title_y to canvas box coords
+                    # title sits at _ty in figure space; map to screen box
+                    title_y_canvas = box_bottom + _ty * box_h
+                    # Estimate text height in figure fraction
+                    suptitle_pt = self.title_size.value()
+                    title_h_frac = (suptitle_pt * 1.6) / (screen_h * 72)
+                    # Top of subplots = just below title text, within box
+                    adj_top = min(adj_top, title_y_canvas - title_h_frac)
+                    adj_top = max(adj_top, adj_bottom + 0.05)
+                    self.canvas.figure.suptitle(_sup_text,
+                        fontsize=suptitle_pt, color=self.title_color,
+                        fontfamily=self.title_font.currentText(),
+                        x=self.title_x.value() if hasattr(self, 'title_x') else 0.5,
+                        y=title_y_canvas,
+                        ha='center', va='top', transform=self.canvas.figure.transFigure)
+
+                _hspace = self.sp_hspace.value() if hasattr(self, 'sp_hspace') else 0.35
+                _wspace = self.sp_wspace.value() if hasattr(self, 'sp_wspace') else 0.35
                 self.canvas.figure.subplots_adjust(
                     left=adj_left, right=adj_right,
                     bottom=adj_bottom, top=adj_top,
+                    hspace=_hspace, wspace=_wspace,
                 )
 
                 # Draw the page-boundary rectangle
@@ -1090,9 +1119,11 @@ class PlotEngineMixin:
                                 self._apply_canvas_style(ax2, idx)
                             t = self.sp_titles.get(idx,'')
                             show_title = self.subplot_title_show.get(idx, True)
-                            title_text = (t if t else f'Subplot {idx+1}') if show_title else ''
-                            if title_text: ax.set_title(title_text, fontfamily=self.title_font.currentText(),
-                                fontsize=self.title_size.value(), color=self.title_color)
+                            title_text = (t or f'Subplot {idx+1}') if show_title else ''
+                            if title_text: ax.set_title(title_text,
+                                fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
+                                fontsize=self.subplot_title_size.get(idx, 11),
+                                color=self.subplot_title_color.get(idx, '#000000'))
                             if self.subplot_xlabel_show.get(idx, True):
                                 xl = self.subplot_xlabels.get(idx,'') or ', '.join(x_cols)
                                 if xl: ax.set_xlabel(xl, fontsize=self.xlabel_size.value(),
@@ -1164,11 +1195,11 @@ class PlotEngineMixin:
                                 self._apply_canvas_style(ax2, idx)
                             t = self.sp_titles.get(idx, '')
                             show_title = self.subplot_title_show.get(idx, True)
-                            title_text = t if show_title else ''
-                            if not title_text and show_title:
-                                title_text = f'Subplot {idx+1}'
-                            if title_text: ax.set_title(title_text, fontfamily=self.title_font.currentText(),
-                                                        fontsize=self.title_size.value(), color=self.title_color)
+                            title_text = (t or f'Subplot {idx+1}') if show_title else ''
+                            if title_text: ax.set_title(title_text,
+                                fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
+                                fontsize=self.subplot_title_size.get(idx, 11),
+                                color=self.subplot_title_color.get(idx, '#000000'))
                             _horiz_bar = (sub_ct == 'Bar' and self.bar_horizontal.isChecked())
                             _default_xl_eff = default_yl if _horiz_bar else default_xl
                             _default_yl_eff = default_xl if _horiz_bar else default_yl
@@ -1224,24 +1255,30 @@ class PlotEngineMixin:
 
             # Apply margins (user values map directly to the export figure)
             exp_top = self.fig_top.value()
-            # Reserve headroom for suptitle: title sits at exp_top, subplots end below
-            _exp_title_text = (self.title_input.text().strip()
-                               or self.title_input.placeholderText())
-            if n > 1 and self.title_check.isChecked() and _exp_title_text:
-                suptitle_frac = (self.title_size.value() * 2.2) / (hi * 72)
-                suptitle_frac = max(suptitle_frac, 0.04)
-                title_y  = exp_top
-                exp_top  = exp_top - suptitle_frac
-                exp_top  = max(exp_top, self.fig_bottom.value() + 0.05)
+            _n_sp_exp = self.subplot_rows * self.subplot_cols
+            _exp_title_text = self.title_input.text().strip() if _n_sp_exp > 1 else ''
+            _ty_widget = getattr(self, 'title_y', getattr(self, 'title_y_offset', None))
+            _exp_ty = _ty_widget.value() if _ty_widget else 0.97
+            if _n_sp_exp > 1 and self.title_check.isChecked() and _exp_title_text:
+                suptitle_pt = self.title_size.value()
+                title_h_frac = (suptitle_pt * 1.6) / (hi * 72)
+                exp_top = min(exp_top, _exp_ty - title_h_frac)
+                exp_top = max(exp_top, self.fig_bottom.value() + 0.05)
                 exp_fig.suptitle(_exp_title_text,
-                                 fontsize=self.title_size.value(), color=self.title_color,
+                                 fontsize=suptitle_pt, color=self.title_color,
                                  fontfamily=self.title_font.currentText(),
-                                 y=title_y)
+                                 x=self.title_x.value() if hasattr(self, 'title_x') else 0.5,
+                                 ha='center', va='top',
+                                 y=_exp_ty)
+            _hspace_exp = self.sp_hspace.value() if hasattr(self, 'sp_hspace') else 0.35
+            _wspace_exp = self.sp_wspace.value() if hasattr(self, 'sp_wspace') else 0.35
             exp_fig.subplots_adjust(
                 left=self.fig_left.value(),
                 right=self.fig_right.value(),
                 bottom=self.fig_bottom.value(),
                 top=exp_top,
+                hspace=_hspace_exp,
+                wspace=_wspace_exp,
             )
 
             exp_fig.savefig(fp, dpi=dpi, format=mpl_fmt, bbox_inches=None)

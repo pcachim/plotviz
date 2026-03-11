@@ -11,4 +11,4 @@ pyproject.toml reads this file via hatchling's path-based versioning,
 so the package metadata stays in sync automatically.
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"

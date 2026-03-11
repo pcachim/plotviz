@@ -44,7 +44,7 @@ DEFAULTS: dict = {
                         if (Path.home() / 'Documents').is_dir()
                         else str(Path.home()),
 
-    # Recently opened .plotviz files  (newest first)
+    # Recently opened .pviz files  (newest first)
     'recent_files':     [],
 
     # Window geometry  [x, y, width, height]
