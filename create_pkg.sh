@@ -49,25 +49,6 @@ uv sync
 echo ""
 echo "▶ PyInstaller $(uv run pyinstaller --version)"
 
-# ── Generate file-type icons ──────────────────────────────────────────────────
-# Produces assets/pviz_icon.png, pvizt_icon.png, pvizx_icon.png
-# echo ""
-# echo "▶ Generating file-type icons..."
-# uv run python make_file_icons.py
-
-# Converts PNGs → assets/pviz.icns, pvizt.icns, pvizx.icns
-# echo "▶ Converting file-type icons to .icns..."
-# bash make_file_icns.sh
-
-# Verify all three icns files were produced
-for _ft in pviz pvizt pvizx; do
-    if [ ! -f "$ASSETS_DIR/${_ft}.icns" ]; then
-        echo "❌ Missing $ASSETS_DIR/${_ft}.icns — icon generation failed"
-        exit 1
-    fi
-done
-echo "   pviz.icns / pvizt.icns / pvizx.icns  ✓"
-
 # ── Clean previous builds ─────────────────────────────────────────────────────
 echo ""
 echo "▶ Cleaning previous build..."
