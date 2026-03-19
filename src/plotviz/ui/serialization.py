@@ -195,7 +195,6 @@ class SerializationMixin:
         s['line_default_lw']       = self.line_default_lw.value()
         s['line_default_markersize'] = self.line_default_markersize.value()
 
-        s['_version'] = '1.3'   # 1.3 adds ann style + line defaults
         return s
 
     def _collect_series_meta(self):
@@ -362,7 +361,9 @@ class SerializationMixin:
         self.subplot_title_size    = _di('subplot_title_size', {'0': 11})
         self.subplot_title_color   = _di('subplot_title_color', {'0': '#000000'})
         if hasattr(self, 'title_x'): self.title_x.setValue(s.get('title_x', 0.5))
-        if hasattr(self, 'title_y'): self.title_y.setValue(s.get('title_y', s.get('title_y_offset', 0.97) + 0.97 if s.get('title_y_offset', 0) != 0 else 0.97))
+        if hasattr(self, 'title_y'):
+            _ty = s['title_y'] if 'title_y' in s else s.get('title_y_offset', 0.97)
+            self.title_y.setValue(min(max(float(_ty), 0.50), 1.00))
         if hasattr(self, 'sp_hspace'): self.sp_hspace.setValue(s.get('sp_hspace', 0.35))
         if hasattr(self, 'sp_wspace'): self.sp_wspace.setValue(s.get('sp_wspace', 0.35))
         self.subplot_xlabels       = _di('subplot_xlabels', {'0': ''})
@@ -610,7 +611,6 @@ class SerializationMixin:
             if 'style' in a and isinstance(a['style'], dict):
                 a['style'] = dict(a['style'])
             if ann['type'] == 'image':
-                import os
                 a['image_file'] = 'images/' + os.path.basename(ann['filepath'])
                 # keep filepath for runtime use but don't embed full path
                 del a['filepath']
@@ -656,17 +656,6 @@ class SerializationMixin:
                     QMessageBox.warning(self, 'Invalid', 'No palette.json in file.'); return
                 self._load_custom_palettes_json(zf.read('palette.json').decode())
             QMessageBox.information(self, 'Imported', 'Palette bundle imported.')
-        except Exception as e:
-            QMessageBox.critical(self, 'Error', str(e))
-
-    def _load_project_inner(self, fp: str):
-        """Core logic for loading a .pviz archive — no dialogs."""
-        try:
-            with zipfile.ZipFile(fp, 'r') as zf:
-                if 'palette.json' not in zf.namelist():
-                    QMessageBox.warning(self, 'Invalid', 'No palette.json in file.'); return
-                self._load_custom_palettes_json(zf.read('palette.json').decode())
-            QMessageBox.information(self, 'Loaded', 'Palette bundle imported.')
         except Exception as e:
             QMessageBox.critical(self, 'Error', str(e))
 
@@ -822,9 +811,12 @@ class SerializationMixin:
                 if 'settings.json' not in names:
                     QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.'); return
                 settings = json.loads(zf.read('settings.json'))
-            self._apply_settings(settings)
+            self._applying_settings = True
+            try:
+                self._apply_settings(settings)
+            finally:
+                self._applying_settings = False
             self.update_preview()
-            QMessageBox.information(self, 'Loaded', 'Template applied.')
         except Exception as e:
             QMessageBox.critical(self, 'Error', str(e))
 
@@ -896,7 +888,11 @@ class SerializationMixin:
             #    manually at the end.
             self.sp_rows.blockSignals(True)
             self.sp_cols.blockSignals(True)
-            self._apply_settings(settings)
+            self._applying_settings = True
+            try:
+                self._apply_settings(settings)
+            finally:
+                self._applying_settings = False
             self.sp_rows.blockSignals(False)
             self.sp_cols.blockSignals(False)
 

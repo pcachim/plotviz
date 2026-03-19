@@ -25,6 +25,7 @@ if _PKG not in sys.path:
 import csv
 import io
 import json
+import shutil
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -37,12 +38,15 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 
 from ui.canvas import CanvasPlotter
-from ui.tab_builders import TabBuildersMixin, COLOR_PALETTES, get_all_palettes, PER_SERIES_TYPES
+from ui.tab_builders import (
+    TabBuildersMixin, COLOR_PALETTES, get_all_palettes, add_custom_palette,
+    PER_SERIES_TYPES, _CUSTOM_PALETTES,
+)
 from ui.plot_engine import PlotEngineMixin
 from ui.serialization import SerializationMixin
 
@@ -51,11 +55,6 @@ import config.settings as settings
 from ui.helpers import _get_dir, _remember_dir, _show_color_dialog
 
 
-# Backward-compat alias — all existing call sites work unchanged
-class PaletteColorDialog:
-    @staticmethod
-    def getColor(initial=None, parent=None, palette_colors=None):
-        return _show_color_dialog(initial, parent, palette_colors)
 
 from data.scientific import CurveFitter
 from styling.presets import ChartPresets
@@ -157,7 +156,7 @@ class AnnotationEditDialog(QDialog):
         mw = QApplication.activeWindow()
         pal_colors = (mw._active_palette_colors()
                       if mw and hasattr(mw, '_active_palette_colors') else None)
-        color = PaletteColorDialog.getColor(QColor(cur), self, palette_colors=pal_colors)
+        color = _show_color_dialog(QColor(cur), self, palette_colors=pal_colors)
         if color.isValid():
             self.fields[field_key].setText(color.name())
 
@@ -635,7 +634,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self._current_filepath = None
 
         # ── Keyboard shortcuts ────────────────────────────────────────────────
-        from PyQt6.QtGui import QShortcut, QKeySequence
         QShortcut(QKeySequence('Ctrl+Z'), self).activated.connect(self._undo)
         QShortcut(QKeySequence('Ctrl+Y'), self).activated.connect(self._redo)
         QShortcut(QKeySequence('Ctrl+Shift+Z'), self).activated.connect(self._redo)
@@ -649,7 +647,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         # Only enable LaTeX rendering if a LaTeX installation is present.
         # In a frozen .app bundle (or any machine without LaTeX) kpsewhich
         # does not exist, so usetex must stay False or every render call fails.
-        import shutil
         if not getattr(__import__('sys'), 'frozen', False) and shutil.which('latex'):
             try:
                 plt.rcParams['text.usetex'] = True
@@ -687,7 +684,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         if hasattr(self, 'fig_preset_combo'):
             settings.set('fig_preset', self.fig_preset_combo.currentText())
         # Persist any custom palettes to settings
-        from ui.tab_builders import _CUSTOM_PALETTES
         settings.set('custom_palettes', dict(_CUSTOM_PALETTES))
         event.accept()
 
@@ -707,7 +703,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         # Register any saved custom palettes first
         custom = settings.get('custom_palettes') or {}
         if custom:
-            from ui.tab_builders import add_custom_palette
             for name, colors in custom.items():
                 add_custom_palette(name, colors)
                 if self.palette_combo.findText(name) < 0:
@@ -747,20 +742,22 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
         self.tabs = QTabWidget()
         self.create_file_tab()
-        self.create_data_tab()       # subplot grid + series table + chart-type options
-        self.create_style_tab()
+        self.create_data_tab()       # datasets + series table + chart-type options
+        self.create_style_tab()      # figure size, margins, colours, grid
+        self.create_series_tab()     # per-curve style
         self.create_axes_tab()       # per-subplot selector + titles, labels, limits, legend
         self.create_annotations_tab()
         self.create_advanced_tab()
 
         # Tooltips shown when hovering over each tab
         for i, tip in enumerate([
-            'Data — load files, open/save charts, export images',
-            'Series — subplot grid, series table, chart type options',
-            'Style — colours, figure size, margins, curves, grid',
+            'Chart — open/save/export, subplot layout, colour palette',
+            'Data — load datasets, series table, chart type options',
+            'Style — figure size, margins, colours, grid',
+            'Series — per-curve line style, colour, marker and curve fitting',
             'Axes — per-subplot titles, labels, axis limits and legend',
             'Annotate — place text, arrows and images on the chart',
-            'Advanced — curve fitting and function generator',
+            'Advanced — function generator and manual data table',
         ]):
             self.tabs.setTabToolTip(i, tip)
 
@@ -913,7 +910,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
     @staticmethod
     def _sec_label(txt):
         """Section header label styled like the DATASETS label."""
-        from PyQt6.QtWidgets import QLabel
         lbl = QLabel(txt.upper())
         lbl.setStyleSheet('font-weight:bold; color:#888; font-size:10px;')
         return lbl
@@ -1056,11 +1052,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
     # ═══════════════════════════════════════════════════════════════════════════
     def _open_palette_editor(self):
         """Open a dialog to create or edit a custom colour palette."""
-        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                                      QLineEdit, QPushButton, QListWidget,
-                                      QDialogButtonBox, QMessageBox)
-        from ui.tab_builders import get_all_palettes, add_custom_palette, _CUSTOM_PALETTES
-        from ui.helpers import _show_color_dialog
 
         dlg = QDialog(self)
         dlg.setWindowTitle('Palette Editor')
@@ -1156,12 +1147,10 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
     def _custom_palettes_json(self):
         """Return _CUSTOM_PALETTES as a JSON string for saving."""
-        from ui.tab_builders import _CUSTOM_PALETTES
         return json.dumps(_CUSTOM_PALETTES, indent=2)
 
     def _load_custom_palettes_json(self, json_str):
         """Load custom palettes from a JSON string."""
-        from ui.tab_builders import add_custom_palette
         try:
             data = json.loads(json_str)
             for name, colors in data.items():
@@ -1231,7 +1220,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             'curve':        getattr(self, 'curve_color',       '#1f77b4'),
             'curve_marker': getattr(self, 'curve_marker_color','#1f77b4'),
         }.get(target, '#000000')
-        color = PaletteColorDialog.getColor(
+        color = _show_color_dialog(
             QColor(_cur), self, palette_colors=self._active_palette_colors())
         if not color.isValid(): return
         hx = color.name()
@@ -1344,7 +1333,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
     def _pick_grid_color(self, which):
         cur = self.grid_color if which == 'major' else self.minor_grid_color
-        color = PaletteColorDialog.getColor(
+        color = _show_color_dialog(
             QColor(cur), self, palette_colors=self._active_palette_colors())
         if not color.isValid(): return
         hx = color.name()
@@ -1359,7 +1348,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
     def _pick_ann_color_attr(self, attr):
         """Generic color picker that writes to self.<attr> and updates <attr>_sw swatch."""
         cur = getattr(self, attr, '#000000')
-        color = PaletteColorDialog.getColor(
+        color = _show_color_dialog(
             QColor(cur), self, palette_colors=self._active_palette_colors())
         if not color.isValid(): return
         hx = color.name()
@@ -1454,15 +1443,256 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             QMessageBox.information(self,'Delete','Select an annotation first.'); return
         self.canvas.remove_annotation_at(idx)
 
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # COLOR SCHEMES
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Keys extracted from a full settings dict that constitute a "color scheme".
+    # Anything not in this list is left untouched when a scheme is applied.
+    _COLOR_SCHEME_KEYS = [
+        'chart_bg_color', 'chart_fg_color', 'plot_bg_color',
+        'grid_color', 'grid_on', 'grid_linestyle', 'grid_linewidth', 'grid_alpha',
+        'minor_grid_color', 'minor_grid_on',
+        'minor_grid_linestyle', 'minor_grid_linewidth', 'minor_grid_alpha',
+        'title_color', 'xlabel_color', 'ylabel_color', 'y2label_color',
+        'title_font', 'xlabel_font', 'ylabel_font',
+        'title_size', 'xlabel_size', 'ylabel_size',
+        'border_top', 'border_bottom', 'border_left', 'border_right',
+        'color_palette',
+        'ann_fontcolor', 'ann_bgcolor', 'ann_edgecolor',
+    ]
+
+    # Built-in named schemes: name → partial settings dict
+    _BUILTIN_COLOR_SCHEMES = {
+        'Default (white)': {
+            'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
+            'grid_color': '#cccccc', 'grid_on': True, 'grid_linestyle': '--',
+            'grid_linewidth': 0.5, 'grid_alpha': 0.4,
+            'minor_grid_color': '#e8e8e8', 'minor_grid_on': False,
+            'title_color': '#000000', 'xlabel_color': '#000000', 'ylabel_color': '#000000',
+            'color_palette': 'Matplotlib',
+        },
+        'Dark (charcoal)': {
+            'chart_bg_color': '#1e1e2e', 'chart_fg_color': '#cdd6f4', 'plot_bg_color': '#181825',
+            'grid_color': '#45475a', 'grid_on': True, 'grid_linestyle': '--',
+            'grid_linewidth': 0.5, 'grid_alpha': 0.5,
+            'minor_grid_color': '#313244', 'minor_grid_on': False,
+            'title_color': '#cdd6f4', 'xlabel_color': '#a6adc8', 'ylabel_color': '#a6adc8',
+            'border_top': False, 'border_right': False,
+            'color_palette': 'Bold',
+        },
+        'Dark (slate)': {
+            'chart_bg_color': '#0f172a', 'chart_fg_color': '#e2e8f0', 'plot_bg_color': '#1e293b',
+            'grid_color': '#334155', 'grid_on': True, 'grid_linestyle': ':',
+            'grid_linewidth': 0.6, 'grid_alpha': 0.6,
+            'minor_grid_color': '#1e293b', 'minor_grid_on': False,
+            'title_color': '#f8fafc', 'xlabel_color': '#94a3b8', 'ylabel_color': '#94a3b8',
+            'border_top': False, 'border_right': False,
+            'color_palette': 'Bold',
+        },
+        'Seaborn (whitegrid)': {
+            'chart_bg_color': '#eaeaf2', 'chart_fg_color': '#333333', 'plot_bg_color': '#ffffff',
+            'grid_color': '#ffffff', 'grid_on': True, 'grid_linestyle': '-',
+            'grid_linewidth': 1.0, 'grid_alpha': 1.0,
+            'minor_grid_color': '#ffffff', 'minor_grid_on': False,
+            'title_color': '#333333', 'xlabel_color': '#555555', 'ylabel_color': '#555555',
+            'color_palette': 'Pastel',
+        },
+        'Scientific (minimal)': {
+            'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
+            'grid_color': '#dddddd', 'grid_on': True, 'grid_linestyle': '--',
+            'grid_linewidth': 0.4, 'grid_alpha': 0.3,
+            'minor_grid_color': '#eeeeee', 'minor_grid_on': False,
+            'title_color': '#111111', 'xlabel_color': '#333333', 'ylabel_color': '#333333',
+            'border_top': False, 'border_right': False,
+            'color_palette': 'Matplotlib',
+        },
+        'Nature / print': {
+            'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
+            'grid_color': '#cccccc', 'grid_on': False, 'grid_linestyle': '--',
+            'grid_linewidth': 0.4, 'grid_alpha': 0.3,
+            'minor_grid_color': '#eeeeee', 'minor_grid_on': False,
+            'title_color': '#000000', 'xlabel_color': '#000000', 'ylabel_color': '#000000',
+            'border_top': False, 'border_right': False,
+            'color_palette': 'Matplotlib',
+        },
+        'Midnight blue': {
+            'chart_bg_color': '#0d1b2a', 'chart_fg_color': '#e0e0e0', 'plot_bg_color': '#0d1b2a',
+            'grid_color': '#1b3a5c', 'grid_on': True, 'grid_linestyle': '-',
+            'grid_linewidth': 0.4, 'grid_alpha': 0.4,
+            'minor_grid_color': '#112233', 'minor_grid_on': False,
+            'title_color': '#ffffff', 'xlabel_color': '#aac8e4', 'ylabel_color': '#aac8e4',
+            'border_top': False, 'border_right': False,
+            'color_palette': 'Bold',
+        },
+        'Warm parchment': {
+            'chart_bg_color': '#f5f0e8', 'chart_fg_color': '#3d2b1f', 'plot_bg_color': '#faf7f0',
+            'grid_color': '#c8b89a', 'grid_on': True, 'grid_linestyle': '--',
+            'grid_linewidth': 0.5, 'grid_alpha': 0.4,
+            'minor_grid_color': '#e0d5c2', 'minor_grid_on': False,
+            'title_color': '#3d2b1f', 'xlabel_color': '#5c4033', 'ylabel_color': '#5c4033',
+            'color_palette': 'Pastel',
+        },
+        'High contrast': {
+            'chart_bg_color': '#000000', 'chart_fg_color': '#ffffff', 'plot_bg_color': '#000000',
+            'grid_color': '#444444', 'grid_on': True, 'grid_linestyle': ':',
+            'grid_linewidth': 0.5, 'grid_alpha': 0.6,
+            'minor_grid_color': '#222222', 'minor_grid_on': False,
+            'title_color': '#ffffff', 'xlabel_color': '#cccccc', 'ylabel_color': '#cccccc',
+            'border_top': True, 'border_right': True,
+            'color_palette': 'Bold',
+        },
+        'Pastel soft': {
+            'chart_bg_color': '#fdfbf7', 'chart_fg_color': '#444444', 'plot_bg_color': '#fdfbf7',
+            'grid_color': '#ddd5e8', 'grid_on': True, 'grid_linestyle': '--',
+            'grid_linewidth': 0.5, 'grid_alpha': 0.5,
+            'minor_grid_color': '#f0ecf5', 'minor_grid_on': False,
+            'title_color': '#444444', 'xlabel_color': '#666666', 'ylabel_color': '#666666',
+            'color_palette': 'Pastel',
+        },
+    }
+
+    # Registry of all schemes (built-in + user-loaded); populated by _init_color_schemes
+    _COLOR_SCHEME_REGISTRY: dict = {}
+
+    def _init_color_schemes(self):
+        """Populate the color scheme combo with built-ins and refresh the swatch."""
+        self._COLOR_SCHEME_REGISTRY = dict(self._BUILTIN_COLOR_SCHEMES)
+        self._cs_combo.blockSignals(True)
+        self._cs_combo.clear()
+        self._cs_combo.addItems(list(self._COLOR_SCHEME_REGISTRY.keys()))
+        self._cs_combo.blockSignals(False)
+        self._cs_combo.currentIndexChanged.connect(self._refresh_cs_swatches)
+        self._refresh_cs_swatches()
+
+    def _refresh_cs_swatches(self):
+        """Update the 5 preview swatches for the currently selected scheme."""
+        name = self._cs_combo.currentText()
+        scheme = self._COLOR_SCHEME_REGISTRY.get(name, {})
+        colors = [
+            scheme.get('chart_bg_color', '#ffffff'),
+            scheme.get('plot_bg_color',  '#ffffff'),
+            scheme.get('chart_fg_color', '#000000'),
+            scheme.get('grid_color',     '#cccccc'),
+            scheme.get('title_color',    '#000000'),
+        ]
+        for sw, color in zip(self._cs_swatches, colors):
+            sw.setStyleSheet(
+                f'background:{color}; border:1px solid #888; border-radius:2px;')
+
+    def _scheme_from_current_settings(self) -> dict:
+        """Extract only the color-scheme keys from the current UI state."""
+        full = self._collect_settings()
+        return {k: full[k] for k in self._COLOR_SCHEME_KEYS if k in full}
+
+    def _apply_color_scheme_dict(self, scheme: dict):
+        """Apply a partial settings dict containing only color-scheme keys."""
+        # Build a full settings dict from current state, overwrite scheme keys only
+        full = self._collect_settings()
+        full.update(scheme)
+        self._applying_settings = True
+        try:
+            self._apply_settings(full)
+        finally:
+            self._applying_settings = False
+        self.update_preview()
+
+    def _apply_color_scheme_selected(self):
+        """Apply the scheme currently selected in the combo."""
+        name = self._cs_combo.currentText()
+        scheme = self._COLOR_SCHEME_REGISTRY.get(name)
+        if scheme:
+            self._apply_color_scheme_dict(scheme)
+
+    def _save_color_scheme(self):
+        """Save the current chart colors as a .pvizt color-scheme file."""
+        import zipfile as _zf, json as _json
+        from PyQt6.QtWidgets import QInputDialog
+        from ui.helpers import _get_dir, _remember_dir
+
+        name, ok = QInputDialog.getText(
+            self, 'Save Color Scheme', 'Scheme name:', text='My Scheme')
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+
+        fp, _ = QFileDialog.getSaveFileName(
+            self, 'Save Color Scheme', _get_dir(),
+            'plotviz Color Scheme (*.pvizt);;All Files (*)')
+        if not fp:
+            return
+        _remember_dir(fp)
+        if not fp.endswith('.pvizt'):
+            fp += '.pvizt'
+
+        try:
+            scheme = self._scheme_from_current_settings()
+            payload = {
+                '_app': 'plotviz',
+                '_file_type': 'color_scheme',
+                '_scheme_name': name,
+            }
+            payload.update(scheme)
+            with _zf.ZipFile(fp, 'w', _zf.ZIP_DEFLATED) as zf:
+                zf.writestr('settings.json', _json.dumps(payload, indent=2))
+
+            # Register in the combo so it can be re-applied this session
+            self._COLOR_SCHEME_REGISTRY[name] = scheme
+            if self._cs_combo.findText(name) < 0:
+                self._cs_combo.addItem(name)
+            self._cs_combo.setCurrentText(name)
+            QMessageBox.information(self, 'Saved', f'Color scheme saved:\n{fp}')
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', str(e))
+
+    def _load_color_scheme(self):
+        """Load a .pvizt color-scheme file and register it in the combo."""
+        import zipfile as _zf, json as _json
+        from ui.helpers import _get_dir, _remember_dir
+
+        fp, _ = QFileDialog.getOpenFileName(
+            self, 'Load Color Scheme', _get_dir(),
+            'plotviz Color Scheme (*.pvizt);;All Files (*)')
+        if not fp:
+            return
+        _remember_dir(fp)
+
+        try:
+            with _zf.ZipFile(fp, 'r') as zf:
+                payload = _json.loads(zf.read('settings.json'))
+
+            # Accept both color_scheme and full template files
+            name = payload.get('_scheme_name') or os.path.splitext(
+                os.path.basename(fp))[0]
+
+            # Extract only the color-scheme keys (ignore layout, data, etc.)
+            scheme = {k: payload[k] for k in self._COLOR_SCHEME_KEYS if k in payload}
+            if not scheme:
+                QMessageBox.warning(self, 'Invalid',
+                    'No color settings found in this file.')
+                return
+
+            self._COLOR_SCHEME_REGISTRY[name] = scheme
+            if self._cs_combo.findText(name) < 0:
+                self._cs_combo.addItem(name)
+            self._cs_combo.setCurrentText(name)
+            self._refresh_cs_swatches()
+
+            reply = QMessageBox.question(
+                self, 'Apply?',
+                f'Scheme "{name}" loaded.\nApply it now?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                self._apply_color_scheme_dict(scheme)
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', str(e))
+
     # ═══════════════════════════════════════════════════════════════════════════
     # DATA
     # ═══════════════════════════════════════════════════════════════════════════
     def _open_app_settings_dialog(self):
         """App-level settings dialog: paths, defaults, UI options."""
-        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                                     QDialogButtonBox, QPushButton, QGroupBox,
-                                     QFormLayout, QLineEdit, QCheckBox, QSpinBox,
-                                     QFrame)
         from PyQt6.QtGui import QDesktopServices
         from PyQt6.QtCore import QUrl
         import config.settings as _cfg
@@ -1602,15 +1832,17 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         """Apply a (settings, series_meta, datasets) snapshot without pushing to undo."""
         import copy
         self._undo_suspended = True
+        self._applying_settings = True
         try:
             settings_d, series_d, datasets_d = snap
             self.datasets = copy.deepcopy(datasets_d)
             self.update_lists(keep_selections=False)
             self._apply_settings(settings_d)
             self._apply_series_meta(series_d)
-            self.update_preview()
         finally:
+            self._applying_settings = False
             self._undo_suspended = False
+        self.update_preview()
         self._update_undo_buttons()
 
     def _undo(self):
@@ -1715,7 +1947,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             'ann_font':      'sans-serif', 'ann_bgcolor': '#ffffcc',
             'ann_bg_alpha':  0.9,  'ann_edgecolor': '#aaaaaa',
             'line_default_style':  '-',    'line_default_marker': 'None',
-            'line_default_lw':     1.5,    'line_default_markersize': 6.0,
+            'line_default_lw':     1.5,    'line_default_markersize': 6,
         }
         return s
 
@@ -1750,14 +1982,18 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.canvas.annotations.clear()
         self._last_fit = None
         self._subplot_mosaic = None
+        # Clear series table BEFORE _apply_settings triggers any redraws,
+        # otherwise stale rows referencing cleared datasets cause a crash.
+        self.series_table.setRowCount(0)
+        self._refresh_curve_select()
         # Reset all UI widgets to fresh defaults via _apply_settings
         self._undo_suspended = True
+        self._applying_settings = True
         try:
             self._apply_settings(self._default_settings())
         finally:
+            self._applying_settings = False
             self._undo_suspended = False
-        self.series_table.setRowCount(0)
-        self._refresh_curve_select()
         self.update_lists()
         self.on_subplot_layout_changed()
         self.update_preview()
@@ -1902,7 +2138,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self.update_preview()
 
     def _refresh_curve_select(self):
-        """Sync the per-curve style combo with current series table labels."""
+        """Sync the per-curve style combo and fit series combo with current series table labels."""
         labels = []
         for row in range(self.series_table.rowCount()):
             item = self.series_table.item(row, 2)
@@ -1916,6 +2152,16 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.curve_select.setCurrentIndex(idx if idx >= 0 else 0)
         self.curve_select.blockSignals(False)
         self.load_curve_style()
+
+        # Keep fit series combo in sync
+        if hasattr(self, 'fit_series_combo'):
+            self.fit_series_combo.blockSignals(True)
+            prev_fit = self.fit_series_combo.currentText()
+            self.fit_series_combo.clear()
+            self.fit_series_combo.addItems(labels)
+            fit_idx = self.fit_series_combo.findText(prev_fit)
+            self.fit_series_combo.setCurrentIndex(fit_idx if fit_idx >= 0 else 0)
+            self.fit_series_combo.blockSignals(False)
 
     def _add_series_row(self):
         cols = sorted(self.datasets)
@@ -2174,14 +2420,14 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
     def select_series_by_label(self, label):
         """Called when user clicks a plotted series on the canvas.
 
-        Switches to the Style tab and sets the curve selector to the
+        Switches to the Series tab and sets the curve selector to the
         matching series so the user can immediately edit its style.
         """
         idx = self.curve_select.findText(label)
         if idx < 0:
             return
-        # Switch to Style tab (index 2: File/Data/Style/Axes/Annotate/Advanced)
-        self.tabs.setCurrentIndex(2)
+        # Switch to Series tab (index 3: Chart/Data/Style/Series/Axes/Annotate/Advanced)
+        self.tabs.setCurrentIndex(3)
         # Select the curve — triggers load_curve_style via currentIndexChanged signal
         if self.curve_select.currentIndex() == idx:
             # Already selected — force a reload so swatches reflect current state
@@ -2557,7 +2803,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
     def _pick_sp_title_color(self):
         cur = getattr(self, 'sp_title_color', '#000000')
-        col = PaletteColorDialog.getColor(QColor(cur), self, palette_colors=self._active_palette_colors())
+        col = _show_color_dialog(QColor(cur), self, palette_colors=self._active_palette_colors())
         if col.isValid():
             self.sp_title_color = col.name()
             self.sp_title_color_label.setStyleSheet(f'color:{col.name()};font-size:16px;')
@@ -2915,18 +3161,20 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
         self._subplot_mosaic = mosaic
 
+        # Block signals on both spinboxes so we control exactly when
+        # on_subplot_layout_changed fires (once, with both values correct).
+        self.sp_rows.blockSignals(True); self.sp_cols.blockSignals(True)
+        self.sp_rows.setValue(rows); self.sp_cols.setValue(cols)
+        self.sp_rows.blockSignals(False); self.sp_cols.blockSignals(False)
+        self.subplot_rows = rows; self.subplot_cols = cols
+
         if mosaic is None:
-            self.sp_rows.setValue(rows)
-            self.sp_cols.setValue(cols)
+            self.on_subplot_layout_changed()
         else:
             cells = list(dict.fromkeys(c for row in mosaic for c in row))
             n = len(cells)
-            self.sp_rows.blockSignals(True); self.sp_cols.blockSignals(True)
-            self.sp_rows.setValue(rows); self.sp_cols.setValue(cols)
-            self.sp_rows.blockSignals(False); self.sp_cols.blockSignals(False)
-            self.subplot_rows = rows; self.subplot_cols = cols
             self.on_subplot_layout_changed(n_override=n)
-            self.update_preview()
+        self.update_preview()
 
     def _adv_generate_or_apply(self):
         """Dispatch to x-range generator or column-function applier based on mode radio."""
@@ -3347,7 +3595,13 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             series = self._get_series_full()
             if not series:
                 QMessageBox.warning(self, 'Warning', 'Add at least one series in the Data tab first.'); return
-            xd, yd, lbl, xc, yc = series[0]
+
+            # Find the series the user selected in the fit_series_combo
+            target_label = self.fit_series_combo.currentText() if hasattr(self, 'fit_series_combo') else ''
+            matched = next((s for s in series if s[2] == target_label), None)
+            if matched is None:
+                matched = series[0]
+            xd, yd, lbl, xc, yc = matched
             popt, pcov, func, eq_str, r2 = CurveFitter.fit(xd, yd, model)
             if popt is None:
                 QMessageBox.warning(self, 'Fit Failed', f'Could not fit {model} to the data.'); return

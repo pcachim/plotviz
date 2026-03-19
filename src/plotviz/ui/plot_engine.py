@@ -772,7 +772,9 @@ class PlotEngineMixin:
             # Guard: bail silently if core widgets aren't built yet
             if not hasattr(self, 'canvas') or not hasattr(self, 'chart_type_combo'):
                 return
-            # Capture undo snapshot before rendering
+            # Guard: suppress intermediate redraws while _apply_settings is running.
+            if getattr(self, '_applying_settings', False):
+                return
             if hasattr(self, '_snapshot'):
                 self._snapshot()
             # Mark dirty (unsaved changes)
@@ -1008,23 +1010,18 @@ class PlotEngineMixin:
 
                 _n_sp = self.subplot_rows * self.subplot_cols
 
-                # ── n==1: ax.set_title already handled in _decorate; no suptitle ──
-                # ── n>1: suptitle placed at user-controlled y, subplots shrunk to fit ──
-                _show_sup  = _n_sp > 1 and self.title_check.isChecked()
-                _sup_text  = self.title_input.text().strip() if _show_sup else ''
+                # ── Suptitle (n>1 only; single-subplot title lives inside the axes) ──
+                _show_sup = _n_sp > 1 and self.title_check.isChecked()
+                _sup_text = self.title_input.text().strip() if _show_sup else ''
                 _title_y_fig = getattr(self, 'title_y', self.title_y_offset if hasattr(self, 'title_y_offset') else None)
                 _ty = _title_y_fig.value() if _title_y_fig else 0.97
 
                 if _show_sup and _sup_text:
-                    # Convert figure-coord title_y to canvas box coords
-                    # title sits at _ty in figure space; map to screen box
+                    # Place suptitle at the user-set position (in canvas-box coords).
+                    # Do NOT clamp adj_top here — title_y only controls where the text
+                    # sits; subplot margins are controlled independently by fig_top.
                     title_y_canvas = box_bottom + _ty * box_h
-                    # Estimate text height in figure fraction
                     suptitle_pt = self.title_size.value()
-                    title_h_frac = (suptitle_pt * 1.6) / (screen_h * 72)
-                    # Top of subplots = just below title text, within box
-                    adj_top = min(adj_top, title_y_canvas - title_h_frac)
-                    adj_top = max(adj_top, adj_bottom + 0.05)
                     self.canvas.figure.suptitle(_sup_text,
                         fontsize=suptitle_pt, color=self.title_color,
                         fontfamily=self.title_font.currentText(),
@@ -1261,9 +1258,7 @@ class PlotEngineMixin:
             _exp_ty = _ty_widget.value() if _ty_widget else 0.97
             if _n_sp_exp > 1 and self.title_check.isChecked() and _exp_title_text:
                 suptitle_pt = self.title_size.value()
-                title_h_frac = (suptitle_pt * 1.6) / (hi * 72)
-                exp_top = min(exp_top, _exp_ty - title_h_frac)
-                exp_top = max(exp_top, self.fig_bottom.value() + 0.05)
+                # title_y positions the suptitle text; do not clamp exp_top by it.
                 exp_fig.suptitle(_exp_title_text,
                                  fontsize=suptitle_pt, color=self.title_color,
                                  fontfamily=self.title_font.currentText(),
