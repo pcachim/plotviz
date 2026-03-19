@@ -248,6 +248,7 @@ class CanvasPlotter(FigureCanvas):
 
         for artist in ax.get_children():
             lbl = artist.get_label()
+            lbl = lbl.get_text() if hasattr(lbl, 'get_text') else str(lbl) if lbl is not None else ''
             if not lbl or lbl.startswith('_'):
                 continue
 
