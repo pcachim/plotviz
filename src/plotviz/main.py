@@ -68,19 +68,49 @@ from ui.main_window import ChartStudioApp
 # File extensions this app owns
 _CHART_EXT    = '.pviz'
 _TEMPLATE_EXT = '.pvizt'
-_PALETTE_EXT  = '.pvizx'
+_PALETTE_EXT  = '.pvizp'
+_SCHEME_EXT   = '.pvizc'
 
 
 def _app_icon() -> QIcon:
-    """Locate assets/plotviz.icns whether running from source or frozen bundle."""
+    """Locate the app icon whether running from source or a frozen bundle.
+
+    On Windows we prefer the .ico file; on macOS we use .icns.
+    Falls back gracefully if neither is found.
+    """
     if getattr(sys, 'frozen', False):
         base = Path(sys._MEIPASS)           # type: ignore[attr-defined]
     else:
-        base = Path(__file__).parent.parent.parent  # repo root (~/plotviz/)
-    icon_path = base / 'assets' / 'plotviz.icns'
-    if icon_path.exists():
-        return QIcon(str(icon_path))
+        base = Path(__file__).parent.parent.parent  # repo root
+
+    assets = base / 'assets'
+
+    # Prefer .ico on Windows, .icns on macOS/Linux
+    candidates = (
+        [assets / 'plotviz.ico', assets / 'plotviz.icns']
+        if sys.platform == 'win32'
+        else [assets / 'plotviz.icns', assets / 'plotviz.ico']
+    )
+    for p in candidates:
+        if p.exists():
+            return QIcon(str(p))
     return QIcon()
+
+
+def _set_win_appusermodel_id() -> None:
+    """Tell Windows to use 'plotviz' as the AppUserModelID.
+
+    This ensures the taskbar groups all plotviz windows together and
+    shows the correct icon instead of a generic Python/PyInstaller icon.
+    Must be called before the first window is shown.
+    """
+    if sys.platform != 'win32':
+        return
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('com.pviz.app.plotviz')
+    except Exception:
+        pass
 
 
 class PlotVizApp(QApplication):
@@ -107,20 +137,25 @@ class PlotVizApp(QApplication):
                 self._window._load_template_from_path(fp)
             elif fp.endswith(_PALETTE_EXT):
                 self._window._import_palette_bundle_from_path(fp)
+            elif fp.endswith(_SCHEME_EXT):
+                self._window._load_color_scheme_from_path(fp)
             return True
         return super().event(e)
 
 
 def main():
+    _set_win_appusermodel_id()   # must be before QApplication on Windows
     app = PlotVizApp(sys.argv)
     app.setApplicationName('plotviz')
     app.setApplicationDisplayName('plotviz')
     app.setOrganizationName('plotviz')
     app.setOrganizationDomain('com.pviz.app')
     app.setStyle('Fusion')
-    app.setWindowIcon(_app_icon())
+    icon = _app_icon()
+    app.setWindowIcon(icon)
 
     window = ChartStudioApp()
+    window.setWindowIcon(icon)   # drives the taskbar button on Windows
     app.set_window(window)
     window.show()
 
@@ -136,6 +171,9 @@ def main():
             break
         if arg.endswith(_PALETTE_EXT) and Path(arg).is_file():
             window._import_palette_bundle_from_path(arg)
+            break
+        if arg.endswith(_SCHEME_EXT) and Path(arg).is_file():
+            window._load_color_scheme_from_path(arg)
             break
 
     sys.exit(app.exec())

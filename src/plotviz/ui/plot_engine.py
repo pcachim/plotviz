@@ -650,6 +650,30 @@ class PlotEngineMixin:
                 if chk.isChecked():
                     spine.set_edgecolor(fg)
 
+    def _legend_kwargs(self, subplot_idx: int) -> dict:
+        """Build the kwargs dict for ax.legend() from per-subplot legend style state."""
+        loc = self.subplot_legend_locs.get(subplot_idx, 'best')
+        lx  = self.subplot_legend_x.get(subplot_idx, 0.01)
+        ly  = self.subplot_legend_y.get(subplot_idx, 0.99)
+        kw = dict(
+            fontsize    = self.subplot_legend_fontsize.get(subplot_idx, 9),
+            ncols       = self.subplot_legend_ncols.get(subplot_idx, 1),
+            frameon     = self.subplot_legend_frameon.get(subplot_idx, True),
+            facecolor   = self.subplot_legend_facecolor.get(subplot_idx, '#ffffff'),
+            edgecolor   = self.subplot_legend_edgecolor.get(subplot_idx, '#cccccc'),
+            framealpha  = self.subplot_legend_alpha.get(subplot_idx, 0.8),
+            labelcolor  = self.subplot_legend_color.get(subplot_idx, '#000000'),
+        )
+        if loc == 'best':
+            # 'best' is automatic — X/Y have no effect, let matplotlib decide
+            kw['loc'] = 'best'
+        else:
+            # For every named location, X/Y fine-tune the anchor point via bbox_to_anchor.
+            # 'manual' means the dropdown is just a helper label; treat as upper left.
+            kw['loc'] = 'upper left' if loc == 'manual' else loc
+            kw['bbox_to_anchor'] = (lx, ly)
+        return kw
+
     def _decorate(self, ax, xc, yd, is3d=False, subplot_idx=0):
         """Apply titles, labels, limits, scale, legend for one subplot panel."""
         ct = self.chart_type_combo.currentText()
@@ -724,10 +748,10 @@ class PlotEngineMixin:
                 if y2lim:
                     ax2.set_ylim(y2lim[0], y2lim[1])
                 if self.subplot_legends.get(subplot_idx, True):
-                    leg_loc = self.subplot_legend_locs.get(subplot_idx, 'best')
                     h1, l1 = ax.get_legend_handles_labels()
                     h2, l2 = ax2.get_legend_handles_labels()
-                    if h1 or h2: ax.legend(h1+h2, l1+l2, loc=leg_loc)
+                    if h1 or h2:
+                        ax.legend(h1+h2, l1+l2, **self._legend_kwargs(subplot_idx))
                 self._apply_canvas_style(ax2, subplot_idx)
 
         # ── Scale & limits ──
@@ -759,8 +783,7 @@ class PlotEngineMixin:
         # ── Legend (no Y2) ──
         if not _y2_active and self.subplot_legends.get(subplot_idx, True) and yd \
                 and ct not in _NO_LEGEND_TYPES:
-            leg_loc = self.subplot_legend_locs.get(subplot_idx, 'best')
-            ax.legend(loc=leg_loc)
+            ax.legend(**self._legend_kwargs(subplot_idx))
         if not is3d:
             self._apply_canvas_style(ax, subplot_idx)
 
@@ -877,9 +900,9 @@ class PlotEngineMixin:
                                 if ax2 and (sub_series or sub_y2_series):
                                     h1,l1 = ax.get_legend_handles_labels()
                                     h2,l2 = ax2.get_legend_handles_labels()
-                                    if h1 or h2: ax.legend(h1+h2, l1+l2, fontsize=8, loc=sp_leg_loc)
+                                    if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
                                 elif sub_series:
-                                    ax.legend(fontsize=8, loc=sp_leg_loc)
+                                    ax.legend(**self._legend_kwargs(idx))
                     else:
                         # ── Regular grid layout ────────────────────────────────
                         for idx in range(n):
@@ -968,9 +991,9 @@ class PlotEngineMixin:
                                 if ax2 and (sub_series or sub_y2_series):
                                     h1,l1 = ax.get_legend_handles_labels()
                                     h2,l2 = ax2.get_legend_handles_labels()
-                                    if h1 or h2: ax.legend(h1+h2, l1+l2, fontsize=8, loc=sp_leg_loc)
+                                    if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
                                 elif sub_series:
-                                    ax.legend(fontsize=8, loc=sp_leg_loc)
+                                    ax.legend(**self._legend_kwargs(idx))
 
                 self.canvas.axes_list = axes_list
                 if axes_list: self.canvas.axes = axes_list[0]
@@ -1151,9 +1174,9 @@ class PlotEngineMixin:
                                 if ax2 and (sub_series or sub_y2_series):
                                     h1,l1 = ax.get_legend_handles_labels()
                                     h2,l2 = ax2.get_legend_handles_labels()
-                                    if h1 or h2: ax.legend(h1+h2, l1+l2, fontsize=8, loc=sp_leg_loc)
+                                    if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
                                 elif sub_series:
-                                    ax.legend(fontsize=8, loc=sp_leg_loc)
+                                    ax.legend(**self._legend_kwargs(idx))
                     else:
                     # ── Regular grid layout ────────────────────────────────────
                         first = None
@@ -1240,9 +1263,9 @@ class PlotEngineMixin:
                                 if ax2 and (sub_series or sub_y2_series):
                                     h1,l1 = ax.get_legend_handles_labels()
                                     h2,l2 = ax2.get_legend_handles_labels()
-                                    if h1 or h2: ax.legend(h1+h2, l1+l2, fontsize=8, loc=sp_leg_loc)
+                                    if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
                                 elif sub_series:
-                                    ax.legend(fontsize=8, loc=sp_leg_loc)
+                                    ax.legend(**self._legend_kwargs(idx))
 
             if n > 1:
                 for _ax_i, _ax in enumerate(axes_list):

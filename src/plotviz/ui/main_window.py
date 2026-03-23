@@ -591,6 +591,15 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.subplot_y2label_show = {0: True}
         self.subplot_legends      = {0: True}
         self.subplot_legend_locs  = {0: 'best'}
+        self.subplot_legend_x     = {0: 0.01}
+        self.subplot_legend_y     = {0: 0.99}
+        self.subplot_legend_fontsize = {0: 9}
+        self.subplot_legend_ncols = {0: 1}
+        self.subplot_legend_frameon = {0: True}
+        self.subplot_legend_color   = {0: '#000000'}
+        self.subplot_legend_facecolor = {0: '#ffffff'}
+        self.subplot_legend_alpha   = {0: 0.8}
+        self.subplot_legend_edgecolor = {0: '#cccccc'}
         self.subplot_xlims        = {0: None}
         self.subplot_ylims        = {0: None}
         self.subplot_y2lims       = {0: None}
@@ -749,14 +758,31 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.create_annotations_tab()
         self.create_advanced_tab()
 
-        # Tooltips shown when hovering over each tab
+        # ── Menu bar — tab navigation ─────────────────────────────────────────
+        from PyQt6.QtWidgets import QMenuBar
+        from PyQt6.QtGui import QAction
+        menubar = self.menuBar()
+        view_menu = menubar.addMenu('View')
+        for i in range(self.tabs.count()):
+            name = self.tabs.tabText(i)
+            action = QAction(name, self)
+            action.setCheckable(True)
+            action.setChecked(i == 0)
+            action.triggered.connect(lambda checked, idx=i: self.tabs.setCurrentIndex(idx))
+            view_menu.addAction(action)
+            # Keep checkmarks in sync when tab changes
+            self.tabs.currentChanged.connect(
+                lambda cur, a=action, idx=i: a.setChecked(cur == idx))
+        self._view_menu = view_menu
+
+        # Tooltips
         for i, tip in enumerate([
             'Chart — open/save/export, subplot layout, colour palette',
             'Data — load datasets, series table, chart type options',
             'Style — figure size, margins, colours, grid',
             'Series — per-curve line style, colour, marker and curve fitting',
             'Axes — per-subplot titles, labels, axis limits and legend',
-            'Annotate — place text, arrows and images on the chart',
+            'Annotations — subplot title, legend, text/arrow/image annotations',
             'Advanced — function generator and manual data table',
         ]):
             self.tabs.setTabToolTip(i, tip)
@@ -1606,7 +1632,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self._apply_color_scheme_dict(scheme)
 
     def _save_color_scheme(self):
-        """Save the current chart colors as a .pvizt color-scheme file."""
+        """Save the current chart colors as a .pvizc color-scheme file."""
         import zipfile as _zf, json as _json
         from PyQt6.QtWidgets import QInputDialog
         from ui.helpers import _get_dir, _remember_dir
@@ -1619,12 +1645,12 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Save Color Scheme', _get_dir(),
-            'plotviz Color Scheme (*.pvizt);;All Files (*)')
+            'plotviz Color Scheme (*.pvizc);;All Files (*)')
         if not fp:
             return
         _remember_dir(fp)
-        if not fp.endswith('.pvizt'):
-            fp += '.pvizt'
+        if not fp.endswith('.pvizc'):
+            fp += '.pvizc'
 
         try:
             scheme = self._scheme_from_current_settings()
@@ -1647,13 +1673,13 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_color_scheme(self):
-        """Load a .pvizt color-scheme file and register it in the combo."""
+        """Load a .pvizc color-scheme file and register it in the combo."""
         import zipfile as _zf, json as _json
         from ui.helpers import _get_dir, _remember_dir
 
         fp, _ = QFileDialog.getOpenFileName(
             self, 'Load Color Scheme', _get_dir(),
-            'plotviz Color Scheme (*.pvizt);;All Files (*)')
+            'plotviz Color Scheme (*.pvizc);;All Files (*)')
         if not fp:
             return
         _remember_dir(fp)
@@ -1685,6 +1711,26 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
                 self._apply_color_scheme_dict(scheme)
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', str(e))
+
+    def _load_color_scheme_from_path(self, fp: str):
+        """Load a .pvizc directly from *fp* (no dialog — Finder/cold-launch)."""
+        import zipfile as _zf, json as _json
+        try:
+            with _zf.ZipFile(fp, 'r') as zf:
+                payload = _json.loads(zf.read('settings.json'))
+            name = payload.get('_scheme_name') or os.path.splitext(
+                os.path.basename(fp))[0]
+            scheme = {k: payload[k] for k in self._COLOR_SCHEME_KEYS if k in payload}
+            if not scheme:
+                return
+            self._COLOR_SCHEME_REGISTRY[name] = scheme
+            if self._cs_combo.findText(name) < 0:
+                self._cs_combo.addItem(name)
+            self._cs_combo.setCurrentText(name)
+            self._refresh_cs_swatches()
+            self._apply_color_scheme_dict(scheme)
         except Exception as e:
             QMessageBox.critical(self, 'Error', str(e))
 
@@ -1889,6 +1935,15 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             'subplot_y2label_show':  _ser({0: True}),
             'subplot_legends':       _ser({0: True}),
             'subplot_legend_locs':   _ser({0: 'best'}),
+            'subplot_legend_x':      _ser({0: 0.01}),
+            'subplot_legend_y':      _ser({0: 0.99}),
+            'subplot_legend_fontsize': _ser({0: 9}),
+            'subplot_legend_ncols':  _ser({0: 1}),
+            'subplot_legend_frameon': _ser({0: True}),
+            'subplot_legend_color':  _ser({0: '#000000'}),
+            'subplot_legend_facecolor': _ser({0: '#ffffff'}),
+            'subplot_legend_alpha':  _ser({0: 0.8}),
+            'subplot_legend_edgecolor': _ser({0: '#cccccc'}),
             'subplot_xlims':         _ser({0: None}),
             'subplot_ylims':         _ser({0: None}),
             'subplot_y2lims':        _ser({0: None}),
@@ -2597,6 +2652,15 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self.subplot_y2label_show.setdefault(i, True)
             self.subplot_legends.setdefault(i, True)
             self.subplot_legend_locs.setdefault(i, 'best')
+            self.subplot_legend_x.setdefault(i, 0.01)
+            self.subplot_legend_y.setdefault(i, 0.99)
+            self.subplot_legend_fontsize.setdefault(i, 9)
+            self.subplot_legend_ncols.setdefault(i, 1)
+            self.subplot_legend_frameon.setdefault(i, True)
+            self.subplot_legend_color.setdefault(i, '#000000')
+            self.subplot_legend_facecolor.setdefault(i, '#ffffff')
+            self.subplot_legend_alpha.setdefault(i, 0.8)
+            self.subplot_legend_edgecolor.setdefault(i, '#cccccc')
             self.subplot_xlims.setdefault(i, None)
             self.subplot_ylims.setdefault(i, None)
             self.subplot_y2lims.setdefault(i, None)
@@ -2624,6 +2688,11 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
                      self.subplot_ylabels, self.subplot_ylabel_show,
                      self.subplot_y2labels, self.subplot_y2label_show,
                      self.subplot_legends, self.subplot_legend_locs,
+                     self.subplot_legend_x, self.subplot_legend_y,
+                     self.subplot_legend_fontsize, self.subplot_legend_ncols,
+                     self.subplot_legend_frameon, self.subplot_legend_color,
+                     self.subplot_legend_facecolor, self.subplot_legend_alpha,
+                     self.subplot_legend_edgecolor,
                      self.subplot_xlims, self.subplot_ylims, self.subplot_y2lims,
                      self.subplot_xscales, self.subplot_yscales,
                      self.subplot_xtick_sizes, self.subplot_ytick_sizes,
@@ -2687,9 +2756,16 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
                 spin.blockSignals(False)
 
     def on_active_subplot_changed(self):
-        """Load per-subplot state into the Axes tab widgets (blocks signals to avoid feedback)."""
+        """Load per-subplot state into the Axes and Annotations tab widgets.
+        Also keeps ann_sp_active and series_sp_active in sync with sp_active."""
         idx = self.sp_active.currentIndex()
         if idx < 0: idx = 0
+
+        # ── Sync the other subplot selectors silently ─────────────────────────
+        for combo in (self.ann_sp_active, self.series_sp_active):
+            combo.blockSignals(True)
+            combo.setCurrentIndex(idx)
+            combo.blockSignals(False)
 
         def _load(widget, value):
             widget.blockSignals(True)
@@ -2752,27 +2828,70 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.legend_pos.blockSignals(True)
         self.legend_pos.setCurrentIndex(i_loc if i_loc >= 0 else 0)
         self.legend_pos.blockSignals(False)
+        _load(self.legend_x, self.subplot_legend_x.get(idx, 0.01))
+        _load(self.legend_y, self.subplot_legend_y.get(idx, 0.99))
+        _load(self.legend_fontsize, self.subplot_legend_fontsize.get(idx, 9))
+        _load(self.legend_ncols, self.subplot_legend_ncols.get(idx, 1))
+        _load(self.legend_frameon, self.subplot_legend_frameon.get(idx, True))
+        # Legend colors
+        for attr, sw_attr, default in [
+            ('legend_color',     'legend_color_sw',     '#000000'),
+            ('legend_facecolor', 'legend_facecolor_sw', '#ffffff'),
+            ('legend_edgecolor', 'legend_edgecolor_sw', '#cccccc'),
+        ]:
+            val = getattr(self, attr.replace('legend_', 'subplot_legend_'), {}).get(idx, default)
+            # use the per-subplot dicts
+            val = {
+                'legend_color':     self.subplot_legend_color,
+                'legend_facecolor': self.subplot_legend_facecolor,
+                'legend_edgecolor': self.subplot_legend_edgecolor,
+            }[attr].get(idx, default)
+            setattr(self, attr, val)
+            sw = getattr(self, sw_attr, None)
+            if sw: sw.setStyleSheet(f'color:{val};font-size:15px;')
+        _load(self.legend_alpha, self.subplot_legend_alpha.get(idx, 0.8))
 
         self._update_label_placeholders()
+        # Refresh annotation-tab visibility and list to match
+        visible = self.subplot_ann_visible.get(idx, True)
+        self.ann_subplot_visible.blockSignals(True)
+        self.ann_subplot_visible.setChecked(visible)
+        self.ann_subplot_visible.blockSignals(False)
+        self.refresh_annotation_list()
 
     # ── Axes tab save-back handlers ──────────────────────────────────────────
     def _save_axes_state(self):
-        """Read all Axes tab widgets and persist to the current subplot's dicts."""
+        """Read all Axes tab widgets and persist to the current subplot's dicts.
+        Legend and subplot-title widgets now live in the Annotations tab and
+        use ann_sp_active; all other axes widgets still use sp_active."""
         idx = self.sp_active.currentIndex()
         if idx < 0: idx = 0
-        self.sp_titles[idx]            = self.sp_title_input.text().strip()
-        self.subplot_title_show[idx]   = self.title_show_check.isChecked()
-        self.subplot_title_font[idx]   = self.sp_title_font.currentText()
-        self.subplot_title_size[idx]   = self.sp_title_size.value()
-        self.subplot_title_color[idx]  = self.sp_title_color
+        # Legend and subplot title are in the Annotations tab — use that selector
+        ann_idx = self.ann_sp_active.currentIndex()
+        if ann_idx < 0: ann_idx = 0
+        self.sp_titles[ann_idx]            = self.sp_title_input.text().strip()
+        self.subplot_title_show[ann_idx]   = self.title_show_check.isChecked()
+        self.subplot_title_font[ann_idx]   = self.sp_title_font.currentText()
+        self.subplot_title_size[ann_idx]   = self.sp_title_size.value()
+        self.subplot_title_color[ann_idx]  = self.sp_title_color
+        self.subplot_legends[ann_idx]      = self.legend_show_check.isChecked()
+        self.subplot_legend_locs[ann_idx]  = self.legend_pos.currentText()
+        self.subplot_legend_x[ann_idx]     = self.legend_x.value()
+        self.subplot_legend_y[ann_idx]     = self.legend_y.value()
+        self.subplot_legend_fontsize[ann_idx] = self.legend_fontsize.value()
+        self.subplot_legend_ncols[ann_idx] = self.legend_ncols.value()
+        self.subplot_legend_frameon[ann_idx] = self.legend_frameon.isChecked()
+        self.subplot_legend_color[ann_idx]   = getattr(self, 'legend_color', '#000000')
+        self.subplot_legend_facecolor[ann_idx] = getattr(self, 'legend_facecolor', '#ffffff')
+        self.subplot_legend_alpha[ann_idx]   = self.legend_alpha.value()
+        self.subplot_legend_edgecolor[ann_idx] = getattr(self, 'legend_edgecolor', '#cccccc')
+        # Axes-tab fields use sp_active
         self.subplot_xlabels[idx]      = self.xlabel_input.text().strip()
         self.subplot_xlabel_show[idx]  = self.xlabel_show_check.isChecked()
         self.subplot_ylabels[idx]      = self.ylabel_input.text().strip()
         self.subplot_ylabel_show[idx]  = self.ylabel_show_check.isChecked()
         self.subplot_y2labels[idx]     = self.y2label_input.text().strip()
         self.subplot_y2label_show[idx] = self.y2label_show_check.isChecked()
-        self.subplot_legends[idx]      = self.legend_show_check.isChecked()
-        self.subplot_legend_locs[idx]  = self.legend_pos.currentText()
         self.subplot_xlims[idx]  = None if self.x_auto.isChecked() else (self.x_min.value(), self.x_max.value())
         self.subplot_ylims[idx]  = None if self.y_auto.isChecked() else (self.y_min.value(), self.y_max.value())
         self.subplot_y2lims[idx] = None if self.y2_auto.isChecked() else (self.y2_min.value(), self.y2_max.value())
@@ -2810,6 +2929,23 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self._save_axes_state()
             self.update_preview()
 
+    def _pick_legend_color(self, target):
+        """Pick color for legend text / background / edge."""
+        mapping = {
+            'text': ('legend_color',     'legend_color_sw'),
+            'bg':   ('legend_facecolor', 'legend_facecolor_sw'),
+            'edge': ('legend_edgecolor', 'legend_edgecolor_sw'),
+        }
+        attr, sw_attr = mapping[target]
+        cur = getattr(self, attr, '#000000')
+        col = _show_color_dialog(QColor(cur), self, palette_colors=self._active_palette_colors())
+        if col.isValid():
+            setattr(self, attr, col.name())
+            sw = getattr(self, sw_attr, None)
+            if sw:
+                sw.setStyleSheet(f'color:{col.name()};font-size:15px;')
+            self._on_sp_legend_changed()
+
     def _on_sp_title_changed(self):       self._save_axes_state(); self.update_preview()
     def _on_sp_title_show_changed(self):  self._save_axes_state()
     def _on_sp_xlabel_changed(self):      self._save_axes_state()
@@ -2823,22 +2959,27 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
     # ── Series-tab subplot selector ──────────────────────────────────────────
     def _on_series_subplot_changed(self, idx):
-        """Keep the Axes-tab active subplot in sync when changed from Series tab."""
+        """Series-tab subplot selector changed — sync all selectors and reload widgets."""
         if idx < 0: return
         self.sp_active.blockSignals(True)
         self.sp_active.setCurrentIndex(idx)
         self.sp_active.blockSignals(False)
+        self.ann_sp_active.blockSignals(True)
+        self.ann_sp_active.setCurrentIndex(idx)
+        self.ann_sp_active.blockSignals(False)
         self.on_active_subplot_changed()
 
     # ── Annotations-tab subplot selector ─────────────────────────────────────
     def _on_ann_subplot_changed(self, idx):
-        """Refresh the annotation list and show/hide toggle for the selected subplot."""
+        """Annotations-tab subplot selector changed — sync all selectors and reload widgets."""
         if idx < 0: return
-        visible = self.subplot_ann_visible.get(idx, True)
-        self.ann_subplot_visible.blockSignals(True)
-        self.ann_subplot_visible.setChecked(visible)
-        self.ann_subplot_visible.blockSignals(False)
-        self.refresh_annotation_list()
+        self.sp_active.blockSignals(True)
+        self.sp_active.setCurrentIndex(idx)
+        self.sp_active.blockSignals(False)
+        self.series_sp_active.blockSignals(True)
+        self.series_sp_active.setCurrentIndex(idx)
+        self.series_sp_active.blockSignals(False)
+        self.on_active_subplot_changed()
 
     def _on_ann_subplot_visibility_changed(self, state):
         """Toggle visibility of all annotations on the current subplot."""

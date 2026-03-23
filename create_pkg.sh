@@ -81,7 +81,7 @@ SIZE=$(du -sh "$APP" | cut -f1)
 echo ""
 echo "▶ Installing file-type icons into bundle Resources..."
 RESOURCES="$APP/Contents/Resources"
-for _ft in pviz pvizt pvizx; do
+for _ft in pviz pvizt pvizc pvizp; do
     cp "$ASSETS_DIR/${_ft}.icns" "$RESOURCES/${_ft}.icns"
     echo "   ${_ft}.icns  →  Resources/"
 done

@@ -58,8 +58,17 @@ class SerializationMixin:
         s['subplot_ylabel_show']   = _ser(self.subplot_ylabel_show)
         s['subplot_y2labels']      = _ser(self.subplot_y2labels)
         s['subplot_y2label_show']  = _ser(self.subplot_y2label_show)
-        s['subplot_legends']       = _ser(self.subplot_legends)
-        s['subplot_legend_locs']   = _ser(self.subplot_legend_locs)
+        s['subplot_legends']          = _ser(self.subplot_legends)
+        s['subplot_legend_locs']      = _ser(self.subplot_legend_locs)
+        s['subplot_legend_x']         = _ser(self.subplot_legend_x)
+        s['subplot_legend_y']         = _ser(self.subplot_legend_y)
+        s['subplot_legend_fontsize']  = _ser(self.subplot_legend_fontsize)
+        s['subplot_legend_ncols']     = _ser(self.subplot_legend_ncols)
+        s['subplot_legend_frameon']   = _ser(self.subplot_legend_frameon)
+        s['subplot_legend_color']     = _ser(self.subplot_legend_color)
+        s['subplot_legend_facecolor'] = _ser(self.subplot_legend_facecolor)
+        s['subplot_legend_alpha']     = _ser(self.subplot_legend_alpha)
+        s['subplot_legend_edgecolor'] = _ser(self.subplot_legend_edgecolor)
         s['subplot_xlims']         = _ser(self.subplot_xlims)
         s['subplot_ylims']         = _ser(self.subplot_ylims)
         s['subplot_y2lims']        = _ser(self.subplot_y2lims)
@@ -372,8 +381,17 @@ class SerializationMixin:
         self.subplot_ylabel_show   = _di('subplot_ylabel_show', {'0': True})
         self.subplot_y2labels      = _di('subplot_y2labels', {'0': ''})
         self.subplot_y2label_show  = _di('subplot_y2label_show', {'0': True})
-        self.subplot_legends       = _di('subplot_legends', {'0': True})
-        self.subplot_legend_locs   = _di('subplot_legend_locs', {'0': 'best'})
+        self.subplot_legends          = _di('subplot_legends', {'0': True})
+        self.subplot_legend_locs      = _di('subplot_legend_locs', {'0': 'best'})
+        self.subplot_legend_x         = _di('subplot_legend_x', {'0': 0.01})
+        self.subplot_legend_y         = _di('subplot_legend_y', {'0': 0.99})
+        self.subplot_legend_fontsize  = _di('subplot_legend_fontsize', {'0': 9})
+        self.subplot_legend_ncols     = _di('subplot_legend_ncols', {'0': 1})
+        self.subplot_legend_frameon   = _di('subplot_legend_frameon', {'0': True})
+        self.subplot_legend_color     = _di('subplot_legend_color', {'0': '#000000'})
+        self.subplot_legend_facecolor = _di('subplot_legend_facecolor', {'0': '#ffffff'})
+        self.subplot_legend_alpha     = _di('subplot_legend_alpha', {'0': 0.8})
+        self.subplot_legend_edgecolor = _di('subplot_legend_edgecolor', {'0': '#cccccc'})
         self.subplot_xlims         = _dlim('subplot_xlims')
         self.subplot_ylims         = _dlim('subplot_ylims')
         self.subplot_y2lims        = _dlim('subplot_y2lims')
@@ -618,13 +636,13 @@ class SerializationMixin:
         return out
 
     def _export_palette_bundle(self):
-        """Save a .pvizx file containing only the custom colour palettes."""
+        """Save a .pvizp file containing only the custom colour palettes."""
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Export Palette Bundle', _get_dir(),
-            'plotviz Palette Bundle (*.pvizx);;All Files (*)')
+            'plotviz Palette Bundle (*.pvizp);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
-        if not fp.endswith('.pvizx'): fp += '.pvizx'
+        if not fp.endswith('.pvizp'): fp += '.pvizp'
         try:
             custom_pal_json = self._custom_palettes_json()
             with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -634,22 +652,22 @@ class SerializationMixin:
             QMessageBox.critical(self, 'Error', str(e))
 
     def _import_palette_bundle(self):
-        """Load a .pvizx palette bundle file (via file dialog)."""
+        """Load a .pvizp palette bundle file (via file dialog)."""
         fp, _ = QFileDialog.getOpenFileName(
             self, 'Import Palette Bundle', _get_dir(),
-            'plotviz Palette Bundle (*.pvizx);;All Files (*)')
+            'plotviz Palette Bundle (*.pvizp);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
         self._import_palette_bundle_from_path(fp)
 
     def _import_palette_bundle_from_path(self, fp: str):
-        """Load a .pvizx palette bundle directly from *fp* (no dialog)."""
+        """Load a .pvizp palette bundle directly from *fp* (no dialog)."""
         import config.settings as _cfg
         _cfg.remember_dir(fp)
         self._import_palette_bundle_inner(fp)
 
     def _import_palette_bundle_inner(self, fp: str):
-        """Core logic for importing a .pvizx palette bundle — no dialogs."""
+        """Core logic for importing a .pvizp palette bundle — no dialogs."""
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 if 'palette.json' not in zf.namelist():

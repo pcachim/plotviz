@@ -94,7 +94,7 @@ COLOR_PALETTES = {
                     '#f0f0f0'],
 }
 
-# Runtime-added custom palettes (loaded from palette.json in .pvizx or user prefs)
+# Runtime-added custom palettes (loaded from palette.json in .pvizp or user prefs)
 _CUSTOM_PALETTES: dict = {}
 
 
@@ -255,11 +255,11 @@ class TabBuildersMixin:
         layout.addLayout(pal_btn_row)
         pal_io_row = QHBoxLayout(); pal_io_row.setSpacing(4)
         btn_import_pal = QPushButton('📥 Import palettes…')
-        btn_import_pal.setToolTip('Load a .pvizx palette bundle')
+        btn_import_pal.setToolTip('Load a .pvizp palette bundle')
         btn_import_pal.clicked.connect(self._import_palette_bundle)
         pal_io_row.addWidget(btn_import_pal)
         btn_export_pal = QPushButton('📤 Export palettes…')
-        btn_export_pal.setToolTip('Save custom palettes as a .pvizx bundle')
+        btn_export_pal.setToolTip('Save custom palettes as a .pvizp bundle')
         btn_export_pal.clicked.connect(self._export_palette_bundle)
         pal_io_row.addWidget(btn_export_pal)
         pal_io_row.addStretch()
@@ -305,11 +305,11 @@ class TabBuildersMixin:
 
         cs_btn_row = QHBoxLayout(); cs_btn_row.setSpacing(4)
         btn_cs_save = QPushButton('💾 Save scheme…')
-        btn_cs_save.setToolTip('Save current colors as a .pvizt color scheme')
+        btn_cs_save.setToolTip('Save current colors as a .pvizc color scheme')
         btn_cs_save.clicked.connect(self._save_color_scheme)
         cs_btn_row.addWidget(btn_cs_save)
         btn_cs_load = QPushButton('📂 Load scheme…')
-        btn_cs_load.setToolTip('Load a .pvizt color scheme file')
+        btn_cs_load.setToolTip('Load a .pvizc color scheme file')
         btn_cs_load.clicked.connect(self._load_color_scheme)
         cs_btn_row.addWidget(btn_cs_load)
         cs_btn_row.addStretch()
@@ -733,36 +733,6 @@ class TabBuildersMixin:
 
         layout.addWidget(self._hline())
 
-        # ── Title (hidden when n==1 — chart title is controlled from Style tab) ──
-        self._axes_title_section = QWidget()
-        _ts_lay = QVBoxLayout(self._axes_title_section); _ts_lay.setContentsMargins(0,0,0,0); _ts_lay.setSpacing(4)
-        _ts_lay.addWidget(self._sec_label('Subplot Title'))
-        title_row = QHBoxLayout()
-        self.title_show_check = QCheckBox('Show title'); self.title_show_check.setChecked(True)
-        self.title_show_check.stateChanged.connect(self._on_sp_title_show_changed)
-        title_row.addWidget(self.title_show_check); title_row.addStretch()
-        _ts_lay.addLayout(title_row)
-        self.sp_title_input = QLineEdit(); self.sp_title_input.setPlaceholderText('Subplot 1')
-        self.sp_title_input.editingFinished.connect(self._on_sp_title_changed)
-        _ts_lay.addWidget(self.sp_title_input)
-        sp_tf_row = QHBoxLayout(); sp_tf_row.setSpacing(4)
-        self.sp_title_font = QComboBox(); self.sp_title_font.addItems(_FONTS)
-        self.sp_title_font.currentTextChanged.connect(lambda _: self._on_sp_title_changed())
-        sp_tf_row.addWidget(self.sp_title_font)
-        self.sp_title_size = QSpinBox(); self.sp_title_size.setRange(6, 32); self.sp_title_size.setValue(11)
-        self.sp_title_size.setFixedWidth(46)
-        self.sp_title_size.valueChanged.connect(lambda _: self._on_sp_title_changed())
-        sp_tf_row.addWidget(self.sp_title_size)
-        self.sp_title_color = '#000000'
-        self.sp_title_color_label = QLabel('■'); self.sp_title_color_label.setStyleSheet('color:#000000;font-size:16px;')
-        btn_sp_tc = QPushButton('Color'); btn_sp_tc.setFixedWidth(46)
-        btn_sp_tc.clicked.connect(lambda: self._pick_sp_title_color())
-        sp_tf_row.addWidget(self.sp_title_color_label); sp_tf_row.addWidget(btn_sp_tc)
-        sp_tf_row.addStretch(); _ts_lay.addLayout(sp_tf_row)
-        _ts_lay.addWidget(self._hline())
-        layout.addWidget(self._axes_title_section)
-        self._axes_title_section.setVisible(False)  # shown only when n > 1
-
         # ── X Axis ───────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('X Axis'))
         xlabel_vis_row = QHBoxLayout()
@@ -977,20 +947,6 @@ class TabBuildersMixin:
         y2lim_row.addStretch(); layout.addLayout(y2lim_row)
 
         layout.addWidget(self._hline())
-
-        # ── Legend ────────────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Legend'))
-        leg_row = QHBoxLayout()
-        self.legend_show_check = QCheckBox('Show legend'); self.legend_show_check.setChecked(True)
-        self.legend_show_check.stateChanged.connect(self._on_sp_legend_changed)
-        leg_row.addWidget(self.legend_show_check)
-        self.legend_pos = QComboBox()
-        self.legend_pos.addItems(['best', 'upper right', 'upper left', 'upper center',
-                                  'lower right', 'lower left', 'lower center',
-                                  'center right', 'center left', 'center'])
-        self.legend_pos.currentTextChanged.connect(self._on_sp_legend_changed)
-        leg_row.addWidget(self.legend_pos); leg_row.addStretch()
-        layout.addLayout(leg_row)
 
         layout.addStretch()
         scroll.setWidget(content); mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
@@ -1382,13 +1338,11 @@ class TabBuildersMixin:
         layout.setSpacing(4)
 
         def irow(*widgets):
-            """Pack widgets onto one horizontal row."""
             r = QHBoxLayout(); r.setSpacing(4)
             for w in widgets: r.addWidget(w)
             r.addStretch(); layout.addLayout(r)
 
         def lrow(label, *widgets):
-            """Fixed-width label + widgets on one row."""
             r = QHBoxLayout(); r.setSpacing(4)
             lb = QLabel(label); lb.setFixedWidth(76); r.addWidget(lb)
             for w in widgets: r.addWidget(w)
@@ -1413,6 +1367,122 @@ class TabBuildersMixin:
         self._ann_sp_row_widget.setVisible(False)
         layout.addWidget(self._ann_sp_row_widget)
 
+        layout.addWidget(self._hline())
+
+        # ── Subplot Title (moved from Axes; hidden when n==1) ─────────────────
+        self._axes_title_section = QWidget()
+        _ts_lay = QVBoxLayout(self._axes_title_section)
+        _ts_lay.setContentsMargins(0, 0, 0, 0); _ts_lay.setSpacing(4)
+        _ts_lay.addWidget(self._sec_label('Subplot Title'))
+        title_row = QHBoxLayout()
+        self.title_show_check = QCheckBox('Show title'); self.title_show_check.setChecked(True)
+        self.title_show_check.stateChanged.connect(self._on_sp_title_show_changed)
+        title_row.addWidget(self.title_show_check); title_row.addStretch()
+        _ts_lay.addLayout(title_row)
+        self.sp_title_input = QLineEdit(); self.sp_title_input.setPlaceholderText('Subplot 1')
+        self.sp_title_input.editingFinished.connect(self._on_sp_title_changed)
+        _ts_lay.addWidget(self.sp_title_input)
+        sp_tf_row = QHBoxLayout(); sp_tf_row.setSpacing(4)
+        self.sp_title_font = QComboBox(); self.sp_title_font.addItems(_FONTS)
+        self.sp_title_font.currentTextChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_tf_row.addWidget(self.sp_title_font)
+        self.sp_title_size = QSpinBox(); self.sp_title_size.setRange(6, 32); self.sp_title_size.setValue(11)
+        self.sp_title_size.setFixedWidth(46)
+        self.sp_title_size.valueChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_tf_row.addWidget(self.sp_title_size)
+        self.sp_title_color = '#000000'
+        self.sp_title_color_label = QLabel('■')
+        self.sp_title_color_label.setStyleSheet('color:#000000;font-size:16px;')
+        btn_sp_tc = QPushButton('Color'); btn_sp_tc.setFixedWidth(46)
+        btn_sp_tc.clicked.connect(lambda: self._pick_sp_title_color())
+        sp_tf_row.addWidget(self.sp_title_color_label); sp_tf_row.addWidget(btn_sp_tc)
+        sp_tf_row.addStretch(); _ts_lay.addLayout(sp_tf_row)
+        _ts_lay.addWidget(self._hline())
+        layout.addWidget(self._axes_title_section)
+        self._axes_title_section.setVisible(False)  # shown only when n > 1
+
+        # ── Legend (moved from Axes; full styling) ────────────────────────────
+        layout.addWidget(self._sec_label('Legend'))
+
+        leg_check_row = QHBoxLayout(); leg_check_row.setSpacing(6)
+        self.legend_show_check = QCheckBox('Show legend'); self.legend_show_check.setChecked(True)
+        self.legend_show_check.stateChanged.connect(self._on_sp_legend_changed)
+        leg_check_row.addWidget(self.legend_show_check); leg_check_row.addStretch()
+        layout.addLayout(leg_check_row)
+
+        # Location dropdown + fine X/Y position
+        leg_loc_row = QHBoxLayout(); leg_loc_row.setSpacing(4)
+        leg_loc_row.addWidget(QLabel('Position:'))
+        self.legend_pos = QComboBox()
+        self.legend_pos.addItems(['best', 'upper right', 'upper left', 'upper center',
+                                  'lower right', 'lower left', 'lower center',
+                                  'center right', 'center left', 'center', 'manual'])
+        self.legend_pos.currentTextChanged.connect(self._on_sp_legend_changed)
+        leg_loc_row.addWidget(self.legend_pos)
+        leg_loc_row.addWidget(QLabel('X:'))
+        self.legend_x = QDoubleSpinBox(); self.legend_x.setRange(0.0, 1.5)
+        self.legend_x.setSingleStep(0.01); self.legend_x.setDecimals(2)
+        self.legend_x.setValue(0.01); self.legend_x.setFixedWidth(60)
+        self.legend_x.setToolTip('Fine X position (figure fraction); active for all positions except "best"')
+        self.legend_x.valueChanged.connect(self._on_sp_legend_changed)
+        leg_loc_row.addWidget(self.legend_x)
+        leg_loc_row.addWidget(QLabel('Y:'))
+        self.legend_y = QDoubleSpinBox(); self.legend_y.setRange(0.0, 1.5)
+        self.legend_y.setSingleStep(0.01); self.legend_y.setDecimals(2)
+        self.legend_y.setValue(0.99); self.legend_y.setFixedWidth(60)
+        self.legend_y.setToolTip('Fine Y position (figure fraction); active for all positions except "best"')
+        self.legend_y.valueChanged.connect(self._on_sp_legend_changed)
+        leg_loc_row.addWidget(self.legend_y)
+        leg_loc_row.addStretch(); layout.addLayout(leg_loc_row)
+
+        # Font size + columns
+        leg_style_row = QHBoxLayout(); leg_style_row.setSpacing(4)
+        leg_style_row.addWidget(QLabel('Font sz:'))
+        self.legend_fontsize = QSpinBox(); self.legend_fontsize.setRange(5, 24)
+        self.legend_fontsize.setValue(9); self.legend_fontsize.setFixedWidth(46)
+        self.legend_fontsize.valueChanged.connect(self._on_sp_legend_changed)
+        leg_style_row.addWidget(self.legend_fontsize)
+        leg_style_row.addWidget(QLabel('Cols:'))
+        self.legend_ncols = QSpinBox(); self.legend_ncols.setRange(1, 8)
+        self.legend_ncols.setValue(1); self.legend_ncols.setFixedWidth(42)
+        self.legend_ncols.valueChanged.connect(self._on_sp_legend_changed)
+        leg_style_row.addWidget(self.legend_ncols)
+        self.legend_frameon = QCheckBox('Frame')
+        self.legend_frameon.setChecked(True)
+        self.legend_frameon.stateChanged.connect(self._on_sp_legend_changed)
+        leg_style_row.addWidget(self.legend_frameon)
+        leg_style_row.addStretch(); layout.addLayout(leg_style_row)
+
+        # Colors — text, background, edge
+        leg_color_row = QHBoxLayout(); leg_color_row.setSpacing(4)
+        leg_color_row.addWidget(QLabel('Text:'))
+        self.legend_color = '#000000'
+        self.legend_color_sw = QLabel('■'); self.legend_color_sw.setStyleSheet('color:#000000;font-size:15px;')
+        btn_leg_tc = QPushButton('…'); btn_leg_tc.setFixedWidth(24)
+        btn_leg_tc.clicked.connect(lambda: self._pick_legend_color('text'))
+        leg_color_row.addWidget(self.legend_color_sw); leg_color_row.addWidget(btn_leg_tc)
+        leg_color_row.addWidget(QLabel('BG:'))
+        self.legend_facecolor = '#ffffff'
+        self.legend_facecolor_sw = QLabel('■'); self.legend_facecolor_sw.setStyleSheet('color:#ffffff;font-size:15px;')
+        btn_leg_bg = QPushButton('…'); btn_leg_bg.setFixedWidth(24)
+        btn_leg_bg.clicked.connect(lambda: self._pick_legend_color('bg'))
+        leg_color_row.addWidget(self.legend_facecolor_sw); leg_color_row.addWidget(btn_leg_bg)
+        leg_color_row.addWidget(QLabel('α:'))
+        self.legend_alpha = QDoubleSpinBox(); self.legend_alpha.setRange(0.0, 1.0)
+        self.legend_alpha.setSingleStep(0.05); self.legend_alpha.setValue(0.8)
+        self.legend_alpha.setFixedWidth(54)
+        self.legend_alpha.valueChanged.connect(self._on_sp_legend_changed)
+        leg_color_row.addWidget(self.legend_alpha)
+        leg_color_row.addWidget(QLabel('Edge:'))
+        self.legend_edgecolor = '#cccccc'
+        self.legend_edgecolor_sw = QLabel('■'); self.legend_edgecolor_sw.setStyleSheet('color:#cccccc;font-size:15px;')
+        btn_leg_ec = QPushButton('…'); btn_leg_ec.setFixedWidth(24)
+        btn_leg_ec.clicked.connect(lambda: self._pick_legend_color('edge'))
+        leg_color_row.addWidget(self.legend_edgecolor_sw); leg_color_row.addWidget(btn_leg_ec)
+        leg_color_row.addStretch(); layout.addLayout(leg_color_row)
+
+        layout.addWidget(self._hline())
+
         # ── Show/hide annotations for current subplot ─────────────────────────
         vis_row = QHBoxLayout(); vis_row.setSpacing(6)
         self.ann_subplot_visible = QCheckBox('Show annotations on this subplot')
@@ -1420,9 +1490,9 @@ class TabBuildersMixin:
         self.ann_subplot_visible.stateChanged.connect(self._on_ann_subplot_visibility_changed)
         vis_row.addWidget(self.ann_subplot_visible); vis_row.addStretch()
         layout.addLayout(vis_row)
-        layout.addWidget(self._hline())
 
-        # ── Mode buttons (2×2 grid) ───────────────────────────────────────────
+        # ── Mode buttons ──────────────────────────────────────────────────────
+        layout.addWidget(self._sec_label('Place Annotation'))
         self.ann_none_btn  = QPushButton('🖱 Normal/Drag')
         self.ann_text_btn  = QPushButton('📝 Text')
         self.ann_arrow_btn = QPushButton('➡ Arrow')
@@ -1442,44 +1512,40 @@ class TabBuildersMixin:
         r_mode2.addWidget(self.ann_arrow_btn); r_mode2.addWidget(self.ann_image_btn)
         layout.addLayout(r_mode2)
 
-        self.ann_image_zoom = QDoubleSpinBox(); self.ann_image_zoom.setRange(0.01,5.0)
+        self.ann_image_zoom = QDoubleSpinBox(); self.ann_image_zoom.setRange(0.01, 5.0)
         self.ann_image_zoom.setValue(0.15); self.ann_image_zoom.setSingleStep(0.01)
         lrow('Img zoom:', self.ann_image_zoom)
 
         layout.addWidget(self._hline())
         layout.addWidget(QLabel('Style for new annotations:'))
 
-        # Font row
         self.ann_font = QComboBox(); self.ann_font.addItems(_FONTS)
         self.ann_font.setFixedWidth(110)
         self.ann_font.currentTextChanged.connect(self._sync_ann_style)
-        self.ann_fontsize = QSpinBox(); self.ann_fontsize.setRange(6,48); self.ann_fontsize.setValue(10)
+        self.ann_fontsize = QSpinBox(); self.ann_fontsize.setRange(6, 48); self.ann_fontsize.setValue(10)
         self.ann_fontsize.setFixedWidth(52)
         self.ann_fontsize.valueChanged.connect(self._sync_ann_style)
         lrow('Font:', self.ann_font, QLabel('Sz:'), self.ann_fontsize)
 
-        # Font color
         self.ann_fontcolor = '#000000'
         fc_sw, fc_btn = color_btn('ann_fontcolor', '#000000')
         lrow('Font color:', fc_sw, fc_btn)
 
-        # BG color + opacity
         self.ann_bgcolor = '#ffffcc'
         bg_sw, bg_btn = color_btn('ann_bgcolor', '#ffffcc')
-        self.ann_bg_alpha = QDoubleSpinBox(); self.ann_bg_alpha.setRange(0,1)
+        self.ann_bg_alpha = QDoubleSpinBox(); self.ann_bg_alpha.setRange(0, 1)
         self.ann_bg_alpha.setSingleStep(0.05); self.ann_bg_alpha.setValue(0.9)
         self.ann_bg_alpha.setFixedWidth(58)
         self.ann_bg_alpha.valueChanged.connect(self._sync_ann_style)
         lrow('BG:', bg_sw, bg_btn, QLabel('α:'), self.ann_bg_alpha)
 
-        # Edge color
         self.ann_edgecolor = '#aaaaaa'
         ec_sw, ec_btn = color_btn('ann_edgecolor', '#aaaaaa')
         lrow('Border:', ec_sw, ec_btn)
 
         layout.addWidget(self._hline())
 
-        # Manual position + place button on one row
+        # Manual position + place
         self.ann_x_override = QLineEdit(); self.ann_x_override.setPlaceholderText('X')
         self.ann_x_override.setFixedWidth(60)
         self.ann_y_override = QLineEdit(); self.ann_y_override.setPlaceholderText('Y')
@@ -1488,7 +1554,6 @@ class TabBuildersMixin:
         btn_place.clicked.connect(self._place_at_override)
         lrow('Position:', self.ann_x_override, self.ann_y_override, btn_place)
 
-        # Undo / clear on one row
         btn_undo  = QPushButton('↩ Undo last')
         btn_clear = QPushButton('🗑 Clear all')
         btn_clear.clicked.connect(lambda: self.canvas.clear_annotations())
@@ -1496,8 +1561,9 @@ class TabBuildersMixin:
         irow(btn_undo, btn_clear)
 
         layout.addWidget(self._hline())
-        layout.addWidget(QLabel('Annotations (select → Edit/Delete):'))
-        self.ann_list_widget = QListWidget(); self.ann_list_widget.setMaximumHeight(110)
+        layout.addWidget(QLabel('Annotations — double-click to edit:'))
+        self.ann_list_widget = QListWidget(); self.ann_list_widget.setMaximumHeight(120)
+        self.ann_list_widget.itemDoubleClicked.connect(self._edit_selected_annotation)
         layout.addWidget(self.ann_list_widget)
 
         btn_edit = QPushButton('✏️ Edit selected')
@@ -1508,7 +1574,7 @@ class TabBuildersMixin:
 
         layout.addStretch()
         scroll.setWidget(content); mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
-        self.tabs.addTab(widget,'Annotate')
+        self.tabs.addTab(widget, 'Annotations')
 
     # ─── Advanced tab ─────────────────────────────────────────────────────────
     def create_advanced_tab(self):
