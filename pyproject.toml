@@ -32,4 +32,7 @@ packages = ["ui", "data", "styling", "config"]
 [dependency-groups]
 dev = [
     "pyinstaller>=6.3",
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mike>=2.1",
 ]

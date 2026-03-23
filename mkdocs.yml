@@ -1,0 +1,90 @@
+site_name: plotviz
+site_description: Publication-quality chart editor for scientists and analysts
+site_author: Paulo Cachim
+site_url: https://yourorg.github.io/plotviz/
+repo_url: https://github.com/yourorg/plotviz
+repo_name: yourorg/plotviz
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+exclude_docs: README.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - User Guide:
+    - Loading Data: data.md
+    - Chart Types: chart-types.md
+    - Style & Appearance: style.md
+    - Axes: axes.md
+    - Annotations: annotations.md
+    - Series & Curve Fitting: series.md
+    - Subplots: subplots.md
+    - Advanced Tools: advanced.md
+  - Reference:
+    - File Formats: file-formats.md
+    - Color Palettes: palettes.md
+    - Keyboard Shortcuts: shortcuts.md
+  - Development:
+    - Building & Packaging: building.md
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yourorg/plotviz
