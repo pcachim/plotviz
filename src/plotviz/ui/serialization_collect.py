@@ -126,10 +126,7 @@ class SerializationCollectMixin:
 
         s['dpi']        = self.dpi_spin.value()
 
-        # Fit curve style
-        s['fit_color']     = self.fit_color
-        s['fit_linestyle'] = self.fit_ls_combo.currentText()
-        s['fit_linewidth'] = self.fit_lw_spin.value()
+        # Fit CI/PI bands (fit_color/fit_linestyle/fit_linewidth removed in 2.0.0)
         s['fit_ci_index']  = self.fit_ci_combo.currentIndex()
         s['fit_pi_index']  = self.fit_pi_combo.currentIndex()
         s['fit_ci_alpha']  = self.fit_ci_alpha_spin.value()

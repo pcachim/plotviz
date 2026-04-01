@@ -40,7 +40,10 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+try:
+    from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
+except ImportError:
+    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 
 from ui.canvas import CanvasPlotter
 from ui.tab_builders import (
@@ -49,6 +52,8 @@ from ui.tab_builders import (
 )
 from ui.plot_engine import PlotEngineMixin
 from ui.serialization import SerializationMixin
+from ui.python_export import PythonExportMixin
+from ui.seaborn_explorer import SeabornExplorer
 
 
 import config.settings as settings
@@ -557,7 +562,7 @@ class DataImportDialog(QDialog):
         return result
 
 
-class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMainWindow):
+class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonExportMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         from config._version import __version__
@@ -624,9 +629,8 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self._colour_mode  = 'system'  # track current scheme for serialization
         self._color_palette = settings.get('color_palette', 'Matplotlib')
         self.subplot_ann_visible  = {0: True}   # per-subplot annotation visibility
-        self.fit_color     = '#ff7f0e'   # default fit curve style
-        self.fit_linestyle = '--'
-        self.fit_linewidth = 1.5
+        # fit_color / fit_linestyle / fit_linewidth removed in 2.0.0 —
+        # fit curves are now styled via curve_styles like any other series.
 
         self.init_ui()
 
@@ -677,6 +681,29 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self._resize_timer.setSingleShot(True)
             self._resize_timer.timeout.connect(self.update_preview)
         self._resize_timer.start(80)   # 80 ms debounce
+
+    # ── Seaborn Explorer ──────────────────────────────────────────────────────
+    def _open_seaborn_explorer(self):
+        """Open (or restore) the Seaborn Explorer window."""
+        palette = [self._palette_color(i) for i in range(10)]
+        if self._sns_explorer is None:
+            self._sns_explorer = SeabornExplorer(
+                datasets=self.datasets,
+                palette=palette,
+                parent=self,
+            )
+            self._sns_explorer.setWindowModality(Qt.WindowModality.NonModal)
+        else:
+            self._sns_explorer.refresh_datasets(self.datasets, palette)
+        self._sns_explorer.show()
+        self._sns_explorer.raise_()
+        self._sns_explorer.activateWindow()
+
+    def _notify_sns_explorer(self):
+        """Called whenever datasets change so the explorer stays in sync."""
+        if self._sns_explorer is not None and self._sns_explorer.isVisible():
+            palette = [self._palette_color(i) for i in range(10)]
+            self._sns_explorer.refresh_datasets(self.datasets, palette)
 
     def closeEvent(self, event):
         """Persist window state and prefs before closing."""
@@ -758,10 +785,71 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.create_annotations_tab()
         self.create_advanced_tab()
 
-        # ── Menu bar — tab navigation ─────────────────────────────────────────
+        # ── Menu bar — File ───────────────────────────────────────────────────
         from PyQt6.QtWidgets import QMenuBar
         from PyQt6.QtGui import QAction
         menubar = self.menuBar()
+
+        file_menu = menubar.addMenu('File')
+
+        def _go_chart_tab():
+            self.tabs.setCurrentIndex(0)   # Chart / File tab
+
+        def _go_data_tab():
+            self.tabs.setCurrentIndex(1)   # Data tab
+
+        act_new = QAction('New Plot', self)
+        act_new.setShortcut('Ctrl+N')
+        act_new.triggered.connect(lambda: (_go_chart_tab(), self._reset_app()))
+        file_menu.addAction(act_new)
+
+        file_menu.addSeparator()
+
+        act_open = QAction('Open Chart (.pviz)…', self)
+        act_open.setShortcut('Ctrl+O')
+        act_open.triggered.connect(lambda: (_go_chart_tab(), self._load_project()))
+        file_menu.addAction(act_open)
+
+        act_open_tpl = QAction('Load Template (.pvizt)…', self)
+        act_open_tpl.triggered.connect(lambda: (_go_chart_tab(), self._load_template()))
+        file_menu.addAction(act_open_tpl)
+
+        file_menu.addSeparator()
+
+        act_save = QAction('Save Chart (.pviz)…', self)
+        act_save.setShortcut('Ctrl+S')
+        act_save.triggered.connect(lambda: (_go_chart_tab(), self._save_project()))
+        file_menu.addAction(act_save)
+
+        act_save_tpl = QAction('Save Template (.pvizt)…', self)
+        act_save_tpl.triggered.connect(lambda: (_go_chart_tab(), self._save_template()))
+        file_menu.addAction(act_save_tpl)
+
+        file_menu.addSeparator()
+
+        act_load_data = QAction('Load Data…', self)
+        act_load_data.setShortcut('Ctrl+L')
+        act_load_data.triggered.connect(lambda: (_go_data_tab(), self.load_data()))
+        file_menu.addAction(act_load_data)
+
+        file_menu.addSeparator()
+
+        act_export_img = QAction('Export Image…', self)
+        act_export_img.setShortcut('Ctrl+E')
+        act_export_img.triggered.connect(
+            lambda: (_go_chart_tab(),
+                     self.export_chart(self._export_fmt_combo.currentText().lower())))
+        file_menu.addAction(act_export_img)
+
+        act_export_py = QAction('Export Python Bundle (.pvizx)…', self)
+        act_export_py.setShortcut('Ctrl+Shift+E')
+        act_export_py.triggered.connect(
+            lambda: (_go_chart_tab(), self._export_python_bundle()))
+        file_menu.addAction(act_export_py)
+
+        self._file_menu = file_menu
+
+        # ── Menu bar — View ───────────────────────────────────────────────────
         view_menu = menubar.addMenu('View')
         for i in range(self.tabs.count()):
             name = self.tabs.tabText(i)
@@ -774,6 +862,17 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self.tabs.currentChanged.connect(
                 lambda cur, a=action, idx=i: a.setChecked(cur == idx))
         self._view_menu = view_menu
+
+        # ── Tools menu ────────────────────────────────────────────────────────
+        from PyQt6.QtGui import QAction
+        tools_menu = menubar.addMenu('Tools')
+        sns_action = QAction('Seaborn Explorer…', self)
+        sns_action.setShortcut('Ctrl+Shift+S')
+        sns_action.setStatusTip('Open the Seaborn statistical chart explorer')
+        sns_action.triggered.connect(self._open_seaborn_explorer)
+        tools_menu.addAction(sns_action)
+        self._tools_menu = tools_menu
+        self._sns_explorer = None   # lazily created
 
         # Tooltips
         for i, tip in enumerate([
@@ -894,19 +993,40 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             grp.setVisible(show)
 
     def _on_chart_type_changed(self, ct):
-        """Chart type selector changed — push to all selected series rows, update option groups."""
-        # Push to every selected row's Type combo (col 3)
+        """Chart type selector changed — push to all rows in the active subplot.
+        For whole-chart types (Polar, Heatmap, Pie, etc.) the type is also
+        stored in subplot_chart_types so the projection is rebuilt correctly.
+        """
+        from ui.tab_builders import WHOLE_CHART_TYPES
+        new_is_whole = ct in WHOLE_CHART_TYPES
         if hasattr(self, 'series_table'):
-            selected_rows = set(idx.row() for idx in self.series_table.selectedIndexes())
-            if not selected_rows:
-                selected_rows = set(range(self.series_table.rowCount()))
-            for row in selected_rows:
+            n = self.subplot_rows * self.subplot_cols
+            active_sp = (self.series_sp_active.currentIndex() + 1) if n > 1 else 1
+            active_idx = active_sp - 1  # 0-based subplot index
+
+            # For whole-chart types, always update subplot_chart_types so the
+            # projection (polar, 3d, …) is applied even when no row is selected.
+            if new_is_whole:
+                self.subplot_chart_types[active_idx] = ct
+            else:
+                # Switching away from a whole-chart type — clear it so per-series
+                # types from the series table take over for this subplot.
+                if self.subplot_chart_types.get(active_idx) in WHOLE_CHART_TYPES:
+                    self.subplot_chart_types[active_idx] = ct
+
+            # Push to every row that belongs to the active subplot.
+            for row in range(self.series_table.rowCount()):
+                spin = self.series_table.cellWidget(row, 4)
+                row_sp = spin.value() if (spin and n > 1) else 1
+                if row_sp != active_sp:
+                    continue
                 type_cb = self.series_table.cellWidget(row, 3)
                 if type_cb:
-                    type_cb.blockSignals(True)
                     i = type_cb.findText(ct)
-                    if i >= 0: type_cb.setCurrentIndex(i)
-                    type_cb.blockSignals(False)
+                    if i >= 0:
+                        type_cb.blockSignals(True)
+                        type_cb.setCurrentIndex(i)
+                        type_cb.blockSignals(False)
         self._update_option_group_visibility(ct)
         if hasattr(self, 'datasets'):
             self.update_preview()
@@ -919,12 +1039,34 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         row = min(selected_rows)
         type_cb = self.series_table.cellWidget(row, 3)
         if type_cb:
-            ct = type_cb.currentText()
-            self.chart_type_combo.blockSignals(True)
-            i = self.chart_type_combo.findText(ct)
-            if i >= 0: self.chart_type_combo.setCurrentIndex(i)
-            self.chart_type_combo.blockSignals(False)
-            self._update_option_group_visibility(ct)
+            self._sync_combo_from_type(type_cb.currentText())
+
+    def _sync_combo_from_type(self, ct):
+        """Sync chart_type_combo and option group visibility to the given type string.
+        Called whenever a series row's Type cell changes or a row is selected.
+        """
+        if not hasattr(self, 'chart_type_combo'): return
+        from ui.tab_builders import WHOLE_CHART_TYPES
+        self.chart_type_combo.blockSignals(True)
+        i = self.chart_type_combo.findText(ct)
+        if i >= 0:
+            self.chart_type_combo.setCurrentIndex(i)
+        self.chart_type_combo.blockSignals(False)
+        self._update_option_group_visibility(ct)
+        # Also update subplot_chart_types for whole-chart types so the projection
+        # is rebuilt correctly when the type is changed via the series table.
+        if ct in WHOLE_CHART_TYPES and hasattr(self, 'series_sp_active'):
+            n = self.subplot_rows * self.subplot_cols
+            active_sp = (self.series_sp_active.currentIndex() + 1) if n > 1 else 1
+            self.subplot_chart_types[active_sp - 1] = ct
+
+    def _on_series_row_type_changed(self, ct):
+        """A Type combo inside the series table was changed directly by the user.
+        Sync the global chart_type_combo and option groups, then redraw.
+        """
+        self._sync_combo_from_type(ct)
+        if hasattr(self, 'datasets'):
+            self.update_preview()
 
     # ═══════════════════════════════════════════════════════════════════════════
     # HELPERS
@@ -1238,7 +1380,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             'chart_bg':     getattr(self, 'chart_bg_color',    '#ffffff'),
             'chart_fg':     getattr(self, 'chart_fg_color',    '#000000'),
             'plot_bg':      getattr(self, 'plot_bg_color',     '#ffffff'),
-            'fit_color':    getattr(self, 'fit_color',         '#ff7700'),
             'title':        getattr(self, 'title_color',       '#000000'),
             'xlabel':       getattr(self, 'xlabel_color',      '#000000'),
             'ylabel':       getattr(self, 'ylabel_color',      '#000000'),
@@ -1258,11 +1399,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             getattr(self, attr + '_hex').setText(hx)
             self.update_preview()
             return
-        if target == 'fit_color':
-            self.fit_color = hx
-            self.fit_color_swatch.setStyleSheet(f'color:{hx};font-size:18px;')
-            self.fit_color_hex_lbl.setText(hx)
-            self.update_preview(); return
         mapping = {
             'title':        ('title_color',        'title_color_label',        'style'),
             'xlabel':       ('xlabel_color',        'xlabel_color_label',       'style'),
@@ -1516,14 +1652,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             'title_color': '#f8fafc', 'xlabel_color': '#94a3b8', 'ylabel_color': '#94a3b8',
             'border_top': False, 'border_right': False,
             'color_palette': 'Bold',
-        },
-        'Seaborn (whitegrid)': {
-            'chart_bg_color': '#eaeaf2', 'chart_fg_color': '#333333', 'plot_bg_color': '#ffffff',
-            'grid_color': '#ffffff', 'grid_on': True, 'grid_linestyle': '-',
-            'grid_linewidth': 1.0, 'grid_alpha': 1.0,
-            'minor_grid_color': '#ffffff', 'minor_grid_on': False,
-            'title_color': '#333333', 'xlabel_color': '#555555', 'ylabel_color': '#555555',
-            'color_palette': 'Pastel',
         },
         'Scientific (minimal)': {
             'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
@@ -1985,8 +2113,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             'minor_grid_on':  False, 'minor_grid_color': '#e8e8e8',
             'minor_grid_linestyle': ':', 'minor_grid_linewidth': 0.3, 'minor_grid_alpha': 0.2,
             'dpi':           300,
-            'fit_color':     '#ff7f0e', 'fit_linestyle': '--',
-            'fit_linewidth': 1.5,  'fit_ci_index': 0, 'fit_pi_index': 0, 'fit_ci_alpha': 0.25,
+            'fit_ci_index': 0, 'fit_pi_index': 0, 'fit_ci_alpha': 0.25,
             'fit_result':    None,
             'subplot_rows':  1,    'subplot_cols': 1,
             'subplot_mosaic':None, 'sp_sharex':    False, 'sp_sharey': False,
@@ -2053,6 +2180,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.on_subplot_layout_changed()
         self.update_preview()
         self.refresh_annotation_list()
+        self._notify_sns_explorer()
 
     def load_data(self):
         files, _ = QFileDialog.getOpenFileNames(
@@ -2075,6 +2203,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.update_lists()
         if self.series_table.rowCount() == 0:
             self._add_series_row()
+        self._notify_sns_explorer()
 
 
     def _remove_selected_datasets(self):
@@ -2086,6 +2215,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             self.datasets.pop(name, None)
         self.update_lists()
         self.update_preview()
+        self._notify_sns_explorer()
 
     def update_lists(self, keep_selections=False):
         """Refresh dataset list, combo_z, combo_err, and series table combos."""
@@ -2134,6 +2264,9 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         i_fn = self.fn_source_combo.findText(prev_fn)
         self.fn_source_combo.setCurrentIndex(i_fn if i_fn >= 0 else 0)
         self.fn_source_combo.blockSignals(False)
+
+        # Notify Seaborn Explorer if it is open
+        self._notify_sns_explorer()
 
     def _refresh_series_combos(self):
         """Re-populate the X/Y QComboBox widgets in every series row and sync Plot spin ranges."""
@@ -2208,16 +2341,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.curve_select.blockSignals(False)
         self.load_curve_style()
 
-        # Keep fit series combo in sync
-        if hasattr(self, 'fit_series_combo'):
-            self.fit_series_combo.blockSignals(True)
-            prev_fit = self.fit_series_combo.currentText()
-            self.fit_series_combo.clear()
-            self.fit_series_combo.addItems(labels)
-            fit_idx = self.fit_series_combo.findText(prev_fit)
-            self.fit_series_combo.setCurrentIndex(fit_idx if fit_idx >= 0 else 0)
-            self.fit_series_combo.blockSignals(False)
-
     def _add_series_row(self):
         cols = sorted(self.datasets)
         row = self.series_table.rowCount()
@@ -2274,10 +2397,12 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         # Label
         self.series_table.setItem(row, 2, QTableWidgetItem(f'Series {row+1}'))
 
-        # Type combo
+        # Type combo — default to whatever the global chart type combo shows
         type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
-        type_cb.currentIndexChanged.connect(self.update_preview)
-        type_cb.currentIndexChanged.connect(self._on_series_selection_changed)
+        if hasattr(self, 'chart_type_combo'):
+            i = type_cb.findText(self.chart_type_combo.currentText())
+            if i >= 0: type_cb.setCurrentIndex(i)
+        type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
         self.series_table.setCellWidget(row, 3, type_cb)
 
         # Plot spinbox — default to whichever subplot is active in the Subplots tab
@@ -2287,6 +2412,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         plot_spin.setValue(max(1, active_subplot))
         plot_spin.setMinimumWidth(36)
         plot_spin.valueChanged.connect(self.update_preview)
+        plot_spin.valueChanged.connect(lambda _: self._filter_series_table_by_subplot())
         self.series_table.setCellWidget(row, 4, plot_spin)
 
         # Y2 checkbox item
@@ -2306,6 +2432,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
 
         self.series_table.blockSignals(False)
         self._refresh_curve_select()
+        self._filter_series_table_by_subplot()
         self.update_preview()
 
     def _on_x_col_changed(self):
@@ -2736,6 +2863,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
                     if hasattr(self, 'title_check'):
                         self.title_check.setChecked(True)
         self.on_active_subplot_changed()
+        self._filter_series_table_by_subplot(0)
         # Sync ann visibility checkbox for subplot 0
         if hasattr(self, 'ann_subplot_visible'):
             self.ann_subplot_visible.blockSignals(True)
@@ -2754,6 +2882,26 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
                 spin.blockSignals(True)
                 spin.setRange(1, n)
                 spin.blockSignals(False)
+
+    def _filter_series_table_by_subplot(self, subplot_idx=None):
+        """Show only series rows that belong to the active subplot.
+        When there is only 1 subplot, all rows are shown.
+        """
+        if not hasattr(self, 'series_table'):
+            return
+        n = self.subplot_rows * self.subplot_cols
+        if n <= 1:
+            # Single subplot — show everything
+            for row in range(self.series_table.rowCount()):
+                self.series_table.setRowHidden(row, False)
+            return
+        if subplot_idx is None:
+            subplot_idx = self.series_sp_active.currentIndex()
+        target = subplot_idx + 1   # spinbox is 1-based
+        for row in range(self.series_table.rowCount()):
+            spin = self.series_table.cellWidget(row, 4)
+            row_subplot = spin.value() if spin else 1
+            self.series_table.setRowHidden(row, row_subplot != target)
 
     def on_active_subplot_changed(self):
         """Load per-subplot state into the Axes and Annotations tab widgets.
@@ -2858,6 +3006,22 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.ann_subplot_visible.setChecked(visible)
         self.ann_subplot_visible.blockSignals(False)
         self.refresh_annotation_list()
+        # Filter series table to only show rows for this subplot
+        self._filter_series_table_by_subplot(idx)
+
+        # ── Sync chart_type_combo to this subplot's chart type ────────────────
+        # For whole-chart types (Polar, Heatmap, Pie, etc.) the type lives in
+        # subplot_chart_types, not in the series-table rows, so we must push it
+        # into chart_type_combo explicitly whenever the active subplot changes.
+        from ui.tab_builders import WHOLE_CHART_TYPES
+        sp_ct = self.subplot_chart_types.get(idx, None)
+        if sp_ct and sp_ct in WHOLE_CHART_TYPES and hasattr(self, 'chart_type_combo'):
+            self.chart_type_combo.blockSignals(True)
+            i = self.chart_type_combo.findText(sp_ct)
+            if i >= 0:
+                self.chart_type_combo.setCurrentIndex(i)
+            self.chart_type_combo.blockSignals(False)
+            self._update_option_group_visibility(sp_ct)
 
     # ── Axes tab save-back handlers ──────────────────────────────────────────
     def _save_axes_state(self):
@@ -2968,6 +3132,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         self.ann_sp_active.setCurrentIndex(idx)
         self.ann_sp_active.blockSignals(False)
         self.on_active_subplot_changed()
+        self._filter_series_table_by_subplot(idx)
 
     # ── Annotations-tab subplot selector ─────────────────────────────────────
     def _on_ann_subplot_changed(self, idx):
@@ -3324,11 +3489,6 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
         else:
             self._apply_col_function()
 
-    def _on_fit_style_changed(self):
-        self.fit_linestyle = self.fit_ls_combo.currentText()
-        self.fit_linewidth = self.fit_lw_spin.value()
-        self.update_preview()
-
     # ═══════════════════════════════════════════════════════════════════════════
     # PRESET / FIT
     # ═══════════════════════════════════════════════════════════════════════════
@@ -3394,8 +3554,7 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
             i_type = type_cb.findText(chart_type)
             if i_type >= 0: type_cb.setCurrentIndex(i_type)
-            type_cb.currentIndexChanged.connect(self.update_preview)
-            type_cb.currentIndexChanged.connect(self._on_series_selection_changed)
+            type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
             self.series_table.setCellWidget(row, 3, type_cb)
             plot_spin = QSpinBox(); plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
             plot_spin.setValue(subplot_num); plot_spin.valueChanged.connect(self.update_preview)
@@ -3737,12 +3896,22 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             if not series:
                 QMessageBox.warning(self, 'Warning', 'Add at least one series in the Data tab first.'); return
 
-            # Find the series the user selected in the fit_series_combo
-            target_label = self.fit_series_combo.currentText() if hasattr(self, 'fit_series_combo') else ''
+            # Find the series the user selected in the per-curve selector
+            target_label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
             matched = next((s for s in series if s[2] == target_label), None)
             if matched is None:
                 matched = series[0]
             xd, yd, lbl, xc, yc = matched
+
+            # Find the subplot (Plot spin value) of the source series row
+            source_plot_num = 1
+            for row in range(self.series_table.rowCount()):
+                item = self.series_table.item(row, 2)
+                if item and item.text() == lbl:
+                    spin = self.series_table.cellWidget(row, 4)
+                    if spin:
+                        source_plot_num = spin.value()
+                    break
             popt, pcov, func, eq_str, r2 = CurveFitter.fit(xd, yd, model)
             if popt is None:
                 QMessageBox.warning(self, 'Fit Failed', f'Could not fit {model} to the data.'); return
@@ -3758,6 +3927,23 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
             # Add fit curve as a new dataset
             nm = f'{lbl} ({model} fit)'
             self.datasets[nm] = func(xd, *popt)
+
+            # Seed a default style for the fit curve if it has none yet.
+            # This makes it immediately editable via the Per-Curve section
+            # without any ambiguity. Use dashed orange to visually distinguish
+            # fit curves from raw data series.
+            if nm not in self.curve_styles:
+                src_color = self.curve_styles.get(lbl, {}).get('color', '#ff7f0e')
+                self.curve_styles[nm] = {
+                    'color':        src_color,
+                    'linestyle':    '--',
+                    'marker':       'None',
+                    'linewidth':    1.8,
+                    'markersize':   6,
+                    'marker_color': src_color,
+                    'color_locked': False,
+                }
+
             self.update_lists()
 
             # Add fit curve as a new series row if not already present
@@ -3777,19 +3963,35 @@ class ChartStudioApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, QMai
                     self.series_table.setCellWidget(row, col_idx, cb)
                 self.series_table.setItem(row, 2, QTableWidgetItem(nm))
                 type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
-                type_cb.currentIndexChanged.connect(self.update_preview)
-                type_cb.currentIndexChanged.connect(self._on_series_selection_changed)
+                type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
                 self.series_table.setCellWidget(row, 3, type_cb)
                 plot_spin = QSpinBox(); plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
-                plot_spin.setValue(1); plot_spin.valueChanged.connect(self.update_preview)
+                plot_spin.setValue(source_plot_num); plot_spin.valueChanged.connect(self.update_preview)
                 self.series_table.setCellWidget(row, 4, plot_spin)
                 y2_item = QTableWidgetItem()
                 y2_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
                 y2_item.setCheckState(Qt.CheckState.Unchecked)
                 self.series_table.setItem(row, 5, y2_item)
+            else:
+                # Row already exists — keep its subplot in sync with the source
+                for row in range(self.series_table.rowCount()):
+                    item = self.series_table.item(row, 2)
+                    if item and item.text() == nm:
+                        spin = self.series_table.cellWidget(row, 4)
+                        if spin:
+                            spin.blockSignals(True)
+                            spin.setValue(source_plot_num)
+                            spin.blockSignals(False)
+                        break
 
             self._update_confidence_band()
             self._refresh_fit_results_panel()
+            # Switch the Per-Curve selector to the fit curve so the user can
+            # immediately style it — no ambiguity about which curve is active.
+            if hasattr(self, 'curve_select'):
+                idx = self.curve_select.findText(nm)
+                if idx >= 0:
+                    self.curve_select.setCurrentIndex(idx)
             self.update_preview()
         except Exception as e:
             QMessageBox.critical(self, 'Error', str(e))

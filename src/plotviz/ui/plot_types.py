@@ -313,18 +313,13 @@ class PlotTypesMixin:
             is_cat = self._is_categorical(xd)
 
             if sct == 'Line':
-                is_fit = lbl.endswith(' fit)') and lbl not in (self.curve_styles or {})
-                if is_fit:
-                    ls = self.fit_linestyle; color = self.fit_color
-                    lw = self.fit_linewidth; mk = None; mk_color = color
-                else:
-                    ls = s.get('linestyle') or self.line_default_style.currentText()
-                    if ls in ('default', ''): ls = '-'
-                    mk = s.get('marker') or self.line_default_marker.currentText()
-                    if mk in ('default', 'None', 'none', ''): mk = None
-                    if ls == 'none' and mk is None: mk = 'o'
-                    lw = s.get('linewidth', self.line_default_lw.value())
-                    mk_color = s.get('marker_color', color)
+                ls = s.get('linestyle') or self.line_default_style.currentText()
+                if ls in ('default', ''): ls = '-'
+                mk = s.get('marker') or self.line_default_marker.currentText()
+                if mk in ('default', 'None', 'none', ''): mk = None
+                if ls == 'none' and mk is None: mk = 'o'
+                lw = s.get('linewidth', self.line_default_lw.value())
+                mk_color = s.get('marker_color', color)
                 xplot = _cat_xplot(xd) if is_cat else xd
                 ds = self.line_drawstyle.currentText()
                 plot_kw = dict(label=lbl, color=color, linestyle=ls, linewidth=lw,
@@ -340,6 +335,11 @@ class PlotTypesMixin:
                 if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
                                     alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
+                pi_upper_key = lbl + ' PI upper'; pi_lower_key = lbl + ' PI lower'
+                if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
+                    ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
+                                    alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
+                                    linestyle='--', label=f'{lbl} PI')
 
             elif sct == 'Scatter':
                 xplot = _cat_xplot(xd) if is_cat else xd
@@ -369,6 +369,11 @@ class PlotTypesMixin:
                 if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
                                     alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
+                pi_upper_key = lbl + ' PI upper'; pi_lower_key = lbl + ' PI lower'
+                if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
+                    ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
+                                    alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
+                                    linestyle='--', label=f'{lbl} PI')
 
             elif sct == 'Bar':
                 bi = bar_idx_counter; bar_idx_counter += 1

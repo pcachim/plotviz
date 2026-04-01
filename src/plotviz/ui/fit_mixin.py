@@ -19,7 +19,33 @@ class FitMixin:
             series = self._get_series_full()
             if not series:
                 QMessageBox.warning(self, 'Warning', 'Add at least one series in the Data tab first.'); return
-            xd, yd, lbl, xc, yc = series[0]
+
+            # ── Use the curve currently selected in curve_select ──────────────
+            selected_label = self.curve_select.currentText() if hasattr(self, 'curve_select') else None
+            matched = None
+            matched_row = 0
+            if selected_label:
+                for row in range(self.series_table.rowCount()):
+                    item = self.series_table.item(row, 2)
+                    if item and item.text() == selected_label:
+                        matched_row = row
+                        break
+                matched = next((s for s in series if s[2] == selected_label), None)
+            if matched is None:
+                matched = series[0]   # fallback to first
+
+            xd, yd, lbl, xc, yc = matched
+
+            # ── Find the subplot number for this series ────────────────────────
+            source_subplot = 1
+            for row in range(self.series_table.rowCount()):
+                item = self.series_table.item(row, 2)
+                if item and item.text() == lbl:
+                    spin = self.series_table.cellWidget(row, 4)
+                    if spin:
+                        source_subplot = spin.value()
+                    break
+
             popt, pcov, func, eq_str, r2 = CurveFitter.fit(xd, yd, model)
             if popt is None:
                 QMessageBox.warning(self, 'Fit Failed', f'Could not fit {model} to the data.'); return
@@ -33,7 +59,8 @@ class FitMixin:
                                   eq_str=eq_str, r2=r2, stats=stats)
 
             # Add fit curve as a new dataset
-            nm = f'{lbl} ({model} fit)'
+            nm = f'{lbl} ({model} fit)'\
+            
             self.datasets[nm] = func(xd, *popt)
             self.update_lists()
 
@@ -57,8 +84,10 @@ class FitMixin:
                 type_cb.currentIndexChanged.connect(self.update_preview)
                 type_cb.currentIndexChanged.connect(self._on_series_selection_changed)
                 self.series_table.setCellWidget(row, 3, type_cb)
+                # ── Place fit curve on the same subplot as its source series ──
                 plot_spin = QSpinBox(); plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
-                plot_spin.setValue(1); plot_spin.valueChanged.connect(self.update_preview)
+                plot_spin.setValue(source_subplot)
+                plot_spin.valueChanged.connect(self.update_preview)
                 self.series_table.setCellWidget(row, 4, plot_spin)
                 y2_item = QTableWidgetItem()
                 y2_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)

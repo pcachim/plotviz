@@ -137,10 +137,8 @@ class SerializationMixin:
 
         s['dpi']        = self.dpi_spin.value()
 
-        # Fit curve style
-        s['fit_color']     = self.fit_color
-        s['fit_linestyle'] = self.fit_ls_combo.currentText()
-        s['fit_linewidth'] = self.fit_lw_spin.value()
+        # Fit curve style (fit_color/fit_linestyle/fit_linewidth removed in 2.0.0 —
+        # fit curves are styled via curve_styles like any other series)
         s['fit_ci_index']  = self.fit_ci_combo.currentIndex()
         s['fit_pi_index']  = self.fit_pi_combo.currentIndex()
         s['fit_ci_alpha']  = self.fit_ci_alpha_spin.value()
@@ -417,14 +415,7 @@ class SerializationMixin:
         # Reload Axes tab widgets for subplot 0
         self.on_active_subplot_changed()
 
-        # Fit curve style
-        fc = s.get('fit_color', '#ff7f0e')
-        self.fit_color = fc
-        self.fit_color_swatch.setStyleSheet(f'color:{fc};font-size:18px;')
-        self.fit_color_hex_lbl.setText(fc)
-        i = self.fit_ls_combo.findText(s.get('fit_linestyle', '--'))
-        if i >= 0: self.fit_ls_combo.setCurrentIndex(i)
-        self.fit_lw_spin.setValue(s.get('fit_linewidth', 1.5))
+        # Fit CI/PI bands (fit_color/fit_linestyle/fit_linewidth removed in 2.0.0)
         self.fit_ci_combo.setCurrentIndex(s.get('fit_ci_index', 0))
         self.fit_pi_combo.setCurrentIndex(s.get('fit_pi_index', 0))
         self.fit_ci_alpha_spin.setValue(s.get('fit_ci_alpha', 0.25))
@@ -727,23 +718,45 @@ class SerializationMixin:
         self._is_dirty = False
 
         # ── Ask which columns to save ─────────────────────────────────────────
-        dlg = QMessageBox(self)
-        dlg.setWindowTitle('Save data')
-        dlg.setText('Which dataset columns do you want to save?')
-        dlg.setInformativeText(
-            '<b>Used series only</b> saves the columns currently assigned '
-            'in the Series table — keeps the file small.<br><br>'
-            '<b>All columns</b> preserves every loaded column so you can '
-            'reassign axes after reopening.'
-        )
-        btn_used = dlg.addButton('Used series only', QMessageBox.ButtonRole.AcceptRole)
-        btn_all  = dlg.addButton('All columns',      QMessageBox.ButtonRole.AcceptRole)
-        dlg.addButton(QMessageBox.StandardButton.Cancel)
-        dlg.exec()
-        clicked = dlg.clickedButton()
-        if clicked is None or clicked not in (btn_used, btn_all):
-            return
-        used_only = (clicked is btn_used)
+        # Collect the set of columns actually used in the series table
+        used_cols = set()
+        for row in range(self.series_table.rowCount()):
+            for col_idx in (0, 1):
+                cb = self.series_table.cellWidget(row, col_idx)
+                if cb:
+                    txt = cb.currentText()
+                    if txt and txt in self.datasets:
+                        used_cols.add(txt)
+        # Also include z and err columns
+        for attr in ('combo_z', 'combo_err'):
+            cb = getattr(self, attr, None)
+            if cb:
+                txt = cb.currentText()
+                if txt and txt != '(none)' and txt in self.datasets:
+                    used_cols.add(txt)
+
+        all_cols = set(self.datasets.keys())
+        if used_cols >= all_cols:
+            # All columns are in use — save everything silently, no dialog needed
+            used_only = False
+        else:
+            dlg = QMessageBox(self)
+            dlg.setWindowTitle('Save data')
+            dlg.setText('Which dataset columns do you want to save?')
+            dlg.setInformativeText(
+                '<b>Used series only</b> saves the columns currently assigned '
+                'in the Series table — keeps the file small.<br><br>'
+                '<b>All columns</b> preserves every loaded column so you can '
+                'reassign axes after reopening.'
+            )
+            btn_used = dlg.addButton('Used series only', QMessageBox.ButtonRole.AcceptRole)
+            btn_all  = dlg.addButton('All columns',      QMessageBox.ButtonRole.AcceptRole)
+            dlg.addButton(QMessageBox.StandardButton.Cancel)
+            dlg.exec()
+            clicked = dlg.clickedButton()
+            if clicked is None or clicked not in (btn_used, btn_all):
+                return
+            used_only = (clicked is btn_used)
 
         try:
             settings = self._collect_settings()
@@ -915,26 +928,32 @@ class SerializationMixin:
             self.sp_cols.blockSignals(False)
 
             # 2. Refresh dataset combos now that self.datasets is populated.
-            self.update_lists()
+            #    Keep _applying_settings=True through steps 2-5 so no intermediate
+            #    update_preview fires on a half-built state.
+            self._applying_settings = True
+            try:
+                self.update_lists()
 
-            # 3. Apply subplot layout — now all dicts are populated so
-            #    on_subplot_layout_changed reads correct values.
-            self.subplot_rows = settings.get('subplot_rows', 1)
-            self.subplot_cols = settings.get('subplot_cols', 1)
-            mosaic = settings.get('subplot_mosaic', None)
-            self._subplot_mosaic = mosaic
-            if mosaic is not None:
-                n_cells = len(dict.fromkeys(c for row in mosaic for c in row))
-                self.on_subplot_layout_changed(n_override=n_cells)
-            else:
-                self.on_subplot_layout_changed()
+                # 3. Apply subplot layout — now all dicts are populated so
+                #    on_subplot_layout_changed reads correct values.
+                self.subplot_rows = settings.get('subplot_rows', 1)
+                self.subplot_cols = settings.get('subplot_cols', 1)
+                mosaic = settings.get('subplot_mosaic', None)
+                self._subplot_mosaic = mosaic
+                if mosaic is not None:
+                    n_cells = len(dict.fromkeys(c for row in mosaic for c in row))
+                    self.on_subplot_layout_changed(n_override=n_cells)
+                else:
+                    self.on_subplot_layout_changed()
 
-            # 4. Restore series table.
-            if series_meta:
-                self._apply_series_meta(series_meta)
+                # 4. Restore series table.
+                if series_meta:
+                    self._apply_series_meta(series_meta)
 
-            # 5. Sync the active-subplot UI panel.
-            self.on_active_subplot_changed()
+                # 5. Sync the active-subplot UI panel.
+                self.on_active_subplot_changed()
+            finally:
+                self._applying_settings = False
 
             # 6. Restore annotations.
             ann_meta = settings.get('annotations', [])

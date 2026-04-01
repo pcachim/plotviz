@@ -284,7 +284,6 @@ class ColorAnnotationMixin(PaletteMixin, AnnotationMixin):
             'chart_bg':     getattr(self, 'chart_bg_color',    '#ffffff'),
             'chart_fg':     getattr(self, 'chart_fg_color',    '#000000'),
             'plot_bg':      getattr(self, 'plot_bg_color',     '#ffffff'),
-            'fit_color':    getattr(self, 'fit_color',         '#ff7700'),
             'title':        getattr(self, 'title_color',       '#000000'),
             'xlabel':       getattr(self, 'xlabel_color',      '#000000'),
             'ylabel':       getattr(self, 'ylabel_color',      '#000000'),
@@ -304,11 +303,6 @@ class ColorAnnotationMixin(PaletteMixin, AnnotationMixin):
             getattr(self, attr + '_hex').setText(hx)
             self.update_preview()
             return
-        if target == 'fit_color':
-            self.fit_color = hx
-            self.fit_color_swatch.setStyleSheet(f'color:{hx};font-size:18px;')
-            self.fit_color_hex_lbl.setText(hx)
-            self.update_preview(); return
         mapping = {
             'title':        ('title_color',        'title_color_label',        'style'),
             'xlabel':       ('xlabel_color',        'xlabel_color_label',       'style'),

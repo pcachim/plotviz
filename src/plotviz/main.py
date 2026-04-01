@@ -63,13 +63,14 @@ from pathlib import Path
 from PyQt6.QtCore import QEvent
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
-from ui.main_window import ChartStudioApp
+from ui.main_window import PlotVizApp
 
 # File extensions this app owns
 _CHART_EXT    = '.pviz'
 _TEMPLATE_EXT = '.pvizt'
 _PALETTE_EXT  = '.pvizp'
 _SCHEME_EXT   = '.pvizc'
+_PYTHON_EXT   = '.pvizx'   # Python bundle (zip of plot.py + data CSVs)
 
 
 def _app_icon() -> QIcon:
@@ -113,7 +114,7 @@ def _set_win_appusermodel_id() -> None:
         pass
 
 
-class PlotVizApp(QApplication):
+class PlotVizQApplication(QApplication):
     """QApplication subclass that handles macOS QFileOpenEvent.
 
     When the user double-clicks a .pviz or .pvizt file in Finder while the
@@ -123,9 +124,9 @@ class PlotVizApp(QApplication):
 
     def __init__(self, argv):
         super().__init__(argv)
-        self._window: ChartStudioApp | None = None
+        self._window: PlotVizApp | None = None
 
-    def set_window(self, window: ChartStudioApp) -> None:
+    def set_window(self, window: PlotVizApp) -> None:
         self._window = window
 
     def event(self, e: QEvent) -> bool:
@@ -145,7 +146,33 @@ class PlotVizApp(QApplication):
 
 def main():
     _set_win_appusermodel_id()   # must be before QApplication on Windows
-    app = PlotVizApp(sys.argv)
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+    import logging
+    from pathlib import Path
+    try:
+        from platformdirs import user_config_dir
+        _log_dir = Path(user_config_dir('plotviz'))
+    except ImportError:
+        _log_dir = Path.home() / '.config' / 'plotviz'
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _log_file = _log_dir / 'plotviz.log'
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s  %(levelname)-8s  %(name)s  %(message)s',
+        datefmt='%H:%M:%S',
+        handlers=[
+            # 'w' truncates on each restart — fresh log every run
+            logging.FileHandler(_log_file, mode='w', encoding='utf-8'),
+            logging.StreamHandler(),          # also echoes to console/terminal
+        ],
+        force=True,
+    )
+    log = logging.getLogger('plotviz')
+    log.info('plotviz starting — log: %s', _log_file)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    app = PlotVizQApplication(sys.argv)
     app.setApplicationName('plotviz')
     app.setApplicationDisplayName('plotviz')
     app.setOrganizationName('plotviz')
@@ -154,7 +181,7 @@ def main():
     icon = _app_icon()
     app.setWindowIcon(icon)
 
-    window = ChartStudioApp()
+    window = PlotVizApp()
     window.setWindowIcon(icon)   # drives the taskbar button on Windows
     app.set_window(window)
     window.show()

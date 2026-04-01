@@ -192,14 +192,8 @@ class SerializationApplyMixin:
         # Reload Axes tab widgets for subplot 0
         self.on_active_subplot_changed()
 
-        # Fit curve style
-        fc = s.get('fit_color', '#ff7f0e')
-        self.fit_color = fc
-        self.fit_color_swatch.setStyleSheet(f'color:{fc};font-size:18px;')
-        self.fit_color_hex_lbl.setText(fc)
-        i = self.fit_ls_combo.findText(s.get('fit_linestyle', '--'))
-        if i >= 0: self.fit_ls_combo.setCurrentIndex(i)
-        self.fit_lw_spin.setValue(s.get('fit_linewidth', 1.5))
+        # Fit CI/PI bands (fit_color/fit_linestyle/fit_linewidth removed in 2.0.0 —
+        # fit curves are now styled via curve_styles like any other series)
         self.fit_ci_combo.setCurrentIndex(s.get('fit_ci_index', 0))
         self.fit_pi_combo.setCurrentIndex(s.get('fit_pi_index', 0))
         self.fit_ci_alpha_spin.setValue(s.get('fit_ci_alpha', 0.25))
@@ -348,6 +342,7 @@ class SerializationApplyMixin:
             plot_spin.setRange(1, n_subplots)
             plot_spin.setValue(min(sd.get('plot_num', 1), n_subplots))
             plot_spin.valueChanged.connect(self.update_preview)
+            plot_spin.valueChanged.connect(lambda _: self._filter_series_table_by_subplot())
             self.series_table.setCellWidget(row, 4, plot_spin)
 
             # Y2 checkbox
@@ -386,6 +381,7 @@ class SerializationApplyMixin:
             self.subplot_chart_types.setdefault(idx, 'Line')
             self.subplot_legend_locs.setdefault(idx, 'best')
         self._refresh_curve_select()
+        self._filter_series_table_by_subplot()
 
 
     # ═══════════════════════════════════════════════════════════════════════════

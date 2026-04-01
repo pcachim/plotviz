@@ -60,12 +60,16 @@ hidden_imports = [
     'openpyxl.utils', 'openpyxl.utils.dataframe',
     # App packages
     'ui', 'ui.main_window', 'ui.tab_builders', 'ui.plot_engine',
-    'ui.serialization', 'ui.canvas',
+    'ui.serialization', 'ui.canvas', 'ui.python_export', 'ui.seaborn_explorer',
     'data', 'data.loader', 'data.scientific',
     'styling', 'styling.presets',
     'config', 'config.settings', 'config._version',
+    # statsmodels (bundled so Robust fit / LOWESS work in .app)
+    'statsmodels', 'statsmodels.regression', 'statsmodels.regression.linear_model',
+    'statsmodels.nonparametric', 'statsmodels.nonparametric.smoothers_lowess',
+    'statsmodels.robust', 'statsmodels.tools',
     # stdlib
-    'zipfile', 'json', 'tempfile', 'traceback',
+    'zipfile', 'json', 'tempfile', 'traceback', 'csv', 'io',
     'multiprocessing', 'multiprocessing.pool',
 ]
 
@@ -75,6 +79,7 @@ hidden_imports += collect_submodules('scipy')
 hidden_imports += collect_submodules('pandas')
 hidden_imports += collect_submodules('openpyxl')
 hidden_imports += collect_submodules('PyQt6')
+hidden_imports += collect_submodules('statsmodels')
 
 datas = []
 # Bundle the assets folder (icon etc.) if it exists
@@ -188,6 +193,15 @@ app = BUNDLE(
                 'CFBundleTypeIconFile':    'pvizp.icns',
                 'LSItemContentTypes':      ['com.pviz.app.pvizp'],
             },
+            {
+                # .pvizx is a standard zip — declare so Finder names the type,
+                # but Alternate rank keeps Archive Utility as the default opener.
+                'CFBundleTypeName':        'plotviz Python Bundle',
+                'CFBundleTypeExtensions':  ['pvizx'],
+                'CFBundleTypeRole':        'Viewer',
+                'LSHandlerRank':           'Alternate',
+                'LSItemContentTypes':      ['com.pviz.app.pvizx'],
+            },
         ],
         'UTExportedTypeDeclarations': [
             {
@@ -217,6 +231,14 @@ app = BUNDLE(
                 'UTTypeConformsTo':        ['public.data', 'public.zip-archive'],
                 'UTTypeTagSpecification':  {'public.filename-extension': ['pvizp']},
                 'UTTypeIconFile':          'pvizp.icns',
+            },
+            {
+                # .pvizx conforms to public.zip-archive so Archive Utility
+                # (and any zip app) can open it natively on macOS.
+                'UTTypeIdentifier':        'com.pviz.app.pvizx',
+                'UTTypeDescription':       'plotviz Python Bundle',
+                'UTTypeConformsTo':        ['public.zip-archive'],
+                'UTTypeTagSpecification':  {'public.filename-extension': ['pvizx']},
             },
         ],
         'LSMinimumSystemVersion':     '11.0',

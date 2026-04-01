@@ -13,12 +13,41 @@ import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # side-effect: registers the 3D projection
 from matplotlib.figure import Figure as MplFigure
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QApplication
 from ui.helpers import _get_dir, _remember_dir
 from PyQt6.QtCore import Qt
 
 
 from ui.tab_builders import WHOLE_CHART_TYPES, _NO_X_TYPES
+
+
+# LaTeX special characters that must be escaped when text.usetex is active.
+_LATEX_SPECIAL = str.maketrans({
+    '&':  r'\&',
+    '%':  r'\%',
+    '$':  r'\$',
+    '#':  r'\#',
+    '_':  r'\_',
+    '{':  r'\{',
+    '}':  r'\}',
+    '~':  r'\textasciitilde{}',
+    '^':  r'\textasciicircum{}',
+    '\\': r'\textbackslash{}',
+})
+
+def _latex_safe(text: str) -> str:
+    """Escape LaTeX special characters in user-supplied text when usetex is on.
+
+    When matplotlib's ``text.usetex`` is True every string passed to
+    set_title / set_xlabel / suptitle / etc. is fed verbatim to LaTeX.
+    Characters like ``&``, ``%``, ``$`` … are LaTeX control characters and
+    will cause a hard render error if left unescaped.  This helper is a
+    no-op when usetex is off so it is safe to call unconditionally.
+    """
+    if not matplotlib.rcParams.get('text.usetex', False):
+        return text
+    return text.translate(_LATEX_SPECIAL)
+
 
 _3D_TYPES = {'3D Surface'}
 _NO_LEGEND_TYPES = {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Contour', '3D Surface', 'Violin', 'Boxplot', 'Radar', 'Quiver'}
@@ -326,18 +355,13 @@ class PlotEngineMixin:
             is_cat = self._is_categorical(xd)
 
             if sct == 'Line':
-                is_fit = lbl.endswith(' fit)') and lbl not in (self.curve_styles or {})
-                if is_fit:
-                    ls = self.fit_linestyle; color = self.fit_color
-                    lw = self.fit_linewidth; mk = None; mk_color = color
-                else:
-                    ls = s.get('linestyle') or self.line_default_style.currentText()
-                    if ls in ('default', ''): ls = '-'
-                    mk = s.get('marker') or self.line_default_marker.currentText()
-                    if mk in ('default', 'None', 'none', ''): mk = None
-                    if ls == 'none' and mk is None: mk = 'o'
-                    lw = s.get('linewidth', self.line_default_lw.value())
-                    mk_color = s.get('marker_color', color)
+                ls = s.get('linestyle') or self.line_default_style.currentText()
+                if ls in ('default', ''): ls = '-'
+                mk = s.get('marker') or self.line_default_marker.currentText()
+                if mk in ('default', 'None', 'none', ''): mk = None
+                if ls == 'none' and mk is None: mk = 'o'
+                lw = s.get('linewidth', self.line_default_lw.value())
+                mk_color = s.get('marker_color', color)
                 xplot = _cat_xplot(xd) if is_cat else xd
                 ds = self.line_drawstyle.currentText()
                 plot_kw = dict(label=lbl, color=color, linestyle=ls, linewidth=lw,
@@ -353,6 +377,11 @@ class PlotEngineMixin:
                 if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
                                     alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
+                pi_upper_key = lbl + ' PI upper'; pi_lower_key = lbl + ' PI lower'
+                if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
+                    ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
+                                    alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
+                                    linestyle='--', label=f'{lbl} PI')
 
             elif sct == 'Scatter':
                 xplot = _cat_xplot(xd) if is_cat else xd
@@ -382,6 +411,11 @@ class PlotEngineMixin:
                 if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
                                     alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
+                pi_upper_key = lbl + ' PI upper'; pi_lower_key = lbl + ' PI lower'
+                if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
+                    ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
+                                    alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
+                                    linestyle='--', label=f'{lbl} PI')
 
             elif sct == 'Bar':
                 bi = bar_idx_counter; bar_idx_counter += 1
@@ -682,26 +716,24 @@ class PlotEngineMixin:
         # n>1: per-subplot title from Axes tab (sp_titles[idx])
         _n_subplots = self.subplot_rows * self.subplot_cols
         if _n_subplots == 1:
-            title_txt = self.title_input.text().strip() or self.title_input.placeholderText()
             show_title = self.title_check.isChecked()
-            if show_title and title_txt:
-                ax.set_title(title_txt,
-                             fontsize=self.title_size.value(),
-                             color=self.title_color,
-                             fontfamily=self.title_font.currentText())
+            title_txt = (self.title_input.text().strip() or self.title_input.placeholderText()) if show_title else ''
+            ax.set_title(_latex_safe(title_txt),
+                         fontsize=self.title_size.value(),
+                         color=self.title_color,
+                         fontfamily=self.title_font.currentText())
         else:
-            title_txt = self.sp_titles.get(subplot_idx, '') or f'Subplot {subplot_idx+1}'
             show_title = self.subplot_title_show.get(subplot_idx, True)
-            if show_title and title_txt:
-                ax.set_title(title_txt,
-                             fontsize=self.subplot_title_size.get(subplot_idx, 11),
-                             color=self.subplot_title_color.get(subplot_idx, '#000000'),
-                             fontfamily=self.subplot_title_font.get(subplot_idx, 'sans-serif'))
+            title_txt = (self.sp_titles.get(subplot_idx, '') or f'Subplot {subplot_idx+1}') if show_title else ''
+            ax.set_title(_latex_safe(title_txt),
+                         fontsize=self.subplot_title_size.get(subplot_idx, 11),
+                         color=self.subplot_title_color.get(subplot_idx, '#000000'),
+                         fontfamily=self.subplot_title_font.get(subplot_idx, 'sans-serif'))
         # ── X label ──
         if self.subplot_xlabel_show.get(subplot_idx, True) and ct not in _NO_X_TYPES:
             xl = self.subplot_xlabels.get(subplot_idx, '') or xc
             if xl:
-                ax.set_xlabel(xl,
+                ax.set_xlabel(_latex_safe(xl),
                               fontsize=self.xlabel_size.value(),
                               color=self.xlabel_color,
                               fontfamily=self.xlabel_font.currentText())
@@ -709,7 +741,7 @@ class PlotEngineMixin:
         if self.subplot_ylabel_show.get(subplot_idx, True):
             yl = self.subplot_ylabels.get(subplot_idx, '') or ', '.join(yd.keys())
             if yl:
-                ax.set_ylabel(yl,
+                ax.set_ylabel(_latex_safe(yl),
                               fontsize=self.ylabel_size.value(),
                               color=self.ylabel_color,
                               fontfamily=self.ylabel_font.currentText())
@@ -740,7 +772,7 @@ class PlotEngineMixin:
                 if self.subplot_y2label_show.get(subplot_idx, True):
                     y2l = self.subplot_y2labels.get(subplot_idx, '') or ', '.join(y2_cols)
                     if y2l:
-                        ax2.set_ylabel(y2l,
+                        ax2.set_ylabel(_latex_safe(y2l),
                                        fontsize=self.y2label_size.value(),
                                        color=self.y2label_color,
                                        fontfamily=self.y2label_font.currentText())
@@ -777,15 +809,14 @@ class PlotEngineMixin:
             ylim = self.subplot_ylims.get(subplot_idx)
             if ylim and ct != 'Pie':
                 ax.set_ylim(ylim[0], ylim[1])
-            if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}:
-                self._apply_grid(ax)
-
         # ── Legend (no Y2) ──
         if not _y2_active and self.subplot_legends.get(subplot_idx, True) and yd \
                 and ct not in _NO_LEGEND_TYPES:
             ax.legend(**self._legend_kwargs(subplot_idx))
         if not is3d:
             self._apply_canvas_style(ax, subplot_idx)
+            if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}:
+                self._apply_grid(ax)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # UPDATE PREVIEW
@@ -798,8 +829,15 @@ class PlotEngineMixin:
             # Guard: suppress intermediate redraws while _apply_settings is running.
             if getattr(self, '_applying_settings', False):
                 return
+            # Schedule snapshot on a debounce timer so it never blocks the render path.
+            # _snapshot() calls _collect_settings() + deepcopy(datasets) which is expensive.
             if hasattr(self, '_snapshot'):
-                self._snapshot()
+                if not hasattr(self, '_snapshot_timer'):
+                    from PyQt6.QtCore import QTimer
+                    self._snapshot_timer = QTimer(self)
+                    self._snapshot_timer.setSingleShot(True)
+                    self._snapshot_timer.timeout.connect(self._snapshot)
+                self._snapshot_timer.start(400)   # 400 ms after last change
             # Mark dirty (unsaved changes)
             if hasattr(self, '_undo_stack') and not getattr(self, '_undo_suspended', False):
                 self._is_dirty = True
@@ -815,6 +853,7 @@ class PlotEngineMixin:
 
             with matplotlib.rc_context({'font.family': chart_font}):
                 self.canvas.figure.clear()
+                self.canvas._border_rect = None   # figure.clear() removes all artists
                 self.canvas.figure.patch.set_facecolor(self.chart_bg_color)
 
                 axes_list = []
@@ -855,7 +894,7 @@ class PlotEngineMixin:
                                 self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx))
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx,'') or ', '.join(y2_cols)
-                                    if y2lbl: ax2.set_ylabel(y2lbl, fontsize=self.y2label_size.value(),
+                                    if y2lbl: ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
                                                               color=self.y2label_color,
                                                               fontfamily=self.y2label_font.currentText())
                                 y2lim = self.subplot_y2lims.get(idx)
@@ -864,18 +903,18 @@ class PlotEngineMixin:
                             t = self.sp_titles.get(idx,'')
                             show_title = self.subplot_title_show.get(idx, True)
                             title_text = (t or f'Subplot {idx+1}') if show_title else ''
-                            if title_text: ax.set_title(title_text,
+                            ax.set_title(_latex_safe(title_text),
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
                                 color=self.subplot_title_color.get(idx, '#000000'))
                             if self.subplot_xlabel_show.get(idx, True):
                                 xl = self.subplot_xlabels.get(idx,'') or ', '.join(x_cols)
-                                if xl: ax.set_xlabel(xl, fontsize=self.xlabel_size.value(),
+                                if xl: ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
                                                      color=self.xlabel_color,
                                                      fontfamily=self.xlabel_font.currentText())
                             if self.subplot_ylabel_show.get(idx, True):
                                 yl = self.subplot_ylabels.get(idx,'') or ', '.join(y_cols)
-                                if yl: ax.set_ylabel(yl, fontsize=self.ylabel_size.value(),
+                                if yl: ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
                                                      color=self.ylabel_color,
                                                      fontfamily=self.ylabel_font.currentText())
                             xs = self.subplot_xscales.get(idx, 'linear')
@@ -891,8 +930,8 @@ class PlotEngineMixin:
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
                             self._apply_canvas_style(ax, idx)
+                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
                             self._apply_cat_ticks(ax, cat_info)
                             show_leg = self.subplot_legends.get(idx, True)
                             sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
@@ -932,7 +971,7 @@ class PlotEngineMixin:
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx, '') or default_y2l
                                     if y2lbl:
-                                        ax2.set_ylabel(y2lbl, fontsize=self.y2label_size.value(),
+                                        ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
                                                        color=self.y2label_color,
                                                        fontfamily=self.y2label_font.currentText())
                                 y2lim = self.subplot_y2lims.get(idx)
@@ -941,7 +980,7 @@ class PlotEngineMixin:
                             t = self.sp_titles.get(idx, '')
                             show_title = self.subplot_title_show.get(idx, True)
                             title_text = (t or f'Subplot {idx+1}') if show_title else ''
-                            if title_text: ax.set_title(title_text,
+                            ax.set_title(_latex_safe(title_text),
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
                                 color=self.subplot_title_color.get(idx, '#000000'))
@@ -953,14 +992,14 @@ class PlotEngineMixin:
                             if r == rows-1 and sub_ct not in _NO_X_TYPES:
                                 if self.subplot_xlabel_show.get(idx, True):
                                     xl = _custom_xl or _default_xl_eff
-                                    ax.set_xlabel(xl, fontsize=self.xlabel_size.value(),
+                                    ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
                                                   color=self.xlabel_color,
                                                   fontfamily=self.xlabel_font.currentText())
                                 else:
                                     ax.set_xlabel('')
                             if self.subplot_ylabel_show.get(idx, True):
                                 yl = _custom_yl or _default_yl_eff
-                                ax.set_ylabel(yl, fontsize=self.ylabel_size.value(),
+                                ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
                                               color=self.ylabel_color,
                                               fontfamily=self.ylabel_font.currentText())
                             else:
@@ -983,7 +1022,6 @@ class PlotEngineMixin:
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx, None)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
                             self._apply_cat_ticks(ax, cat_info)
                             show_leg = self.subplot_legends.get(idx, True)
                             sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
@@ -1004,6 +1042,7 @@ class PlotEngineMixin:
                         _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
                         if _ax_ct not in _3D_TYPES:
                             self._apply_canvas_style(_ax, _ax_i)
+                            if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(_ax)
 
                 # ── Margins / centering ────────────────────────────────────────────
                 wi, hi = self._fig_size_in_inches()   # export size in inches
@@ -1034,12 +1073,12 @@ class PlotEngineMixin:
                 _n_sp = self.subplot_rows * self.subplot_cols
 
                 # ── Suptitle (n>1 only; single-subplot title lives inside the axes) ──
-                _show_sup = _n_sp > 1 and self.title_check.isChecked()
-                _sup_text = self.title_input.text().strip() if _show_sup else ''
+                _show_sup = self.title_check.isChecked()
+                _sup_text = _latex_safe(self.title_input.text().strip()) if _show_sup else ''
                 _title_y_fig = getattr(self, 'title_y', self.title_y_offset if hasattr(self, 'title_y_offset') else None)
                 _ty = _title_y_fig.value() if _title_y_fig else 0.97
 
-                if _show_sup and _sup_text:
+                if _show_sup and _sup_text and _n_sp > 1:
                     # Place suptitle at the user-set position (in canvas-box coords).
                     # Do NOT clamp adj_top here — title_y only controls where the text
                     # sits; subplot margins are controlled independently by fig_top.
@@ -1071,6 +1110,8 @@ class PlotEngineMixin:
                     self.canvas.redraw_annotations()
 
                 self.canvas.draw()
+                self.canvas.repaint()
+                QApplication.processEvents()
                 self.refresh_annotation_list()
 
         except Exception as e:
@@ -1132,7 +1173,7 @@ class PlotEngineMixin:
                                 self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx))
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx,'') or ', '.join(y2_cols)
-                                    if y2lbl: ax2.set_ylabel(y2lbl, fontsize=self.y2label_size.value(),
+                                    if y2lbl: ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
                                                               color=self.y2label_color, fontfamily=self.y2label_font.currentText())
                                 y2lim = self.subplot_y2lims.get(idx)
                                 if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
@@ -1140,17 +1181,17 @@ class PlotEngineMixin:
                             t = self.sp_titles.get(idx,'')
                             show_title = self.subplot_title_show.get(idx, True)
                             title_text = (t or f'Subplot {idx+1}') if show_title else ''
-                            if title_text: ax.set_title(title_text,
+                            ax.set_title(_latex_safe(title_text),
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
                                 color=self.subplot_title_color.get(idx, '#000000'))
                             if self.subplot_xlabel_show.get(idx, True):
                                 xl = self.subplot_xlabels.get(idx,'') or ', '.join(x_cols)
-                                if xl: ax.set_xlabel(xl, fontsize=self.xlabel_size.value(),
+                                if xl: ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
                                     color=self.xlabel_color, fontfamily=self.xlabel_font.currentText())
                             if self.subplot_ylabel_show.get(idx, True):
                                 yl = self.subplot_ylabels.get(idx,'') or ', '.join(y_cols)
-                                if yl: ax.set_ylabel(yl, fontsize=self.ylabel_size.value(),
+                                if yl: ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
                                     color=self.ylabel_color, fontfamily=self.ylabel_font.currentText())
                             xs = self.subplot_xscales.get(idx, 'linear')
                             ys = self.subplot_yscales.get(idx, 'linear')
@@ -1165,8 +1206,8 @@ class PlotEngineMixin:
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
                             self._apply_canvas_style(ax, idx)
+                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
                             self._apply_cat_ticks(ax, cat_info)
                             show_leg = self.subplot_legends.get(idx, True)
                             sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
@@ -1207,7 +1248,7 @@ class PlotEngineMixin:
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx, '') or default_y2l
                                     if y2lbl:
-                                        ax2.set_ylabel(y2lbl, fontsize=self.y2label_size.value(),
+                                        ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
                                                        color=self.y2label_color,
                                                        fontfamily=self.y2label_font.currentText())
                                 y2lim = self.subplot_y2lims.get(idx)
@@ -1216,7 +1257,7 @@ class PlotEngineMixin:
                             t = self.sp_titles.get(idx, '')
                             show_title = self.subplot_title_show.get(idx, True)
                             title_text = (t or f'Subplot {idx+1}') if show_title else ''
-                            if title_text: ax.set_title(title_text,
+                            ax.set_title(_latex_safe(title_text),
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
                                 color=self.subplot_title_color.get(idx, '#000000'))
@@ -1228,13 +1269,13 @@ class PlotEngineMixin:
                             if r == rows-1 and sub_ct not in _NO_X_TYPES:
                                 if self.subplot_xlabel_show.get(idx, True):
                                     xl = _custom_xl or _default_xl_eff
-                                    ax.set_xlabel(xl, fontsize=self.xlabel_size.value(),
+                                    ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
                                                   color=self.xlabel_color, fontfamily=self.xlabel_font.currentText())
                                 else:
                                     ax.set_xlabel('')
                             if self.subplot_ylabel_show.get(idx, True):
                                 yl = _custom_yl or _default_yl_eff
-                                ax.set_ylabel(yl, fontsize=self.ylabel_size.value(),
+                                ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
                                               color=self.ylabel_color, fontfamily=self.ylabel_font.currentText())
                             else:
                                 ax.set_ylabel('')
@@ -1255,7 +1296,6 @@ class PlotEngineMixin:
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
                             self._apply_cat_ticks(ax, cat_info)
                             show_leg = self.subplot_legends.get(idx, True)
                             sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
@@ -1272,11 +1312,12 @@ class PlotEngineMixin:
                     _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
                     if _ax_ct not in _3D_TYPES:
                         self._apply_canvas_style(_ax, _ax_i)
+                        if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(_ax)
 
             # Apply margins (user values map directly to the export figure)
             exp_top = self.fig_top.value()
             _n_sp_exp = self.subplot_rows * self.subplot_cols
-            _exp_title_text = self.title_input.text().strip() if _n_sp_exp > 1 else ''
+            _exp_title_text = _latex_safe(self.title_input.text().strip()) if _n_sp_exp > 1 else ''
             _ty_widget = getattr(self, 'title_y', getattr(self, 'title_y_offset', None))
             _exp_ty = _ty_widget.value() if _ty_widget else 0.97
             if _n_sp_exp > 1 and self.title_check.isChecked() and _exp_title_text:

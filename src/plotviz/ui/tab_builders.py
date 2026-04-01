@@ -6,7 +6,7 @@ of this repository or at https://opensource.org/licenses/MIT.
 
 
 ui/tab_builders.py  –  plotviz
-Mixin that provides all create_*_tab() methods for ChartStudioApp.
+Mixin that provides all create_*_tab() methods for PlotVizApp.
 """
 import numpy as np
 from PyQt6.QtWidgets import (
@@ -44,7 +44,8 @@ WHOLE_CHART_TYPES = {
     'ECDF', 'Quiver',
 }
 
-_NO_X_TYPES = {'Histogram', 'Boxplot', 'Violin', 'Pie', 'ECDF'}
+_NO_X_TYPES = {'Histogram', 'Boxplot', 'Violin', 'Pie', 'ECDF',
+}
 
 # ── Named colour palettes available in the Data tab (16 colours = Qt custom slots)
 COLOR_PALETTES = {
@@ -347,7 +348,7 @@ class TabBuildersMixin:
         layout.addWidget(self._sec_label('Datasets'))
         btn_load = QPushButton('📂  Browse Files  (CSV, Excel, JSON, TXT)')
         btn_load.clicked.connect(self.load_data); layout.addWidget(btn_load)
-        self.dataset_list = QListWidget(); self.dataset_list.setMaximumHeight(160)
+        self.dataset_list = QListWidget(); self.dataset_list.setMinimumHeight(220); self.dataset_list.setMaximumHeight(320)
         self.dataset_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         layout.addWidget(self.dataset_list)
         ds_btn_row = QHBoxLayout(); ds_btn_row.setSpacing(4)
@@ -381,8 +382,11 @@ class TabBuildersMixin:
         hh.setStretchLastSection(False)
         hh.resizeSection(0, 90); hh.resizeSection(1, 90); hh.resizeSection(2, 80)
         hh.resizeSection(3, 75); hh.resizeSection(4, 36); hh.resizeSection(5, 30)
-        self.series_table.setMinimumHeight(120)
-        self.series_table.setMaximumHeight(200)
+        self.series_table.setMinimumHeight(140)
+        self.series_table.setSizePolicy(
+            __import__('PyQt6.QtWidgets', fromlist=['QSizePolicy']).QSizePolicy.Policy.Expanding,
+            __import__('PyQt6.QtWidgets', fromlist=['QSizePolicy']).QSizePolicy.Policy.Expanding,
+        )
         self.series_table.itemChanged.connect(self._on_series_item_changed)
         self.series_table.itemSelectionChanged.connect(self._on_series_selection_changed)
         layout.addWidget(self.series_table)
@@ -1210,8 +1214,10 @@ class TabBuildersMixin:
         # ── Per-curve ─────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('Per-Curve'))
         self.curve_select = QComboBox()
+        self.curve_select.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.curve_select.currentIndexChanged.connect(self.load_curve_style)
-        row('Curve:', self.curve_select)
+        layout.addWidget(self.curve_select)
 
         # Line style
         self.curve_linestyle = QComboBox(); self.curve_linestyle.addItems(['-','--','-.', ':','none'])
@@ -1262,11 +1268,9 @@ class TabBuildersMixin:
 
         # ── Curve Fit ─────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('Curve Fit (Line / Scatter)'))
-
-        sr = QHBoxLayout(); sr.addWidget(QLabel('Series:'))
-        self.fit_series_combo = QComboBox()
-        self.fit_series_combo.setToolTip('Choose which series to fit')
-        sr.addWidget(self.fit_series_combo, 1); layout.addLayout(sr)
+        lbl_hint = QLabel('Fits the curve selected above.\nUse Per-Curve controls to style the fit curve.')
+        lbl_hint.setStyleSheet('color:#888; font-size:10px;')
+        layout.addWidget(lbl_hint)
 
         fr = QHBoxLayout(); fr.addWidget(QLabel('Model:'))
         self.fit_combo = QComboBox(); self.fit_combo.addItem('None')
@@ -1275,25 +1279,6 @@ class TabBuildersMixin:
 
         btn_fit = QPushButton('▶  Apply Fit')
         btn_fit.clicked.connect(self.apply_fit); layout.addWidget(btn_fit)
-
-        fit_style_box = QGroupBox('Fit Curve Style')
-        fs_lay = QVBoxLayout(fit_style_box); fs_lay.setSpacing(4)
-        fc_row = QHBoxLayout(); fc_row.addWidget(QLabel('Color:'))
-        self.fit_color_swatch = QLabel('■'); self.fit_color_swatch.setStyleSheet('color:#ff7f0e;font-size:18px;')
-        fc_row.addWidget(self.fit_color_swatch)
-        self.fit_color_hex_lbl = QLabel('#ff7f0e'); fc_row.addWidget(self.fit_color_hex_lbl)
-        fc_btn = QPushButton('…'); fc_btn.setFixedWidth(28)
-        fc_btn.clicked.connect(lambda: self.pick_color('fit_color')); fc_row.addWidget(fc_btn)
-        fc_row.addStretch(); fs_lay.addLayout(fc_row)
-        fls_row = QHBoxLayout(); fls_row.addWidget(QLabel('Line:'))
-        self.fit_ls_combo = QComboBox(); self.fit_ls_combo.addItems(['-','--','-.',':'])
-        self.fit_ls_combo.setCurrentText('--')
-        self.fit_ls_combo.currentTextChanged.connect(self._on_fit_style_changed); fls_row.addWidget(self.fit_ls_combo)
-        fls_row.addWidget(QLabel('Width:'))
-        self.fit_lw_spin = QDoubleSpinBox(); self.fit_lw_spin.setRange(0.5, 8); self.fit_lw_spin.setValue(1.5); self.fit_lw_spin.setSingleStep(0.5)
-        self.fit_lw_spin.valueChanged.connect(self._on_fit_style_changed); fls_row.addWidget(self.fit_lw_spin)
-        fls_row.addStretch(); fs_lay.addLayout(fls_row)
-        layout.addWidget(fit_style_box)
 
         ci_row = QHBoxLayout(); ci_row.setSpacing(6); ci_row.addWidget(QLabel('Conf. band:'))
         self.fit_ci_combo = QComboBox()

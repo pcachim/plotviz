@@ -7,7 +7,7 @@ of this repository or at https://opensource.org/licenses/MIT.
 ui package – User interface components.
 """
 
-from .main_window import ChartStudioApp
+from .main_window import PlotVizApp
 from .canvas import CanvasPlotter
 
-__all__ = ['ChartStudioApp', 'CanvasPlotter']
+__all__ = ['PlotVizApp', 'CanvasPlotter']

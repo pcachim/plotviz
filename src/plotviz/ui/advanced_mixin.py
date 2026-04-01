@@ -18,11 +18,6 @@ class AdvancedMixin(FitMixin):
         else:
             self._apply_col_function()
 
-    def _on_fit_style_changed(self):
-        self.fit_linestyle = self.fit_ls_combo.currentText()
-        self.fit_linewidth = self.fit_lw_spin.value()
-        self.update_preview()
-
     # ═══════════════════════════════════════════════════════════════════════════
     # PRESET / FIT
     # ═══════════════════════════════════════════════════════════════════════════
