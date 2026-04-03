@@ -37,7 +37,7 @@ for /f "tokens=*" %%v in ('uv run python --version') do set PY_VER=%%v
 echo    uv     : %UV_VER%
 echo    Python : %PY_VER%
 
-for /f "tokens=*" %%v in ('uv run python -c "import sys,pathlib;sys.path.insert(0,str(pathlib.Path(\"src/plotviz\"))); from config._version import __version__;print(__version__)"') do set VERSION=%%v
+for /f "tokens=*" %%v in ('uv run python -c "import pathlib;t=pathlib.Path('src/plotviz/config/_version.py').read_text();print([l.split(chr(34))[1] for l in t.splitlines() if l.startswith('__version__')][0])"') do set VERSION=%%v
 echo    Version: %VERSION%
 
 set "APP_NAME=plotviz"

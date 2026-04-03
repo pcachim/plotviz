@@ -54,6 +54,7 @@ from ui.plot_engine import PlotEngineMixin
 from ui.serialization import SerializationMixin
 from ui.python_export import PythonExportMixin
 from ui.seaborn_explorer import SeabornExplorer
+from ui.code_runner import CodeRunnerDialog
 
 
 import config.settings as settings
@@ -667,6 +668,110 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             except Exception:
                 pass
 
+        # ── Load last chart (or sample) once the event loop is running ─────────
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._load_on_startup)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # STARTUP LOAD
+    # ═══════════════════════════════════════════════════════════════════════════
+    def _load_on_startup(self):
+        """After the window is shown, silently load the last-used chart.
+        If no recent file exists (first launch or cleared history) load a
+        built-in sample chart so the canvas is never blank on first open.
+        """
+        import config.settings as _cfg
+        recent = _cfg.get_recent_files()
+        if recent:
+            fp = recent[0]
+            try:
+                self._load_project_inner(fp, silent=True)
+                self._current_filepath = fp
+                return
+            except Exception:
+                pass  # File unreadable — fall through to sample
+
+        self._load_sample_chart()
+
+    def _load_sample_chart(self):
+        """Populate a sample sine/cosine chart directly into the app state.
+        Follows the same pattern as _reset_app so the canvas always renders.
+        """
+        import numpy as np
+
+        # ── 1. Clear any existing state ───────────────────────────────────────
+        self._current_filepath = None
+        self._is_dirty = False
+        if hasattr(self, '_undo_stack'):
+            self._undo_stack.clear()
+            self._redo_stack.clear()
+            self._update_undo_buttons()
+        self.datasets.clear()
+        self.curve_styles.clear()
+        if hasattr(self.canvas, 'annotations'):
+            self.canvas.annotations.clear()
+        self._subplot_mosaic = None
+        self.series_table.setRowCount(0)
+        if hasattr(self, '_refresh_curve_select'):
+            self._refresh_curve_select()
+
+        # ── 2. Load sample data ───────────────────────────────────────────────
+        x = np.linspace(0, 4 * np.pi, 60)
+        self.datasets['x']     = x
+        self.datasets['sin_x'] = np.sin(x)
+        self.datasets['cos_x'] = np.cos(x)
+
+        # ── 3. Apply default settings then override title / grid ──────────────
+        sample_settings = self._default_settings()
+        sample_settings.update({
+            'title_show':    True,
+            'title_text':    'Welcome to plotviz',
+            'title_size':    14,
+            'title_color':   '#222222',
+            'grid_on':       True,
+            'grid_color':    '#cccccc',
+            'grid_linestyle': '-',
+            'grid_linewidth': 0.8,
+            'grid_alpha':    0.6,
+        })
+
+        self._undo_suspended = True
+        self._applying_settings = True
+        try:
+            self._apply_settings(sample_settings)
+        finally:
+            self._applying_settings = False
+            self._undo_suspended = False
+
+        # ── 4. Populate combos then add series rows ───────────────────────────
+        self.update_lists()
+        self.on_subplot_layout_changed()
+
+        # Add sin_x and cos_x series using the standard add-row mechanism
+        for x_col, y_col, label in [
+            ('x', 'sin_x', 'sin(x)'),
+            ('x', 'cos_x', 'cos(x)'),
+        ]:
+            self._add_series_row()
+            row = self.series_table.rowCount() - 1
+            for col_idx, col_name in [(0, x_col), (1, y_col)]:
+                cb = self.series_table.cellWidget(row, col_idx)
+                if cb is not None:
+                    i = cb.findText(col_name)
+                    if i >= 0:
+                        cb.blockSignals(True)
+                        cb.setCurrentIndex(i)
+                        cb.blockSignals(False)
+            lbl_item = self.series_table.item(row, 2)
+            if lbl_item is not None:
+                lbl_item.setText(label)
+
+        # ── 5. Draw ───────────────────────────────────────────────────────────
+        self.update_preview()
+        if hasattr(self, 'refresh_annotation_list'):
+            self.refresh_annotation_list()
+        self._notify_sns_explorer()
+
     # ═══════════════════════════════════════════════════════════════════════════
     # ═══════════════════════════════════════════════════════════════════════════
     def resizeEvent(self, event):
@@ -704,6 +809,28 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         if self._sns_explorer is not None and self._sns_explorer.isVisible():
             palette = [self._palette_color(i) for i in range(10)]
             self._sns_explorer.refresh_datasets(self.datasets, palette)
+        if self._code_runner is not None and self._code_runner.isVisible():
+            self._code_runner.refresh_datasets(self.datasets)
+
+    # ── Python Code Runner ────────────────────────────────────────────────────
+    def _open_code_runner(self):
+        """Open (or restore) the Python Code Runner window."""
+        if self._code_runner is None:
+            self._code_runner = CodeRunnerDialog(
+                datasets=self.datasets,
+                parent=self,
+            )
+            self._code_runner.setWindowModality(Qt.WindowModality.NonModal)
+        else:
+            self._code_runner.refresh_datasets(self.datasets)
+        self._code_runner.show()
+        self._code_runner.raise_()
+        self._code_runner.activateWindow()
+
+    def _open_pvizx_in_code_runner(self, fp: str):
+        """Open the Code Runner, load fp (.pvizx) into it, and run it."""
+        self._open_code_runner()
+        self._code_runner.load_pvizx(fp)
 
     def closeEvent(self, event):
         """Persist window state and prefs before closing."""
@@ -871,8 +998,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         sns_action.setStatusTip('Open the Seaborn statistical chart explorer')
         sns_action.triggered.connect(self._open_seaborn_explorer)
         tools_menu.addAction(sns_action)
+
+        code_action = QAction('Python Code Runner…', self)
+        code_action.setShortcut('Ctrl+Shift+P')
+        code_action.setStatusTip('Write or load Python code to draw a matplotlib/seaborn chart')
+        code_action.triggered.connect(self._open_code_runner)
+        tools_menu.addAction(code_action)
+
         self._tools_menu = tools_menu
-        self._sns_explorer = None   # lazily created
+        self._sns_explorer  = None   # lazily created
+        self._code_runner   = None   # lazily created
 
         # Tooltips
         for i, tip in enumerate([

@@ -151,53 +151,160 @@ class CanvasPlotter(FigureCanvas):
                     pass
             self.draw_idle()
 
+    # ── Tab-navigation constants ──────────────────────────────────────────────
+    _TAB_AXES   = 2   # Chart / Data / Axes / Style / Series / Annotations / Advanced
+    _TAB_STYLE  = 3
+    _TAB_SERIES = 4
+
+    def _nav_zone(self, event):
+        """Classify a left-click for tab navigation.
+
+        Returns one of:
+          'data'   – inside the inner spine box (ax.bbox); try series hit first
+          'axes'   – axis decoration: tick/axis labels, below/beside inner box
+          'style'  – title area, figure background, margins
+
+        Rule:
+          matplotlib sets event.inaxes iff the click is inside ax.bbox.
+          Anything above ax.bbox.y1 (title, figure top) → 'style'.
+          Everything below/beside ax.bbox that is inside get_tightbbox → 'axes'.
+          Everything else → 'style'.
+        """
+        if event.inaxes is not None:
+            return 'data'
+
+        px, py = event.x, event.y
+        if px is None or py is None:
+            return 'style'
+
+        try:
+            renderer = self.figure.canvas.get_renderer()
+        except Exception:
+            renderer = None
+
+        for ax in self.axes_list:
+            inner = ax.bbox
+            # Anything above the inner box top → title / figure top → Style
+            if py > inner.y1:
+                continue
+            # Check tightbbox for the decoration band (below/beside inner box)
+            try:
+                tb = ax.get_tightbbox(renderer) if renderer else None
+            except Exception:
+                tb = None
+            if tb is None:
+                # Fallback: generous fixed expansion of inner box
+                from matplotlib.transforms import Bbox as _Bbox
+                b = inner
+                tb = _Bbox([[b.x0 - 80, b.y0 - 80], [b.x1 + 80, b.y1 + 80]])
+            M = 10  # small tolerance for rounding
+            if (tb.x0 - M <= px <= tb.x1 + M and
+                    tb.y0 - M <= py <= tb.y1 + M):
+                return 'axes'
+
+        return 'style'
+
     def on_click(self, event):
-        if event.inaxes is None or event.button != 1:
-            return
-        ax     = event.inaxes
-        ax_idx = self._axes_index(ax)
-        x, y   = event.xdata, event.ydata
-        if x is None or y is None:
+        if event.button != 1:
             return
 
-        # In all modes, check if user is clicking an existing annotation to drag it
-        hit = self._find_annotation_at(ax, x, y)
-        if hit is not None:
-            self._drag_ann = hit
-            self._deactivate_toolbar()
-            if hit['type'] == 'text':
-                self._drag_offx = x - hit['x']
-                self._drag_offy = y - hit['y']
-            elif hit['type'] == 'arrow':
-                self._drag_offx = x - hit['x0']
-                self._drag_offy = y - hit['y0']
-            elif hit['type'] == 'image':
-                self._drag_offx = x - hit['x']
-                self._drag_offy = y - hit['y']
-            return   # don't place a new annotation
+        mw = self.main_window
 
-        # In default mode (no annotation tool active) try to select a series
-        if self.annotation_mode is None:
-            label = self._find_series_at(ax, x, y, event)
-            if label and self.main_window:
-                self.main_window.select_series_by_label(label)
+        # ── Annotation placement modes ────────────────────────────────────────
+        if self.annotation_mode is not None:
+            if event.inaxes is None:
+                return
+            ax     = event.inaxes
+            ax_idx = self._axes_index(ax)
+            x, y   = event.xdata, event.ydata
+            if x is None or y is None:
+                return
+            hit = self._find_annotation_at(ax, x, y)
+            if hit is not None:
+                self._drag_ann = hit
+                self._deactivate_toolbar()
+                if hit['type'] == 'text':
+                    self._drag_offx = x - hit['x']
+                    self._drag_offy = y - hit['y']
+                elif hit['type'] == 'arrow':
+                    self._drag_offx = x - hit['x0']
+                    self._drag_offy = y - hit['y0']
+                elif hit['type'] == 'image':
+                    self._drag_offx = x - hit['x']
+                    self._drag_offy = y - hit['y']
+                return
+            if self.annotation_mode == 'text':
+                self._place_text_annotation(ax, ax_idx, x, y)
+            elif self.annotation_mode == 'arrow':
+                if self._arrow_start is None:
+                    self._arrow_start = (x, y, ax_idx)
+                else:
+                    x0, y0, ax0 = self._arrow_start
+                    self._arrow_start = None
+                    if ax0 == ax_idx:
+                        self._place_arrow_annotation(ax, ax_idx, x0, y0, x, y)
+            elif self.annotation_mode == 'image':
+                if self._pending_image_path:
+                    self._place_image_annotation(ax, ax_idx, x, y,
+                                                  self._pending_image_path,
+                                                  zoom=self.ann_image_zoom)
             return
 
-        if self.annotation_mode == 'text':
-            self._place_text_annotation(ax, ax_idx, x, y)
-        elif self.annotation_mode == 'arrow':
-            if self._arrow_start is None:
-                self._arrow_start = (x, y, ax_idx)
-            else:
-                x0, y0, ax0 = self._arrow_start
-                self._arrow_start = None
-                if ax0 == ax_idx:
-                    self._place_arrow_annotation(ax, ax_idx, x0, y0, x, y)
-        elif self.annotation_mode == 'image':
-            if self._pending_image_path:
-                self._place_image_annotation(ax, ax_idx, x, y,
-                                              self._pending_image_path,
-                                              zoom=self.ann_image_zoom)
+        # ── Default mode ──────────────────────────────────────────────────────
+        zone = self._nav_zone(event)
+
+        if zone == 'data':
+            ax     = event.inaxes
+            ax_idx = self._axes_index(ax)
+            x, y   = event.xdata, event.ydata
+            if x is not None and y is not None:
+                # Annotation drag
+                hit = self._find_annotation_at(ax, x, y)
+                if hit is not None:
+                    self._drag_ann = hit
+                    self._deactivate_toolbar()
+                    if hit['type'] == 'text':
+                        self._drag_offx = x - hit['x']
+                        self._drag_offy = y - hit['y']
+                    elif hit['type'] == 'arrow':
+                        self._drag_offx = x - hit['x0']
+                        self._drag_offy = y - hit['y0']
+                    elif hit['type'] == 'image':
+                        self._drag_offx = x - hit['x']
+                        self._drag_offy = y - hit['y']
+                    return
+                # Series hit
+                label = self._find_series_at(ax, x, y, event)
+                if label and mw:
+                    mw.select_series_by_label(label)
+                    return
+            # No series hit — go to Axes tab for this subplot
+            if mw:
+                if hasattr(mw, 'sp_active'):
+                    mw.sp_active.setCurrentIndex(ax_idx)
+                mw.tabs.setCurrentIndex(self._TAB_AXES)
+
+        elif zone == 'axes':
+            # Axis decoration area — find which subplot and go to Axes tab
+            px, py = event.x, event.y
+            ax_idx = 0
+            # Pick the subplot whose inner box is closest vertically/horizontally
+            best_d = float('inf')
+            for i, ax in enumerate(self.axes_list):
+                b = ax.bbox
+                cx = max(b.x0, min(px, b.x1))
+                cy = max(b.y0, min(py, b.y1))
+                d = (px - cx) ** 2 + (py - cy) ** 2
+                if d < best_d:
+                    best_d, ax_idx = d, i
+            if mw:
+                if hasattr(mw, 'sp_active'):
+                    mw.sp_active.setCurrentIndex(ax_idx)
+                mw.tabs.setCurrentIndex(self._TAB_AXES)
+
+        else:  # 'style'
+            if mw:
+                mw.tabs.setCurrentIndex(self._TAB_STYLE)
 
     def on_release(self, event):
         if self._drag_ann is not None:
@@ -248,7 +355,11 @@ class CanvasPlotter(FigureCanvas):
 
         if event.x is None or event.y is None:
             return None
-        ex, ey = event.x, event.y   # click in display (pixel) coords
+
+        # event.x/y and ax.transData.transform() are both in figure DPI
+        # display coordinates — no pixel-ratio conversion needed.
+        ex = event.x
+        ey = event.y
 
         for artist in ax.get_children():
             lbl = artist.get_label()

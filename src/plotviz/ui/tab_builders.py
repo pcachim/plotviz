@@ -1216,7 +1216,7 @@ class TabBuildersMixin:
         self.curve_select = QComboBox()
         self.curve_select.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.curve_select.currentIndexChanged.connect(self.load_curve_style)
+        self.curve_select.currentIndexChanged.connect(lambda _: self.load_curve_style())
         layout.addWidget(self.curve_select)
 
         # Line style

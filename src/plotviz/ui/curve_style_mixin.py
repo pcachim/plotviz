@@ -60,8 +60,8 @@ class CurveStyleMixin:
         idx = self.curve_select.findText(label)
         if idx < 0:
             return
-        # Switch to Series tab (index 3: Chart/Data/Style/Series/Axes/Annotate/Advanced)
-        self.tabs.setCurrentIndex(3)
+        # Switch to Series tab (index 4: Chart/Data/Axes/Style/Series/Annotations/Advanced)
+        self.tabs.setCurrentIndex(4)
         # Select the curve — triggers load_curve_style via currentIndexChanged signal
         if self.curve_select.currentIndex() == idx:
             # Already selected — force a reload so swatches reflect current state

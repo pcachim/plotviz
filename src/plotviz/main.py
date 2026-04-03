@@ -140,6 +140,8 @@ class PlotVizQApplication(QApplication):
                 self._window._import_palette_bundle_from_path(fp)
             elif fp.endswith(_SCHEME_EXT):
                 self._window._load_color_scheme_from_path(fp)
+            elif fp.endswith(_PYTHON_EXT):
+                self._window._open_pvizx_in_code_runner(fp)
             return True
         return super().event(e)
 
@@ -201,6 +203,9 @@ def main():
             break
         if arg.endswith(_SCHEME_EXT) and Path(arg).is_file():
             window._load_color_scheme_from_path(arg)
+            break
+        if arg.endswith(_PYTHON_EXT) and Path(arg).is_file():
+            window._open_pvizx_in_code_runner(arg)
             break
 
     sys.exit(app.exec())

@@ -864,8 +864,10 @@ class SerializationMixin:
         self._current_filepath = fp
         self._load_project_inner(fp)
 
-    def _load_project_inner(self, fp: str):
-        """Core logic for loading a .pviz archive — no dialogs."""
+    def _load_project_inner(self, fp: str, silent: bool = False):
+        """Core logic for loading a .pviz archive.
+        Pass silent=True to suppress all QMessageBox dialogs (e.g. on startup).
+        """
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 names = zf.namelist()
@@ -923,9 +925,11 @@ class SerializationMixin:
             try:
                 self._apply_settings(settings)
             finally:
-                self._applying_settings = False
-            self.sp_rows.blockSignals(False)
-            self.sp_cols.blockSignals(False)
+                # Keep _applying_settings True while unblocking so any deferred
+                # valueChanged signals from sp_rows/sp_cols don't fire update_preview
+                # before the series table is restored (steps 2-5 below).
+                self.sp_rows.blockSignals(False)
+                self.sp_cols.blockSignals(False)
 
             # 2. Refresh dataset combos now that self.datasets is populated.
             #    Keep _applying_settings=True through steps 2-5 so no intermediate
@@ -981,7 +985,9 @@ class SerializationMixin:
                     self._snapshot()
                 self._update_undo_buttons()
             self._is_dirty = False
-            QMessageBox.information(self, 'Loaded', 'Chart loaded successfully.')
+            if not silent:
+                QMessageBox.information(self, 'Loaded', 'Chart loaded successfully.')
         except Exception as e:
-            QMessageBox.critical(self, 'Error', str(e))
+            if not silent:
+                QMessageBox.critical(self, 'Error', str(e))
 

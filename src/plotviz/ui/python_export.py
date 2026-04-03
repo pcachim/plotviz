@@ -24,9 +24,18 @@ def _esc(s):
     return str(s).replace('\\', '\\\\').replace("'", "\\'")
 
 
-def _col_ref(col):
-    """Return a Python expression to load a column: df['col']."""
-    return f"df['{_esc(col)}']"
+def _col_ref(col, use_combined=True, datasets=None):
+    """Return a Python expression to reference a dataset column.
+
+    When all columns share the same length (use_combined=True) they are read
+    into a single combined ``df``, so we emit ``df['col']``.
+    When columns differ in length each is in its own ``_df_<safe>`` frame and
+    we emit ``_df_<safe>['col']`` to avoid NaN-padding from pd.concat.
+    """
+    if use_combined or datasets is None:
+        return f"df['{_esc(col)}']"
+    safe = col.replace(' ', '_').replace('-', '_')
+    return f"_df_{safe}['{_esc(col)}']"
 
 
 def _color(palette, i):
@@ -323,6 +332,12 @@ def generate_plot_script(settings: dict, series_meta: dict,
     settings = dict(settings)
     settings['_z_col']   = series_meta.get('z_col', '')
     settings['_err_col'] = series_meta.get('err_col', '')
+    # subplot_chart_types lives in series_meta, not settings — merge it in
+    if not settings.get('subplot_chart_types'):
+        settings['subplot_chart_types'] = series_meta.get('subplot_chart_types', {})
+    # per-subplot z columns (if stored separately)
+    if not settings.get('subplot_z_cols'):
+        settings['subplot_z_cols'] = series_meta.get('subplot_z_cols', {})
 
     # ── Collect dataset filenames ──────────────────────────────────────────────
     used_cols = {s.get('x_col') for s in series_list} | {s.get('y_col') for s in series_list}
@@ -331,6 +346,13 @@ def generate_plot_script(settings: dict, series_meta: dict,
     # All datasets go into data/ as CSVs; build a combined CSV if they share length
     lengths = {len(v) for v in datasets.values() if v is not None}
     use_combined = len(lengths) == 1   # all same length → one CSV
+
+    # Rebind _col_ref so every generator in this script uses the right frame
+    def _col_ref(col, _uc=use_combined, _ds=datasets):  # noqa: F811
+        if _uc or _ds is None:
+            return f"df['{_esc(col)}']"
+        safe = col.replace(' ', '_').replace('-', '_')
+        return f"_df_{safe}['{_esc(col)}']"
 
     # ── Imports ───────────────────────────────────────────────────────────────
     lines = [
@@ -415,10 +437,11 @@ def generate_plot_script(settings: dict, series_meta: dict,
         yl = settings.get('subplot_ylabels', {}).get('0', '')
         if xl: lines.append(f"ax.set_xlabel('{_esc(xl)}')")
         if yl: lines.append(f"ax.set_ylabel('{_esc(yl)}')")
-        if title_text: lines.append(f"ax.set_title('{_esc(title_text)}')")
+        sp_title = (settings.get('sp_titles') or {}).get('0', '')
+        if sp_title: lines.append(f"ax.set_title('{_esc(sp_title)}')")
         lines.append("ax.legend()")
     else:
-        subplot_types = settings.get('subplot_chart_types', {})
+        subplot_types = settings.get('subplot_chart_types') or {}
         lines.append(f"axes = []")
         for idx in range(n_subplots):
             sub_ct = subplot_types.get(str(idx), ct)
@@ -433,9 +456,17 @@ def generate_plot_script(settings: dict, series_meta: dict,
             sub_ct      = subplot_types.get(str(idx), ct)
             sub_series  = [s for s in series_list if s.get('plot_num', 1) == idx + 1]
             ax_var      = f"ax{idx}"
+            # Build a per-subplot settings view with the correct z column
+            sub_z       = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
+            if not sub_z:
+                # Fall back: z applies only if this subplot is a 2-D field type
+                sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Surface3D', 'Hist2D', 'Hexbin') else ''
+            sub_settings = dict(settings)
+            sub_settings['chart_type'] = sub_ct
+            sub_settings['_z_col']     = sub_z
             lines.append(f"# Subplot {idx+1}: {sub_ct}")
             gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
-            for l in gen(settings, sub_series, datasets, palette, ax_var):
+            for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
                 lines.append(l)
             sp_title = settings.get('sp_titles', {}).get(str(idx), f'Subplot {idx+1}')
             if sp_title: lines.append(f"{ax_var}.set_title('{_esc(sp_title)}')")
@@ -445,9 +476,26 @@ def generate_plot_script(settings: dict, series_meta: dict,
     # ── Final touches ─────────────────────────────────────────────────────────
     hspace = settings.get('sp_hspace', 0.35)
     wspace = settings.get('sp_wspace', 0.35)
+    # Figure-level title (suptitle)
+    title_show  = settings.get('title_show', True)
+    title_font  = settings.get('title_font', 'sans-serif')
+    title_size  = settings.get('title_size', 14)
+    title_color = settings.get('title_color', '#000000')
+    title_x     = settings.get('title_x', 0.5)
+    title_y     = settings.get('title_y', 0.98)
+    suptitle_lines = []
+    if title_show and title_text:
+        suptitle_lines = [
+            f"fig.suptitle('{_esc(title_text)}', "
+            f"fontsize={title_size}, "
+            f"fontfamily='{_esc(title_font)}', "
+            f"color='{_esc(title_color)}', "
+            f"x={title_x}, y={title_y})",
+        ]
     lines += [
         "",
         "# ── Layout ───────────────────────────────────────────────────────────",
+    ] + suptitle_lines + [
         f"fig.subplots_adjust(hspace={hspace}, wspace={wspace})",
         "plt.tight_layout()",
         "plt.show()",
@@ -700,6 +748,45 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
     return '\n'.join(lines)
 
 
+
+def _build_pyproject_toml(chart_title: str, script: str) -> str:
+    """Generate a pyproject.toml with dependencies inferred from the script."""
+    import re
+    safe_name = re.sub(r'[^a-z0-9]+', '-', chart_title.lower()).strip('-') or 'plotviz-chart'
+
+    deps = [
+        'matplotlib>=3.7',
+        'numpy>=1.24',
+        'pandas>=2.0',
+    ]
+    if 'scipy' in script:
+        deps.append('scipy>=1.10')
+    if 'seaborn' in script:
+        deps.append('seaborn>=0.12')
+
+    deps_toml = '\n'.join(f'    "{d}",' for d in deps)
+
+    return f'''[project]
+name = "{safe_name}"
+version = "1.0.0"
+description = "Standalone chart script exported from plotviz"
+requires-python = ">=3.10"
+dependencies = [
+{deps_toml}
+]
+
+[project.scripts]
+run = "plot:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+# Run with: uv run plot.py
+'''
+
+
 class PythonExportMixin:
     """Mixin that adds _export_python_bundle() to PlotVizApp."""
 
@@ -767,6 +854,7 @@ class PythonExportMixin:
             with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr('plot.py', script)
                 zf.writestr('README.md', _build_readme(chart_title, datasets_to_export, n_subplots))
+                zf.writestr('pyproject.toml', _build_pyproject_toml(chart_title, script))
 
                 if use_combined:
                     # Single CSV with all columns
