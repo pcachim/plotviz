@@ -152,9 +152,9 @@ class CanvasPlotter(FigureCanvas):
             self.draw_idle()
 
     # ── Tab-navigation constants ──────────────────────────────────────────────
-    _TAB_AXES   = 2   # Chart / Data / Axes / Style / Series / Annotations / Advanced
-    _TAB_STYLE  = 3
-    _TAB_SERIES = 4
+    _TAB_AXES   = 4   # Chart / Data / Style / Series / Axes / Annotations / Advanced
+    _TAB_STYLE  = 2
+    _TAB_SERIES = 3
 
     def _nav_zone(self, event):
         """Classify a left-click for tab navigation.
@@ -278,11 +278,7 @@ class CanvasPlotter(FigureCanvas):
                 if label and mw:
                     mw.select_series_by_label(label)
                     return
-            # No series hit — go to Axes tab for this subplot
-            if mw:
-                if hasattr(mw, 'sp_active'):
-                    mw.sp_active.setCurrentIndex(ax_idx)
-                mw.tabs.setCurrentIndex(self._TAB_AXES)
+            # No series hit — do nothing; don't change tabs or option groups
 
         elif zone == 'axes':
             # Axis decoration area — find which subplot and go to Axes tab
@@ -337,18 +333,13 @@ class CanvasPlotter(FigureCanvas):
     def _find_series_at(self, ax, x, y, event, px_threshold=20):
         """Return the label of the plotted series closest to the click, or None.
 
-        Strategy:
-        1. For Line2D: convert all data points to display (pixel) coords and find
-           the minimum pixel distance to the click.  Accept if within px_threshold.
-           This avoids the unreliable artist.contains() path and works regardless
-           of axis scale, zoom level, or whether the canvas has been drawn.
-        2. For PathCollection (scatter): use artist.contains() which works reliably
-           for filled markers, plus the same pixel-distance fallback.
-        Artists with labels starting with '_' are matplotlib-internal and skipped.
+        Detects Line2D, PathCollection (scatter/bubble) and Rectangle (bar/barh).
+        Artists whose label starts with '_' are matplotlib-internal and skipped.
         """
         import numpy as np
         from matplotlib.lines import Line2D
         from matplotlib.collections import PathCollection
+        from matplotlib.patches import Rectangle
 
         best_label = None
         best_px    = float('inf')
@@ -356,8 +347,6 @@ class CanvasPlotter(FigureCanvas):
         if event.x is None or event.y is None:
             return None
 
-        # event.x/y and ax.transData.transform() are both in figure DPI
-        # display coordinates — no pixel-ratio conversion needed.
         ex = event.x
         ey = event.y
 
@@ -367,14 +356,13 @@ class CanvasPlotter(FigureCanvas):
             if not lbl or lbl.startswith('_'):
                 continue
 
-            # --- Line2D (line, step, errorbar spine) ------------------------
+            # --- Line2D (line, step, stem, errorbar spine) ------------------
             if isinstance(artist, Line2D):
                 try:
                     xd = np.asarray(artist.get_xdata(), dtype=float)
                     yd = np.asarray(artist.get_ydata(), dtype=float)
                     if len(xd) == 0:
                         continue
-                    # Transform ALL data points to pixel coords in one call
                     pts = ax.transData.transform(np.column_stack([xd, yd]))
                     px_dists = np.hypot(pts[:, 0] - ex, pts[:, 1] - ey)
                     min_d = float(np.nanmin(px_dists))
@@ -385,7 +373,6 @@ class CanvasPlotter(FigureCanvas):
 
             # --- PathCollection (scatter / bubble) --------------------------
             elif isinstance(artist, PathCollection):
-                # contains() is reliable for scatter markers
                 try:
                     hit, info = artist.contains(event)
                     if hit:
@@ -398,7 +385,6 @@ class CanvasPlotter(FigureCanvas):
                                 best_px, best_label = d, lbl
                 except Exception:
                     pass
-                # Pixel-distance fallback for sparse scatter
                 try:
                     offsets = np.asarray(artist.get_offsets())
                     if len(offsets):
@@ -410,7 +396,21 @@ class CanvasPlotter(FigureCanvas):
                 except Exception:
                     pass
 
+            # --- Rectangle (bar / barh) -------------------------------------
+            elif isinstance(artist, Rectangle):
+                try:
+                    if artist.contains_point(ax.transData.transform((x, y))):
+                        bx = artist.get_x() + artist.get_width() / 2
+                        by = artist.get_y() + artist.get_height() / 2
+                        pt = ax.transData.transform((bx, by))
+                        d = float(np.hypot(pt[0] - ex, pt[1] - ey))
+                        if d < best_px:
+                            best_px, best_label = d, lbl
+                except Exception:
+                    pass
+
         return best_label
+
 
     def _deactivate_toolbar(self):
         """Deactivate any active zoom/pan tool so our drag can take over."""

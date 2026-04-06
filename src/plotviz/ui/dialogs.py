@@ -86,7 +86,7 @@ class AnnotationEditDialog(QDialog):
             row3 = QHBoxLayout(); row3.addWidget(self.fields['fontcolor']); row3.addWidget(btn_fc2)
             w3 = QWidget(); w3.setLayout(row3)
             form.addRow('Arrow color:', w3)
-
+ 
         elif atype == 'image':
             self.fields['x'] = QDoubleSpinBox()
             self.fields['x'].setRange(-1e9,1e9); self.fields['x'].setDecimals(6)

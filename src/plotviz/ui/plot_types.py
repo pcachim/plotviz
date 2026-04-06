@@ -109,6 +109,21 @@ class PlotTypesMixin:
                     labels = list(xd) if self._is_categorical(xd) else [f'{v:.4g}' for v in xd]
                     explode = [0.08] + [0.0]*(len(yd)-1) if self.pie_explode_first.isChecked() else None
                     wedge_kw = {'width': 0.5} if self.pie_donut.isChecked() else {}
+                    palette_colors = self._tab10(len(yd))
+                    wedge_colors = []
+                    for i, seg in enumerate(labels):
+                        key = str(seg)
+                        s = self.curve_styles.get(key, {})
+                        if s.get('color'):
+                            # Entry exists (from file, palette change, or prior render) — use it
+                            wedge_colors.append(s['color'])
+                        else:
+                            # No entry yet: seed from palette and store for future updates
+                            c = palette_colors[i]
+                            s['color'] = c
+                            s['marker_color'] = c
+                            self.curve_styles[key] = s
+                            wedge_colors.append(c)
                     ax.pie(np.abs(yd), labels=labels,
                            autopct='%1.1f%%' if self.pie_autopct.isChecked() else None,
                            shadow=self.pie_shadow.isChecked(),
@@ -116,7 +131,7 @@ class PlotTypesMixin:
                            labeldistance=self.pie_labeldistance.value(),
                            pctdistance=self.pie_pctdistance.value(),
                            explode=explode, wedgeprops=wedge_kw,
-                           colors=self._tab10(len(yd)))
+                           colors=wedge_colors)
                     ax.set_aspect('equal')
 
             elif ct == 'Heatmap':
@@ -500,8 +515,8 @@ class PlotTypesMixin:
                 xd_f, yd_f = xd_f[:n], yd_f[:n]
                 w   = self.waterfall_width.value()
                 al  = self.waterfall_alpha.value()
-                pos_c = getattr(self, 'waterfall_pos_color', '#2ecc71')
-                neg_c = getattr(self, 'waterfall_neg_color', '#e74c3c')
+                pos_c = getattr(self, 'waterfall_pos_color', None) or '#2ecc71'
+                neg_c = getattr(self, 'waterfall_neg_color', None) or '#e74c3c'
                 running = 0.0; prev_top = None
                 for k in range(n):
                     val = float(yd_f[k])

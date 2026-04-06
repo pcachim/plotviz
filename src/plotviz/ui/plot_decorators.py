@@ -159,6 +159,10 @@ class PlotDecoratorsMixin:
                               fontsize=self.xlabel_size.value(),
                               color=self.xlabel_color,
                               fontfamily=self.xlabel_font.currentText())
+            else:
+                ax.set_xlabel('')
+        else:
+            ax.set_xlabel('')
         # ── Y label ──
         if self.subplot_ylabel_show.get(subplot_idx, True):
             yl = self.subplot_ylabels.get(subplot_idx, '') or ', '.join(yd.keys())
@@ -167,6 +171,10 @@ class PlotDecoratorsMixin:
                               fontsize=self.ylabel_size.value(),
                               color=self.ylabel_color,
                               fontfamily=self.ylabel_font.currentText())
+            else:
+                ax.set_ylabel('')
+        else:
+            ax.set_ylabel('')
 
         # ── Secondary Y axis ──
         _y2_active = False

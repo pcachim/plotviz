@@ -143,10 +143,11 @@ class SubplotMixin(SubplotConfigMixin):
         if idx < 0: idx = 0
 
         def _load(widget, value):
+            from PyQt6.QtWidgets import QSpinBox
             widget.blockSignals(True)
-            if hasattr(widget, 'setChecked'):   widget.setChecked(value)
-            elif hasattr(widget, 'setText'):    widget.setText(value)
-            elif hasattr(widget, 'setValue'):   widget.setValue(value)
+            if hasattr(widget, 'setChecked'):       widget.setChecked(value)
+            elif hasattr(widget, 'setText'):        widget.setText(value)
+            elif hasattr(widget, 'setValue'):       widget.setValue(int(value) if isinstance(widget, QSpinBox) else value)
             elif hasattr(widget, 'setCurrentText'): widget.setCurrentText(value)
             widget.blockSignals(False)
 

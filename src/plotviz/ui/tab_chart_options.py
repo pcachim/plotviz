@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QDoubleSpinBox, QPushButton, QGroupBox, QCheckBox,
 )
+from ui.tab_builders import _CMAP_LIST
 
 
 class TabChartOptionsMixin:
@@ -78,9 +79,7 @@ class TabChartOptionsMixin:
         # ── Heatmap / Contour / 3D Surface ────────────────────────────────────
         self.heat_group = QGroupBox('Heatmap / Contour / 3D Options')
         hgb = QVBoxLayout(self.heat_group)
-        hgb.addLayout(_row(QLabel('Colormap:'), self._make_combo('cmap_combo',
-            ['viridis','plasma','inferno','magma','cividis','coolwarm','RdBu','RdYlBu',
-             'Spectral','hot','jet','gray','Blues','Reds','YlOrRd','PuBu'])))
+        hgb.addLayout(_row(QLabel('Colormap:'), self._make_combo('cmap_combo', _CMAP_LIST)))
         hgb.addLayout(_row(QLabel('Contour levels:'), self._make_spin('contour_levels', 3, 100, 10)))
         hgb.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('heat_alpha', 0.05, 1.0, 1.0, 0.05)))
         hgb.addLayout(_row(QLabel('Interpolation:'), self._make_combo('heat_interpolation',

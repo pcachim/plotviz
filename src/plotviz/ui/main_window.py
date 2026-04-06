@@ -49,6 +49,7 @@ from ui.canvas import CanvasPlotter
 from ui.tab_builders import (
     TabBuildersMixin, COLOR_PALETTES, get_all_palettes, add_custom_palette,
     PER_SERIES_TYPES, _CUSTOM_PALETTES,
+    PLOT_MODE_GROUPS, TYPE_TO_PLOT_MODE,
 )
 from ui.plot_engine import PlotEngineMixin
 from ui.serialization import SerializationMixin
@@ -59,508 +60,507 @@ from ui.code_runner import CodeRunnerDialog
 
 import config.settings as settings
 from ui.helpers import _get_dir, _remember_dir, _show_color_dialog
-
-
+from ui.dialogs import AnnotationEditDialog, DataImportDialog
 
 from data.scientific import CurveFitter
 from styling.presets import ChartPresets
 
 
-class AnnotationEditDialog(QDialog):
-    """Edit a single annotation's position, label, style, and image zoom."""
+# class AnnotationEditDialog(QDialog):
+#     """Edit a single annotation's position, label, style, and image zoom."""
 
-    def __init__(self, ann, parent=None):
-        super().__init__(parent)
-        self.ann = ann
-        self.setWindowTitle('Edit Annotation')
-        layout = QVBoxLayout(self)
-        form   = QFormLayout()
+#     def __init__(self, ann, parent=None):
+#         super().__init__(parent)
+#         self.ann = ann
+#         self.setWindowTitle('Edit Annotation')
+#         layout = QVBoxLayout(self)
+#         form   = QFormLayout()
 
-        atype = ann['type']
-        self.fields = {}
+#         atype = ann['type']
+#         self.fields = {}
 
-        if atype == 'text':
-            self.fields['label'] = QLineEdit(ann.get('label',''))
-            form.addRow('Label:', self.fields['label'])
-            self.fields['x'] = QDoubleSpinBox()
-            self.fields['x'].setRange(-1e9, 1e9); self.fields['x'].setDecimals(6)
-            self.fields['x'].setValue(ann['x'])
-            form.addRow('X:', self.fields['x'])
-            self.fields['y'] = QDoubleSpinBox()
-            self.fields['y'].setRange(-1e9, 1e9); self.fields['y'].setDecimals(6)
-            self.fields['y'].setValue(ann['y'])
-            form.addRow('Y:', self.fields['y'])
+#         if atype == 'text':
+#             self.fields['label'] = QLineEdit(ann.get('label',''))
+#             form.addRow('Label:', self.fields['label'])
+#             self.fields['x'] = QDoubleSpinBox()
+#             self.fields['x'].setRange(-1e9, 1e9); self.fields['x'].setDecimals(6)
+#             self.fields['x'].setValue(ann['x'])
+#             form.addRow('X:', self.fields['x'])
+#             self.fields['y'] = QDoubleSpinBox()
+#             self.fields['y'].setRange(-1e9, 1e9); self.fields['y'].setDecimals(6)
+#             self.fields['y'].setValue(ann['y'])
+#             form.addRow('Y:', self.fields['y'])
 
-            s = ann.get('style', {})
-            self.fields['fontsize'] = QSpinBox()
-            self.fields['fontsize'].setRange(6,72)
-            self.fields['fontsize'].setValue(s.get('fontsize',10))
-            form.addRow('Font size:', self.fields['fontsize'])
+#             s = ann.get('style', {})
+#             self.fields['fontsize'] = QSpinBox()
+#             self.fields['fontsize'].setRange(6,72)
+#             self.fields['fontsize'].setValue(s.get('fontsize',10))
+#             form.addRow('Font size:', self.fields['fontsize'])
 
-            self.fields['fontcolor'] = QLineEdit(s.get('fontcolor','#000000'))
-            btn_fc = QPushButton('…')
-            btn_fc.setFixedWidth(28)
-            btn_fc.clicked.connect(lambda: self._pick_color('fontcolor'))
-            row = QHBoxLayout(); row.addWidget(self.fields['fontcolor']); row.addWidget(btn_fc)
-            w = QWidget(); w.setLayout(row)
-            form.addRow('Font color:', w)
+#             self.fields['fontcolor'] = QLineEdit(s.get('fontcolor','#000000'))
+#             btn_fc = QPushButton('…')
+#             btn_fc.setFixedWidth(28)
+#             btn_fc.clicked.connect(lambda: self._pick_color('fontcolor'))
+#             row = QHBoxLayout(); row.addWidget(self.fields['fontcolor']); row.addWidget(btn_fc)
+#             w = QWidget(); w.setLayout(row)
+#             form.addRow('Font color:', w)
 
-            self.fields['bg_alpha'] = QDoubleSpinBox()
-            self.fields['bg_alpha'].setRange(0,1); self.fields['bg_alpha'].setSingleStep(0.05)
-            self.fields['bg_alpha'].setValue(s.get('bg_alpha',0.9))
-            form.addRow('BG opacity:', self.fields['bg_alpha'])
+#             self.fields['bg_alpha'] = QDoubleSpinBox()
+#             self.fields['bg_alpha'].setRange(0,1); self.fields['bg_alpha'].setSingleStep(0.05)
+#             self.fields['bg_alpha'].setValue(s.get('bg_alpha',0.9))
+#             form.addRow('BG opacity:', self.fields['bg_alpha'])
 
-            self.fields['bg_color'] = QLineEdit(s.get('bg_color','#ffffcc'))
-            btn_bg = QPushButton('…')
-            btn_bg.setFixedWidth(28)
-            btn_bg.clicked.connect(lambda: self._pick_color('bg_color'))
-            row2 = QHBoxLayout(); row2.addWidget(self.fields['bg_color']); row2.addWidget(btn_bg)
-            w2 = QWidget(); w2.setLayout(row2)
-            form.addRow('BG color:', w2)
+#             self.fields['bg_color'] = QLineEdit(s.get('bg_color','#ffffcc'))
+#             btn_bg = QPushButton('…')
+#             btn_bg.setFixedWidth(28)
+#             btn_bg.clicked.connect(lambda: self._pick_color('bg_color'))
+#             row2 = QHBoxLayout(); row2.addWidget(self.fields['bg_color']); row2.addWidget(btn_bg)
+#             w2 = QWidget(); w2.setLayout(row2)
+#             form.addRow('BG color:', w2)
 
-        elif atype == 'arrow':
-            for k, label in [('x0','Tail X'),('y0','Tail Y'),('x1','Tip X'),('y1','Tip Y')]:
-                sb = QDoubleSpinBox()
-                sb.setRange(-1e9,1e9); sb.setDecimals(6)
-                sb.setValue(ann[k])
-                self.fields[k] = sb
-                form.addRow(label+':', sb)
-            self.fields['label'] = QLineEdit(ann.get('label',''))
-            form.addRow('Label:', self.fields['label'])
-            s = ann.get('style', {})
-            self.fields['fontcolor'] = QLineEdit(s.get('fontcolor','#000000'))
-            btn_fc2 = QPushButton('…'); btn_fc2.setFixedWidth(28)
-            btn_fc2.clicked.connect(lambda: self._pick_color('fontcolor'))
-            row3 = QHBoxLayout(); row3.addWidget(self.fields['fontcolor']); row3.addWidget(btn_fc2)
-            w3 = QWidget(); w3.setLayout(row3)
-            form.addRow('Arrow color:', w3)
+#         elif atype == 'arrow':
+#             for k, label in [('x0','Tail X'),('y0','Tail Y'),('x1','Tip X'),('y1','Tip Y')]:
+#                 sb = QDoubleSpinBox()
+#                 sb.setRange(-1e9,1e9); sb.setDecimals(6)
+#                 sb.setValue(ann[k])
+#                 self.fields[k] = sb
+#                 form.addRow(label+':', sb)
+#             self.fields['label'] = QLineEdit(ann.get('label',''))
+#             form.addRow('Label:', self.fields['label'])
+#             s = ann.get('style', {})
+#             self.fields['fontcolor'] = QLineEdit(s.get('fontcolor','#000000'))
+#             btn_fc2 = QPushButton('…'); btn_fc2.setFixedWidth(28)
+#             btn_fc2.clicked.connect(lambda: self._pick_color('fontcolor'))
+#             row3 = QHBoxLayout(); row3.addWidget(self.fields['fontcolor']); row3.addWidget(btn_fc2)
+#             w3 = QWidget(); w3.setLayout(row3)
+#             form.addRow('Arrow color:', w3)
 
-        elif atype == 'image':
-            self.fields['x'] = QDoubleSpinBox()
-            self.fields['x'].setRange(-1e9,1e9); self.fields['x'].setDecimals(6)
-            self.fields['x'].setValue(ann['x'])
-            form.addRow('X:', self.fields['x'])
-            self.fields['y'] = QDoubleSpinBox()
-            self.fields['y'].setRange(-1e9,1e9); self.fields['y'].setDecimals(6)
-            self.fields['y'].setValue(ann['y'])
-            form.addRow('Y:', self.fields['y'])
-            self.fields['zoom'] = QDoubleSpinBox()
-            self.fields['zoom'].setRange(0.01,5.0); self.fields['zoom'].setSingleStep(0.05)
-            self.fields['zoom'].setValue(ann.get('zoom',0.15))
-            form.addRow('Zoom:', self.fields['zoom'])
+#         elif atype == 'image':
+#             self.fields['x'] = QDoubleSpinBox()
+#             self.fields['x'].setRange(-1e9,1e9); self.fields['x'].setDecimals(6)
+#             self.fields['x'].setValue(ann['x'])
+#             form.addRow('X:', self.fields['x'])
+#             self.fields['y'] = QDoubleSpinBox()
+#             self.fields['y'].setRange(-1e9,1e9); self.fields['y'].setDecimals(6)
+#             self.fields['y'].setValue(ann['y'])
+#             form.addRow('Y:', self.fields['y'])
+#             self.fields['zoom'] = QDoubleSpinBox()
+#             self.fields['zoom'].setRange(0.01,5.0); self.fields['zoom'].setSingleStep(0.05)
+#             self.fields['zoom'].setValue(ann.get('zoom',0.15))
+#             form.addRow('Zoom:', self.fields['zoom'])
 
-        layout.addLayout(form)
-        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                                QDialogButtonBox.StandardButton.Cancel)
-        btns.accepted.connect(self.accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
+#         layout.addLayout(form)
+#         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+#                                 QDialogButtonBox.StandardButton.Cancel)
+#         btns.accepted.connect(self.accept)
+#         btns.rejected.connect(self.reject)
+#         layout.addWidget(btns)
 
-    def _pick_color(self, field_key):
-        cur = self.fields[field_key].text() if field_key in self.fields else '#000000'
-        # Pull active palette from main window if available
-        mw = QApplication.activeWindow()
-        pal_colors = (mw._active_palette_colors()
-                      if mw and hasattr(mw, '_active_palette_colors') else None)
-        color = _show_color_dialog(QColor(cur), self, palette_colors=pal_colors)
-        if color.isValid():
-            self.fields[field_key].setText(color.name())
+#     def _pick_color(self, field_key):
+#         cur = self.fields[field_key].text() if field_key in self.fields else '#000000'
+#         # Pull active palette from main window if available
+#         mw = QApplication.activeWindow()
+#         pal_colors = (mw._active_palette_colors()
+#                       if mw and hasattr(mw, '_active_palette_colors') else None)
+#         color = _show_color_dialog(QColor(cur), self, palette_colors=pal_colors)
+#         if color.isValid():
+#             self.fields[field_key].setText(color.name())
 
-    def apply(self):
-        """Write edited values back into self.ann."""
-        ann   = self.ann
-        atype = ann['type']
-        if atype == 'text':
-            ann['label'] = self.fields['label'].text()
-            ann['x']     = self.fields['x'].value()
-            ann['y']     = self.fields['y'].value()
-            ann.setdefault('style', {})
-            ann['style']['fontsize']  = self.fields['fontsize'].value()
-            ann['style']['fontcolor'] = self.fields['fontcolor'].text()
-            ann['style']['bg_alpha']  = self.fields['bg_alpha'].value()
-            ann['style']['bg_color']  = self.fields['bg_color'].text()
-            # Preserve edge_color if already set
-            ann['style'].setdefault('edge_color', '#aaaaaa')
-            ann['style'].setdefault('fontfamily', 'sans-serif')
-        elif atype == 'arrow':
-            for k in ('x0','y0','x1','y1'):
-                ann[k] = self.fields[k].value()
-            ann['label'] = self.fields['label'].text()
-            ann.setdefault('style', {})
-            ann['style']['fontcolor'] = self.fields['fontcolor'].text()
-            ann['style'].setdefault('fontsize', 10)
-            ann['style'].setdefault('fontfamily', 'sans-serif')
-        elif atype == 'image':
-            ann['x']    = self.fields['x'].value()
-            ann['y']    = self.fields['y'].value()
-            ann['zoom'] = self.fields['zoom'].value()
+#     def apply(self):
+#         """Write edited values back into self.ann."""
+#         ann   = self.ann
+#         atype = ann['type']
+#         if atype == 'text':
+#             ann['label'] = self.fields['label'].text()
+#             ann['x']     = self.fields['x'].value()
+#             ann['y']     = self.fields['y'].value()
+#             ann.setdefault('style', {})
+#             ann['style']['fontsize']  = self.fields['fontsize'].value()
+#             ann['style']['fontcolor'] = self.fields['fontcolor'].text()
+#             ann['style']['bg_alpha']  = self.fields['bg_alpha'].value()
+#             ann['style']['bg_color']  = self.fields['bg_color'].text()
+#             # Preserve edge_color if already set
+#             ann['style'].setdefault('edge_color', '#aaaaaa')
+#             ann['style'].setdefault('fontfamily', 'sans-serif')
+#         elif atype == 'arrow':
+#             for k in ('x0','y0','x1','y1'):
+#                 ann[k] = self.fields[k].value()
+#             ann['label'] = self.fields['label'].text()
+#             ann.setdefault('style', {})
+#             ann['style']['fontcolor'] = self.fields['fontcolor'].text()
+#             ann['style'].setdefault('fontsize', 10)
+#             ann['style'].setdefault('fontfamily', 'sans-serif')
+#         elif atype == 'image':
+#             ann['x']    = self.fields['x'].value()
+#             ann['y']    = self.fields['y'].value()
+#             ann['zoom'] = self.fields['zoom'].value()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DATA IMPORT DIALOG
 # ═══════════════════════════════════════════════════════════════════════════════
-class DataImportDialog(QDialog):
-    """
-    Per-file import wizard.  Lets the user:
-      • choose sheet (Excel), separator (CSV/TXT), or JSON orientation
-      • set header row & skip rows
-      • preview the raw table
-      • select / deselect / rename individual columns
-    """
+# class DataImportDialog(QDialog):
+#     """
+#     Per-file import wizard.  Lets the user:
+#       • choose sheet (Excel), separator (CSV/TXT), or JSON orientation
+#       • set header row & skip rows
+#       • preview the raw table
+#       • select / deselect / rename individual columns
+#     """
 
-    # ── supported separators for CSV / TXT ───────────────────────────────────
-    _SEP_LABELS = ['Auto-detect', 'Comma  (,)', 'Semicolon  (;)',
-                   'Tab  (\\t)', 'Space / whitespace', 'Pipe  (|)', 'Custom…']
-    _SEP_CHARS  = [None, ',', ';', '\t', r'\s+', '|', None]
+#     # ── supported separators for CSV / TXT ───────────────────────────────────
+#     _SEP_LABELS = ['Auto-detect', 'Comma  (,)', 'Semicolon  (;)',
+#                    'Tab  (\\t)', 'Space / whitespace', 'Pipe  (|)', 'Custom…']
+#     _SEP_CHARS  = [None, ',', ';', '\t', r'\s+', '|', None]
 
-    def __init__(self, filepath: str, parent=None):
-        super().__init__(parent)
-        self.filepath  = filepath
-        self.ext       = os.path.splitext(filepath)[1].lower()
-        self._raw_df   = None        # full DataFrame from last parse
-        self._col_data = {}          # col_name → np.ndarray after dtype inference
-        self._col_checks  = {}       # col_name → QCheckBox
-        self._col_renames = {}       # col_name → QLineEdit
-        self._building = False       # guard against recursive refresh
+#     def __init__(self, filepath: str, parent=None):
+#         super().__init__(parent)
+#         self.filepath  = filepath
+#         self.ext       = os.path.splitext(filepath)[1].lower()
+#         self._raw_df   = None        # full DataFrame from last parse
+#         self._col_data = {}          # col_name → np.ndarray after dtype inference
+#         self._col_checks  = {}       # col_name → QCheckBox
+#         self._col_renames = {}       # col_name → QLineEdit
+#         self._building = False       # guard against recursive refresh
 
-        self.setWindowTitle(f'Import — {os.path.basename(filepath)}')
-        self.setMinimumSize(860, 620)
-        self._build_ui()
-        self._refresh()
+#         self.setWindowTitle(f'Import — {os.path.basename(filepath)}')
+#         self.setMinimumSize(860, 620)
+#         self._build_ui()
+#         self._refresh()
 
-    # ─── UI construction ─────────────────────────────────────────────────────
-    def _build_ui(self):
-        root = QVBoxLayout(self)
-        root.setSpacing(6)
+#     # ─── UI construction ─────────────────────────────────────────────────────
+#     def _build_ui(self):
+#         root = QVBoxLayout(self)
+#         root.setSpacing(6)
 
-        # ── top bar: file path label ──────────────────────────────────────────
-        path_lbl = QLabel(f'<b>File:</b> {self.filepath}')
-        path_lbl.setWordWrap(True)
-        root.addWidget(path_lbl)
+#         # ── top bar: file path label ──────────────────────────────────────────
+#         path_lbl = QLabel(f'<b>File:</b> {self.filepath}')
+#         path_lbl.setWordWrap(True)
+#         root.addWidget(path_lbl)
 
-        # ── format-specific options ───────────────────────────────────────────
-        opt_box = QGroupBox('Parse options')
-        opt_lay = QHBoxLayout(opt_box)
-        opt_lay.setSpacing(12)
+#         # ── format-specific options ───────────────────────────────────────────
+#         opt_box = QGroupBox('Parse options')
+#         opt_lay = QHBoxLayout(opt_box)
+#         opt_lay.setSpacing(12)
 
-        # Sheet selector (Excel only)
-        self._sheet_label = QLabel('Sheet:')
-        self._sheet_combo = QComboBox(); self._sheet_combo.setMinimumWidth(120)
-        self._sheet_combo.currentTextChanged.connect(self._refresh)
-        opt_lay.addWidget(self._sheet_label)
-        opt_lay.addWidget(self._sheet_combo)
-        is_excel = self.ext in ('.xlsx', '.xls')
-        self._sheet_label.setVisible(is_excel)
-        self._sheet_combo.setVisible(is_excel)
-        if is_excel:
-            try:
-                import openpyxl
-                wb = openpyxl.load_workbook(self.filepath, read_only=True, data_only=True)
-                self._sheet_combo.blockSignals(True)
-                self._sheet_combo.addItems(wb.sheetnames)
-                self._sheet_combo.blockSignals(False)
-                wb.close()
-            except Exception:
-                try:
-                    xl = pd.ExcelFile(self.filepath)
-                    self._sheet_combo.blockSignals(True)
-                    self._sheet_combo.addItems(xl.sheet_names)
-                    self._sheet_combo.blockSignals(False)
-                except Exception:
-                    pass
+#         # Sheet selector (Excel only)
+#         self._sheet_label = QLabel('Sheet:')
+#         self._sheet_combo = QComboBox(); self._sheet_combo.setMinimumWidth(120)
+#         self._sheet_combo.currentTextChanged.connect(self._refresh)
+#         opt_lay.addWidget(self._sheet_label)
+#         opt_lay.addWidget(self._sheet_combo)
+#         is_excel = self.ext in ('.xlsx', '.xls')
+#         self._sheet_label.setVisible(is_excel)
+#         self._sheet_combo.setVisible(is_excel)
+#         if is_excel:
+#             try:
+#                 import openpyxl
+#                 wb = openpyxl.load_workbook(self.filepath, read_only=True, data_only=True)
+#                 self._sheet_combo.blockSignals(True)
+#                 self._sheet_combo.addItems(wb.sheetnames)
+#                 self._sheet_combo.blockSignals(False)
+#                 wb.close()
+#             except Exception:
+#                 try:
+#                     xl = pd.ExcelFile(self.filepath)
+#                     self._sheet_combo.blockSignals(True)
+#                     self._sheet_combo.addItems(xl.sheet_names)
+#                     self._sheet_combo.blockSignals(False)
+#                 except Exception:
+#                     pass
 
-        # Separator (CSV / TXT only)
-        self._sep_label = QLabel('Separator:')
-        self._sep_combo = QComboBox()
-        self._sep_combo.addItems(self._SEP_LABELS)
-        self._sep_combo.currentIndexChanged.connect(self._on_sep_changed)
-        self._sep_custom = QLineEdit(); self._sep_custom.setPlaceholderText('regex / char')
-        self._sep_custom.setFixedWidth(80); self._sep_custom.setVisible(False)
-        self._sep_custom.editingFinished.connect(self._refresh)
-        opt_lay.addWidget(self._sep_label)
-        opt_lay.addWidget(self._sep_combo)
-        opt_lay.addWidget(self._sep_custom)
-        is_text = self.ext in ('.csv', '.txt')
-        self._sep_label.setVisible(is_text)
-        self._sep_combo.setVisible(is_text)
-        if is_text:
-            # default: comma for csv, whitespace for txt
-            self._sep_combo.blockSignals(True)
-            self._sep_combo.setCurrentIndex(1 if self.ext == '.csv' else 4)
-            self._sep_combo.blockSignals(False)
+#         # Separator (CSV / TXT only)
+#         self._sep_label = QLabel('Separator:')
+#         self._sep_combo = QComboBox()
+#         self._sep_combo.addItems(self._SEP_LABELS)
+#         self._sep_combo.currentIndexChanged.connect(self._on_sep_changed)
+#         self._sep_custom = QLineEdit(); self._sep_custom.setPlaceholderText('regex / char')
+#         self._sep_custom.setFixedWidth(80); self._sep_custom.setVisible(False)
+#         self._sep_custom.editingFinished.connect(self._refresh)
+#         opt_lay.addWidget(self._sep_label)
+#         opt_lay.addWidget(self._sep_combo)
+#         opt_lay.addWidget(self._sep_custom)
+#         is_text = self.ext in ('.csv', '.txt')
+#         self._sep_label.setVisible(is_text)
+#         self._sep_combo.setVisible(is_text)
+#         if is_text:
+#             # default: comma for csv, whitespace for txt
+#             self._sep_combo.blockSignals(True)
+#             self._sep_combo.setCurrentIndex(1 if self.ext == '.csv' else 4)
+#             self._sep_combo.blockSignals(False)
 
-        # JSON orientation
-        self._json_label = QLabel('Orientation:')
-        self._json_combo = QComboBox()
-        self._json_combo.addItems(['columns (default)', 'records', 'index', 'split', 'values'])
-        self._json_combo.currentTextChanged.connect(self._refresh)
-        opt_lay.addWidget(self._json_label)
-        opt_lay.addWidget(self._json_combo)
-        is_json = self.ext == '.json'
-        self._json_label.setVisible(is_json)
-        self._json_combo.setVisible(is_json)
+#         # JSON orientation
+#         self._json_label = QLabel('Orientation:')
+#         self._json_combo = QComboBox()
+#         self._json_combo.addItems(['columns (default)', 'records', 'index', 'split', 'values'])
+#         self._json_combo.currentTextChanged.connect(self._refresh)
+#         opt_lay.addWidget(self._json_label)
+#         opt_lay.addWidget(self._json_combo)
+#         is_json = self.ext == '.json'
+#         self._json_label.setVisible(is_json)
+#         self._json_combo.setVisible(is_json)
 
-        # Header row & skip rows (always visible)
-        opt_lay.addWidget(QLabel('Header row:'))
-        self._header_spin = QSpinBox(); self._header_spin.setRange(0, 100)
-        self._header_spin.setValue(0); self._header_spin.setFixedWidth(55)
-        self._header_spin.valueChanged.connect(self._refresh)
-        opt_lay.addWidget(self._header_spin)
+#         # Header row & skip rows (always visible)
+#         opt_lay.addWidget(QLabel('Header row:'))
+#         self._header_spin = QSpinBox(); self._header_spin.setRange(0, 100)
+#         self._header_spin.setValue(0); self._header_spin.setFixedWidth(55)
+#         self._header_spin.valueChanged.connect(self._refresh)
+#         opt_lay.addWidget(self._header_spin)
 
-        opt_lay.addWidget(QLabel('Skip rows:'))
-        self._skip_spin = QSpinBox(); self._skip_spin.setRange(0, 1000)
-        self._skip_spin.setValue(0); self._skip_spin.setFixedWidth(55)
-        self._skip_spin.valueChanged.connect(self._refresh)
-        opt_lay.addWidget(self._skip_spin)
+#         opt_lay.addWidget(QLabel('Skip rows:'))
+#         self._skip_spin = QSpinBox(); self._skip_spin.setRange(0, 1000)
+#         self._skip_spin.setValue(0); self._skip_spin.setFixedWidth(55)
+#         self._skip_spin.valueChanged.connect(self._refresh)
+#         opt_lay.addWidget(self._skip_spin)
 
-        opt_lay.addStretch()
-        root.addWidget(opt_box)
+#         opt_lay.addStretch()
+#         root.addWidget(opt_box)
 
-        # ── splitter: preview (top) + column picker (bottom) ─────────────────
-        splitter = QSplitter(Qt.Orientation.Vertical)
+#         # ── splitter: preview (top) + column picker (bottom) ─────────────────
+#         splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # Preview table
-        preview_w = QWidget(); preview_lay = QVBoxLayout(preview_w); preview_lay.setContentsMargins(0,0,0,0)
-        hdr_row = QHBoxLayout()
-        hdr_row.addWidget(QLabel('<b>Data preview</b> (first 100 rows):'))
-        self._shape_lbl = QLabel('')
-        self._shape_lbl.setStyleSheet('color:#555;font-size:11px;')
-        hdr_row.addWidget(self._shape_lbl); hdr_row.addStretch()
-        preview_lay.addLayout(hdr_row)
-        self._preview_table = QTableWidget()
-        self._preview_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._preview_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectColumns)
-        self._preview_table.horizontalHeader().setStretchLastSection(False)
-        self._preview_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self._preview_table.setMinimumHeight(180)
-        preview_lay.addWidget(self._preview_table)
-        splitter.addWidget(preview_w)
+#         # Preview table
+#         preview_w = QWidget(); preview_lay = QVBoxLayout(preview_w); preview_lay.setContentsMargins(0,0,0,0)
+#         hdr_row = QHBoxLayout()
+#         hdr_row.addWidget(QLabel('<b>Data preview</b> (first 100 rows):'))
+#         self._shape_lbl = QLabel('')
+#         self._shape_lbl.setStyleSheet('color:#555;font-size:11px;')
+#         hdr_row.addWidget(self._shape_lbl); hdr_row.addStretch()
+#         preview_lay.addLayout(hdr_row)
+#         self._preview_table = QTableWidget()
+#         self._preview_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+#         self._preview_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectColumns)
+#         self._preview_table.horizontalHeader().setStretchLastSection(False)
+#         self._preview_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+#         self._preview_table.setMinimumHeight(180)
+#         preview_lay.addWidget(self._preview_table)
+#         splitter.addWidget(preview_w)
 
-        # Column picker
-        picker_w = QWidget(); picker_lay = QVBoxLayout(picker_w); picker_lay.setContentsMargins(0,0,0,0)
-        pick_hdr = QHBoxLayout()
-        pick_hdr.addWidget(QLabel('<b>Columns to import</b> (✔ = include, edit name to rename):'))
-        btn_all  = QPushButton('Select all');   btn_all.setFixedWidth(90)
-        btn_none = QPushButton('Select none');  btn_none.setFixedWidth(90)
-        btn_all.clicked.connect(lambda: self._set_all_checks(True))
-        btn_none.clicked.connect(lambda: self._set_all_checks(False))
-        pick_hdr.addStretch(); pick_hdr.addWidget(btn_all); pick_hdr.addWidget(btn_none)
-        picker_lay.addLayout(pick_hdr)
+#         # Column picker
+#         picker_w = QWidget(); picker_lay = QVBoxLayout(picker_w); picker_lay.setContentsMargins(0,0,0,0)
+#         pick_hdr = QHBoxLayout()
+#         pick_hdr.addWidget(QLabel('<b>Columns to import</b> (✔ = include, edit name to rename):'))
+#         btn_all  = QPushButton('Select all');   btn_all.setFixedWidth(90)
+#         btn_none = QPushButton('Select none');  btn_none.setFixedWidth(90)
+#         btn_all.clicked.connect(lambda: self._set_all_checks(True))
+#         btn_none.clicked.connect(lambda: self._set_all_checks(False))
+#         pick_hdr.addStretch(); pick_hdr.addWidget(btn_all); pick_hdr.addWidget(btn_none)
+#         picker_lay.addLayout(pick_hdr)
 
-        scroll = QScrollArea(); scroll.setWidgetResizable(True)
-        self._col_picker_widget = QWidget()
-        self._col_picker_lay = QVBoxLayout(self._col_picker_widget)
-        self._col_picker_lay.setSpacing(3); self._col_picker_lay.setContentsMargins(4,4,4,4)
-        scroll.setWidget(self._col_picker_widget)
-        picker_lay.addWidget(scroll)
-        splitter.addWidget(picker_w)
+#         scroll = QScrollArea(); scroll.setWidgetResizable(True)
+#         self._col_picker_widget = QWidget()
+#         self._col_picker_lay = QVBoxLayout(self._col_picker_widget)
+#         self._col_picker_lay.setSpacing(3); self._col_picker_lay.setContentsMargins(4,4,4,4)
+#         scroll.setWidget(self._col_picker_widget)
+#         picker_lay.addWidget(scroll)
+#         splitter.addWidget(picker_w)
 
-        splitter.setSizes([280, 200])
-        root.addWidget(splitter, 1)
+#         splitter.setSizes([280, 200])
+#         root.addWidget(splitter, 1)
 
-        # ── status / error label ──────────────────────────────────────────────
-        self._status_lbl = QLabel('')
-        self._status_lbl.setStyleSheet('color:#b00;font-size:11px;')
-        self._status_lbl.setWordWrap(True)
-        root.addWidget(self._status_lbl)
+#         # ── status / error label ──────────────────────────────────────────────
+#         self._status_lbl = QLabel('')
+#         self._status_lbl.setStyleSheet('color:#b00;font-size:11px;')
+#         self._status_lbl.setWordWrap(True)
+#         root.addWidget(self._status_lbl)
 
-        # ── dialog buttons ────────────────────────────────────────────────────
-        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                                QDialogButtonBox.StandardButton.Cancel)
-        btns.accepted.connect(self._on_accept)
-        btns.rejected.connect(self.reject)
-        self._ok_btn = btns.button(QDialogButtonBox.StandardButton.Ok)
-        self._ok_btn.setText('Import selected columns')
-        root.addWidget(btns)
+#         # ── dialog buttons ────────────────────────────────────────────────────
+#         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+#                                 QDialogButtonBox.StandardButton.Cancel)
+#         btns.accepted.connect(self._on_accept)
+#         btns.rejected.connect(self.reject)
+#         self._ok_btn = btns.button(QDialogButtonBox.StandardButton.Ok)
+#         self._ok_btn.setText('Import selected columns')
+#         root.addWidget(btns)
 
-    # ─── separator combo ─────────────────────────────────────────────────────
-    def _on_sep_changed(self, idx):
-        is_custom = (idx == len(self._SEP_LABELS) - 1)
-        self._sep_custom.setVisible(is_custom)
-        if not is_custom:
-            self._refresh()
+#     # ─── separator combo ─────────────────────────────────────────────────────
+#     def _on_sep_changed(self, idx):
+#         is_custom = (idx == len(self._SEP_LABELS) - 1)
+#         self._sep_custom.setVisible(is_custom)
+#         if not is_custom:
+#             self._refresh()
 
-    def _current_sep(self):
-        idx = self._sep_combo.currentIndex()
-        if idx == len(self._SEP_CHARS) - 1:          # Custom
-            return self._sep_custom.text() or ','
-        return self._SEP_CHARS[idx]                   # may be None (auto)
+#     def _current_sep(self):
+#         idx = self._sep_combo.currentIndex()
+#         if idx == len(self._SEP_CHARS) - 1:          # Custom
+#             return self._sep_custom.text() or ','
+#         return self._SEP_CHARS[idx]                   # may be None (auto)
 
-    # ─── core parse / refresh ────────────────────────────────────────────────
-    def _refresh(self):
-        if self._building:
-            return
-        self._building = True
-        try:
-            self._raw_df = self._parse()
-            if self._raw_df is not None:
-                self._status_lbl.setText('')
-                self._populate_preview(self._raw_df)
-                self._infer_col_data(self._raw_df)
-                self._rebuild_col_picker(self._raw_df)
-                self._shape_lbl.setText(
-                    f'{len(self._raw_df):,} rows × {len(self._raw_df.columns):,} columns')
-        except Exception as e:
-            self._status_lbl.setText(f'Parse error: {e}')
-            self._preview_table.setRowCount(0)
-            self._preview_table.setColumnCount(0)
-            self._shape_lbl.setText('')
-        finally:
-            self._building = False
+#     # ─── core parse / refresh ────────────────────────────────────────────────
+#     def _refresh(self):
+#         if self._building:
+#             return
+#         self._building = True
+#         try:
+#             self._raw_df = self._parse()
+#             if self._raw_df is not None:
+#                 self._status_lbl.setText('')
+#                 self._populate_preview(self._raw_df)
+#                 self._infer_col_data(self._raw_df)
+#                 self._rebuild_col_picker(self._raw_df)
+#                 self._shape_lbl.setText(
+#                     f'{len(self._raw_df):,} rows × {len(self._raw_df.columns):,} columns')
+#         except Exception as e:
+#             self._status_lbl.setText(f'Parse error: {e}')
+#             self._preview_table.setRowCount(0)
+#             self._preview_table.setColumnCount(0)
+#             self._shape_lbl.setText('')
+#         finally:
+#             self._building = False
 
-    def _parse(self):
-        import pandas as pd
-        ext  = self.ext
-        hdr  = self._header_spin.value()
-        skip = self._skip_spin.value()
+#     def _parse(self):
+#         import pandas as pd
+#         ext  = self.ext
+#         hdr  = self._header_spin.value()
+#         skip = self._skip_spin.value()
 
-        if ext in ('.xlsx', '.xls'):
-            sheet = self._sheet_combo.currentText() or 0
-            return pd.read_excel(self.filepath, sheet_name=sheet,
-                                 header=hdr, skiprows=skip or None)
+#         if ext in ('.xlsx', '.xls'):
+#             sheet = self._sheet_combo.currentText() or 0
+#             return pd.read_excel(self.filepath, sheet_name=sheet,
+#                                  header=hdr, skiprows=skip or None)
 
-        if ext == '.json':
-            orient_map = {
-                'columns (default)': None, 'records': 'records',
-                'index': 'index', 'split': 'split', 'values': 'values',
-            }
-            orient = orient_map.get(self._json_combo.currentText())
-            with open(self.filepath) as f:
-                import json as _json
-                raw = _json.load(f)
-            if isinstance(raw, list):
-                return pd.DataFrame(raw)
-            kw = {'orient': orient} if orient else {}
-            return pd.read_json(self.filepath, **kw)
+#         if ext == '.json':
+#             orient_map = {
+#                 'columns (default)': None, 'records': 'records',
+#                 'index': 'index', 'split': 'split', 'values': 'values',
+#             }
+#             orient = orient_map.get(self._json_combo.currentText())
+#             with open(self.filepath) as f:
+#                 import json as _json
+#                 raw = _json.load(f)
+#             if isinstance(raw, list):
+#                 return pd.DataFrame(raw)
+#             kw = {'orient': orient} if orient else {}
+#             return pd.read_json(self.filepath, **kw)
 
-        # CSV / TXT
-        sep = self._current_sep()
-        if sep is None:                       # auto-detect
-            try:
-                with open(self.filepath, newline='') as f:
-                    dialect = csv.Sniffer().sniff(f.read(4096))
-                sep = dialect.delimiter
-            except Exception:
-                sep = ','
-        kw = dict(header=hdr, skiprows=skip or None)
-        if sep == r'\s+':
-            return pd.read_csv(self.filepath, sep=r'\s+', engine='python', **kw)
-        return pd.read_csv(self.filepath, sep=sep, **kw)
+#         # CSV / TXT
+#         sep = self._current_sep()
+#         if sep is None:                       # auto-detect
+#             try:
+#                 with open(self.filepath, newline='') as f:
+#                     dialect = csv.Sniffer().sniff(f.read(4096))
+#                 sep = dialect.delimiter
+#             except Exception:
+#                 sep = ','
+#         kw = dict(header=hdr, skiprows=skip or None)
+#         if sep == r'\s+':
+#             return pd.read_csv(self.filepath, sep=r'\s+', engine='python', **kw)
+#         return pd.read_csv(self.filepath, sep=sep, **kw)
 
-    # ─── preview table ───────────────────────────────────────────────────────
-    def _populate_preview(self, df):
-        preview = df.head(100)
-        self._preview_table.blockSignals(True)
-        self._preview_table.setRowCount(len(preview))
-        self._preview_table.setColumnCount(len(preview.columns))
-        self._preview_table.setHorizontalHeaderLabels([str(c) for c in preview.columns])
-        for ri, row in enumerate(preview.itertuples(index=False)):
-            for ci, val in enumerate(row):
-                self._preview_table.setItem(ri, ci, QTableWidgetItem(str(val)))
-        self._preview_table.blockSignals(False)
+#     # ─── preview table ───────────────────────────────────────────────────────
+#     def _populate_preview(self, df):
+#         preview = df.head(100)
+#         self._preview_table.blockSignals(True)
+#         self._preview_table.setRowCount(len(preview))
+#         self._preview_table.setColumnCount(len(preview.columns))
+#         self._preview_table.setHorizontalHeaderLabels([str(c) for c in preview.columns])
+#         for ri, row in enumerate(preview.itertuples(index=False)):
+#             for ci, val in enumerate(row):
+#                 self._preview_table.setItem(ri, ci, QTableWidgetItem(str(val)))
+#         self._preview_table.blockSignals(False)
 
-    # ─── dtype inference ─────────────────────────────────────────────────────
-    def _infer_col_data(self, df):
-        import numpy as np, pandas as pd
-        self._col_data = {}
-        for col in df.columns:
-            series = df[col]
-            numeric = pd.to_numeric(series, errors='coerce')
-            non_null = series.notna().sum()
-            if non_null > 0 and numeric.notna().sum() == non_null:
-                self._col_data[str(col)] = numeric.to_numpy(dtype=float, na_value=np.nan)
-            else:
-                self._col_data[str(col)] = series.fillna('').astype(str).to_numpy()
+#     # ─── dtype inference ─────────────────────────────────────────────────────
+#     def _infer_col_data(self, df):
+#         import numpy as np, pandas as pd
+#         self._col_data = {}
+#         for col in df.columns:
+#             series = df[col]
+#             numeric = pd.to_numeric(series, errors='coerce')
+#             non_null = series.notna().sum()
+#             if non_null > 0 and numeric.notna().sum() == non_null:
+#                 self._col_data[str(col)] = numeric.to_numpy(dtype=float, na_value=np.nan)
+#             else:
+#                 self._col_data[str(col)] = series.fillna('').astype(str).to_numpy()
 
-    # ─── column picker ───────────────────────────────────────────────────────
-    def _rebuild_col_picker(self, df):
-        # Save existing check states + rename text before wiping
-        prev_checks  = {col: cb.isChecked()  for col, cb in self._col_checks.items()}
-        prev_renames = {col: le.text()        for col, le in self._col_renames.items()}
+#     # ─── column picker ───────────────────────────────────────────────────────
+#     def _rebuild_col_picker(self, df):
+#         # Save existing check states + rename text before wiping
+#         prev_checks  = {col: cb.isChecked()  for col, cb in self._col_checks.items()}
+#         prev_renames = {col: le.text()        for col, le in self._col_renames.items()}
 
-        # Clear layout
-        while self._col_picker_lay.count():
-            item = self._col_picker_lay.takeAt(0)
-            if item.widget(): item.widget().deleteLater()
-        self._col_checks.clear()
-        self._col_renames.clear()
+#         # Clear layout
+#         while self._col_picker_lay.count():
+#             item = self._col_picker_lay.takeAt(0)
+#             if item.widget(): item.widget().deleteLater()
+#         self._col_checks.clear()
+#         self._col_renames.clear()
 
-        cols = [str(c) for c in df.columns]
-        dtype_icons = {'float': '🔢', 'str': '🔤'}
+#         cols = [str(c) for c in df.columns]
+#         dtype_icons = {'float': '🔢', 'str': '🔤'}
 
-        # Header row
-        hdr_w = QWidget()
-        hdr_l = QHBoxLayout(hdr_w); hdr_l.setContentsMargins(0,0,0,0); hdr_l.setSpacing(6)
-        lbl_inc  = QLabel('Include'); lbl_inc.setFixedWidth(56); lbl_inc.setStyleSheet('font-weight:bold;')
-        lbl_orig = QLabel('Original name'); lbl_orig.setFixedWidth(180); lbl_orig.setStyleSheet('font-weight:bold;')
-        lbl_type = QLabel('Type'); lbl_type.setFixedWidth(42); lbl_type.setStyleSheet('font-weight:bold;')
-        lbl_imp  = QLabel('Import as (rename)'); lbl_imp.setStyleSheet('font-weight:bold;')
-        hdr_l.addWidget(lbl_inc); hdr_l.addWidget(lbl_orig)
-        hdr_l.addWidget(lbl_type); hdr_l.addWidget(lbl_imp); hdr_l.addStretch()
-        self._col_picker_lay.addWidget(hdr_w)
+#         # Header row
+#         hdr_w = QWidget()
+#         hdr_l = QHBoxLayout(hdr_w); hdr_l.setContentsMargins(0,0,0,0); hdr_l.setSpacing(6)
+#         lbl_inc  = QLabel('Include'); lbl_inc.setFixedWidth(56); lbl_inc.setStyleSheet('font-weight:bold;')
+#         lbl_orig = QLabel('Original name'); lbl_orig.setFixedWidth(180); lbl_orig.setStyleSheet('font-weight:bold;')
+#         lbl_type = QLabel('Type'); lbl_type.setFixedWidth(42); lbl_type.setStyleSheet('font-weight:bold;')
+#         lbl_imp  = QLabel('Import as (rename)'); lbl_imp.setStyleSheet('font-weight:bold;')
+#         hdr_l.addWidget(lbl_inc); hdr_l.addWidget(lbl_orig)
+#         hdr_l.addWidget(lbl_type); hdr_l.addWidget(lbl_imp); hdr_l.addStretch()
+#         self._col_picker_lay.addWidget(hdr_w)
 
-        # One row per column
-        for col in cols:
-            arr = self._col_data.get(col)
-            dtype_icon = dtype_icons['float'] if (arr is not None and arr.dtype != object) else dtype_icons['str']
+#         # One row per column
+#         for col in cols:
+#             arr = self._col_data.get(col)
+#             dtype_icon = dtype_icons['float'] if (arr is not None and arr.dtype != object) else dtype_icons['str']
 
-            row_w = QWidget()
-            row_l = QHBoxLayout(row_w); row_l.setContentsMargins(0,0,0,0); row_l.setSpacing(6)
+#             row_w = QWidget()
+#             row_l = QHBoxLayout(row_w); row_l.setContentsMargins(0,0,0,0); row_l.setSpacing(6)
 
-            chk = QCheckBox()
-            chk.setChecked(prev_checks.get(col, True))
-            chk.setFixedWidth(56)
-            self._col_checks[col] = chk
+#             chk = QCheckBox()
+#             chk.setChecked(prev_checks.get(col, True))
+#             chk.setFixedWidth(56)
+#             self._col_checks[col] = chk
 
-            orig_lbl = QLabel(col); orig_lbl.setFixedWidth(180)
-            orig_lbl.setToolTip(col)
+#             orig_lbl = QLabel(col); orig_lbl.setFixedWidth(180)
+#             orig_lbl.setToolTip(col)
 
-            type_lbl = QLabel(dtype_icon); type_lbl.setFixedWidth(42)
-            type_lbl.setToolTip('Numeric' if dtype_icon == dtype_icons['float'] else 'Text/categorical')
+#             type_lbl = QLabel(dtype_icon); type_lbl.setFixedWidth(42)
+#             type_lbl.setToolTip('Numeric' if dtype_icon == dtype_icons['float'] else 'Text/categorical')
 
-            rename_edit = QLineEdit(prev_renames.get(col, col))
-            rename_edit.setMinimumWidth(160)
-            rename_edit.setPlaceholderText(col)
-            self._col_renames[col] = rename_edit
+#             rename_edit = QLineEdit(prev_renames.get(col, col))
+#             rename_edit.setMinimumWidth(160)
+#             rename_edit.setPlaceholderText(col)
+#             self._col_renames[col] = rename_edit
 
-            # Grey out rename when unchecked
-            def _on_check(state, le=rename_edit):
-                le.setEnabled(bool(state))
-            chk.stateChanged.connect(_on_check)
-            rename_edit.setEnabled(chk.isChecked())
+#             # Grey out rename when unchecked
+#             def _on_check(state, le=rename_edit):
+#                 le.setEnabled(bool(state))
+#             chk.stateChanged.connect(_on_check)
+#             rename_edit.setEnabled(chk.isChecked())
 
-            row_l.addWidget(chk)
-            row_l.addWidget(orig_lbl)
-            row_l.addWidget(type_lbl)
-            row_l.addWidget(rename_edit)
-            row_l.addStretch()
-            self._col_picker_lay.addWidget(row_w)
+#             row_l.addWidget(chk)
+#             row_l.addWidget(orig_lbl)
+#             row_l.addWidget(type_lbl)
+#             row_l.addWidget(rename_edit)
+#             row_l.addStretch()
+#             self._col_picker_lay.addWidget(row_w)
 
-        self._col_picker_lay.addStretch()
+#         self._col_picker_lay.addStretch()
 
-    def _set_all_checks(self, state: bool):
-        for chk in self._col_checks.values():
-            chk.setChecked(state)
+#     def _set_all_checks(self, state: bool):
+#         for chk in self._col_checks.values():
+#             chk.setChecked(state)
 
-    # ─── accept / collect ─────────────────────────────────────────────────────
-    def _on_accept(self):
-        selected = {col for col, chk in self._col_checks.items() if chk.isChecked()}
-        if not selected:
-            QMessageBox.warning(self, 'No columns', 'Select at least one column to import.')
-            return
-        self.accept()
+#     # ─── accept / collect ─────────────────────────────────────────────────────
+#     def _on_accept(self):
+#         selected = {col for col, chk in self._col_checks.items() if chk.isChecked()}
+#         if not selected:
+#             QMessageBox.warning(self, 'No columns', 'Select at least one column to import.')
+#             return
+#         self.accept()
 
-    def get_selected_data(self) -> dict:
-        """Return {import_name: np.ndarray} for all checked columns."""
-        result = {}
-        for col, chk in self._col_checks.items():
-            if not chk.isChecked():
-                continue
-            new_name = self._col_renames[col].text().strip() or col
-            arr = self._col_data.get(col)
-            if arr is not None:
-                result[new_name] = arr
-        return result
+#     def get_selected_data(self) -> dict:
+#         """Return {import_name: np.ndarray} for all checked columns."""
+#         result = {}
+#         for col, chk in self._col_checks.items():
+#             if not chk.isChecked():
+#                 continue
+#             new_name = self._col_renames[col].text().strip() or col
+#             arr = self._col_data.get(col)
+#             if arr is not None:
+#                 result[new_name] = arr
+#         return result
 
 
 class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonExportMixin, QMainWindow):
@@ -584,6 +584,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_rows  = 1
         self.subplot_cols  = 1
         self.subplot_chart_types  = {0: 'Line'}
+        self.subplot_plot_modes   = {0: 'Standard'}
         self.sp_titles            = {0: ''}
         self.subplot_title_show   = {0: True}
         self.subplot_title_font   = {0: 'sans-serif'}
@@ -669,8 +670,27 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 pass
 
         # ── Load last chart (or sample) once the event loop is running ─────────
+        # Connect per-series option widgets AFTER all tab builders have run so
+        # every widget attribute is guaranteed to exist.
+        self._loading_series_options = False
+        self._connect_series_option_signals()
+
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._load_on_startup)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # WINDOW TITLE
+    # ═══════════════════════════════════════════════════════════════════════════
+    def _update_window_title(self):
+        """Set the title bar to 'plotviz <version>' or 'plotviz <version> - <stem>'."""
+        from config._version import __version__
+        fp = getattr(self, '_current_filepath', None)
+        if fp:
+            import os as _os
+            stem = _os.path.splitext(_os.path.basename(fp))[0]
+            self.setWindowTitle(f'plotviz {__version__} - {stem}')
+        else:
+            self.setWindowTitle(f'plotviz {__version__}')
 
     # ═══════════════════════════════════════════════════════════════════════════
     # STARTUP LOAD
@@ -687,6 +707,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             try:
                 self._load_project_inner(fp, silent=True)
                 self._current_filepath = fp
+                self._update_window_title()
                 return
             except Exception:
                 pass  # File unreadable — fall through to sample
@@ -701,6 +722,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── 1. Clear any existing state ───────────────────────────────────────
         self._current_filepath = None
+        self._update_window_title()
         self._is_dirty = False
         if hasattr(self, '_undo_stack'):
             self._undo_stack.clear()
@@ -1009,6 +1031,43 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._sns_explorer  = None   # lazily created
         self._code_runner   = None   # lazily created
 
+        # ── Configurations menu ───────────────────────────────────────────────
+        config_menu = menubar.addMenu('Configurations')
+
+        _prefs_label = 'Preferences…' if sys.platform == 'darwin' else 'Settings…'
+        act_prefs = QAction(_prefs_label, self)
+        act_prefs.setShortcut('Ctrl+,' if sys.platform == 'darwin' else 'Ctrl+Alt+S')
+        act_prefs.setStatusTip('Open application settings / preferences')
+        act_prefs.triggered.connect(self._open_app_settings_dialog)
+        config_menu.addAction(act_prefs)
+
+        config_menu.addSeparator()
+
+        act_about_cfg = QAction('About plotviz…', self)
+        act_about_cfg.setStatusTip('About this application')
+        act_about_cfg.triggered.connect(self._show_about)
+        config_menu.addAction(act_about_cfg)
+
+        self._config_menu = config_menu
+
+        # ── macOS application menu (plotviz / python) ─────────────────────────
+        # On macOS Qt maps QMenu with the same name as the app to the system
+        # application menu that appears left of "File". We add Preferences and
+        # About there so they appear in the native location.
+        if sys.platform == 'darwin':
+            app_menu = menubar.addMenu('plotviz')
+
+            act_about_app = QAction('About plotviz', self)
+            act_about_app.triggered.connect(self._show_about)
+            app_menu.addAction(act_about_app)
+
+            app_menu.addSeparator()
+
+            act_prefs_app = QAction('Preferences…', self)
+            act_prefs_app.setShortcut('Ctrl+,')
+            act_prefs_app.triggered.connect(self._open_app_settings_dialog)
+            app_menu.addAction(act_prefs_app)
+
         # Tooltips
         for i, tip in enumerate([
             'Chart — open/save/export, subplot layout, colour palette',
@@ -1031,8 +1090,49 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         cv_widget = QWidget()
         cv_widget.setLayout(cv_layout)
 
+        # ── Left panel: top action bar + tabs ─────────────────────────────────
+        left_panel = QWidget()
+        left_vbox = QVBoxLayout(left_panel)
+        left_vbox.setContentsMargins(0, 0, 0, 0)
+        left_vbox.setSpacing(0)
+
+        # Top action bar (above tabs): New Plot | Undo | Redo
+        top_bar = QWidget()
+        top_bar_layout = QHBoxLayout(top_bar)
+        top_bar_layout.setContentsMargins(6, 4, 6, 4)
+        top_bar_layout.setSpacing(4)
+
+        btn_new = QPushButton('＋ New Plot')
+        btn_new.setToolTip('Start a new blank plot (Ctrl+N)')
+        btn_new.clicked.connect(lambda: (self.tabs.setCurrentIndex(0), self._reset_app()))
+        top_bar_layout.addWidget(btn_new)
+
+        top_bar_layout.addStretch()
+
+        btn_undo = QPushButton('↩ Undo')
+        btn_undo.setToolTip('Undo last change (Ctrl+Z)')
+        btn_undo.clicked.connect(self._undo)
+        btn_undo.setFixedWidth(72)
+        top_bar_layout.addWidget(btn_undo)
+        self._btn_undo = btn_undo
+
+        btn_redo = QPushButton('↪ Redo')
+        btn_redo.setToolTip('Redo (Ctrl+Y)')
+        btn_redo.clicked.connect(self._redo)
+        btn_redo.setFixedWidth(72)
+        top_bar_layout.addWidget(btn_redo)
+        self._btn_redo = btn_redo
+
+        # Separator line below top bar
+        top_sep = QFrame(); top_sep.setFrameShape(QFrame.Shape.HLine)
+        top_sep.setFrameShadow(QFrame.Shadow.Sunken)
+
+        left_vbox.addWidget(top_bar)
+        left_vbox.addWidget(top_sep)
+        left_vbox.addWidget(self.tabs)
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self.tabs)
+        splitter.addWidget(left_panel)
         splitter.addWidget(cv_widget)
         splitter.setSizes([520, 1480])
         splitter.splitterMoved.connect(lambda: self._on_canvas_resized())
@@ -1099,7 +1199,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # CHART TYPE VISIBILITY
     # ═══════════════════════════════════════════════════════════════════════════
     def _update_option_group_visibility(self, ct):
-        """Show/hide chart-type option groups for the given chart type string."""
+        """Show/hide chart-type option groups and extra column pickers for the given type."""
         if not hasattr(self, 'hist_group'):
             return
         vis = {
@@ -1126,30 +1226,46 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         }
         for grp, show in vis.items():
             grp.setVisible(show)
+        # Show Z-column picker only for types that use it
+        if hasattr(self, '_combo_z_widget'):
+            self._combo_z_widget.setVisible(ct in ('Heatmap', 'Contour', '3D Surface'))
+        # Show Error-column picker only for Errorbar
+        if hasattr(self, '_combo_err_widget'):
+            self._combo_err_widget.setVisible(ct == 'Errorbar')
 
     def _on_chart_type_changed(self, ct):
-        """Chart type selector changed — push to all rows in the active subplot.
-        For whole-chart types (Polar, Heatmap, Pie, etc.) the type is also
-        stored in subplot_chart_types so the projection is rebuilt correctly.
+        """Hidden chart_type_combo changed — update subplot_chart_types and option groups.
+        No longer pushes to series table rows; that is now _on_plot_mode_changed's job.
         """
         from ui.tab_builders import WHOLE_CHART_TYPES
-        new_is_whole = ct in WHOLE_CHART_TYPES
-        if hasattr(self, 'series_table'):
+        if hasattr(self, 'series_sp_active'):
             n = self.subplot_rows * self.subplot_cols
             active_sp = (self.series_sp_active.currentIndex() + 1) if n > 1 else 1
-            active_idx = active_sp - 1  # 0-based subplot index
-
-            # For whole-chart types, always update subplot_chart_types so the
-            # projection (polar, 3d, …) is applied even when no row is selected.
-            if new_is_whole:
+            active_idx = active_sp - 1
+            if ct in WHOLE_CHART_TYPES:
                 self.subplot_chart_types[active_idx] = ct
             else:
-                # Switching away from a whole-chart type — clear it so per-series
-                # types from the series table take over for this subplot.
                 if self.subplot_chart_types.get(active_idx) in WHOLE_CHART_TYPES:
                     self.subplot_chart_types[active_idx] = ct
+        self._update_option_group_visibility(ct)
+        if hasattr(self, 'datasets'):
+            self.update_preview()
 
-            # Push to every row that belongs to the active subplot.
+    def _on_plot_mode_changed(self, mode):
+        """Plot Mode combo changed — repopulate type cells in the active subplot's rows
+        to only contain the types that belong to this mode, then update option groups.
+        """
+        from ui.tab_builders import PLOT_MODE_GROUPS, WHOLE_CHART_TYPES
+        allowed = PLOT_MODE_GROUPS.get(mode, [])
+        if not allowed:
+            return
+        n = self.subplot_rows * self.subplot_cols
+        active_sp = (self.series_sp_active.currentIndex() + 1) if (n > 1 and hasattr(self, 'series_sp_active')) else 1
+        active_idx = active_sp - 1
+        # Persist the mode for this subplot
+        self.subplot_plot_modes[active_idx] = mode
+        # Repopulate every visible type combo for the active subplot
+        if hasattr(self, 'series_table'):
             for row in range(self.series_table.rowCount()):
                 spin = self.series_table.cellWidget(row, 4)
                 row_sp = spin.value() if (spin and n > 1) else 1
@@ -1157,30 +1273,326 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     continue
                 type_cb = self.series_table.cellWidget(row, 3)
                 if type_cb:
-                    i = type_cb.findText(ct)
-                    if i >= 0:
-                        type_cb.blockSignals(True)
-                        type_cb.setCurrentIndex(i)
-                        type_cb.blockSignals(False)
-        self._update_option_group_visibility(ct)
+                    current = type_cb.currentText()
+                    type_cb.blockSignals(True)
+                    type_cb.clear()
+                    type_cb.addItems(allowed)
+                    new_idx = type_cb.findText(current) if current in allowed else 0
+                    type_cb.setCurrentIndex(new_idx)
+                    type_cb.blockSignals(False)
+        first_type = allowed[0]
+        # Sync the hidden chart_type_combo
+        if hasattr(self, 'chart_type_combo'):
+            self.chart_type_combo.blockSignals(True)
+            i = self.chart_type_combo.findText(first_type)
+            if i >= 0:
+                self.chart_type_combo.setCurrentIndex(i)
+            self.chart_type_combo.blockSignals(False)
+        # Update subplot_chart_types for whole-chart projections
+        if first_type in WHOLE_CHART_TYPES:
+            self.subplot_chart_types[active_idx] = first_type
+        else:
+            if self.subplot_chart_types.get(active_idx) in WHOLE_CHART_TYPES:
+                self.subplot_chart_types[active_idx] = first_type
+        self._update_option_group_visibility(first_type)
         if hasattr(self, 'datasets'):
             self.update_preview()
 
-    def _on_series_selection_changed(self):
-        """Series table selection changed — pull chart type from the first selected row."""
-        if not hasattr(self, 'chart_type_combo'): return
-        selected_rows = set(idx.row() for idx in self.series_table.selectedIndexes())
-        if not selected_rows: return
+    # ── Per-series option fields ──────────────────────────────────────────────
+    # Each entry: (widget_attr, storage_key, default_value, widget_kind)
+    # widget_kind: 'spin' | 'dbl' | 'check' | 'combo'
+    _SERIES_OPTION_FIELDS = [
+        # Line
+        ('line_default_style',      'line_style',       '-',       'combo'),
+        ('line_default_lw',         'line_lw',          1.5,       'dbl'),
+        ('line_default_marker',     'line_marker',      'None',    'combo'),
+        ('line_default_markersize', 'line_markersize',  6,         'spin'),
+        ('line_drawstyle',          'line_drawstyle',   'default', 'combo'),
+        # Scatter
+        ('scatter_size',            'sc_size',          20,        'spin'),
+        ('scatter_alpha',           'sc_alpha',         0.7,       'dbl'),
+        ('scatter_marker',          'sc_marker',        'o',       'combo'),
+        ('scatter_edgecolor',       'sc_edgecolor',     'none',    'combo'),
+        ('scatter_lw',              'sc_lw',            0.5,       'dbl'),
+        ('scatter_colorby_check',   'sc_colorby',       False,     'check'),
+        ('scatter_cmap_combo',      'sc_cmap',          'viridis', 'combo'),
+        # Bar
+        ('bar_width',               'bar_width',        0.8,       'dbl'),
+        ('bar_alpha',               'bar_alpha',        1.0,       'dbl'),
+        ('bar_edgecolor',           'bar_edgecolor',    'none',    'combo'),
+        ('bar_edge_lw',             'bar_edge_lw',      0.5,       'dbl'),
+        ('bar_stacked',             'bar_stacked',      False,     'check'),
+        ('bar_horizontal',          'bar_horizontal',   False,     'check'),
+        ('bar_colorbyval',          'bar_colorbyval',   False,     'check'),
+        # Histogram
+        ('hist_bins',               'hist_bins',        20,        'spin'),
+        ('hist_density',            'hist_density',     False,     'check'),
+        ('hist_cumulative',         'hist_cumulative',  False,     'check'),
+        ('hist_histtype',           'hist_histtype',    'bar',     'combo'),
+        ('hist_orientation',        'hist_orientation', 'vertical','combo'),
+        ('hist_alpha',              'hist_alpha',       0.7,       'dbl'),
+        ('hist_edgecolor',          'hist_edgecolor',   'white',   'combo'),
+        # Errorbar
+        ('err_capsize',             'err_capsize',      4,         'spin'),
+        ('err_capthick',            'err_capthick',     1.5,       'dbl'),
+        ('err_elinewidth',          'err_elinewidth',   1.5,       'dbl'),
+        ('err_fmt_marker',          'err_marker',       'o',       'combo'),
+        ('err_barsabove',           'err_barsabove',    False,     'check'),
+        # Heatmap / Contour / 3D
+        ('cmap_combo',              'cmap',             'viridis', 'combo'),
+        ('contour_levels',          'contour_levels',   10,        'spin'),
+        ('heat_alpha',              'heat_alpha',       1.0,       'dbl'),
+        ('heat_interpolation',      'heat_interp',      'nearest', 'combo'),
+        ('heat_colorbar',           'heat_colorbar',    True,      'check'),
+        ('heat_filled_contour',     'heat_filled',      True,      'check'),
+        ('heat_contour_lines',      'heat_contour_lines',True,     'check'),
+        ('surf_stride',             'surf_stride',      1,         'spin'),
+        ('surf_wireframe',          'surf_wireframe',   False,     'check'),
+        # Pie
+        ('pie_autopct',             'pie_autopct',      True,      'check'),
+        ('pie_shadow',              'pie_shadow',       False,     'check'),
+        ('pie_donut',               'pie_donut',        False,     'check'),
+        ('pie_explode_first',       'pie_explode',      False,     'check'),
+        ('pie_startangle',          'pie_startangle',   90.0,      'dbl'),
+        ('pie_labeldistance',       'pie_labeldist',    1.1,       'dbl'),
+        ('pie_pctdistance',         'pie_pctdist',      0.6,       'dbl'),
+        # Area
+        ('area_alpha',              'area_alpha',       0.4,       'dbl'),
+        ('area_lw',                 'area_lw',          0.8,       'dbl'),
+        ('area_baseline',           'area_baseline',    0.0,       'dbl'),
+        ('area_stacked',            'area_stacked',     False,     'check'),
+        ('area_showline',           'area_showline',    True,      'check'),
+        # Violin
+        ('violin_show_means',       'vio_means',        True,      'check'),
+        ('violin_show_medians',     'vio_medians',      True,      'check'),
+        ('violin_show_extrema',     'vio_extrema',      False,     'check'),
+        ('violin_points',           'vio_points',       '100',     'combo'),
+        ('violin_bw',               'vio_bw',           'scott',   'combo'),
+        ('violin_vert',             'vio_vert',         True,      'check'),
+        # Boxplot
+        ('box_show_means',          'box_means',        False,     'check'),
+        ('box_show_medians',        'box_medians',      True,      'check'),
+        ('box_notch',               'box_notch',        False,     'check'),
+        ('box_showfliers',          'box_fliers',       True,      'check'),
+        ('box_vert',                'box_vert',         True,      'check'),
+        ('box_whis',                'box_whis',         1.5,       'dbl'),
+        ('box_alpha',               'box_alpha',        0.7,       'dbl'),
+        # Step
+        ('step_where',              'step_where',       'pre',     'combo'),
+        ('step_lw',                 'step_lw',          1.5,       'dbl'),
+        ('step_fill',               'step_fill',        False,     'check'),
+        ('step_fill_alpha',         'step_fill_alpha',  0.2,       'dbl'),
+        # Stem
+        ('stem_baseline',           'stem_baseline',    0.0,       'dbl'),
+        ('stem_markfmt',            'stem_marker',      'o',       'combo'),
+        ('stem_lw',                 'stem_lw',          1.2,       'dbl'),
+        ('stem_markersize',         'stem_markersize',  8,         'spin'),
+        # Bubble
+        ('bubble_scale',            'bubble_scale',     200.0,     'dbl'),
+        ('bubble_alpha',            'bubble_alpha',     0.6,       'dbl'),
+        ('bubble_marker',           'bubble_marker',    'o',       'combo'),
+        ('bubble_edgecolor',        'bubble_edgecolor', 'none',    'combo'),
+        # Waterfall
+        ('waterfall_width',         'wf_width',         0.6,       'dbl'),
+        ('waterfall_alpha',         'wf_alpha',         1.0,       'dbl'),
+        ('waterfall_connector',     'wf_connector',     True,      'check'),
+        ('waterfall_pos_color',     'wf_pos_color',     '#2ecc71', 'color'),
+        ('waterfall_neg_color',     'wf_neg_color',     '#e74c3c', 'color'),
+        # Hist2D
+        ('hist2d_bins_x',           'h2d_bins_x',       20,        'spin'),
+        ('hist2d_bins_y',           'h2d_bins_y',       20,        'spin'),
+        ('hist2d_alpha',            'h2d_alpha',        1.0,       'dbl'),
+        ('hist2d_cmap_combo',       'h2d_cmap',         'viridis', 'combo'),
+        ('hist2d_colorbar',         'h2d_colorbar',     True,      'check'),
+        ('hist2d_log',              'h2d_log',          False,     'check'),
+        # Hexbin
+        ('hexbin_gridsize',         'hx_gridsize',      20,        'spin'),
+        ('hexbin_alpha',            'hx_alpha',         1.0,       'dbl'),
+        ('hexbin_cmap_combo',       'hx_cmap',          'viridis', 'combo'),
+        ('hexbin_colorbar',         'hx_colorbar',      True,      'check'),
+        ('hexbin_log',              'hx_log',           False,     'check'),
+        # Polar
+        ('polar_linestyle',         'pol_style',        '-',       'combo'),
+        ('polar_lw',                'pol_lw',           1.5,       'dbl'),
+        ('polar_marker',            'pol_marker',       'None',    'combo'),
+        ('polar_fill',              'pol_fill',         False,     'check'),
+        ('polar_fill_alpha',        'pol_fill_alpha',   0.2,       'dbl'),
+        # Radar
+        ('radar_fill',              'rad_fill',         True,      'check'),
+        ('radar_fill_alpha',        'rad_fill_alpha',   0.25,      'dbl'),
+        ('radar_lw',                'rad_lw',           1.8,       'dbl'),
+        ('radar_gridlevels',        'rad_gridlevels',   5,         'spin'),
+        # ECDF
+        ('ecdf_complementary',      'ecdf_comp',        False,     'check'),
+        ('ecdf_markers',            'ecdf_markers',     False,     'check'),
+        ('ecdf_lw',                 'ecdf_lw',          1.8,       'dbl'),
+        ('ecdf_alpha',              'ecdf_alpha',       1.0,       'dbl'),
+        # Quiver
+        ('quiver_scale',            'qv_scale',         1.0,       'dbl'),
+        ('quiver_width',            'qv_width',         0.005,     'dbl'),
+        ('quiver_color_by_mag',     'qv_colorby',       False,     'check'),
+        ('quiver_cmap_combo',       'qv_cmap',          'viridis', 'combo'),
+    ]
+
+    def _series_opts_key(self, row):
+        """Return the curve_styles label for a series table row, or None."""
+        lbl_item = self.series_table.item(row, 2)
+        if lbl_item and lbl_item.text():
+            return lbl_item.text()
+        ycb = self.series_table.cellWidget(row, 1)
+        return ycb.currentText() if ycb else None
+
+    def _save_series_options(self):
+        """Persist the current option-group widget values into the selected series'
+        curve_styles entry.  Called by each option widget's change signal."""
+        if getattr(self, '_loading_series_options', False):
+            return
+        selected_rows = set(
+            idx.row() for idx in self.series_table.selectedIndexes()
+            if not self.series_table.isRowHidden(idx.row())
+        )
+        if not selected_rows:
+            return
         row = min(selected_rows)
+        label = self._series_opts_key(row)
+        if not label:
+            return
+        entry = self.curve_styles.setdefault(label, {})
+        opts = entry.setdefault('opts', {})
+        for attr, key, _default, kind in self._SERIES_OPTION_FIELDS:
+            w = getattr(self, attr, None)
+            if w is None:
+                continue
+            if kind == 'spin':
+                opts[key] = w.value()
+            elif kind == 'dbl':
+                opts[key] = w.value()
+            elif kind == 'check':
+                opts[key] = w.isChecked()
+            elif kind == 'combo':
+                opts[key] = w.currentText()
+            elif kind == 'color':
+                # w is the hex string stored directly on self (not a Qt widget)
+                opts[key] = w if isinstance(w, str) else _default
+
+    def _load_series_options(self, row):
+        """Push the stored per-series option values into the option-group widgets.
+        Signals are blocked so no spurious redraws fire during the load."""
+        label = self._series_opts_key(row)
+        opts = {}
+        if label:
+            opts = self.curve_styles.get(label, {}).get('opts', {})
+
+        self._loading_series_options = True
+        try:
+            for attr, key, default, kind in self._SERIES_OPTION_FIELDS:
+                w = getattr(self, attr, None)
+                if w is None:
+                    continue
+                val = opts.get(key, default)
+                if kind == 'color':
+                    # attr holds the hex string; the swatch button is at attr + '_btn'
+                    setattr(self, attr, val)
+                    btn = getattr(self, attr + '_btn', None)
+                    if btn:
+                        btn.setStyleSheet(f'background-color:{val};border:1px solid #888;')
+                    continue
+                w.blockSignals(True)
+                try:
+                    if kind in ('spin', 'dbl'):
+                        w.setValue(val)
+                    elif kind == 'check':
+                        w.setChecked(bool(val))
+                    elif kind == 'combo':
+                        i = w.findText(str(val))
+                        if i >= 0:
+                            w.setCurrentIndex(i)
+                finally:
+                    w.blockSignals(False)
+        finally:
+            self._loading_series_options = False
+
+    def _connect_series_option_signals(self):
+        """Connect every option-group widget to _save_series_options so that any
+        change is immediately persisted to the selected series.  Called once after
+        all tab builders have run (end of __init__)."""
+        for attr, _key, _default, kind in self._SERIES_OPTION_FIELDS:
+            w = getattr(self, attr, None)
+            if w is None:
+                continue
+            if kind in ('spin', 'dbl'):
+                w.valueChanged.connect(self._save_series_options)
+            elif kind == 'check':
+                w.stateChanged.connect(self._save_series_options)
+            elif kind == 'combo':
+                w.currentTextChanged.connect(self._save_series_options)
+            elif kind == 'color':
+                # attr is a hex string on self; the button is at attr + '_btn'
+                btn = getattr(self, attr + '_btn', None)
+                if btn:
+                    btn.clicked.connect(self._save_series_options)
+
+    def _on_series_selection_changed(self):
+        """Series table row selected — update the selected-series label, load that
+        series' stored option values into the option-group widgets, sync the hidden
+        chart_type_combo and option group visibility.
+        When no visible row is selected, hide all option groups.
+        """
+        if not hasattr(self, 'chart_type_combo'):
+            return
+        # Only consider visible (non-hidden) rows — hidden rows from other subplots
+        # can remain in Qt's selection model after setRowHidden.
+        selected_rows = set(
+            idx.row() for idx in self.series_table.selectedIndexes()
+            if not self.series_table.isRowHidden(idx.row())
+        )
+        lbl_widget = getattr(self, '_selected_series_label', None)
+        if not selected_rows:
+            if lbl_widget:
+                lbl_widget.setText('▶  No series selected')
+                lbl_widget.setStyleSheet('font-weight:bold; color:#aaa; font-size:11px; padding:2px 0;')
+            if hasattr(self, 'hist_group'):
+                for grp in (self.line_group, self.scatter_group, self.bar_group,
+                            self.hist_group, self.err_group, self.heat_group,
+                            self.pie_group, self.area_group, self.violin_group,
+                            self.boxplot_group, self.step_group, self.stem_group,
+                            self.bubble_group, self.waterfall_group, self.hist2d_group,
+                            self.hexbin_group, self.polar_group, self.radar_group,
+                            self.ecdf_group, self.quiver_group):
+                    grp.setVisible(False)
+            if hasattr(self, '_combo_z_widget'):   self._combo_z_widget.setVisible(False)
+            if hasattr(self, '_combo_err_widget'): self._combo_err_widget.setVisible(False)
+            return
+        row = min(selected_rows)
+        # Update the selected-series label
+        lbl_item = self.series_table.item(row, 2)
+        series_name = lbl_item.text() if lbl_item and lbl_item.text() else f'Series {row+1}'
+        if lbl_widget:
+            lbl_widget.setText(f'▶  {series_name}')
+            lbl_widget.setStyleSheet('font-weight:bold; color:#1a6fc4; font-size:11px; padding:2px 0;')
         type_cb = self.series_table.cellWidget(row, 3)
-        if type_cb:
-            self._sync_combo_from_type(type_cb.currentText())
+        if not type_cb:
+            return
+        ct = type_cb.currentText()
+        # Sync hidden chart_type_combo and option group visibility
+        self._sync_combo_from_type(ct)
+        # Sync plot_mode_combo silently — must NOT fire _on_plot_mode_changed
+        if hasattr(self, 'plot_mode_combo'):
+            mode = TYPE_TO_PLOT_MODE.get(ct, 'Standard')
+            self.plot_mode_combo.blockSignals(True)
+            i = self.plot_mode_combo.findText(mode)
+            if i >= 0:
+                self.plot_mode_combo.setCurrentIndex(i)
+            self.plot_mode_combo.blockSignals(False)
+        # Load this series' stored option values into the option-group widgets
+        self._load_series_options(row)
 
     def _sync_combo_from_type(self, ct):
-        """Sync chart_type_combo and option group visibility to the given type string.
+        """Sync the hidden chart_type_combo and option groups to the given type.
         Called whenever a series row's Type cell changes or a row is selected.
         """
-        if not hasattr(self, 'chart_type_combo'): return
+        if not hasattr(self, 'chart_type_combo'):
+            return
         from ui.tab_builders import WHOLE_CHART_TYPES
         self.chart_type_combo.blockSignals(True)
         i = self.chart_type_combo.findText(ct)
@@ -1188,8 +1600,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.chart_type_combo.setCurrentIndex(i)
         self.chart_type_combo.blockSignals(False)
         self._update_option_group_visibility(ct)
-        # Also update subplot_chart_types for whole-chart types so the projection
-        # is rebuilt correctly when the type is changed via the series table.
+        # Keep subplot_chart_types correct for whole-chart projections
         if ct in WHOLE_CHART_TYPES and hasattr(self, 'series_sp_active'):
             n = self.subplot_rows * self.subplot_cols
             active_sp = (self.series_sp_active.currentIndex() + 1) if n > 1 else 1
@@ -1197,9 +1608,14 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     def _on_series_row_type_changed(self, ct):
         """A Type combo inside the series table was changed directly by the user.
-        Sync the global chart_type_combo and option groups, then redraw.
+        Save current options for the old type, sync combos, load options for the
+        new type, then redraw.
         """
         self._sync_combo_from_type(ct)
+        # Load stored options for the newly selected type on the active row
+        selected_rows = set(idx.row() for idx in self.series_table.selectedIndexes())
+        if selected_rows:
+            self._load_series_options(min(selected_rows))
         if hasattr(self, 'datasets'):
             self.update_preview()
 
@@ -1277,6 +1693,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 s['color'] = new_color
                 s['marker_color'] = new_color
                 self.curve_styles[lbl] = s
+                # For Pie subplots, also update per-wedge entries keyed by x-value
+                self._recolor_pie_wedges(row, self._local_palette_index(row))
         self._refresh_lock_indicator()
         # Refresh the curve colour swatches visible in the Style tab
         self.load_curve_style()
@@ -1323,8 +1741,33 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             s['color'] = new_color
             s['marker_color'] = new_color
             self.curve_styles[lbl] = s
+            # For Pie subplots, also update per-wedge entries keyed by x-value
+            self._recolor_pie_wedges(row, self._local_palette_index(row))
         self._refresh_lock_indicator()
         self.update_preview()
+
+    def _recolor_pie_wedges(self, row, palette_offset):
+        """If the series at `row` belongs to a Pie subplot, assign palette colors
+        to each x-value entry in curve_styles (one color per wedge).
+        `palette_offset` is the local palette index for the first wedge."""
+        n_subplots = self.subplot_rows * self.subplot_cols
+        ps = self.series_table.cellWidget(row, 4)
+        subplot_idx = (ps.value() - 1) if (ps and n_subplots > 1) else 0
+        if self.subplot_chart_types.get(subplot_idx, 'Line') != 'Pie':
+            return
+        xcb = self.series_table.cellWidget(row, 0)
+        if xcb is None:
+            return
+        xc = xcb.currentText()
+        x_vals = list(self.datasets.get(xc, []))
+        for i, seg in enumerate(x_vals):
+            key = str(seg)
+            s = self.curve_styles.get(key, {})
+            if not s.get('color_locked', False):
+                c = self._palette_color(palette_offset + i)
+                s['color'] = c
+                s['marker_color'] = c
+                self.curve_styles[key] = s
 
     # ═══════════════════════════════════════════════════════════════════════════
     # RECENT FILES
@@ -2008,7 +2451,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from config._version import __version__
 
         dlg = QDialog(self)
-        dlg.setWindowTitle('Settings')
+        dlg.setWindowTitle('Preferences' if sys.platform == 'darwin' else 'Settings')
         dlg.setMinimumWidth(520)
         lay = QVBoxLayout(dlg); lay.setSpacing(12)
 
@@ -2032,6 +2475,23 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _path_row('Config folder:', str(_cfg.CFG_FILE.parent))
 
         lay.addWidget(grp_paths)
+
+        # ── Appearance ───────────────────────────────────────────────────────
+        grp_appearance = QGroupBox('Appearance')
+        appearance_form = QFormLayout(grp_appearance); appearance_form.setSpacing(6)
+
+        from PyQt6.QtWidgets import QComboBox as _QComboBox
+        appearance_combo = _QComboBox()
+        appearance_combo.addItems(['System', 'Light', 'Dark'])
+        current_theme = _cfg.get('theme') or 'System'
+        idx = appearance_combo.findText(current_theme)
+        if idx >= 0:
+            appearance_combo.setCurrentIndex(idx)
+        appearance_combo.setToolTip('Application colour scheme (takes effect immediately)')
+        appearance_combo.currentTextChanged.connect(self._apply_colour_scheme)
+        appearance_form.addRow('Colour scheme:', appearance_combo)
+
+        lay.addWidget(grp_appearance)
 
         # ── UI defaults ──────────────────────────────────────────────────────
         grp_ui = QGroupBox('Defaults')
@@ -2088,10 +2548,24 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         bbox.rejected.connect(dlg.reject)
         lay.addWidget(bbox)
 
+        _original_theme = current_theme  # snapshot before dialog opens
+
         if dlg.exec() != QDialog.DialogCode.Accepted:
+            # Revert any live appearance change the user previewed then cancelled
+            if appearance_combo.currentText() != _original_theme:
+                self._apply_colour_scheme(_original_theme)
             return
 
         # Apply changes
+        chosen_theme = appearance_combo.currentText()
+        if hasattr(self, 'colour_scheme_combo'):
+            idx2 = self.colour_scheme_combo.findText(chosen_theme)
+            if idx2 >= 0:
+                self.colour_scheme_combo.blockSignals(True)
+                self.colour_scheme_combo.setCurrentIndex(idx2)
+                self.colour_scheme_combo.blockSignals(False)
+        self._apply_colour_scheme(chosen_theme)
+
         _cfg.set('show_toolbar', chk_toolbar.isChecked())
         if hasattr(self, 'canvas') and hasattr(self.canvas, 'toolbar'):
             tb = self.canvas.toolbar
@@ -2290,6 +2764,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                                     ) != QMessageBox.StandardButton.Yes:
                 return
         self._current_filepath = None
+        self._update_window_title()
         self._is_dirty = False
         self._undo_stack.clear()
         self._redo_stack.clear()
@@ -2461,16 +2936,29 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.update_preview()
 
     def _refresh_curve_select(self):
-        """Sync the per-curve style combo and fit series combo with current series table labels."""
+        """Sync the per-curve style combo with series labels on the active subplot.
+        When multiple subplots exist, only series whose Plot spinbox matches the
+        currently selected subplot in the Series tab are shown.
+        """
+        n = self.subplot_rows * self.subplot_cols
+        active_sp = None
+        if n > 1 and hasattr(self, 'series_curve_sp_active'):
+            active_sp = self.series_curve_sp_active.currentIndex() + 1  # 1-based
+
         labels = []
         for row in range(self.series_table.rowCount()):
+            if active_sp is not None:
+                spin = self.series_table.cellWidget(row, 4)
+                row_sp = spin.value() if spin else 1
+                if row_sp != active_sp:
+                    continue
             item = self.series_table.item(row, 2)
             labels.append(item.text() if item else f'Series {row+1}')
+
         self.curve_select.blockSignals(True)
         prev = self.curve_select.currentText()
         self.curve_select.clear()
         self.curve_select.addItems(labels)
-        # Try to restore previous selection
         idx = self.curve_select.findText(prev)
         self.curve_select.setCurrentIndex(idx if idx >= 0 else 0)
         self.curve_select.blockSignals(False)
@@ -2532,10 +3020,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # Label
         self.series_table.setItem(row, 2, QTableWidgetItem(f'Series {row+1}'))
 
-        # Type combo — default to whatever the global chart type combo shows
-        type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
+        # Type combo — constrained to the current plot mode's allowed types
+        allowed_types = list(PLOT_MODE_GROUPS.get(
+            self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard',
+            PER_SERIES_TYPES
+        ))
+        type_cb = QComboBox(); type_cb.addItems(allowed_types)
         if hasattr(self, 'chart_type_combo'):
-            i = type_cb.findText(self.chart_type_combo.currentText())
+            current_type = self.chart_type_combo.currentText()
+            i = type_cb.findText(current_type)
             if i >= 0: type_cb.setCurrentIndex(i)
         type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
         self.series_table.setCellWidget(row, 3, type_cb)
@@ -2737,21 +3230,39 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def select_series_by_label(self, label):
         """Called when user clicks a plotted series on the canvas.
 
-        Switches to the Series tab and sets the curve selector to the
-        matching series so the user can immediately edit its style.
+        Switches to the Series tab, highlights the matching curve, and also
+        selects the matching row in the Data tab so option groups update.
         """
+        # ── Series tab: select the curve for style editing ───────────────────
         idx = self.curve_select.findText(label)
-        if idx < 0:
-            return
-        # Switch to Series tab (index 3: Chart/Data/Style/Series/Axes/Annotate/Advanced)
-        self.tabs.setCurrentIndex(3)
-        # Select the curve — triggers load_curve_style via currentIndexChanged signal
-        if self.curve_select.currentIndex() == idx:
-            # Already selected — force a reload so swatches reflect current state
-            self.load_curve_style()
-        else:
-            self.curve_select.setCurrentIndex(idx)
-        # Show feedback in the status bar
+        if idx >= 0:
+            # Series tab is index 3 (Chart/Data/Style/Series/Axes/Annotations/Advanced)
+            self.tabs.setCurrentIndex(3)
+            if self.curve_select.currentIndex() == idx:
+                self.load_curve_style()
+            else:
+                self.curve_select.setCurrentIndex(idx)
+
+        # ── Data tab: also select the matching series table row ───────────────
+        # This loads the per-series option groups (bar width, scatter size, etc.)
+        for row in range(self.series_table.rowCount()):
+            lbl_item = self.series_table.item(row, 2)
+            if lbl_item and lbl_item.text() == label:
+                # Make that subplot visible first
+                spin = self.series_table.cellWidget(row, 4)
+                if spin and self.subplot_rows * self.subplot_cols > 1:
+                    subplot_idx = spin.value() - 1
+                    self.series_sp_active.blockSignals(True)
+                    self.series_sp_active.setCurrentIndex(subplot_idx)
+                    self.series_sp_active.blockSignals(False)
+                    self.series_curve_sp_active.blockSignals(True)
+                    self.series_curve_sp_active.setCurrentIndex(subplot_idx)
+                    self.series_curve_sp_active.blockSignals(False)
+                    self._filter_series_table_by_subplot(subplot_idx)
+                self.series_table.selectRow(row)
+                self._refresh_curve_select()
+                break
+
         if hasattr(self, 'statusBar'):
             self.statusBar().showMessage(f'Selected: {label}', 3000)
 
@@ -2901,6 +3412,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # Ensure all dicts have entries for every subplot slot
         for i in range(n):
             self.subplot_chart_types.setdefault(i, 'Line')
+            self.subplot_plot_modes.setdefault(i, 'Standard')
             self.sp_titles.setdefault(i, '')
             self.subplot_title_show.setdefault(i, True)
             self.subplot_title_font.setdefault(i, 'sans-serif')
@@ -2944,7 +3456,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.subplot_yticks_show.setdefault(i, True)
             self.subplot_ann_visible.setdefault(i, True)
         # Prune entries beyond current grid
-        all_dicts = (self.subplot_chart_types, self.sp_titles, self.subplot_title_show,
+        all_dicts = (self.subplot_chart_types, self.subplot_plot_modes, self.sp_titles, self.subplot_title_show,
                      self.subplot_title_font, self.subplot_title_size, self.subplot_title_color,
                      self.subplot_xlabels, self.subplot_xlabel_show,
                      self.subplot_ylabels, self.subplot_ylabel_show,
@@ -2973,9 +3485,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._update_plot_spin_ranges(n)
         # Rebuild all subplot selectors and show/hide them
         for combo, vis_attr in [
-            (self.sp_active,         '_axes_sp_row_widget'),
-            (self.series_sp_active,  '_series_sp_row_widget'),
-            (self.ann_sp_active,     '_ann_sp_row_widget'),
+            (self.sp_active,              '_axes_sp_row_widget'),
+            (self.series_sp_active,       '_series_sp_row_widget'),
+            (self.ann_sp_active,          '_ann_sp_row_widget'),
+            (self.series_curve_sp_active, '_series_curve_sp_row_widget'),
         ]:
             combo.blockSignals(True); combo.clear()
             for i in range(n): combo.addItem(f'Subplot {i+1}')
@@ -3021,22 +3534,44 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _filter_series_table_by_subplot(self, subplot_idx=None):
         """Show only series rows that belong to the active subplot.
         When there is only 1 subplot, all rows are shown.
+        Clears the Qt selection after hiding/showing so that stale selections
+        from the previous subplot never bleed into _on_series_selection_changed.
         """
         if not hasattr(self, 'series_table'):
             return
         n = self.subplot_rows * self.subplot_cols
         if n <= 1:
-            # Single subplot — show everything
+            # Single subplot — show everything and auto-select the first row
             for row in range(self.series_table.rowCount()):
                 self.series_table.setRowHidden(row, False)
+            self.series_table.blockSignals(True)
+            self.series_table.clearSelection()
+            for row in range(self.series_table.rowCount()):
+                self.series_table.selectRow(row)
+                break
+            self.series_table.blockSignals(False)
+            self._on_series_selection_changed()
             return
         if subplot_idx is None:
             subplot_idx = self.series_sp_active.currentIndex()
         target = subplot_idx + 1   # spinbox is 1-based
+        # Block signals while adjusting visibility so itemSelectionChanged
+        # does not fire with a partially-updated hidden set.
+        self.series_table.blockSignals(True)
         for row in range(self.series_table.rowCount()):
             spin = self.series_table.cellWidget(row, 4)
             row_subplot = spin.value() if spin else 1
             self.series_table.setRowHidden(row, row_subplot != target)
+        self.series_table.clearSelection()
+        # Auto-select the first visible row so option groups always reflect a
+        # real series when the user switches subplots.
+        for row in range(self.series_table.rowCount()):
+            if not self.series_table.isRowHidden(row):
+                self.series_table.selectRow(row)
+                break
+        self.series_table.blockSignals(False)
+        # Manually trigger option load for the now-selected row (signals were blocked)
+        self._on_series_selection_changed()
 
     def on_active_subplot_changed(self):
         """Load per-subplot state into the Axes and Annotations tab widgets.
@@ -3045,7 +3580,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         if idx < 0: idx = 0
 
         # ── Sync the other subplot selectors silently ─────────────────────────
-        for combo in (self.ann_sp_active, self.series_sp_active):
+        for combo in (self.ann_sp_active, self.series_sp_active, self.series_curve_sp_active):
             combo.blockSignals(True)
             combo.setCurrentIndex(idx)
             combo.blockSignals(False)
@@ -3144,19 +3679,33 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # Filter series table to only show rows for this subplot
         self._filter_series_table_by_subplot(idx)
 
-        # ── Sync chart_type_combo to this subplot's chart type ────────────────
+        # ── Sync chart_type_combo / plot_mode_combo to this subplot's state ─────
         # For whole-chart types (Polar, Heatmap, Pie, etc.) the type lives in
         # subplot_chart_types, not in the series-table rows, so we must push it
         # into chart_type_combo explicitly whenever the active subplot changes.
         from ui.tab_builders import WHOLE_CHART_TYPES
+        # Sync plot_mode_combo to the stored mode for this subplot
+        if hasattr(self, 'plot_mode_combo'):
+            stored_mode = self.subplot_plot_modes.get(idx, 'Standard')
+            self.plot_mode_combo.blockSignals(True)
+            mi = self.plot_mode_combo.findText(stored_mode)
+            if mi >= 0:
+                self.plot_mode_combo.setCurrentIndex(mi)
+            self.plot_mode_combo.blockSignals(False)
+            # Do NOT call _on_plot_mode_changed here: it resets type combos to
+            # allowed[0] (Line) and overwrites option-group visibility, undoing
+            # what _filter_series_table_by_subplot/_on_series_selection_changed
+            # already set correctly for the selected row.
         sp_ct = self.subplot_chart_types.get(idx, None)
-        if sp_ct and sp_ct in WHOLE_CHART_TYPES and hasattr(self, 'chart_type_combo'):
+        if sp_ct in WHOLE_CHART_TYPES and hasattr(self, 'chart_type_combo'):
             self.chart_type_combo.blockSignals(True)
             i = self.chart_type_combo.findText(sp_ct)
             if i >= 0:
                 self.chart_type_combo.setCurrentIndex(i)
             self.chart_type_combo.blockSignals(False)
             self._update_option_group_visibility(sp_ct)
+        # Keep curve_select in the Series tab filtered to this subplot
+        self._refresh_curve_select()
 
     # ── Axes tab save-back handlers ──────────────────────────────────────────
     def _save_axes_state(self):
@@ -3258,16 +3807,54 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     # ── Series-tab subplot selector ──────────────────────────────────────────
     def _on_series_subplot_changed(self, idx):
-        """Series-tab subplot selector changed — sync all selectors and reload widgets."""
-        if idx < 0: return
-        self.sp_active.blockSignals(True)
-        self.sp_active.setCurrentIndex(idx)
-        self.sp_active.blockSignals(False)
-        self.ann_sp_active.blockSignals(True)
-        self.ann_sp_active.setCurrentIndex(idx)
-        self.ann_sp_active.blockSignals(False)
-        self.on_active_subplot_changed()
+        """Data-tab subplot selector changed.
+
+        1. Silently sync the other selectors so they stay consistent.
+        2. Update plot_mode_combo to this subplot's stored mode (silently).
+        3. Call _on_plot_mode_changed so type combos for this subplot are correct.
+        4. Filter the series table to show only this subplot's rows.
+        """
+        if idx < 0:
+            return
+        # Keep all three selectors in sync silently
+        for combo in (self.sp_active, self.ann_sp_active, self.series_curve_sp_active):
+            combo.blockSignals(True)
+            combo.setCurrentIndex(idx)
+            combo.blockSignals(False)
+        # Restore the plot mode for this subplot
+        if hasattr(self, 'plot_mode_combo'):
+            stored_mode = self.subplot_plot_modes.get(idx, 'Standard')
+            self.plot_mode_combo.blockSignals(True)
+            mi = self.plot_mode_combo.findText(stored_mode)
+            if mi >= 0:
+                self.plot_mode_combo.setCurrentIndex(mi)
+            self.plot_mode_combo.blockSignals(False)
+            # Do NOT call _on_plot_mode_changed here — same reason as
+            # on_active_subplot_changed: it resets series types to Line.
+        # Filter table and auto-select first row
         self._filter_series_table_by_subplot(idx)
+        # Keep curve_select in the Series tab filtered to this subplot
+        self._refresh_curve_select()
+
+    # ── Series-tab (Per-Curve) subplot selector ───────────────────────────────
+    def _on_series_curve_sp_changed(self, idx):
+        """Series tab subplot selector changed.
+
+        Only purpose: keep the other selectors in sync and refresh curve_select
+        so it shows only the series belonging to this subplot.
+        Must NOT call _on_plot_mode_changed — that rewrites type combos and
+        can inadvertently reset series types (e.g. Bar -> Line).
+        """
+        if idx < 0:
+            return
+        for combo in (self.sp_active, self.series_sp_active, self.ann_sp_active):
+            combo.blockSignals(True)
+            combo.setCurrentIndex(idx)
+            combo.blockSignals(False)
+        # Keep the Data-tab series table filtered to the same subplot
+        self._filter_series_table_by_subplot(idx)
+        # Refresh curve_select to show only series on this subplot
+        self._refresh_curve_select()
 
     # ── Annotations-tab subplot selector ─────────────────────────────────────
     def _on_ann_subplot_changed(self, idx):
@@ -3279,6 +3866,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.series_sp_active.blockSignals(True)
         self.series_sp_active.setCurrentIndex(idx)
         self.series_sp_active.blockSignals(False)
+        self.series_curve_sp_active.blockSignals(True)
+        self.series_curve_sp_active.setCurrentIndex(idx)
+        self.series_curve_sp_active.blockSignals(False)
         self.on_active_subplot_changed()
 
     def _on_ann_subplot_visibility_changed(self, state):
@@ -3686,9 +4276,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 cb.currentIndexChanged.connect(handler)
                 self.series_table.setCellWidget(row, col_idx, cb)
             self.series_table.setItem(row, 2, QTableWidgetItem(series_label))
-            type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
-            i_type = type_cb.findText(chart_type)
-            if i_type >= 0: type_cb.setCurrentIndex(i_type)
+            _mode = self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard'
+            _allowed = list(PLOT_MODE_GROUPS.get(_mode, PER_SERIES_TYPES))
+            type_cb = QComboBox(); type_cb.addItems(_allowed)
+            i_type = type_cb.findText(chart_type) if chart_type in _allowed else 0
+            type_cb.setCurrentIndex(max(i_type, 0))
             type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
             self.series_table.setCellWidget(row, 3, type_cb)
             plot_spin = QSpinBox(); plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
@@ -3771,7 +4363,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout,
                                      QDialogButtonBox, QLabel, QLineEdit,
                                      QSpinBox, QComboBox)
-        from ui.tab_builders import ALL_CHART_TYPES
         dlg = QDialog(self)
         dlg.setWindowTitle('New Series Created')
         dlg.setFixedWidth(370)
@@ -3794,8 +4385,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         form.addRow('Subplot:', sp_subplot)
 
         cb_type = QComboBox()
-        cb_type.addItems(ALL_CHART_TYPES)
-        form.addRow('Chart type:', cb_type)
+        from ui.tab_builders import PLOT_MODE_GROUPS
+        _mode = self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard'
+        cb_type.addItems(PLOT_MODE_GROUPS.get(_mode, list(PLOT_MODE_GROUPS['Standard'])))
+        form.addRow('Series type:', cb_type)
         vlay.addLayout(form)
 
         note = QLabel('Customise the series before it is added to the chart.')
@@ -4097,7 +4690,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     cb.currentIndexChanged.connect(handler)
                     self.series_table.setCellWidget(row, col_idx, cb)
                 self.series_table.setItem(row, 2, QTableWidgetItem(nm))
-                type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
+                _mode = self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard'
+                _allowed = list(PLOT_MODE_GROUPS.get(_mode, PER_SERIES_TYPES))
+                type_cb = QComboBox(); type_cb.addItems(_allowed)
                 type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
                 self.series_table.setCellWidget(row, 3, type_cb)
                 plot_spin = QSpinBox(); plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))

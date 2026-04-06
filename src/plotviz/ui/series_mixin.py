@@ -150,16 +150,27 @@ class SeriesMixin(CurveStyleMixin):
             self.update_preview()
 
     def _refresh_curve_select(self):
-        """Sync the per-curve style combo with current series table labels."""
+        """Sync the per-curve style combo with series labels on the active subplot."""
+        n = self.subplot_rows * self.subplot_cols
+        active_sp = None
+        if n > 1 and hasattr(self, 'series_curve_sp_active'):
+            active_sp = self.series_curve_sp_active.currentIndex() + 1  # 1-based
+
         labels = []
         for row in range(self.series_table.rowCount()):
+            # Filter by subplot when multiple subplots exist
+            if active_sp is not None:
+                spin = self.series_table.cellWidget(row, 4)
+                row_sp = spin.value() if spin else 1
+                if row_sp != active_sp:
+                    continue
             item = self.series_table.item(row, 2)
             labels.append(item.text() if item else f'Series {row+1}')
+
         self.curve_select.blockSignals(True)
         prev = self.curve_select.currentText()
         self.curve_select.clear()
         self.curve_select.addItems(labels)
-        # Try to restore previous selection
         idx = self.curve_select.findText(prev)
         self.curve_select.setCurrentIndex(idx if idx >= 0 else 0)
         self.curve_select.blockSignals(False)

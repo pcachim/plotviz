@@ -47,6 +47,41 @@ WHOLE_CHART_TYPES = {
 _NO_X_TYPES = {'Histogram', 'Boxplot', 'Violin', 'Pie', 'ECDF',
 }
 
+# Master colormap list — used by every chart type that accepts a colormap.
+_CMAP_LIST = [
+    # Perceptually uniform sequential
+    'viridis', 'plasma', 'inferno', 'magma', 'cividis', 'turbo',
+    # Sequential single-hue
+    'Blues', 'Greens', 'Reds', 'Purples', 'Oranges', 'Greys',
+    'YlOrRd', 'YlGnBu', 'BuPu', 'RdPu', 'PuBu',
+    # Classic / misc sequential
+    'hot', 'cool', 'copper', 'bone', 'gray',
+    # Diverging
+    'coolwarm', 'RdBu', 'RdYlBu', 'RdYlGn', 'Spectral',
+    'PiYG', 'PRGn', 'BrBG', 'PuOr', 'bwr', 'seismic',
+    # Cyclic
+    'twilight', 'hsv',
+    # Miscellaneous / legacy
+    'jet', 'rainbow', 'nipy_spectral',
+]
+
+# ── Plot-mode groups ──────────────────────────────────────────────────────────
+# "Standard" covers all freely-mixable per-series types. The remaining modes
+# are for whole-chart exclusive types that can't be mixed with anything else.
+PLOT_MODE_GROUPS = {
+    'Standard':          ['Line', 'Scatter', 'Bar', 'Area', 'Errorbar',
+                          'Step', 'Stem', 'Bubble', 'Waterfall'],
+    'Histogram':         ['Histogram'],
+    'Statistical':       ['Boxplot', 'Violin', 'ECDF'],
+    'Heatmap & Contour': ['Heatmap', 'Contour', 'Hist2D', 'Hexbin', '3D Surface'],
+    'Polar & Radar':     ['Polar', 'Radar'],
+    'Pie':               ['Pie'],
+    'Quiver':            ['Quiver'],
+}
+
+# Reverse: given a series type, which plot mode contains it?
+TYPE_TO_PLOT_MODE = {t: m for m, types in PLOT_MODE_GROUPS.items() for t in types}
+
 # ── Named colour palettes available in the Data tab (16 colours = Qt custom slots)
 COLOR_PALETTES = {
     'Matplotlib':  ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
@@ -116,32 +151,13 @@ class TabBuildersMixin:
         widget = QWidget(); scroll = QScrollArea(); scroll.setWidgetResizable(True)
         content = QWidget(); layout = QVBoxLayout(content); layout.setSpacing(6)
 
-        # ── Appearance (Dark / Light / System) + Undo / Redo ────────────────
+        # ── Appearance (Dark / Light / System) ──────────────────────────────
         app_row = QHBoxLayout(); app_row.setSpacing(6)
         app_row.addWidget(QLabel('Appearance:'))
         self.colour_scheme_combo = QComboBox()
         self.colour_scheme_combo.addItems(['System', 'Light', 'Dark'])
         self.colour_scheme_combo.currentTextChanged.connect(self._apply_colour_scheme)
         app_row.addWidget(self.colour_scheme_combo)
-
-        # Separator
-        sep = QFrame(); sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setFrameShadow(QFrame.Shadow.Sunken); sep.setFixedWidth(10)
-        app_row.addWidget(sep)
-
-        btn_undo = QPushButton('↩ Undo')
-        btn_undo.setToolTip('Undo last change (Ctrl+Z)')
-        btn_undo.clicked.connect(self._undo)
-        btn_undo.setFixedWidth(72)
-        app_row.addWidget(btn_undo)
-        self._btn_undo = btn_undo
-
-        btn_redo = QPushButton('↪ Redo')
-        btn_redo.setToolTip('Redo (Ctrl+Y)')
-        btn_redo.clicked.connect(self._redo)
-        btn_redo.setFixedWidth(72)
-        app_row.addWidget(btn_redo)
-        self._btn_redo = btn_redo
 
         app_row.addStretch()
         layout.addLayout(app_row)
@@ -321,20 +337,6 @@ class TabBuildersMixin:
 
         layout.addWidget(self._hline())
 
-        bottom_row = QHBoxLayout(); bottom_row.setSpacing(4)
-        btn_reset = QPushButton('🗋  New Plot')
-        btn_reset.setToolTip('Clear all data and start a new plot')
-        btn_reset.clicked.connect(self._reset_app)
-        bottom_row.addWidget(btn_reset)
-        btn_settings = QPushButton('⚙  Settings…')
-        btn_settings.setToolTip('App settings and configuration paths')
-        btn_settings.clicked.connect(self._open_app_settings_dialog)
-        bottom_row.addWidget(btn_settings)
-        btn_about = QPushButton('ℹ️  About…')
-        btn_about.clicked.connect(self._show_about)
-        bottom_row.addWidget(btn_about)
-        layout.addLayout(bottom_row)
-
         layout.addStretch()
         scroll.setWidget(content); mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
         self.tabs.addTab(widget, 'Chart')
@@ -372,6 +374,16 @@ class TabBuildersMixin:
         self._series_sp_row_widget.setLayout(sp_sel_row)
         self._series_sp_row_widget.setVisible(False)
         layout.addWidget(self._series_sp_row_widget)
+
+        # ── Plot Mode selector ───────────────────────────────────────────────
+        layout.addWidget(self._hline())
+        layout.addWidget(self._sec_label('Plot Mode'))
+        self.plot_mode_combo = QComboBox()
+        self.plot_mode_combo.addItems(list(PLOT_MODE_GROUPS.keys()))
+        self.plot_mode_combo.setToolTip('Sets what types of series can be drawn on this subplot')
+        self.plot_mode_combo.currentTextChanged.connect(self._on_plot_mode_changed)
+        layout.addWidget(self.plot_mode_combo)
+
         layout.addWidget(self._hline())
 
         # ── Series table: X, Y, Label, Type, Plot, Y2 ────────────────────────
@@ -399,15 +411,11 @@ class TabBuildersMixin:
         sr.addWidget(btn_add_row); sr.addWidget(btn_del_row)
         layout.addLayout(sr)
 
-        # ── Chart type selector linked to series table Type column ────────────
-        layout.addWidget(self._hline())
-        ct_row = QHBoxLayout()
-        ct_row.addWidget(QLabel('Chart type:'))
-        self.chart_type_combo = QComboBox()
+        # Hidden chart_type_combo — kept for backward-compat with plot_engine,
+        # chart_export, plot_decorators etc. Always reflects the active series type.
+        self.chart_type_combo = QComboBox(); self.chart_type_combo.setVisible(False)
         self.chart_type_combo.addItems(ALL_CHART_TYPES)
-        self.chart_type_combo.currentTextChanged.connect(self._on_chart_type_changed)
-        ct_row.addWidget(self.chart_type_combo); ct_row.addStretch()
-        layout.addLayout(ct_row)
+        layout.addWidget(self.chart_type_combo)
 
         # Hidden combo_x / y_list kept for compat
         self.combo_x = QComboBox(); self.combo_x.setVisible(False)
@@ -416,19 +424,36 @@ class TabBuildersMixin:
         self.y_list.itemSelectionChanged.connect(self.on_y_selection_changed)
         layout.addWidget(self.combo_x); layout.addWidget(self.y_list)
 
+        # ── Series-selection-driven extras (Z col, Err col, option groups) ─────
+        # These are wrapped so they can be shown/hidden based on the selected
+        # series row's type rather than the (now hidden) chart_type_combo.
         layout.addWidget(self._hline())
 
-        layout.addWidget(QLabel('Z / Color column  (Heatmap, Contour, 3D):'))
+        self._combo_z_widget = QWidget()
+        _zl = QVBoxLayout(self._combo_z_widget); _zl.setContentsMargins(0,0,0,0); _zl.setSpacing(2)
+        _zl.addWidget(QLabel('Z / Color column  (Heatmap, Contour, 3D):'))
         self.combo_z = QComboBox(); self.combo_z.addItem('(none)')
         self.combo_z.currentIndexChanged.connect(self.update_preview)
-        layout.addWidget(self.combo_z)
+        _zl.addWidget(self.combo_z)
+        self._combo_z_widget.setVisible(False)
+        layout.addWidget(self._combo_z_widget)
 
-        layout.addWidget(QLabel('Error column  (Errorbar):'))
+        self._combo_err_widget = QWidget()
+        _el = QVBoxLayout(self._combo_err_widget); _el.setContentsMargins(0,0,0,0); _el.setSpacing(2)
+        _el.addWidget(QLabel('Error column  (Errorbar):'))
         self.combo_err = QComboBox(); self.combo_err.addItem('(none)')
         self.combo_err.currentIndexChanged.connect(self.update_preview)
-        layout.addWidget(self.combo_err)
+        _el.addWidget(self.combo_err)
+        self._combo_err_widget.setVisible(False)
+        layout.addWidget(self._combo_err_widget)
 
         layout.addWidget(self._hline())
+
+        # ── Selected series indicator ─────────────────────────────────────────
+        self._selected_series_label = QLabel('▶  No series selected')
+        self._selected_series_label.setStyleSheet(
+            'font-weight:bold; color:#555; font-size:11px; padding:2px 0;')
+        layout.addWidget(self._selected_series_label)
 
         # ── Chart-type option groups (visible one at a time) ──────────────────
         self._build_chart_option_groups(layout)
@@ -437,9 +462,9 @@ class TabBuildersMixin:
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
         self.tabs.addTab(widget, 'Data')
-        self._on_chart_type_changed('Line')
+        self._on_plot_mode_changed('Standard')
 
-        # Dummy sp_chart_type — chart type driven by series table Type column
+        # Dummy sp_chart_type — kept for compat
         self.sp_chart_type = QComboBox(); self.sp_chart_type.setVisible(False)
         self.sp_chart_type.addItems(ALL_CHART_TYPES)
 
@@ -471,6 +496,7 @@ class TabBuildersMixin:
         sg.addLayout(_row(QLabel('Edge width:'), self._make_dbl_spin('scatter_lw', 0.0, 5.0, 0.5, 0.25)))
         self.scatter_colorby_check = QCheckBox('Color by Z column')
         self.scatter_colorby_check.stateChanged.connect(self.update_preview); sg.addWidget(self.scatter_colorby_check)
+        sg.addLayout(_row(QLabel('Colormap:'), self._make_combo('scatter_cmap_combo', _CMAP_LIST)))
         layout.addWidget(self.scatter_group)
 
         # ── Bar ───────────────────────────────────────────────────────────────
@@ -511,9 +537,7 @@ class TabBuildersMixin:
         # ── Heatmap / Contour / 3D Surface ────────────────────────────────────
         self.heat_group = QGroupBox('Heatmap / Contour / 3D Options')
         hgb = QVBoxLayout(self.heat_group)
-        hgb.addLayout(_row(QLabel('Colormap:'), self._make_combo('cmap_combo',
-            ['viridis','plasma','inferno','magma','cividis','coolwarm','RdBu','RdYlBu',
-             'Spectral','hot','jet','gray','Blues','Reds','YlOrRd','PuBu'])))
+        hgb.addLayout(_row(QLabel('Colormap:'), self._make_combo('cmap_combo', _CMAP_LIST)))
         hgb.addLayout(_row(QLabel('Contour levels:'), self._make_spin('contour_levels', 3, 100, 10)))
         hgb.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('heat_alpha', 0.05, 1.0, 1.0, 0.05)))
         hgb.addLayout(_row(QLabel('Interpolation:'), self._make_combo('heat_interpolation',
@@ -614,6 +638,7 @@ class TabBuildersMixin:
         h2g.addLayout(_row(QLabel('Bins X:'), self._make_spin('hist2d_bins_x', 2, 200, 20),
                            QLabel('Y:'),      self._make_spin('hist2d_bins_y', 2, 200, 20)))
         h2g.addLayout(_row(QLabel('Alpha:'),  self._make_dbl_spin('hist2d_alpha', 0.05, 1.0, 1.0, 0.05)))
+        h2g.addLayout(_row(QLabel('Colormap:'), self._make_combo('hist2d_cmap_combo', _CMAP_LIST)))
         self.hist2d_colorbar = QCheckBox('Show colorbar'); self.hist2d_colorbar.setChecked(True); self.hist2d_colorbar.stateChanged.connect(self.update_preview); h2g.addWidget(self.hist2d_colorbar)
         self.hist2d_log      = QCheckBox('Log color scale'); self.hist2d_log.stateChanged.connect(self.update_preview); h2g.addWidget(self.hist2d_log)
         layout.addWidget(self.hist2d_group)
@@ -623,6 +648,7 @@ class TabBuildersMixin:
         hxg = QVBoxLayout(self.hexbin_group)
         hxg.addLayout(_row(QLabel('Grid size:'), self._make_spin('hexbin_gridsize', 5, 100, 20)))
         hxg.addLayout(_row(QLabel('Alpha:'),     self._make_dbl_spin('hexbin_alpha', 0.05, 1.0, 1.0, 0.05)))
+        hxg.addLayout(_row(QLabel('Colormap:'),  self._make_combo('hexbin_cmap_combo', _CMAP_LIST)))
         self.hexbin_colorbar = QCheckBox('Show colorbar'); self.hexbin_colorbar.setChecked(True); self.hexbin_colorbar.stateChanged.connect(self.update_preview); hxg.addWidget(self.hexbin_colorbar)
         self.hexbin_log      = QCheckBox('Log scale counts'); self.hexbin_log.stateChanged.connect(self.update_preview); hxg.addWidget(self.hexbin_log)
         layout.addWidget(self.hexbin_group)
@@ -663,6 +689,7 @@ class TabBuildersMixin:
         qvg.addLayout(_row(QLabel('Scale:'),      self._make_dbl_spin('quiver_scale', 0.01, 1000, 1.0, 0.1)))
         qvg.addLayout(_row(QLabel('Arrow width:'), self._make_dbl_spin('quiver_width', 0.001, 0.05, 0.005, 0.001)))
         self.quiver_color_by_mag = QCheckBox('Color by magnitude'); self.quiver_color_by_mag.stateChanged.connect(self.update_preview); qvg.addWidget(self.quiver_color_by_mag)
+        qvg.addLayout(_row(QLabel('Colormap:'), self._make_combo('quiver_cmap_combo', _CMAP_LIST)))
         layout.addWidget(self.quiver_group)
 
     # ── Widget factory helpers ─────────────────────────────────────────────────
@@ -700,14 +727,22 @@ class TabBuildersMixin:
         setattr(self, attr, w); w.currentTextChanged.connect(self.update_preview); return w
 
     def _make_color_btn(self, attr, default_hex):
-        """Small colour swatch QPushButton that opens a colour picker and stores hex in self.<attr>."""
+        """Small colour swatch QPushButton that opens a colour picker and stores hex in self.<attr>.
+
+        Does NOT overwrite self.<attr> if it is already set — this prevents the widget
+        construction (which runs at startup and after _apply_settings) from clobbering
+        a colour that serialization_apply already restored from a saved file.
+        """
         from PyQt6.QtWidgets import QPushButton, QColorDialog
         from PyQt6.QtGui import QColor
         from ui.helpers import _show_color_dialog
-        setattr(self, attr, default_hex)
+        if not getattr(self, attr, None):
+            setattr(self, attr, default_hex)
+        current = getattr(self, attr, default_hex)
         btn = QPushButton()
         btn.setFixedSize(60, 20)
-        btn.setStyleSheet(f'background-color:{default_hex};border:1px solid #888;')
+        btn.setStyleSheet(f'background-color:{current};border:1px solid #888;')
+        setattr(self, attr + '_btn', btn)          # store so serialization can sync it
         def _pick():
             pal = self._active_palette_colors() if hasattr(self, '_active_palette_colors') else None
             col = _show_color_dialog(QColor(getattr(self, attr)), self, pal)
@@ -745,7 +780,7 @@ class TabBuildersMixin:
         xlabel_vis_row.addWidget(self.xlabel_show_check); xlabel_vis_row.addStretch()
         layout.addLayout(xlabel_vis_row)
         self.xlabel_input = QLineEdit(); self.xlabel_input.setPlaceholderText('X label (optional)')
-        self.xlabel_input.editingFinished.connect(self._on_sp_xlabel_changed)
+        self.xlabel_input.textChanged.connect(self._on_sp_xlabel_changed)
         layout.addWidget(self.xlabel_input)
 
         xfont_row = QHBoxLayout(); xfont_row.setSpacing(4)
@@ -833,7 +868,7 @@ class TabBuildersMixin:
         ylabel_vis_row.addWidget(self.ylabel_show_check); ylabel_vis_row.addStretch()
         layout.addLayout(ylabel_vis_row)
         self.ylabel_input = QLineEdit(); self.ylabel_input.setPlaceholderText('Y label (optional)')
-        self.ylabel_input.editingFinished.connect(self._on_sp_ylabel_changed)
+        self.ylabel_input.textChanged.connect(self._on_sp_ylabel_changed)
         layout.addWidget(self.ylabel_input)
 
         yfont_row = QHBoxLayout(); yfont_row.setSpacing(4)
@@ -922,7 +957,7 @@ class TabBuildersMixin:
         y2label_vis_row.addWidget(self.y2label_show_check); y2label_vis_row.addStretch()
         layout.addLayout(y2label_vis_row)
         self.y2label_input = QLineEdit(); self.y2label_input.setPlaceholderText('Y2 label (optional)')
-        self.y2label_input.editingFinished.connect(self._on_sp_y2label_changed)
+        self.y2label_input.textChanged.connect(self._on_sp_y2label_changed)
         layout.addWidget(self.y2label_input)
 
         y2font_row = QHBoxLayout(); y2font_row.setSpacing(4)
@@ -1210,6 +1245,17 @@ class TabBuildersMixin:
             r.addWidget(lbl); r.addWidget(widget_obj)
             if stretch: r.addStretch()
             layout.addLayout(r)
+
+        # ── Active subplot selector (shown when n > 1) ───────────────────────
+        sc_sp_row = QHBoxLayout(); sc_sp_row.setSpacing(6)
+        sc_sp_row.addWidget(QLabel('Subplot:'))
+        self.series_curve_sp_active = QComboBox(); self.series_curve_sp_active.addItem('Subplot 1')
+        self.series_curve_sp_active.currentIndexChanged.connect(self._on_series_curve_sp_changed)
+        sc_sp_row.addWidget(self.series_curve_sp_active); sc_sp_row.addStretch()
+        self._series_curve_sp_row_widget = QWidget()
+        self._series_curve_sp_row_widget.setLayout(sc_sp_row)
+        self._series_curve_sp_row_widget.setVisible(False)
+        layout.addWidget(self._series_curve_sp_row_widget)
 
         # ── Per-curve ─────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('Per-Curve'))

@@ -226,7 +226,12 @@ class SerializationMixin:
             'series':               series_data,
             'z_col':                self.combo_z.currentText(),
             'err_col':              self.combo_err.currentText(),
+            'quiver_u_col':         self.quiver_u_combo.currentText() if hasattr(self, 'quiver_u_combo') else '(none)',
+            'quiver_v_col':         self.quiver_v_combo.currentText() if hasattr(self, 'quiver_v_combo') else '(none)',
+            'bubble_size_col':      self.bubble_size_combo.currentText() if hasattr(self, 'bubble_size_combo') else '(uniform)',
+            'err_xerr_col':         self.err_xerr_combo.currentText() if hasattr(self, 'err_xerr_combo') else '(none)',
             'subplot_chart_types':  {str(k): v for k, v in self.subplot_chart_types.items()},
+            'subplot_plot_modes':   {str(k): v for k, v in self.subplot_plot_modes.items()},
             'subplot_legend_locs':  {str(k): v for k, v in self.subplot_legend_locs.items()},
         }
 
@@ -520,10 +525,21 @@ class SerializationMixin:
 
     def _apply_series_meta(self, m):
         """Restore series table and subplot assignments from series.json dict."""
-        from ui.tab_builders import PER_SERIES_TYPES
+        from ui.tab_builders import PER_SERIES_TYPES, PLOT_MODE_GROUPS
         old_y2_cols = set(m.get('y2_cols', []))
         cols = sorted(self.datasets)
         n_subplots = max(1, self.subplot_rows * self.subplot_cols)
+
+        # Resolve subplot_plot_modes from the saved data *before* building the
+        # series rows so each type combo is restricted to the correct mode.
+        # The full restore (including setdefault fills) still happens later in
+        # the method; we only need the mapping here.
+        _mode_compat = {'Lines & Scatter': 'Standard', 'Bar & Histogram': 'Histogram', 'normal': 'Standard'}
+        _saved_modes = {
+            int(k): _mode_compat.get(v, v)
+            for k, v in m.get('subplot_plot_modes', {}).items()
+        }
+
         self.series_table.blockSignals(True)
         self.series_table.setRowCount(0)
         for sd in m.get('series', []):
@@ -550,8 +566,14 @@ class SerializationMixin:
 
             self.series_table.setItem(row, 2, QTableWidgetItem(sd.get('label', f'Series {row+1}')))
 
-            # Type combo
-            type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
+            # Type combo — restricted to the plot mode of this series' subplot,
+            # matching the behaviour when rows are added interactively.
+            plot_num = sd.get('plot_num', 1)
+            subplot_idx = max(0, plot_num - 1)
+            _mode = _saved_modes.get(subplot_idx, 'Standard')
+            _allowed = list(PLOT_MODE_GROUPS.get(_mode, PER_SERIES_TYPES))
+            type_cb = QComboBox()
+            type_cb.addItems(_allowed)
             saved_type = sd.get('series_type', 'Line')
             ti = type_cb.findText(saved_type)
             if ti >= 0: type_cb.setCurrentIndex(ti)
@@ -593,16 +615,35 @@ class SerializationMixin:
         i = self.combo_err.findText(m.get('err_col', '(none)'))
         if i >= 0: self.combo_err.setCurrentIndex(i)
 
-        # Restore subplot chart types
+        # Restore subplot chart types, plot modes, and legend locs
         saved_ct = m.get('subplot_chart_types', {})
         self.subplot_chart_types = {int(k): v for k, v in saved_ct.items()}
         saved_ll = m.get('subplot_legend_locs', {})
         self.subplot_legend_locs = {int(k): v for k, v in saved_ll.items()}
+        saved_pm = m.get('subplot_plot_modes', {})
+        _mode_compat = {'Lines & Scatter': 'Standard', 'Bar & Histogram': 'Histogram', 'normal': 'Standard'}
+        self.subplot_plot_modes = {int(k): _mode_compat.get(v, v) for k, v in saved_pm.items()}
         for idx in range(n_subplots):
             self.subplot_chart_types.setdefault(idx, 'Line')
             self.subplot_legend_locs.setdefault(idx, 'best')
-        self._refresh_curve_select()
+            self.subplot_plot_modes.setdefault(idx, 'Standard')
 
+        # Restore extra column combos (quiver U/V, bubble size, X error)
+        for attr, key, sentinel in [
+            ('quiver_u_combo',    'quiver_u_col',    '(none)'),
+            ('quiver_v_combo',    'quiver_v_col',    '(none)'),
+            ('bubble_size_combo', 'bubble_size_col', '(uniform)'),
+            ('err_xerr_combo',    'err_xerr_col',    '(none)'),
+        ]:
+            w = getattr(self, attr, None)
+            if w:
+                val = m.get(key, sentinel)
+                i = w.findText(val)
+                w.blockSignals(True)
+                w.setCurrentIndex(i if i >= 0 else 0)
+                w.blockSignals(False)
+
+        self._refresh_curve_select()
 
     # ═══════════════════════════════════════════════════════════════════════════
     # .pviz SAVE / LOAD  (zip containing settings.json + data.json + images/)
@@ -715,6 +756,7 @@ class SerializationMixin:
         _remember_dir(fp)
         if not fp.endswith('.pviz'): fp += '.pviz'
         self._current_filepath = fp
+        self._update_window_title()
         self._is_dirty = False
 
         # ── Ask which columns to save ─────────────────────────────────────────
@@ -727,12 +769,19 @@ class SerializationMixin:
                     txt = cb.currentText()
                     if txt and txt in self.datasets:
                         used_cols.add(txt)
-        # Also include z and err columns
-        for attr in ('combo_z', 'combo_err'):
+        # Also include z, err, bubble-size, quiver U/V, and x-error columns
+        for attr, sentinel in [
+            ('combo_z',           '(none)'),
+            ('combo_err',         '(none)'),
+            ('bubble_size_combo', '(uniform)'),
+            ('quiver_u_combo',    '(none)'),
+            ('quiver_v_combo',    '(none)'),
+            ('err_xerr_combo',    '(none)'),
+        ]:
             cb = getattr(self, attr, None)
             if cb:
                 txt = cb.currentText()
-                if txt and txt != '(none)' and txt in self.datasets:
+                if txt and txt != sentinel and txt in self.datasets:
                     used_cols.add(txt)
 
         all_cols = set(self.datasets.keys())
@@ -773,10 +822,17 @@ class SerializationMixin:
                         col = sd.get(key, '')
                         if col and col in self.datasets:
                             keep.add(col)
-                # Also keep z and err columns if set
-                for key in ('z_col', 'err_col'):
+                # Also keep z, err, bubble-size, quiver U/V, and x-error columns
+                for key, sentinel in [
+                    ('z_col',           '(none)'),
+                    ('err_col',         '(none)'),
+                    ('bubble_size_col', '(uniform)'),
+                    ('quiver_u_col',    '(none)'),
+                    ('quiver_v_col',    '(none)'),
+                    ('err_xerr_col',    '(none)'),
+                ]:
                     col = series_meta.get(key, '')
-                    if col and col in self.datasets:
+                    if col and col != sentinel and col in self.datasets:
                         keep.add(col)
             else:
                 keep = set(self.datasets.keys())
@@ -826,6 +882,7 @@ class SerializationMixin:
         if hasattr(self, '_rebuild_recent_files_ui'):
             self._rebuild_recent_files_ui()
         self._current_filepath = fp
+        self._update_window_title()
         self._load_project_inner(fp)
 
     def _load_template_from_path(self, fp: str):
@@ -862,12 +919,35 @@ class SerializationMixin:
         if hasattr(self, '_rebuild_recent_files_ui'):
             self._rebuild_recent_files_ui()
         self._current_filepath = fp
+        self._update_window_title()
         self._load_project_inner(fp)
 
     def _load_project_inner(self, fp: str, silent: bool = False):
         """Core logic for loading a .pviz archive.
         Pass silent=True to suppress all QMessageBox dialogs (e.g. on startup).
         """
+        # ── Silent reset: clear all stale state before loading ──────────────────
+        # Mirrors _reset_app but without prompts or default-settings application.
+        # This ensures that opening a second .pviz (without clicking New Plot) is
+        # equivalent to a fresh start — no stale datasets, styles, subplot modes,
+        # series rows, or type-combo contents can bleed through from the old file.
+        self.datasets.clear()
+        self.curve_styles.clear()
+        if hasattr(self, 'canvas'):
+            self.canvas.annotations.clear()
+        self._last_fit = None
+        self._subplot_mosaic = None
+        # Clear subplot-state dicts so on_subplot_layout_changed's setdefault
+        # calls never see stale values from a previously loaded file.
+        self.subplot_chart_types.clear()
+        self.subplot_plot_modes.clear()
+        # Clear the series table BEFORE _apply_settings or any signal-triggered
+        # redraws can reference the now-empty datasets and crash.
+        if hasattr(self, 'series_table'):
+            self.series_table.blockSignals(True)
+            self.series_table.setRowCount(0)
+            self.series_table.blockSignals(False)
+        # ───────────────────────────────────────────────────────────────────────
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 names = zf.namelist()

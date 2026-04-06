@@ -42,6 +42,27 @@ def _color(palette, i):
     return f"'{palette[i % len(palette)]}'"
 
 
+def _series_style(settings, series, i, palette):
+    """Return resolved style properties for one series.
+
+    Prefers curve_styles[label] stored in settings; falls back to palette index.
+    """
+    lbl   = series.get("label", f"Series {i+1}")
+    curve = (settings.get("curve_styles") or {}).get(lbl, {})
+    color = curve.get("color") or palette[i % len(palette)]
+    return {
+        "color":         color,
+        "linestyle":     curve.get("linestyle",   "-"),
+        "linewidth":     curve.get("linewidth",    1.5),
+        "marker":        curve.get("marker",      "None"),
+        "markersize":    curve.get("markersize",   6),
+        "marker_color":  curve.get("marker_color") or color,
+        "scatter_alpha": settings.get("scatter_alpha", 0.6),
+        "area_alpha":    settings.get("area_alpha",    0.35),
+    }
+
+
+
 def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palette, ax_var):
     lines = []
     chart_type = settings.get('chart_type', 'Line')
@@ -49,38 +70,60 @@ def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palett
         xc, yc = s.get('x_col', ''), s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
         ct  = s.get('series_type', chart_type)
-        col = _color(palette, i)
         if not yc:
             continue
+        st  = _series_style(settings, s, i, palette)
+        col = f"'{st['color']}'"
+        ls  = st['linestyle']
+        lw  = st['linewidth']
+        mk  = st['marker']
+        ms  = st['markersize']
+        mkc = f"'{st['marker_color']}'"
+        sal = st['scatter_alpha']
+        aal = st['area_alpha']
         xexpr = _col_ref(xc) if xc else f'range(len({_col_ref(yc)}))'
         yexpr = _col_ref(yc)
 
+        mk_arg  = f", marker='{mk}', markersize={ms}, markerfacecolor={mkc}" if mk not in ('None', '', None) else ''
         if ct == 'Line':
-            lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, label='{lbl}', color={col})")
+            lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, label='{lbl}', color={col}, linestyle='{ls}', linewidth={lw}{mk_arg})")
         elif ct == 'Scatter':
-            lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, s=30)")
+            lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={sal}, s={ms**2})")
         elif ct == 'Bar':
             lines.append(f"{ax_var}.bar({xexpr}, {yexpr}, label='{lbl}', color={col})")
         elif ct == 'Area':
-            lines.append(f"{ax_var}.fill_between({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha=0.4)")
+            lines.append(f"{ax_var}.fill_between({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={aal})")
         elif ct == 'Step':
-            lines.append(f"{ax_var}.step({xexpr}, {yexpr}, label='{lbl}', color={col}, where='mid')")
+            lines.append(f"{ax_var}.step({xexpr}, {yexpr}, label='{lbl}', color={col}, linewidth={lw}, where='mid')")
         elif ct == 'Stem':
             lines.append(f"markerline, stemlines, baseline = {ax_var}.stem({xexpr}, {yexpr}, label='{lbl}')")
-            lines.append(f"plt.setp(stemlines, color={col}); plt.setp(markerline, color={col})")
+            lines.append(f"plt.setp(stemlines, color={col}, linewidth={lw}); plt.setp(markerline, color={col})")
         elif ct == 'Errorbar':
-            lines.append(f"{ax_var}.errorbar({xexpr}, {yexpr}, fmt='o', label='{lbl}', color={col})")
+            lines.append(f"{ax_var}.errorbar({xexpr}, {yexpr}, fmt='o', label='{lbl}', color={col}, linewidth={lw})")
         elif ct == 'Bubble':
-            lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha=0.6)")
+            lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={sal})")
         elif ct == 'Waterfall':
+            pos_c = settings.get('waterfall_pos_color', '#2ecc71')
+            neg_c = settings.get('waterfall_neg_color', '#e74c3c')
+            wf_w  = settings.get('waterfall_width', 0.8)
+            wf_al = settings.get('waterfall_alpha', 0.85)
             lines.append(f"# Waterfall: '{lbl}'")
-            lines.append(f"_wf = {yexpr}.values if hasattr({yexpr}, 'values') else list({yexpr})")
-            lines.append(f"_running = 0")
-            lines.append(f"for _wi, _wv in enumerate(_wf):")
-            lines.append(f"    {ax_var}.bar(_wi, _wv, bottom=_running, color=('green' if _wv >= 0 else 'red'), alpha=0.8)")
+            lines.append(f"_wf_x = list({xexpr})")
+            lines.append(f"_wf_y = list({yexpr})")
+            lines.append(f"_wf_n = min(len(_wf_x), len(_wf_y))")
+            lines.append(f"_wf_x, _wf_y = _wf_x[:_wf_n], _wf_y[:_wf_n]")
+            lines.append(f"_wf_is_cat = isinstance(_wf_x[0], str) if _wf_x else False")
+            lines.append(f"_running = 0.0")
+            lines.append(f"for _wi, _wv in enumerate(_wf_y):")
+            lines.append(f"    _fc = {repr(pos_c)} if _wv >= 0 else {repr(neg_c)}")
+            lines.append(f"    _xi = _wi if _wf_is_cat else _wf_x[_wi]")
+            lines.append(f"    {ax_var}.bar(_xi, _wv, bottom=_running, width={wf_w}, color=_fc, edgecolor='white', linewidth=0.5, alpha={wf_al}, label=('{lbl}' if _wi == 0 else '_nolegend_'))")
             lines.append(f"    _running += _wv")
+            lines.append(f"if _wf_is_cat:")
+            lines.append(f"    {ax_var}.set_xticks(range(len(_wf_x)))")
+            lines.append(f"    {ax_var}.set_xticklabels(_wf_x, rotation=45, ha='right')")
         else:
-            lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, label='{lbl}', color={col})")
+            lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, label='{lbl}', color={col}, linestyle='{ls}', linewidth={lw}{mk_arg})")
     return lines
 
 
@@ -89,7 +132,8 @@ def _gen_histogram(settings, series, datasets, palette, ax_var):
     for i, s in enumerate(series):
         yc  = s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
-        col = _color(palette, i)
+        st  = _series_style(settings, s, i, palette)
+        col = f"'{st['color']}'"
         if yc:
             lines.append(f"{ax_var}.hist({_col_ref(yc)}.dropna(), bins=25, label='{lbl}', color={col}, alpha=0.7)")
     return lines
@@ -127,8 +171,37 @@ def _gen_pie(settings, series, datasets, palette, ax_var):
         xc  = s.get('x_col', '')
         yc  = s.get('y_col', '')
         if yc:
-            lblexpr = f"{_col_ref(xc)}.astype(str)" if xc else 'None'
-            lines.append(f"{ax_var}.pie({_col_ref(yc)}, labels={lblexpr}, autopct='%1.1f%%')")
+            lblexpr      = f"{_col_ref(xc)}.astype(str)" if xc else 'None'
+            autopct      = "'%1.1f%%'" if settings.get('pie_autopct', True) else 'None'
+            shadow       = settings.get('pie_shadow', False)
+            startangle   = settings.get('pie_startangle', 90.0)
+            labeldist    = settings.get('pie_labeldistance', 1.1)
+            pctdist      = settings.get('pie_pctdistance', 0.6)
+            donut        = settings.get('pie_donut', False)
+            explode_first = settings.get('pie_explode_first', False)
+            wedge_arg    = ", wedgeprops={'width': 0.5}" if donut else ''
+            # Build colors list: look up each x-label in curve_styles, fall back to palette
+            curve_styles = settings.get('curve_styles', {})
+            x_vals = list(datasets.get(xc, [])) if xc and datasets else []
+            if x_vals:
+                colors = [curve_styles.get(str(v), {}).get('color') or palette[i % len(palette)]
+                          for i, v in enumerate(x_vals)]
+                colors_arg = f", colors={colors!r}"
+            else:
+                colors_arg = ''
+            # explode: runtime because slice count comes from data
+            if explode_first:
+                lines.append(f"_pie_n = len({_col_ref(yc)})")
+                lines.append(f"_pie_explode = [0.08] + [0.0] * (_pie_n - 1)")
+                explode_arg = ", explode=_pie_explode"
+            else:
+                explode_arg = ''
+            lines.append(
+                f"{ax_var}.pie({_col_ref(yc)}, labels={lblexpr}, autopct={autopct}, "
+                f"shadow={shadow}, startangle={startangle}, "
+                f"labeldistance={labeldist}, pctdistance={pctdist}"
+                f"{colors_arg}{explode_arg}{wedge_arg})"
+            )
             lines.append(f"{ax_var}.axis('equal')")
     return lines
 
@@ -138,9 +211,12 @@ def _gen_polar(settings, series, datasets, palette, ax_var):
     for i, s in enumerate(series):
         xc = s.get('x_col', ''); yc = s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
-        col = _color(palette, i)
+        st  = _series_style(settings, s, i, palette)
+        col = f"'{st['color']}'"
+        lw  = st['linewidth']
+        ls  = st['linestyle']
         if xc and yc:
-            lines.append(f"{ax_var}.plot({_col_ref(xc)}, {_col_ref(yc)}, label='{lbl}', color={col})")
+            lines.append(f"{ax_var}.plot({_col_ref(xc)}, {_col_ref(yc)}, label='{lbl}', color={col}, linestyle='{ls}', linewidth={lw})")
     return lines
 
 
@@ -217,12 +293,14 @@ def _gen_ecdf(settings, series, datasets, palette, ax_var):
     for i, s in enumerate(series):
         yc  = s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
-        col = _color(palette, i)
+        st  = _series_style(settings, s, i, palette)
+        col = f"'{st['color']}'"
+        lw  = st['linewidth']
         if yc:
             lines += [
                 f"_ecdf_d = np.sort({_col_ref(yc)}.dropna())",
                 f"_ecdf_y = np.arange(1, len(_ecdf_d)+1) / len(_ecdf_d)",
-                f"{ax_var}.plot(_ecdf_d, _ecdf_y, label='{lbl}', color={col})",
+                f"{ax_var}.plot(_ecdf_d, _ecdf_y, label='{lbl}', color={col}, linewidth={lw})",
             ]
     return lines
 
@@ -264,7 +342,8 @@ def _gen_radar(settings, series, datasets, palette, ax_var):
     ]
     for i, s in enumerate(series):
         lbl = _esc(s.get('label', f'Series {i+1}'))
-        col = _color(palette, i)
+        st  = _series_style(settings, s, i, palette)
+        col = f"'{st['color']}'"
         lines += [
             f"_rad_vals_{i} = df[_rad_cols].iloc[{i}].tolist() if {i} < len(df) else [0]*_rad_N",
             f"_rad_vals_{i} += _rad_vals_{i}[:1]",
@@ -305,6 +384,33 @@ _GENERATORS = {
 
 _3D_TYPES    = {'3D Surface'}
 _POLAR_TYPES = {'Polar', 'Radar'}
+
+
+def _legend_call(settings, idx, ax_var):
+    """Return a fully-qualified ax.legend(...) line for subplot `idx`,
+    mirroring exactly what plot_engine._legend_kwargs() produces."""
+    # idx can be int or str key — normalise to str for settings dicts
+    k = str(idx)
+    loc        = (settings.get('subplot_legend_locs') or {}).get(k, 'best')
+    lx         = (settings.get('subplot_legend_x')    or {}).get(k, 0.01)
+    ly         = (settings.get('subplot_legend_y')    or {}).get(k, 0.99)
+    fontsize   = (settings.get('subplot_legend_fontsize')  or {}).get(k, 9)
+    ncols      = (settings.get('subplot_legend_ncols')     or {}).get(k, 1)
+    frameon    = (settings.get('subplot_legend_frameon')   or {}).get(k, True)
+    facecolor  = (settings.get('subplot_legend_facecolor') or {}).get(k, '#ffffff')
+    edgecolor  = (settings.get('subplot_legend_edgecolor') or {}).get(k, '#cccccc')
+    framealpha = (settings.get('subplot_legend_alpha')     or {}).get(k, 0.8)
+    labelcolor = (settings.get('subplot_legend_color')     or {}).get(k, '#000000')
+
+    common = (f"fontsize={fontsize}, ncols={ncols}, frameon={frameon}, "
+              f"facecolor='{_esc(facecolor)}', edgecolor='{_esc(edgecolor)}', "
+              f"framealpha={framealpha}, labelcolor='{_esc(labelcolor)}'")
+
+    if loc == 'best':
+        return f"{ax_var}.legend(loc='best', {common})"
+    else:
+        real_loc = 'upper left' if loc == 'manual' else loc
+        return f"{ax_var}.legend(loc='{_esc(real_loc)}', bbox_to_anchor=({lx}, {ly}), {common})"
 
 
 def _projection_for(ct):
@@ -439,39 +545,74 @@ def generate_plot_script(settings: dict, series_meta: dict,
         if yl: lines.append(f"ax.set_ylabel('{_esc(yl)}')")
         sp_title = (settings.get('sp_titles') or {}).get('0', '')
         if sp_title: lines.append(f"ax.set_title('{_esc(sp_title)}')")
-        lines.append("ax.legend()")
+        lines.append(_legend_call(settings, 0, 'ax'))
     else:
         subplot_types = settings.get('subplot_chart_types') or {}
-        lines.append(f"axes = []")
-        for idx in range(n_subplots):
-            sub_ct = subplot_types.get(str(idx), ct)
-            proj   = _projection_for(sub_ct)
-            proj_arg = f", projection={proj}" if proj != 'None' else ''
-            lines.append(f"ax{idx} = fig.add_subplot({rows}, {cols_}, {idx+1}{proj_arg})")
-            lines.append(f"ax{idx}.set_facecolor('{_esc(bg_color)}')")
-            lines.append(f"axes.append(ax{idx})")
-        lines.append("")
-        lines.append("# ── Per-subplot plotting ─────────────────────────────────")
-        for idx in range(n_subplots):
-            sub_ct      = subplot_types.get(str(idx), ct)
-            sub_series  = [s for s in series_list if s.get('plot_num', 1) == idx + 1]
-            ax_var      = f"ax{idx}"
-            # Build a per-subplot settings view with the correct z column
-            sub_z       = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
-            if not sub_z:
-                # Fall back: z applies only if this subplot is a 2-D field type
-                sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Surface3D', 'Hist2D', 'Hexbin') else ''
-            sub_settings = dict(settings)
-            sub_settings['chart_type'] = sub_ct
-            sub_settings['_z_col']     = sub_z
-            lines.append(f"# Subplot {idx+1}: {sub_ct}")
-            gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
-            for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
-                lines.append(l)
-            sp_title = settings.get('sp_titles', {}).get(str(idx), f'Subplot {idx+1}')
-            if sp_title: lines.append(f"{ax_var}.set_title('{_esc(sp_title)}')")
-            lines.append(f"{ax_var}.legend()")
+        mosaic = settings.get('subplot_mosaic')
+
+        if mosaic is not None:
+            # ── Mosaic layout ─────────────────────────────────────────────────
+            seen_order = list(dict.fromkeys(c for row in mosaic for c in row))
+            n_mosaic   = len(seen_order)
+            lines.append(f"# Mosaic layout: {mosaic!r}")
+            lines.append(f"_ax_dict = fig.subplot_mosaic({mosaic!r})")
+            for ki, key in enumerate(seen_order):
+                lines.append(f"ax{ki} = _ax_dict[{key!r}]")
+                lines.append(f"ax{ki}.set_facecolor('{_esc(bg_color)}')")
             lines.append("")
+            lines.append("# ── Per-subplot plotting ─────────────────────────────────")
+            for idx in range(n_mosaic):
+                sub_ct     = subplot_types.get(str(idx), ct)
+                sub_series = [s for s in series_list if s.get('plot_num', 1) == idx + 1]
+                ax_var     = f"ax{idx}"
+                sub_z      = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
+                if not sub_z:
+                    sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Surface3D', 'Hist2D', 'Hexbin') else ''
+                sub_settings = dict(settings)
+                sub_settings['chart_type'] = sub_ct
+                sub_settings['_z_col']     = sub_z
+                lines.append(f"# Subplot {idx+1} ({seen_order[idx]}): {sub_ct}")
+                gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
+                for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
+                    lines.append(l)
+                sp_title = settings.get('sp_titles', {}).get(str(idx), f'Subplot {idx+1}')
+                xl = settings.get('subplot_xlabels', {}).get(str(idx), '')
+                yl = settings.get('subplot_ylabels', {}).get(str(idx), '')
+                if sp_title: lines.append(f"{ax_var}.set_title('{_esc(sp_title)}')")
+                if xl: lines.append(f"{ax_var}.set_xlabel('{_esc(xl)}')")
+                if yl: lines.append(f"{ax_var}.set_ylabel('{_esc(yl)}')")
+                lines.append(_legend_call(settings, idx, ax_var))
+                lines.append("")
+        else:
+            # ── Regular grid layout ───────────────────────────────────────────
+            lines.append(f"axes = []")
+            for idx in range(n_subplots):
+                sub_ct = subplot_types.get(str(idx), ct)
+                proj   = _projection_for(sub_ct)
+                proj_arg = f", projection={proj}" if proj != 'None' else ''
+                lines.append(f"ax{idx} = fig.add_subplot({rows}, {cols_}, {idx+1}{proj_arg})")
+                lines.append(f"ax{idx}.set_facecolor('{_esc(bg_color)}')")
+                lines.append(f"axes.append(ax{idx})")
+            lines.append("")
+            lines.append("# ── Per-subplot plotting ─────────────────────────────────")
+            for idx in range(n_subplots):
+                sub_ct      = subplot_types.get(str(idx), ct)
+                sub_series  = [s for s in series_list if s.get('plot_num', 1) == idx + 1]
+                ax_var      = f"ax{idx}"
+                sub_z       = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
+                if not sub_z:
+                    sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Surface3D', 'Hist2D', 'Hexbin') else ''
+                sub_settings = dict(settings)
+                sub_settings['chart_type'] = sub_ct
+                sub_settings['_z_col']     = sub_z
+                lines.append(f"# Subplot {idx+1}: {sub_ct}")
+                gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
+                for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
+                    lines.append(l)
+                sp_title = settings.get('sp_titles', {}).get(str(idx), f'Subplot {idx+1}')
+                if sp_title: lines.append(f"{ax_var}.set_title('{_esc(sp_title)}')")
+                lines.append(_legend_call(settings, idx, ax_var))
+                lines.append("")
 
     # ── Final touches ─────────────────────────────────────────────────────────
     hspace = settings.get('sp_hspace', 0.35)
@@ -492,12 +633,21 @@ def generate_plot_script(settings: dict, series_meta: dict,
             f"color='{_esc(title_color)}', "
             f"x={title_x}, y={title_y})",
         ]
+    # When there is a suptitle, reserve space at the top for it so that
+    # tight_layout() does not push subplot content over the title.
+    # We derive the top rect from title_y — subtract a small font-height margin.
+    if title_show and title_text:
+        font_frac = (title_size / 72) / fig_h * 1.8   # approx line height as fig fraction
+        tight_top = min(title_y - font_frac, 0.96)
+        tight_layout_line = f"plt.tight_layout(rect=[0, 0, 1, {tight_top:.3f}])"
+    else:
+        tight_layout_line = "plt.tight_layout()"
     lines += [
         "",
         "# ── Layout ───────────────────────────────────────────────────────────",
     ] + suptitle_lines + [
         f"fig.subplots_adjust(hspace={hspace}, wspace={wspace})",
-        "plt.tight_layout()",
+        tight_layout_line,
         "plt.show()",
         "",
     ]
