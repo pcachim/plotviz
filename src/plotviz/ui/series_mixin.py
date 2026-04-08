@@ -234,8 +234,7 @@ class SeriesMixin(CurveStyleMixin):
 
         # Type combo
         type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
-        type_cb.currentIndexChanged.connect(self.update_preview)
-        type_cb.currentIndexChanged.connect(self._on_series_selection_changed)
+        type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
         self.series_table.setCellWidget(row, 3, type_cb)
 
         # Plot spinbox — default to whichever subplot is active in the Subplots tab

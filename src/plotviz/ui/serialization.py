@@ -169,24 +169,84 @@ class SerializationMixin:
         s['sp_sharex']      = self.sp_sharex.isChecked()
         s['sp_sharey']      = self.sp_sharey.isChecked()
 
-        # Chart-type specific
-        s['hist_bins']           = self.hist_bins.value()
-        s['hist_density']        = self.hist_density.isChecked()
-        s['bar_width']           = self.bar_width.value()
+        # ── Chart-mode params (apply to entire chart, not per-series) ───────────
+        # Bar
         s['bar_stacked']         = self.bar_stacked.isChecked()
         s['bar_horizontal']      = self.bar_horizontal.isChecked()
-        s['scatter_size']        = self.scatter_size.value()
-        s['scatter_alpha']       = self.scatter_alpha.value()
-        s['err_capsize']         = self.err_capsize.value()
+        # Histogram
+        s['hist_bins']           = self.hist_bins.value()
+        s['hist_density']        = self.hist_density.isChecked()
+        s['hist_cumulative']     = self.hist_cumulative.isChecked()
+        s['hist_histtype']       = self.hist_histtype.currentText()
+        s['hist_orientation']    = self.hist_orientation.currentText()
+        # Heatmap / Contour / 3D
         s['cmap']                = self.cmap_combo.currentText()
         s['contour_levels']      = self.contour_levels.value()
+        s['heat_alpha']          = self.heat_alpha.value()
+        s['heat_interpolation']  = self.heat_interpolation.currentText()
         s['heat_colorbar']       = self.heat_colorbar.isChecked()
+        s['heat_filled_contour'] = self.heat_filled_contour.isChecked()
+        s['heat_contour_lines']  = self.heat_contour_lines.isChecked()
+        s['surf_stride']         = self.surf_stride.value()
+        s['surf_wireframe']      = self.surf_wireframe.isChecked()
+        # Pie
         s['pie_autopct']         = self.pie_autopct.isChecked()
         s['pie_shadow']          = self.pie_shadow.isChecked()
-        s['area_alpha']          = self.area_alpha.value()
+        s['pie_donut']           = self.pie_donut.isChecked()
+        s['pie_explode_first']   = self.pie_explode_first.isChecked()
+        s['pie_startangle']      = self.pie_startangle.value()
+        s['pie_labeldistance']   = self.pie_labeldistance.value()
+        s['pie_pctdistance']     = self.pie_pctdistance.value()
+        # Area
         s['area_stacked']        = self.area_stacked.isChecked()
+        s['area_baseline']       = self.area_baseline.value()
+        # Violin
         s['violin_show_means']   = self.violin_show_means.isChecked()
         s['violin_show_medians'] = self.violin_show_medians.isChecked()
+        s['violin_show_extrema'] = self.violin_show_extrema.isChecked()
+        s['violin_points']       = self.violin_points.currentText()
+        s['violin_bw']           = self.violin_bw.currentText()
+        s['violin_vert']         = self.violin_vert.isChecked()
+        # Boxplot
+        s['box_show_means']      = self.box_show_means.isChecked()
+        s['box_show_medians']    = self.box_show_medians.isChecked()
+        s['box_notch']           = self.box_notch.isChecked()
+        s['box_showfliers']      = self.box_showfliers.isChecked()
+        s['box_vert']            = self.box_vert.isChecked()
+        s['box_whis']            = self.box_whis.value()
+        s['box_alpha']           = self.box_alpha.value()
+        # Step
+        s['step_where']          = self.step_where.currentText()
+        # Stem
+        s['stem_baseline']       = self.stem_baseline.value()
+        # Waterfall
+        s['waterfall_connector'] = self.waterfall_connector.isChecked()
+        s['waterfall_width']     = self.waterfall_width.value()
+        s['waterfall_alpha']     = self.waterfall_alpha.value()
+        s['waterfall_pos_color'] = getattr(self, 'waterfall_pos_color', '#2ecc71')
+        s['waterfall_neg_color'] = getattr(self, 'waterfall_neg_color', '#e74c3c')
+        # Hist2D
+        s['hist2d_bins_x']       = self.hist2d_bins_x.value()
+        s['hist2d_bins_y']       = self.hist2d_bins_y.value()
+        s['hist2d_alpha']        = self.hist2d_alpha.value()
+        s['hist2d_cmap']         = self.hist2d_cmap_combo.currentText()
+        s['hist2d_colorbar']     = self.hist2d_colorbar.isChecked()
+        s['hist2d_log']          = self.hist2d_log.isChecked()
+        # Hexbin
+        s['hexbin_gridsize']     = self.hexbin_gridsize.value()
+        s['hexbin_alpha']        = self.hexbin_alpha.value()
+        s['hexbin_cmap']         = self.hexbin_cmap_combo.currentText()
+        s['hexbin_colorbar']     = self.hexbin_colorbar.isChecked()
+        s['hexbin_log']          = self.hexbin_log.isChecked()
+        # Radar
+        s['radar_gridlevels']    = self.radar_gridlevels.value()
+        # ECDF
+        s['ecdf_complementary']  = self.ecdf_complementary.isChecked()
+        # Quiver
+        s['quiver_scale']        = self.quiver_scale.value()
+        s['quiver_width']        = self.quiver_width.value()
+        s['quiver_color_by_mag'] = self.quiver_color_by_mag.isChecked()
+        s['quiver_cmap']         = self.quiver_cmap_combo.currentText()
 
         # Default annotation style (applied to new annotations; not per-annotation)
         s['ann_fontcolor']  = getattr(self, 'ann_fontcolor',  '#000000')
@@ -195,12 +255,6 @@ class SerializationMixin:
         s['ann_bgcolor']    = getattr(self, 'ann_bgcolor',    '#ffffcc')
         s['ann_bg_alpha']   = self.ann_bg_alpha.value()
         s['ann_edgecolor']  = getattr(self, 'ann_edgecolor',  '#aaaaaa')
-
-        # Line / default series style
-        s['line_default_style']    = self.line_default_style.currentText()
-        s['line_default_marker']   = self.line_default_marker.currentText()
-        s['line_default_lw']       = self.line_default_lw.value()
-        s['line_default_markersize'] = self.line_default_markersize.value()
 
         return s
 
@@ -450,25 +504,95 @@ class SerializationMixin:
         else:
             self._last_fit = None
 
-        # Chart-type specific
-        self.hist_bins.setValue(s.get('hist_bins', 20))
-        self.hist_density.setChecked(s.get('hist_density', False))
-        self.bar_width.setValue(s.get('bar_width', 0.8))
-        self.bar_stacked.setChecked(s.get('bar_stacked', False))
-        self.bar_horizontal.setChecked(s.get('bar_horizontal', False))
-        self.scatter_size.setValue(s.get('scatter_size', 20))
-        self.scatter_alpha.setValue(s.get('scatter_alpha', 0.8))
-        self.err_capsize.setValue(s.get('err_capsize', 4))
-        i = self.cmap_combo.findText(s.get('cmap','viridis'))
-        if i >= 0: self.cmap_combo.setCurrentIndex(i)
-        self.contour_levels.setValue(s.get('contour_levels', 10))
-        self.heat_colorbar.setChecked(s.get('heat_colorbar', True))
-        self.pie_autopct.setChecked(s.get('pie_autopct', True))
-        self.pie_shadow.setChecked(s.get('pie_shadow', False))
-        self.area_alpha.setValue(s.get('area_alpha', 0.4))
-        self.area_stacked.setChecked(s.get('area_stacked', False))
-        self.violin_show_means.setChecked(s.get('violin_show_means', True))
-        self.violin_show_medians.setChecked(s.get('violin_show_medians', True))
+        # ── Chart-mode params ────────────────────────────────────────────────────
+        def _cb(w, key, default): w.setChecked(s.get(key, default))
+        def _sp(w, key, default): w.setValue(s.get(key, default))
+        def _co(w, key, default):
+            i = w.findText(s.get(key, default))
+            if i >= 0: w.setCurrentIndex(i)
+
+        # Bar
+        _cb(self.bar_stacked,    'bar_stacked',    False)
+        _cb(self.bar_horizontal, 'bar_horizontal', False)
+        # Histogram
+        _sp(self.hist_bins, 'hist_bins', 20)
+        _cb(self.hist_density,    'hist_density',    False)
+        _cb(self.hist_cumulative, 'hist_cumulative', False)
+        _co(self.hist_histtype,   'hist_histtype',   'bar')
+        _co(self.hist_orientation,'hist_orientation','vertical')
+        # Heatmap / Contour / 3D
+        _co(self.cmap_combo,          'cmap',             'viridis')
+        _sp(self.contour_levels,      'contour_levels',   10)
+        _sp(self.heat_alpha,          'heat_alpha',       1.0)
+        _co(self.heat_interpolation,  'heat_interpolation','nearest')
+        _cb(self.heat_colorbar,       'heat_colorbar',     True)
+        _cb(self.heat_filled_contour, 'heat_filled_contour', True)
+        _cb(self.heat_contour_lines,  'heat_contour_lines',  True)
+        _sp(self.surf_stride,         'surf_stride',      1)
+        _cb(self.surf_wireframe,      'surf_wireframe',   False)
+        # Pie
+        _cb(self.pie_autopct,       'pie_autopct',      True)
+        _cb(self.pie_shadow,        'pie_shadow',       False)
+        _cb(self.pie_donut,         'pie_donut',        False)
+        _cb(self.pie_explode_first, 'pie_explode_first',False)
+        _sp(self.pie_startangle,    'pie_startangle',   90.0)
+        _sp(self.pie_labeldistance, 'pie_labeldistance',1.1)
+        _sp(self.pie_pctdistance,   'pie_pctdistance',  0.6)
+        # Area
+        _cb(self.area_stacked,  'area_stacked',  False)
+        _sp(self.area_baseline, 'area_baseline', 0.0)
+        # Violin
+        _cb(self.violin_show_means,   'violin_show_means',   True)
+        _cb(self.violin_show_medians, 'violin_show_medians', True)
+        _cb(self.violin_show_extrema, 'violin_show_extrema', False)
+        _co(self.violin_points,       'violin_points',       '100')
+        _co(self.violin_bw,           'violin_bw',           'scott')
+        _cb(self.violin_vert,         'violin_vert',         True)
+        # Boxplot
+        _cb(self.box_show_means,   'box_show_means',   False)
+        _cb(self.box_show_medians, 'box_show_medians', True)
+        _cb(self.box_notch,        'box_notch',        False)
+        _cb(self.box_showfliers,   'box_showfliers',   True)
+        _cb(self.box_vert,         'box_vert',         True)
+        _sp(self.box_whis,         'box_whis',         1.5)
+        _sp(self.box_alpha,        'box_alpha',        0.7)
+        # Step
+        _co(self.step_where, 'step_where', 'pre')
+        # Stem
+        _sp(self.stem_baseline, 'stem_baseline', 0.0)
+        # Waterfall
+        _cb(self.waterfall_connector, 'waterfall_connector', True)
+        _sp(self.waterfall_width,     'waterfall_width',     0.6)
+        _sp(self.waterfall_alpha,     'waterfall_alpha',     1.0)
+        for _attr, _key, _def in [
+            ('waterfall_pos_color', 'waterfall_pos_color', '#2ecc71'),
+            ('waterfall_neg_color', 'waterfall_neg_color', '#e74c3c'),
+        ]:
+            _v = s.get(_key, _def); setattr(self, _attr, _v)
+            _btn = getattr(self, _attr + '_btn', None)
+            if _btn: _btn.setStyleSheet(f'background-color:{_v};border:1px solid #888;')
+        # Hist2D
+        _sp(self.hist2d_bins_x,  'hist2d_bins_x',  20)
+        _sp(self.hist2d_bins_y,  'hist2d_bins_y',  20)
+        _sp(self.hist2d_alpha,   'hist2d_alpha',   1.0)
+        _co(self.hist2d_cmap_combo, 'hist2d_cmap', 'viridis')
+        _cb(self.hist2d_colorbar,'hist2d_colorbar', True)
+        _cb(self.hist2d_log,     'hist2d_log',      False)
+        # Hexbin
+        _sp(self.hexbin_gridsize,    'hexbin_gridsize', 20)
+        _sp(self.hexbin_alpha,       'hexbin_alpha',    1.0)
+        _co(self.hexbin_cmap_combo,  'hexbin_cmap',     'viridis')
+        _cb(self.hexbin_colorbar,    'hexbin_colorbar', True)
+        _cb(self.hexbin_log,         'hexbin_log',      False)
+        # Radar
+        _sp(self.radar_gridlevels, 'radar_gridlevels', 5)
+        # ECDF
+        _cb(self.ecdf_complementary, 'ecdf_complementary', False)
+        # Quiver
+        _sp(self.quiver_scale,       'quiver_scale',       1.0)
+        _sp(self.quiver_width,       'quiver_width',       0.005)
+        _cb(self.quiver_color_by_mag,'quiver_color_by_mag',False)
+        _co(self.quiver_cmap_combo,  'quiver_cmap',        'viridis')
 
         # ── Annotation default style ─────────────────────────────────────────
         def _set_ann_color(attr, default):
@@ -492,24 +616,6 @@ class SerializationMixin:
         self.ann_bg_alpha.blockSignals(True)
         self.ann_bg_alpha.setValue(s.get('ann_bg_alpha', 0.9))
         self.ann_bg_alpha.blockSignals(False)
-
-        # ── Line / series defaults ───────────────────────────────────────────
-        for attr, default in [
-            ('line_default_style',      '-'),
-            ('line_default_marker',     'None'),
-        ]:
-            w = getattr(self, attr, None)
-            if w:
-                i = w.findText(s.get(attr, default))
-                if i >= 0:
-                    w.blockSignals(True); w.setCurrentIndex(i); w.blockSignals(False)
-        for attr, default in [
-            ('line_default_lw',         1.5),
-            ('line_default_markersize', 6.0),
-        ]:
-            w = getattr(self, attr, None)
-            if w:
-                w.blockSignals(True); w.setValue(s.get(attr, default)); w.blockSignals(False)
 
         self.combo_x.blockSignals(False); self.y_list.blockSignals(False)
 
@@ -577,8 +683,7 @@ class SerializationMixin:
             saved_type = sd.get('series_type', 'Line')
             ti = type_cb.findText(saved_type)
             if ti >= 0: type_cb.setCurrentIndex(ti)
-            type_cb.currentIndexChanged.connect(self.update_preview)
-            type_cb.currentIndexChanged.connect(self._on_series_selection_changed)
+            type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
             self.series_table.setCellWidget(row, 3, type_cb)
 
             # Plot spinbox
@@ -669,8 +774,10 @@ class SerializationMixin:
 
     def _export_palette_bundle(self):
         """Save a .pvizp file containing only the custom colour palettes."""
+        _stem = (os.path.splitext(os.path.basename(self._current_filepath))[0]
+                 if getattr(self, '_current_filepath', None) else 'untitled')
         fp, _ = QFileDialog.getSaveFileName(
-            self, 'Export Palette Bundle', _get_dir(),
+            self, 'Save Palette', os.path.join(_get_dir(), _stem + '.pvizp'),
             'plotviz Palette Bundle (*.pvizp);;All Files (*)')
         if not fp: return
         _remember_dir(fp)

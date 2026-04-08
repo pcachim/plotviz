@@ -982,8 +982,10 @@ class PythonExportMixin:
 
         # ── File dialog ────────────────────────────────────────────────────────
         from ui.helpers import _get_dir, _remember_dir
+        _stem = (os.path.splitext(os.path.basename(self._current_filepath))[0]
+                 if getattr(self, '_current_filepath', None) else chart_title or 'untitled')
         fp, _ = QFileDialog.getSaveFileName(
-            self, 'Export Python Bundle', _get_dir(),
+            self, 'Export Python Bundle', os.path.join(_get_dir(), _stem + '.pvizx'),
             'plotviz Python Bundle (*.pvizx);;All Files (*)')
         if not fp:
             return

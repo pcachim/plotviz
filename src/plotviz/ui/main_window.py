@@ -675,6 +675,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._loading_series_options = False
         self._connect_series_option_signals()
 
+        # Auto-select a series table row whenever one of its embedded cell widgets
+        # (X/Y combos, type combo, subplot spin) gains keyboard focus.  Without this,
+        # clicking directly on a cell widget bypasses the table's selection model, so
+        # _save_series_options would still target the previously-selected row.
+        QApplication.instance().focusChanged.connect(self._on_cell_widget_focused)
+
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._load_on_startup)
 
@@ -947,11 +953,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         def _go_data_tab():
             self.tabs.setCurrentIndex(1)   # Data tab
 
+        # ── New ───────────────────────────────────────────────────────────────
         act_new = QAction('New Plot', self)
         act_new.setShortcut('Ctrl+N')
         act_new.triggered.connect(lambda: (_go_chart_tab(), self._reset_app()))
         file_menu.addAction(act_new)
 
+        # ── Open / Load ───────────────────────────────────────────────────────
         file_menu.addSeparator()
 
         act_open = QAction('Open Chart (.pviz)…', self)
@@ -963,6 +971,25 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         act_open_tpl.triggered.connect(lambda: (_go_chart_tab(), self._load_template()))
         file_menu.addAction(act_open_tpl)
 
+        act_load_pal = QAction('Load Palette (.pvizp)…', self)
+        act_load_pal.triggered.connect(
+            lambda: (_go_chart_tab(), self._import_palette_bundle()))
+        file_menu.addAction(act_load_pal)
+
+        act_load_scheme = QAction('Load Scheme (.pvizc)…', self)
+        act_load_scheme.triggered.connect(
+            lambda: (_go_chart_tab(), self._load_color_scheme()))
+        file_menu.addAction(act_load_scheme)
+
+        # ── Load Data ─────────────────────────────────────────────────────────
+        file_menu.addSeparator()
+
+        act_load_data = QAction('Load Data…', self)
+        act_load_data.setShortcut('Ctrl+L')
+        act_load_data.triggered.connect(lambda: (_go_data_tab(), self.load_data()))
+        file_menu.addAction(act_load_data)
+
+        # ── Save ──────────────────────────────────────────────────────────────
         file_menu.addSeparator()
 
         act_save = QAction('Save Chart (.pviz)…', self)
@@ -974,13 +1001,17 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         act_save_tpl.triggered.connect(lambda: (_go_chart_tab(), self._save_template()))
         file_menu.addAction(act_save_tpl)
 
-        file_menu.addSeparator()
+        act_save_pal = QAction('Save Palette (.pvizp)…', self)
+        act_save_pal.triggered.connect(
+            lambda: (_go_chart_tab(), self._export_palette_bundle()))
+        file_menu.addAction(act_save_pal)
 
-        act_load_data = QAction('Load Data…', self)
-        act_load_data.setShortcut('Ctrl+L')
-        act_load_data.triggered.connect(lambda: (_go_data_tab(), self.load_data()))
-        file_menu.addAction(act_load_data)
+        act_save_scheme = QAction('Save Scheme (.pvizc)…', self)
+        act_save_scheme.triggered.connect(
+            lambda: (_go_chart_tab(), self._save_color_scheme()))
+        file_menu.addAction(act_save_scheme)
 
+        # ── Export ────────────────────────────────────────────────────────────
         file_menu.addSeparator()
 
         act_export_img = QAction('Export Image…', self)
@@ -1199,15 +1230,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # CHART TYPE VISIBILITY
     # ═══════════════════════════════════════════════════════════════════════════
     def _update_option_group_visibility(self, ct):
-        """Show/hide chart-type option groups and extra column pickers for the given type."""
+        """Show/hide chart-type option groups (Data tab) and series-type option
+        groups (Series tab) for the given chart type."""
         if not hasattr(self, 'hist_group'):
             return
-        vis = {
-            self.line_group:      ct == 'Line',
-            self.scatter_group:   ct == 'Scatter',
+
+        # ── Data tab: chart-mode groups ───────────────────────────────────────
+        data_vis = {
             self.bar_group:       ct == 'Bar',
             self.hist_group:      ct == 'Histogram',
-            self.err_group:       ct == 'Errorbar',
             self.heat_group:      ct in ('Heatmap', 'Contour', '3D Surface'),
             self.pie_group:       ct == 'Pie',
             self.area_group:      ct == 'Area',
@@ -1215,21 +1246,37 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.boxplot_group:   ct == 'Boxplot',
             self.step_group:      ct == 'Step',
             self.stem_group:      ct == 'Stem',
-            self.bubble_group:    ct == 'Bubble',
             self.waterfall_group: ct == 'Waterfall',
             self.hist2d_group:    ct == 'Hist2D',
             self.hexbin_group:    ct == 'Hexbin',
-            self.polar_group:     ct == 'Polar',
             self.radar_group:     ct == 'Radar',
             self.ecdf_group:      ct == 'ECDF',
             self.quiver_group:    ct == 'Quiver',
         }
-        for grp, show in vis.items():
+        for grp, show in data_vis.items():
             grp.setVisible(show)
-        # Show Z-column picker only for types that use it
+
+        # ── Series tab: per-series type groups ────────────────────────────────
+        for attr, show in [
+            ('st_line_group',    ct == 'Line'),
+            ('st_scatter_group', ct == 'Scatter'),
+            ('st_bar_group',     ct == 'Bar'),
+            ('st_hist_group',    ct == 'Histogram'),
+            ('st_err_group',     ct == 'Errorbar'),
+            ('st_area_group',    ct == 'Area'),
+            ('st_step_group',    ct == 'Step'),
+            ('st_bubble_group',  ct == 'Bubble'),
+            ('st_polar_group',   ct == 'Polar'),
+            ('st_radar_group',   ct == 'Radar'),
+            ('st_ecdf_group',    ct == 'ECDF'),
+        ]:
+            grp = getattr(self, attr, None)
+            if grp is not None:
+                grp.setVisible(show)
+
+        # ── Column-picker visibility ───────────────────────────────────────────
         if hasattr(self, '_combo_z_widget'):
             self._combo_z_widget.setVisible(ct in ('Heatmap', 'Contour', '3D Surface'))
-        # Show Error-column picker only for Errorbar
         if hasattr(self, '_combo_err_widget'):
             self._combo_err_widget.setVisible(ct == 'Errorbar')
 
@@ -1301,137 +1348,55 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # ── Per-series option fields ──────────────────────────────────────────────
     # Each entry: (widget_attr, storage_key, default_value, widget_kind)
     # widget_kind: 'spin' | 'dbl' | 'check' | 'combo'
+    # Only per-series visual params live here (Series tab groups).
+    # Chart-mode params (bar_stacked, hist_bins, etc.) are saved at chart level
+    # via _collect_settings / _apply_settings in serialization.py.
     _SERIES_OPTION_FIELDS = [
-        # Line
-        ('line_default_style',      'line_style',       '-',       'combo'),
-        ('line_default_lw',         'line_lw',          1.5,       'dbl'),
-        ('line_default_marker',     'line_marker',      'None',    'combo'),
-        ('line_default_markersize', 'line_markersize',  6,         'spin'),
+        # Line (per-series visual) — linestyle/lw/marker/markersize from Per-Curve
         ('line_drawstyle',          'line_drawstyle',   'default', 'combo'),
-        # Scatter
+        # Scatter (per-series visual) — marker from Per-Curve
         ('scatter_size',            'sc_size',          20,        'spin'),
         ('scatter_alpha',           'sc_alpha',         0.7,       'dbl'),
-        ('scatter_marker',          'sc_marker',        'o',       'combo'),
         ('scatter_edgecolor',       'sc_edgecolor',     'none',    'combo'),
         ('scatter_lw',              'sc_lw',            0.5,       'dbl'),
         ('scatter_colorby_check',   'sc_colorby',       False,     'check'),
         ('scatter_cmap_combo',      'sc_cmap',          'viridis', 'combo'),
-        # Bar
+        # Bar (per-series visual only; stacked/horizontal saved at chart level)
         ('bar_width',               'bar_width',        0.8,       'dbl'),
         ('bar_alpha',               'bar_alpha',        1.0,       'dbl'),
         ('bar_edgecolor',           'bar_edgecolor',    'none',    'combo'),
         ('bar_edge_lw',             'bar_edge_lw',      0.5,       'dbl'),
-        ('bar_stacked',             'bar_stacked',      False,     'check'),
-        ('bar_horizontal',          'bar_horizontal',   False,     'check'),
         ('bar_colorbyval',          'bar_colorbyval',   False,     'check'),
-        # Histogram
-        ('hist_bins',               'hist_bins',        20,        'spin'),
-        ('hist_density',            'hist_density',     False,     'check'),
-        ('hist_cumulative',         'hist_cumulative',  False,     'check'),
-        ('hist_histtype',           'hist_histtype',    'bar',     'combo'),
-        ('hist_orientation',        'hist_orientation', 'vertical','combo'),
+        # Histogram (per-series visual only; bins/density/etc. saved at chart level)
         ('hist_alpha',              'hist_alpha',       0.7,       'dbl'),
         ('hist_edgecolor',          'hist_edgecolor',   'white',   'combo'),
-        # Errorbar
+        # Errorbar (per-series visual) — marker/linewidth from Per-Curve
         ('err_capsize',             'err_capsize',      4,         'spin'),
         ('err_capthick',            'err_capthick',     1.5,       'dbl'),
         ('err_elinewidth',          'err_elinewidth',   1.5,       'dbl'),
-        ('err_fmt_marker',          'err_marker',       'o',       'combo'),
         ('err_barsabove',           'err_barsabove',    False,     'check'),
-        # Heatmap / Contour / 3D
-        ('cmap_combo',              'cmap',             'viridis', 'combo'),
-        ('contour_levels',          'contour_levels',   10,        'spin'),
-        ('heat_alpha',              'heat_alpha',       1.0,       'dbl'),
-        ('heat_interpolation',      'heat_interp',      'nearest', 'combo'),
-        ('heat_colorbar',           'heat_colorbar',    True,      'check'),
-        ('heat_filled_contour',     'heat_filled',      True,      'check'),
-        ('heat_contour_lines',      'heat_contour_lines',True,     'check'),
-        ('surf_stride',             'surf_stride',      1,         'spin'),
-        ('surf_wireframe',          'surf_wireframe',   False,     'check'),
-        # Pie
-        ('pie_autopct',             'pie_autopct',      True,      'check'),
-        ('pie_shadow',              'pie_shadow',       False,     'check'),
-        ('pie_donut',               'pie_donut',        False,     'check'),
-        ('pie_explode_first',       'pie_explode',      False,     'check'),
-        ('pie_startangle',          'pie_startangle',   90.0,      'dbl'),
-        ('pie_labeldistance',       'pie_labeldist',    1.1,       'dbl'),
-        ('pie_pctdistance',         'pie_pctdist',      0.6,       'dbl'),
-        # Area
+        # Area (per-series visual only; stacked/baseline saved at chart level)
         ('area_alpha',              'area_alpha',       0.4,       'dbl'),
         ('area_lw',                 'area_lw',          0.8,       'dbl'),
-        ('area_baseline',           'area_baseline',    0.0,       'dbl'),
-        ('area_stacked',            'area_stacked',     False,     'check'),
         ('area_showline',           'area_showline',    True,      'check'),
-        # Violin
-        ('violin_show_means',       'vio_means',        True,      'check'),
-        ('violin_show_medians',     'vio_medians',      True,      'check'),
-        ('violin_show_extrema',     'vio_extrema',      False,     'check'),
-        ('violin_points',           'vio_points',       '100',     'combo'),
-        ('violin_bw',               'vio_bw',           'scott',   'combo'),
-        ('violin_vert',             'vio_vert',         True,      'check'),
-        # Boxplot
-        ('box_show_means',          'box_means',        False,     'check'),
-        ('box_show_medians',        'box_medians',      True,      'check'),
-        ('box_notch',               'box_notch',        False,     'check'),
-        ('box_showfliers',          'box_fliers',       True,      'check'),
-        ('box_vert',                'box_vert',         True,      'check'),
-        ('box_whis',                'box_whis',         1.5,       'dbl'),
-        ('box_alpha',               'box_alpha',        0.7,       'dbl'),
-        # Step
-        ('step_where',              'step_where',       'pre',     'combo'),
-        ('step_lw',                 'step_lw',          1.5,       'dbl'),
+        # Step (per-series visual only; where saved at chart level) — lw from Per-Curve
         ('step_fill',               'step_fill',        False,     'check'),
         ('step_fill_alpha',         'step_fill_alpha',  0.2,       'dbl'),
-        # Stem
-        ('stem_baseline',           'stem_baseline',    0.0,       'dbl'),
-        ('stem_markfmt',            'stem_marker',      'o',       'combo'),
-        ('stem_lw',                 'stem_lw',          1.2,       'dbl'),
-        ('stem_markersize',         'stem_markersize',  8,         'spin'),
-        # Bubble
+        # Stem — marker/lw/markersize all from Per-Curve; no type-specific opts
+        # Bubble (per-series visual) — marker from Per-Curve
         ('bubble_scale',            'bubble_scale',     200.0,     'dbl'),
         ('bubble_alpha',            'bubble_alpha',     0.6,       'dbl'),
-        ('bubble_marker',           'bubble_marker',    'o',       'combo'),
         ('bubble_edgecolor',        'bubble_edgecolor', 'none',    'combo'),
-        # Waterfall
-        ('waterfall_width',         'wf_width',         0.6,       'dbl'),
-        ('waterfall_alpha',         'wf_alpha',         1.0,       'dbl'),
-        ('waterfall_connector',     'wf_connector',     True,      'check'),
-        ('waterfall_pos_color',     'wf_pos_color',     '#2ecc71', 'color'),
-        ('waterfall_neg_color',     'wf_neg_color',     '#e74c3c', 'color'),
-        # Hist2D
-        ('hist2d_bins_x',           'h2d_bins_x',       20,        'spin'),
-        ('hist2d_bins_y',           'h2d_bins_y',       20,        'spin'),
-        ('hist2d_alpha',            'h2d_alpha',        1.0,       'dbl'),
-        ('hist2d_cmap_combo',       'h2d_cmap',         'viridis', 'combo'),
-        ('hist2d_colorbar',         'h2d_colorbar',     True,      'check'),
-        ('hist2d_log',              'h2d_log',          False,     'check'),
-        # Hexbin
-        ('hexbin_gridsize',         'hx_gridsize',      20,        'spin'),
-        ('hexbin_alpha',            'hx_alpha',         1.0,       'dbl'),
-        ('hexbin_cmap_combo',       'hx_cmap',          'viridis', 'combo'),
-        ('hexbin_colorbar',         'hx_colorbar',      True,      'check'),
-        ('hexbin_log',              'hx_log',           False,     'check'),
-        # Polar
-        ('polar_linestyle',         'pol_style',        '-',       'combo'),
-        ('polar_lw',                'pol_lw',           1.5,       'dbl'),
-        ('polar_marker',            'pol_marker',       'None',    'combo'),
+        # Polar (per-series visual) — linestyle/lw/marker from Per-Curve
         ('polar_fill',              'pol_fill',         False,     'check'),
         ('polar_fill_alpha',        'pol_fill_alpha',   0.2,       'dbl'),
-        # Radar
+        # Radar (per-series visual only; gridlevels saved at chart level) — lw from Per-Curve
         ('radar_fill',              'rad_fill',         True,      'check'),
         ('radar_fill_alpha',        'rad_fill_alpha',   0.25,      'dbl'),
-        ('radar_lw',                'rad_lw',           1.8,       'dbl'),
-        ('radar_gridlevels',        'rad_gridlevels',   5,         'spin'),
-        # ECDF
-        ('ecdf_complementary',      'ecdf_comp',        False,     'check'),
+        # ECDF (per-series visual only; complementary saved at chart level) — lw from Per-Curve
         ('ecdf_markers',            'ecdf_markers',     False,     'check'),
-        ('ecdf_lw',                 'ecdf_lw',          1.8,       'dbl'),
         ('ecdf_alpha',              'ecdf_alpha',       1.0,       'dbl'),
-        # Quiver
-        ('quiver_scale',            'qv_scale',         1.0,       'dbl'),
-        ('quiver_width',            'qv_width',         0.005,     'dbl'),
-        ('quiver_color_by_mag',     'qv_colorby',       False,     'check'),
-        ('quiver_cmap_combo',       'qv_cmap',          'viridis', 'combo'),
+        # Quiver params are chart-mode — saved at chart level, not per-series
     ]
 
     def _series_opts_key(self, row):
@@ -1443,18 +1408,20 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         return ycb.currentText() if ycb else None
 
     def _save_series_options(self):
-        """Persist the current option-group widget values into the selected series'
-        curve_styles entry.  Called by each option widget's change signal."""
+        """Persist the current option-group widget values into curve_styles for
+        whichever series is currently selected in the Per-Curve combo (curve_select).
+        The Series tab is self-contained — no dependency on the Data tab table.
+
+        IMPORTANT: always ends with update_preview() so the chart reflects the
+        new values.  Some option widgets (e.g. radar_fill) also have a direct
+        stateChanged→update_preview connection that fires *before* this method
+        (Qt delivers signals in connection order).  Without the call here the
+        chart would render with the old stored value and only update on the next
+        external event, making the checkbox appear inverted."""
         if getattr(self, '_loading_series_options', False):
             return
-        selected_rows = set(
-            idx.row() for idx in self.series_table.selectedIndexes()
-            if not self.series_table.isRowHidden(idx.row())
-        )
-        if not selected_rows:
-            return
-        row = min(selected_rows)
-        label = self._series_opts_key(row)
+        cs = getattr(self, 'curve_select', None)
+        label = cs.currentText() if cs else None
         if not label:
             return
         entry = self.curve_styles.setdefault(label, {})
@@ -1474,14 +1441,21 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             elif kind == 'color':
                 # w is the hex string stored directly on self (not a Qt widget)
                 opts[key] = w if isinstance(w, str) else _default
+        # Redraw *after* saving so the chart always reflects the current widget
+        # state, not the stale stored value from the earlier direct signal.
+        if hasattr(self, 'datasets'):
+            self.update_preview()
 
-    def _load_series_options(self, row):
-        """Push the stored per-series option values into the option-group widgets.
-        Signals are blocked so no spurious redraws fire during the load."""
-        label = self._series_opts_key(row)
-        opts = {}
+    def _load_series_options_by_label(self, label):
+        """Push stored per-series option values into the option-group widgets for
+        the given series label.  The Series tab calls this directly; the Data tab
+        wrapper (_load_series_options) resolves a row to a label first."""
+        entry = self.curve_styles.setdefault(label, {}) if label else {}
+        stored = entry.get('opts', {}) if label else {}
+        opts = {key: stored.get(key, default)
+                for _, key, default, _ in self._SERIES_OPTION_FIELDS}
         if label:
-            opts = self.curve_styles.get(label, {}).get('opts', {})
+            entry['opts'] = opts  # persist so plot_engine always finds full opts
 
         self._loading_series_options = True
         try:
@@ -1491,7 +1465,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     continue
                 val = opts.get(key, default)
                 if kind == 'color':
-                    # attr holds the hex string; the swatch button is at attr + '_btn'
                     setattr(self, attr, val)
                     btn = getattr(self, attr + '_btn', None)
                     if btn:
@@ -1511,6 +1484,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     w.blockSignals(False)
         finally:
             self._loading_series_options = False
+
+    def _load_series_options(self, row):
+        """Row-based wrapper — resolves label from the series table then delegates."""
+        label = self._series_opts_key(row)
+        self._load_series_options_by_label(label)
 
     def _connect_series_option_signals(self):
         """Connect every option-group widget to _save_series_options so that any
@@ -1532,6 +1510,24 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 if btn:
                     btn.clicked.connect(self._save_series_options)
 
+    def _on_cell_widget_focused(self, old_widget, new_widget):
+        """Called whenever application focus changes.  If the newly focused widget
+        is a cell widget embedded inside the series table, select that row so that
+        _save_series_options always targets the correct series."""
+        if new_widget is None:
+            return
+        if getattr(self, '_loading_series_options', False):
+            return
+        if not hasattr(self, 'series_table'):
+            return
+        for r in range(self.series_table.rowCount()):
+            if self.series_table.isRowHidden(r):
+                continue
+            for c in range(self.series_table.columnCount()):
+                if self.series_table.cellWidget(r, c) is new_widget:
+                    self.series_table.selectRow(r)
+                    return
+
     def _on_series_selection_changed(self):
         """Series table row selected — update the selected-series label, load that
         series' stored option values into the option-group widgets, sync the hidden
@@ -1552,14 +1548,20 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 lbl_widget.setText('▶  No series selected')
                 lbl_widget.setStyleSheet('font-weight:bold; color:#aaa; font-size:11px; padding:2px 0;')
             if hasattr(self, 'hist_group'):
-                for grp in (self.line_group, self.scatter_group, self.bar_group,
-                            self.hist_group, self.err_group, self.heat_group,
+                # Data tab chart-mode groups
+                for grp in (self.bar_group, self.hist_group, self.heat_group,
                             self.pie_group, self.area_group, self.violin_group,
                             self.boxplot_group, self.step_group, self.stem_group,
-                            self.bubble_group, self.waterfall_group, self.hist2d_group,
-                            self.hexbin_group, self.polar_group, self.radar_group,
-                            self.ecdf_group, self.quiver_group):
+                            self.waterfall_group, self.hist2d_group, self.hexbin_group,
+                            self.radar_group, self.ecdf_group, self.quiver_group):
                     grp.setVisible(False)
+                # Series tab per-series groups
+                for _attr in ('st_line_group','st_scatter_group','st_bar_group',
+                              'st_hist_group','st_err_group','st_area_group',
+                              'st_step_group','st_stem_group','st_bubble_group',
+                              'st_polar_group','st_radar_group','st_ecdf_group'):
+                    _g = getattr(self, _attr, None)
+                    if _g: _g.setVisible(False)
             if hasattr(self, '_combo_z_widget'):   self._combo_z_widget.setVisible(False)
             if hasattr(self, '_combo_err_widget'): self._combo_err_widget.setVisible(False)
             return
@@ -1584,8 +1586,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             if i >= 0:
                 self.plot_mode_combo.setCurrentIndex(i)
             self.plot_mode_combo.blockSignals(False)
-        # Load this series' stored option values into the option-group widgets
-        self._load_series_options(row)
+        # Series type options are driven by curve_select on the Series tab, not
+        # by data-tab row selection — see load_curve_style / _save_series_options.
 
     def _sync_combo_from_type(self, ct):
         """Sync the hidden chart_type_combo and option groups to the given type.
@@ -1608,14 +1610,19 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     def _on_series_row_type_changed(self, ct):
         """A Type combo inside the series table was changed directly by the user.
-        Save current options for the old type, sync combos, load options for the
-        new type, then redraw.
+        Sync combos/option-group visibility for the new type.  Only update the
+        Series tab option widgets if the changed row matches curve_select — the
+        Series tab is self-contained around curve_select and we must not push
+        a different series' opts into the widgets while curve_select shows another.
         """
         self._sync_combo_from_type(ct)
-        # Load stored options for the newly selected type on the active row
         selected_rows = set(idx.row() for idx in self.series_table.selectedIndexes())
         if selected_rows:
-            self._load_series_options(min(selected_rows))
+            row = min(selected_rows)
+            changed_label = self._series_opts_key(row)
+            cs = getattr(self, 'curve_select', None)
+            if cs and cs.currentText() == changed_label:
+                self._load_series_options_by_label(changed_label)
         if hasattr(self, 'datasets'):
             self.update_preview()
 
@@ -2349,8 +2356,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             return
         name = name.strip()
 
+        _stem = (os.path.splitext(os.path.basename(self._current_filepath))[0]
+                 if getattr(self, '_current_filepath', None) else 'untitled')
         fp, _ = QFileDialog.getSaveFileName(
-            self, 'Save Color Scheme', _get_dir(),
+            self, 'Save Color Scheme', os.path.join(_get_dir(), _stem + '.pvizc'),
             'plotviz Color Scheme (*.pvizc);;All Files (*)')
         if not fp:
             return
@@ -3283,12 +3292,23 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.curve_markersize.setValue(s.get('markersize', 6))
         self.curve_markersize.blockSignals(False)
         self.curve_marker_color = s.get('marker_color', self.curve_color)
-        # Render color swatches using stylesheet so color is always correct
         self.curve_color_label.setText('■')
         self.curve_color_label.setStyleSheet(f'color:{self.curve_color};font-size:16px;')
         self.curve_marker_color_label.setText('■')
         self.curve_marker_color_label.setStyleSheet(f'color:{self.curve_marker_color};font-size:16px;')
         self._refresh_lock_indicator()
+        # Load per-series type options (fill, alpha, linewidth, etc.) for this series
+        # and update which type-option group is visible.  Entirely driven by curve_select.
+        if curve:
+            self._load_series_options_by_label(curve)
+            for row in range(self.series_table.rowCount()):
+                item = self.series_table.item(row, 2)
+                lbl = item.text() if item else f'Series {row+1}'
+                if lbl == curve:
+                    type_cb = self.series_table.cellWidget(row, 3)
+                    if type_cb:
+                        self._update_option_group_visibility(type_cb.currentText())
+                    break
 
     def save_curve_style(self, lock_color=False):
         curve = self.curve_select.currentText()
@@ -3301,8 +3321,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 'linewidth': self.curve_linewidth.value(),
                 'markersize': self.curve_markersize.value(),
                 'marker_color': self.curve_marker_color,
-                # Preserve existing lock; only set True when caller explicitly requests it
                 'color_locked': existing.get('color_locked', False) or lock_color,
+                # Preserve per-series type options so changing color/marker doesn't wipe them
+                'opts': existing.get('opts', {}),
             }
             self._refresh_lock_indicator()
             self.update_preview()

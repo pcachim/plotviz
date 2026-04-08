@@ -97,12 +97,14 @@ class PlotEngineMixin:
             if ct == 'Histogram':
                 for i, (xd, yd, lbl, _) in enumerate(series):
                     s = self.curve_styles.get(lbl, {})
-                    ec_val = self.hist_edgecolor.currentText()
+                    o = s.get('opts', {})
+                    ec_val = o.get('hist_edgecolor', self.hist_edgecolor.currentText())
                     if ec_val == 'auto': ec_val = s.get('color', C[i])
+                    h_alpha = o.get('hist_alpha', self.hist_alpha.value())
                     if self._is_categorical(yd):
                         vals, counts = np.unique(yd, return_counts=True)
                         ax.bar(vals, counts, label=lbl, color=s.get('color', C[i]),
-                               alpha=self.hist_alpha.value(),
+                               alpha=h_alpha,
                                edgecolor=ec_val if ec_val != 'none' else None)
                         ax.tick_params(axis='x', rotation=45)
                     else:
@@ -111,7 +113,7 @@ class PlotEngineMixin:
                                 cumulative=self.hist_cumulative.isChecked(),
                                 histtype=self.hist_histtype.currentText(),
                                 orientation=self.hist_orientation.currentText(),
-                                alpha=self.hist_alpha.value(),
+                                alpha=h_alpha,
                                 edgecolor=ec_val if ec_val != 'none' else None,
                                 label=lbl, color=s.get('color', C[i]))
 
@@ -260,15 +262,16 @@ class PlotEngineMixin:
                 for i, (xd, yd, lbl, _) in enumerate(series):
                     if self._is_categorical(xd): continue
                     s = self.curve_styles.get(lbl, {})
+                    o = s.get('opts', {})
                     color = s.get('color', C[i])
-                    ls = self.polar_linestyle.currentText()
-                    mk = self.polar_marker.currentText(); mk = None if mk == 'None' else mk
+                    ls = s.get('linestyle', '-') or '-'
+                    mk = s.get('marker', 'None'); mk = None if mk in ('None', 'none', '') else mk
                     theta = xd.astype(float); r = yd.astype(float)
                     if ls != 'none':
                         ax.plot(theta, r, linestyle=ls, color=color,
-                                linewidth=self.polar_lw.value(), marker=mk, label=lbl)
-                    if self.polar_fill.isChecked():
-                        ax.fill(theta, r, alpha=self.polar_fill_alpha.value(), color=color)
+                                linewidth=s.get('linewidth', 1.5), marker=mk, label=lbl)
+                    if o.get('pol_fill', self.polar_fill.isChecked()):
+                        ax.fill(theta, r, alpha=o.get('pol_fill_alpha', self.polar_fill_alpha.value()), color=color)
 
             elif ct == 'Radar':
                 if series:
@@ -285,24 +288,27 @@ class PlotEngineMixin:
                         ax.set_yticks(np.linspace(0, vmax, self.radar_gridlevels.value()+1)[1:])
                         for i, (xd_s, yd_s, lbl_s, _) in enumerate(series):
                             s = self.curve_styles.get(lbl_s, {})
+                            o_s = s.get('opts', {})
                             color = s.get('color', C[i])
                             vals = list(yd_s.astype(float)) + [float(yd_s[0])]
-                            ax.plot(angles, vals, color=color, linewidth=self.radar_lw.value(), label=lbl_s)
-                            if self.radar_fill.isChecked():
-                                ax.fill(angles, vals, color=color, alpha=self.radar_fill_alpha.value())
+                            ax.plot(angles, vals, color=color, linewidth=s.get('linewidth', 1.8), label=lbl_s)
+                            if o_s.get('rad_fill', self.radar_fill.isChecked()):
+                                ax.fill(angles, vals, color=color, alpha=o_s.get('rad_fill_alpha', self.radar_fill_alpha.value()))
 
             elif ct == 'ECDF':
                 for i, (xd, yd, lbl, _) in enumerate(series):
                     if self._is_categorical(yd): continue
                     s = self.curve_styles.get(lbl, {})
+                    o = s.get('opts', {})
                     color = s.get('color', C[i])
                     sorted_d = np.sort(yd.astype(float))
                     ecdf = np.arange(1, len(sorted_d)+1) / len(sorted_d)
                     if self.ecdf_complementary.isChecked(): ecdf = 1.0 - ecdf
                     ax.step(sorted_d, ecdf, color=color,
-                            linewidth=self.ecdf_lw.value(), alpha=self.ecdf_alpha.value(),
+                            linewidth=s.get('linewidth', 1.8),
+                            alpha=o.get('ecdf_alpha', self.ecdf_alpha.value()),
                             label=lbl, where='post')
-                    if self.ecdf_markers.isChecked():
+                    if o.get('ecdf_markers', self.ecdf_markers.isChecked()):
                         ax.scatter(sorted_d, ecdf, color=color, s=12, zorder=4)
                 ax.set_ylim(-0.02, 1.02); ax.set_ylabel('F(x)')
 
@@ -316,12 +322,16 @@ class PlotEngineMixin:
                         V = self.datasets[vc].astype(float)
                         n = min(len(xd), len(yd), len(U), len(V))
                         sc = self.quiver_scale.value()
-                        ax.quiver(xd[:n].astype(float), yd[:n].astype(float), U[:n], V[:n],
-                                  np.hypot(U[:n], V[:n]) if self.quiver_color_by_mag.isChecked() else None,
-                                  cmap=_cmap('quiver_cmap_combo') if self.quiver_color_by_mag.isChecked() else None,
-                                  scale=sc if sc != 1.0 else None,
-                                  scale_units='xy' if sc != 1.0 else None,
-                                  width=self.quiver_width.value(), alpha=0.85)
+                        _x, _y = xd[:n].astype(float), yd[:n].astype(float)
+                        _U, _V = U[:n].astype(float), V[:n].astype(float)
+                        _kw = dict(scale=sc if sc != 1.0 else None,
+                                   scale_units='xy' if sc != 1.0 else None,
+                                   width=self.quiver_width.value(), alpha=0.85)
+                        if self.quiver_color_by_mag.isChecked():
+                            ax.quiver(_x, _y, _U, _V, np.hypot(_U, _V),
+                                      cmap=_cmap('quiver_cmap_combo'), **_kw)
+                        else:
+                            ax.quiver(_x, _y, _U, _V, **_kw)
             return
 
         # ── Per-series mixable types ─────────────────────────────────────────
@@ -380,17 +390,17 @@ class PlotEngineMixin:
             o = s.get('opts', {})
 
             if sct == 'Line':
-                ls = s.get('linestyle') or o.get('line_style', self.line_default_style.currentText())
+                ls = s.get('linestyle', '-') or '-'
                 if ls in ('default', ''): ls = '-'
-                mk = s.get('marker') or o.get('line_marker', self.line_default_marker.currentText())
+                mk = s.get('marker', 'None')
                 if mk in ('default', 'None', 'none', ''): mk = None
                 if ls == 'none' and mk is None: mk = 'o'
-                lw = s.get('linewidth', o.get('line_lw', self.line_default_lw.value()))
+                lw = s.get('linewidth', 1.5)
                 mk_color = s.get('marker_color', color)
                 xplot = _cat_xplot(xd) if is_cat else xd
                 ds = o.get('line_drawstyle', self.line_drawstyle.currentText())
                 plot_kw = dict(label=lbl, color=color, linestyle=ls, linewidth=lw,
-                               markersize=s.get('markersize', o.get('line_markersize', self.line_default_markersize.value())),
+                               markersize=s.get('markersize', 6),
                                drawstyle=ds if ds != 'default' else 'default')
                 if mk:
                     plot_kw['marker'] = mk
@@ -410,7 +420,7 @@ class PlotEngineMixin:
 
             elif sct == 'Scatter':
                 xplot = _cat_xplot(xd) if is_cat else xd
-                mk = o.get('sc_marker', self.scatter_marker.currentText()); mk = 'o' if mk == 'None' else mk
+                mk = s.get('marker', 'o'); mk = 'o' if mk in ('None', 'none', '') else mk
                 mk_color = s.get('marker_color', color)
                 sc_ec = o.get('sc_edgecolor', self.scatter_edgecolor.currentText())
                 if sc_ec == 'auto': sc_ec = mk_color
@@ -520,7 +530,7 @@ class PlotEngineMixin:
                 err  = self.datasets.get(ec)  if ec      != '(none)' else None
                 xerr = self.datasets.get(xerr_c) if xerr_c != '(none)' else None
                 xplot = _cat_xplot(xd) if is_cat else xd
-                mk = o.get('err_marker', self.err_fmt_marker.currentText()); mk = 'o' if mk == 'None' else mk
+                mk = s.get('marker', 'o'); mk = 'o' if mk in ('None', 'none', '') else mk
                 ax.errorbar(xplot, yd, yerr=err, xerr=xerr, label=lbl,
                             capsize=o.get('err_capsize',   self.err_capsize.value()),
                             capthick=o.get('err_capthick', self.err_capthick.value()),
@@ -533,20 +543,20 @@ class PlotEngineMixin:
                 if self._is_categorical(yd): continue
                 xplot = _cat_xplot(xd) if is_cat else xd
                 where = self.step_where.currentText()
-                lw = s.get('linewidth', self.step_lw.value())
+                lw = s.get('linewidth', 1.5)
                 ax.step(xplot, yd, where=where, label=lbl, color=color, linewidth=lw)
-                if self.step_fill.isChecked():
+                if o.get('step_fill', self.step_fill.isChecked()):
                     ax.fill_between(xplot, yd, step=where,
-                                    alpha=self.step_fill_alpha.value(), color=color)
+                                    alpha=o.get('step_fill_alpha', self.step_fill_alpha.value()), color=color)
 
             elif sct == 'Stem':
                 if self._is_categorical(yd): continue
                 xplot = _cat_xplot(xd) if is_cat else xd
                 baseline = self.stem_baseline.value()
-                mk = self.stem_markfmt.currentText()
+                mk = s.get('marker', 'o')
                 mk_color = s.get('marker_color', color)
-                lw = self.stem_lw.value()
-                ms = self.stem_markersize.value()
+                lw = s.get('linewidth', 1.2)
+                ms = s.get('markersize', 8)
                 markerline, stemlines, baseline_line = ax.stem(
                     xplot, yd, linefmt='-', markerfmt=mk,
                     basefmt='k-', label=lbl, bottom=baseline)
@@ -557,23 +567,24 @@ class PlotEngineMixin:
                 if self._is_categorical(yd): continue
                 xplot = _cat_xplot(xd) if is_cat else xd
                 sc_name = self.bubble_size_combo.currentText()
+                b_scale = o.get('bubble_scale', self.bubble_scale.value())
                 if sc_name != '(uniform)' and sc_name in self.datasets:
                     raw_s = self.datasets[sc_name].astype(float)
                     n = min(len(xplot), len(yd), len(raw_s))
                     raw_s = raw_s[:n]
                     mn, mx = np.nanmin(np.abs(raw_s)), np.nanmax(np.abs(raw_s))
                     if mx > mn:
-                        sizes = 10 + (np.abs(raw_s) - mn) / (mx - mn) * self.bubble_scale.value()
+                        sizes = 10 + (np.abs(raw_s) - mn) / (mx - mn) * b_scale
                     else:
-                        sizes = np.full(n, self.bubble_scale.value() / 2)
+                        sizes = np.full(n, b_scale / 2)
                 else:
                     n = min(len(xplot), len(yd))
-                    sizes = self.bubble_scale.value() / 4
+                    sizes = b_scale / 4
                 mk_color = s.get('marker_color', color)
-                mk = self.bubble_marker.currentText(); mk = 'o' if mk == 'None' else mk
-                b_ec = self.bubble_edgecolor.currentText()
+                mk = s.get('marker', 'o'); mk = 'o' if mk in ('None', 'none', '') else mk
+                b_ec = o.get('bubble_edgecolor', self.bubble_edgecolor.currentText())
                 if b_ec == 'auto': b_ec = mk_color
-                ax.scatter(xplot[:n], yd[:n], s=sizes, alpha=self.bubble_alpha.value(),
+                ax.scatter(xplot[:n], yd[:n], s=sizes, alpha=o.get('bubble_alpha', self.bubble_alpha.value()),
                            color=mk_color, edgecolors=b_ec if b_ec != 'none' else 'none',
                            marker=mk, label=lbl)
 
@@ -976,7 +987,7 @@ class PlotEngineMixin:
             # Use title_font as the global chart font (applies to tick labels too)
             chart_font = self.title_font.currentText()
 
-            with matplotlib.rc_context({'font.family': chart_font}):
+            with matplotlib.rc_context({'font.family': chart_font, 'text.usetex': False}):
                 self.canvas.figure.clear()
                 self.canvas._border_rect = None   # figure.clear() removes all artists
                 self.canvas.figure.patch.set_facecolor(self.chart_bg_color)
@@ -1259,7 +1270,7 @@ class PlotEngineMixin:
                 self.refresh_annotation_list()
 
         except Exception as e:
-            print(f'Preview error: {e}'); traceback.print_exc()
+            traceback.print_exc()
 
     # ═══════════════════════════════════════════════════════════════════════════
     # EXPORT

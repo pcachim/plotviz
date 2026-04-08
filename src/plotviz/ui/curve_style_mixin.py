@@ -95,6 +95,22 @@ class CurveStyleMixin:
         self.curve_marker_color_label.setText('■')
         self.curve_marker_color_label.setStyleSheet(f'color:{self.curve_marker_color};font-size:16px;')
         self._refresh_lock_indicator()
+        # Load this series' per-type option values (alpha, linewidth, etc.) and
+        # update which type-option group is visible.  Entirely driven by curve_select
+        # — no dependency on the Data tab's series table.
+        if curve:
+            if hasattr(self, '_load_series_options_by_label'):
+                self._load_series_options_by_label(curve)
+            # Show the correct type-option group for this series' chart type
+            if hasattr(self, 'series_table') and hasattr(self, '_update_option_group_visibility'):
+                for row in range(self.series_table.rowCount()):
+                    item = self.series_table.item(row, 2)
+                    lbl = item.text() if item else f'Series {row+1}'
+                    if lbl == curve:
+                        type_cb = self.series_table.cellWidget(row, 3)
+                        if type_cb:
+                            self._update_option_group_visibility(type_cb.currentText())
+                        break
 
     def save_curve_style(self, lock_color=False):
         curve = self.curve_select.currentText()
@@ -109,6 +125,8 @@ class CurveStyleMixin:
                 'marker_color': self.curve_marker_color,
                 # Preserve existing lock; only set True when caller explicitly requests it
                 'color_locked': existing.get('color_locked', False) or lock_color,
+                # Preserve per-series type options (alpha, lw, etc.) set by _save_series_options
+                'opts': existing.get('opts', {}),
             }
             self._refresh_lock_indicator()
             self.update_preview()

@@ -81,8 +81,7 @@ class FitMixin:
                     self.series_table.setCellWidget(row, col_idx, cb)
                 self.series_table.setItem(row, 2, QTableWidgetItem(nm))
                 type_cb = QComboBox(); type_cb.addItems(PER_SERIES_TYPES)
-                type_cb.currentIndexChanged.connect(self.update_preview)
-                type_cb.currentIndexChanged.connect(self._on_series_selection_changed)
+                type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
                 self.series_table.setCellWidget(row, 3, type_cb)
                 # ── Place fit curve on the same subplot as its source series ──
                 plot_spin = QSpinBox(); plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))

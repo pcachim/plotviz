@@ -271,11 +271,11 @@ class TabBuildersMixin:
         pal_btn_row.addStretch()
         layout.addLayout(pal_btn_row)
         pal_io_row = QHBoxLayout(); pal_io_row.setSpacing(4)
-        btn_import_pal = QPushButton('📥 Import palettes…')
+        btn_import_pal = QPushButton('📥 Load palette…')
         btn_import_pal.setToolTip('Load a .pvizp palette bundle')
         btn_import_pal.clicked.connect(self._import_palette_bundle)
         pal_io_row.addWidget(btn_import_pal)
-        btn_export_pal = QPushButton('📤 Export palettes…')
+        btn_export_pal = QPushButton('📤 Save palette…')
         btn_export_pal.setToolTip('Save custom palettes as a .pvizp bundle')
         btn_export_pal.clicked.connect(self._export_palette_bundle)
         pal_io_row.addWidget(btn_export_pal)
@@ -321,14 +321,14 @@ class TabBuildersMixin:
         layout.addLayout(sw_detail)
 
         cs_btn_row = QHBoxLayout(); cs_btn_row.setSpacing(4)
-        btn_cs_save = QPushButton('💾 Save scheme…')
-        btn_cs_save.setToolTip('Save current colors as a .pvizc color scheme')
-        btn_cs_save.clicked.connect(self._save_color_scheme)
-        cs_btn_row.addWidget(btn_cs_save)
         btn_cs_load = QPushButton('📂 Load scheme…')
         btn_cs_load.setToolTip('Load a .pvizc color scheme file')
         btn_cs_load.clicked.connect(self._load_color_scheme)
         cs_btn_row.addWidget(btn_cs_load)
+        btn_cs_save = QPushButton('💾 Save scheme…')
+        btn_cs_save.setToolTip('Save current colors as a .pvizc color scheme')
+        btn_cs_save.clicked.connect(self._save_color_scheme)
+        cs_btn_row.addWidget(btn_cs_save)
         cs_btn_row.addStretch()
         layout.addLayout(cs_btn_row)
 
@@ -474,44 +474,14 @@ class TabBuildersMixin:
             for w in widgets: h.addWidget(w)
             return h
 
-        # ── Line ──────────────────────────────────────────────────────────────
-        self.line_group = QGroupBox('Line Options')
-        lg = QVBoxLayout(self.line_group)
-        lg.addLayout(_row(QLabel('Default style:'), self._make_linestyle_combo('line_default_style', '-')))
-        lg.addLayout(_row(QLabel('Line width:'), self._make_dbl_spin('line_default_lw', 0.5, 10.0, 1.5, 0.5)))
-        lg.addLayout(_row(QLabel('Marker:'), self._make_marker_combo('line_default_marker', 'None')))
-        lg.addLayout(_row(QLabel('Marker size:'), self._make_spin('line_default_markersize', 1, 30, 6)))
-        self.line_drawstyle = QComboBox(); self.line_drawstyle.addItems(['default', 'steps-pre', 'steps-post', 'steps-mid'])
-        self.line_drawstyle.currentTextChanged.connect(self.update_preview)
-        lg.addLayout(_row(QLabel('Draw style:'), self.line_drawstyle))
-        layout.addWidget(self.line_group)
-
-        # ── Scatter ───────────────────────────────────────────────────────────
-        self.scatter_group = QGroupBox('Scatter Options')
-        sg = QVBoxLayout(self.scatter_group)
-        sg.addLayout(_row(QLabel('Point size:'), self._make_spin('scatter_size', 1, 500, 20)))
-        sg.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('scatter_alpha', 0.05, 1.0, 0.7, 0.05)))
-        sg.addLayout(_row(QLabel('Marker:'), self._make_marker_combo('scatter_marker', 'o')))
-        sg.addLayout(_row(QLabel('Edge color:'), self._make_edgecolor_combo('scatter_edgecolor', 'none')))
-        sg.addLayout(_row(QLabel('Edge width:'), self._make_dbl_spin('scatter_lw', 0.0, 5.0, 0.5, 0.25)))
-        self.scatter_colorby_check = QCheckBox('Color by Z column')
-        self.scatter_colorby_check.stateChanged.connect(self.update_preview); sg.addWidget(self.scatter_colorby_check)
-        sg.addLayout(_row(QLabel('Colormap:'), self._make_combo('scatter_cmap_combo', _CMAP_LIST)))
-        layout.addWidget(self.scatter_group)
-
-        # ── Bar ───────────────────────────────────────────────────────────────
+        # ── Bar (chart-mode options only) ─────────────────────────────────────
         self.bar_group = QGroupBox('Bar Options')
         bg = QVBoxLayout(self.bar_group)
-        bg.addLayout(_row(QLabel('Width:'), self._make_dbl_spin('bar_width', 0.05, 1.0, 0.8, 0.05)))
-        bg.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('bar_alpha', 0.05, 1.0, 1.0, 0.05)))
-        bg.addLayout(_row(QLabel('Edge color:'), self._make_edgecolor_combo('bar_edgecolor', 'none')))
-        bg.addLayout(_row(QLabel('Edge width:'), self._make_dbl_spin('bar_edge_lw', 0.0, 4.0, 0.5, 0.25)))
         self.bar_stacked    = QCheckBox('Stacked');    self.bar_stacked.stateChanged.connect(self.update_preview);    bg.addWidget(self.bar_stacked)
         self.bar_horizontal = QCheckBox('Horizontal'); self.bar_horizontal.stateChanged.connect(self.update_preview); bg.addWidget(self.bar_horizontal)
-        self.bar_colorbyval = QCheckBox('Color bars by value'); self.bar_colorbyval.stateChanged.connect(self.update_preview); bg.addWidget(self.bar_colorbyval)
         layout.addWidget(self.bar_group)
 
-        # ── Histogram ─────────────────────────────────────────────────────────
+        # ── Histogram (chart-mode options only) ───────────────────────────────
         self.hist_group = QGroupBox('Histogram Options')
         hg = QVBoxLayout(self.hist_group)
         hg.addLayout(_row(QLabel('Bins:'), self._make_spin('hist_bins', 2, 500, 20)))
@@ -519,20 +489,7 @@ class TabBuildersMixin:
         self.hist_cumulative = QCheckBox('Cumulative');           self.hist_cumulative.stateChanged.connect(self.update_preview); hg.addWidget(self.hist_cumulative)
         hg.addLayout(_row(QLabel('Type:'), self._make_combo('hist_histtype', ['bar','barstacked','step','stepfilled'])))
         hg.addLayout(_row(QLabel('Orientation:'), self._make_combo('hist_orientation', ['vertical','horizontal'])))
-        hg.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('hist_alpha', 0.05, 1.0, 0.7, 0.05)))
-        hg.addLayout(_row(QLabel('Edge color:'), self._make_edgecolor_combo('hist_edgecolor', 'white')))
         layout.addWidget(self.hist_group)
-
-        # ── Errorbar ──────────────────────────────────────────────────────────
-        self.err_group = QGroupBox('Errorbar Options')
-        eg = QVBoxLayout(self.err_group)
-        eg.addLayout(_row(QLabel('Cap size:'),    self._make_spin('err_capsize', 0, 20, 4)))
-        eg.addLayout(_row(QLabel('Cap thick:'),   self._make_dbl_spin('err_capthick', 0.5, 8.0, 1.5, 0.5)))
-        eg.addLayout(_row(QLabel('Line width:'),  self._make_dbl_spin('err_elinewidth', 0.5, 8.0, 1.5, 0.5)))
-        eg.addLayout(_row(QLabel('Marker:'),      self._make_marker_combo('err_fmt_marker', 'o')))
-        eg.addLayout(_row(QLabel('X errors:'), self._make_combo('err_xerr_combo', ['(none)'])))  # populated in update_lists
-        self.err_barsabove = QCheckBox('Bars above line'); self.err_barsabove.stateChanged.connect(self.update_preview); eg.addWidget(self.err_barsabove)
-        layout.addWidget(self.err_group)
 
         # ── Heatmap / Contour / 3D Surface ────────────────────────────────────
         self.heat_group = QGroupBox('Heatmap / Contour / 3D Options')
@@ -561,14 +518,11 @@ class TabBuildersMixin:
         pg.addLayout(_row(QLabel('Pct dist:'),    self._make_dbl_spin('pie_pctdistance', 0.3, 1.5, 0.6, 0.05)))
         layout.addWidget(self.pie_group)
 
-        # ── Area ──────────────────────────────────────────────────────────────
+        # ── Area (chart-mode options only) ────────────────────────────────────
         self.area_group = QGroupBox('Area Options')
         ag = QVBoxLayout(self.area_group)
-        ag.addLayout(_row(QLabel('Fill alpha:'), self._make_dbl_spin('area_alpha', 0.05, 1.0, 0.4, 0.05)))
-        ag.addLayout(_row(QLabel('Line width:'), self._make_dbl_spin('area_lw', 0.0, 5.0, 0.8, 0.25)))
-        ag.addLayout(_row(QLabel('Baseline:'),   self._make_dbl_spin('area_baseline', -1e6, 1e6, 0.0, 1.0)))
-        self.area_stacked  = QCheckBox('Stacked');        self.area_stacked.stateChanged.connect(self.update_preview);  ag.addWidget(self.area_stacked)
-        self.area_showline = QCheckBox('Show edge line'); self.area_showline.setChecked(True); self.area_showline.stateChanged.connect(self.update_preview); ag.addWidget(self.area_showline)
+        ag.addLayout(_row(QLabel('Baseline:'), self._make_dbl_spin('area_baseline', -1e6, 1e6, 0.0, 1.0)))
+        self.area_stacked = QCheckBox('Stacked'); self.area_stacked.stateChanged.connect(self.update_preview); ag.addWidget(self.area_stacked)
         layout.addWidget(self.area_group)
 
         # ── Violin ────────────────────────────────────────────────────────────
@@ -594,33 +548,17 @@ class TabBuildersMixin:
         bxg.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('box_alpha', 0.05, 1.0, 0.7, 0.05)))
         layout.addWidget(self.boxplot_group)
 
-        # ── Step ──────────────────────────────────────────────────────────────
+        # ── Step (chart-mode options only) ────────────────────────────────────
         self.step_group = QGroupBox('Step Options')
         stg = QVBoxLayout(self.step_group)
         stg.addLayout(_row(QLabel('Where:'), self._make_combo('step_where', ['pre','post','mid'])))
-        stg.addLayout(_row(QLabel('Line width:'), self._make_dbl_spin('step_lw', 0.5, 8.0, 1.5, 0.5)))
-        self.step_fill = QCheckBox('Fill under'); self.step_fill.stateChanged.connect(self.update_preview); stg.addWidget(self.step_fill)
-        stg.addLayout(_row(QLabel('Fill alpha:'), self._make_dbl_spin('step_fill_alpha', 0.05, 1.0, 0.2, 0.05)))
         layout.addWidget(self.step_group)
 
-        # ── Stem ──────────────────────────────────────────────────────────────
+        # ── Stem (chart-mode options only) ────────────────────────────────────
         self.stem_group = QGroupBox('Stem Options')
         smg = QVBoxLayout(self.stem_group)
         smg.addLayout(_row(QLabel('Baseline:'), self._make_dbl_spin('stem_baseline', -1e9, 1e9, 0.0, 0.1)))
-        smg.addLayout(_row(QLabel('Marker:'),   self._make_marker_combo('stem_markfmt', 'o')))
-        smg.addLayout(_row(QLabel('Line width:'), self._make_dbl_spin('stem_lw', 0.5, 6.0, 1.2, 0.25)))
-        smg.addLayout(_row(QLabel('Marker size:'), self._make_spin('stem_markersize', 2, 30, 8)))
         layout.addWidget(self.stem_group)
-
-        # ── Bubble ────────────────────────────────────────────────────────────
-        self.bubble_group = QGroupBox('Bubble Options')
-        bug = QVBoxLayout(self.bubble_group)
-        bug.addLayout(_row(QLabel('Size col:'), self._make_col_combo('bubble_size_combo', '(uniform)')))
-        bug.addLayout(_row(QLabel('Scale:'),    self._make_dbl_spin('bubble_scale', 1, 5000, 200, 50)))
-        bug.addLayout(_row(QLabel('Alpha:'),    self._make_dbl_spin('bubble_alpha', 0.05, 1.0, 0.6, 0.05)))
-        bug.addLayout(_row(QLabel('Marker:'),   self._make_marker_combo('bubble_marker', 'o')))
-        bug.addLayout(_row(QLabel('Edge color:'), self._make_edgecolor_combo('bubble_edgecolor', 'none')))
-        layout.addWidget(self.bubble_group)
 
         # ── Waterfall ─────────────────────────────────────────────────────────
         self.waterfall_group = QGroupBox('Waterfall Options')
@@ -653,32 +591,16 @@ class TabBuildersMixin:
         self.hexbin_log      = QCheckBox('Log scale counts'); self.hexbin_log.stateChanged.connect(self.update_preview); hxg.addWidget(self.hexbin_log)
         layout.addWidget(self.hexbin_group)
 
-        # ── Polar ─────────────────────────────────────────────────────────────
-        self.polar_group = QGroupBox('Polar Options')
-        plg = QVBoxLayout(self.polar_group)
-        plg.addLayout(_row(QLabel('Line style:'), self._make_linestyle_combo('polar_linestyle', '-')))
-        plg.addLayout(_row(QLabel('Line width:'), self._make_dbl_spin('polar_lw', 0.5, 8.0, 1.5, 0.5)))
-        plg.addLayout(_row(QLabel('Marker:'),     self._make_marker_combo('polar_marker', 'None')))
-        self.polar_fill = QCheckBox('Fill'); self.polar_fill.stateChanged.connect(self.update_preview); plg.addWidget(self.polar_fill)
-        plg.addLayout(_row(QLabel('Fill alpha:'), self._make_dbl_spin('polar_fill_alpha', 0.05, 1.0, 0.2, 0.05)))
-        layout.addWidget(self.polar_group)
-
-        # ── Radar / Spider ────────────────────────────────────────────────────
+        # ── Radar / Spider (chart-mode options only) ──────────────────────────
         self.radar_group = QGroupBox('Radar / Spider Options')
         rdr = QVBoxLayout(self.radar_group)
-        self.radar_fill = QCheckBox('Fill'); self.radar_fill.setChecked(True); self.radar_fill.stateChanged.connect(self.update_preview); rdr.addWidget(self.radar_fill)
-        rdr.addLayout(_row(QLabel('Fill alpha:'),  self._make_dbl_spin('radar_fill_alpha', 0.05, 1.0, 0.25, 0.05)))
-        rdr.addLayout(_row(QLabel('Line width:'),  self._make_dbl_spin('radar_lw', 0.5, 6.0, 1.8, 0.25)))
         rdr.addLayout(_row(QLabel('Grid levels:'), self._make_spin('radar_gridlevels', 3, 10, 5)))
         layout.addWidget(self.radar_group)
 
-        # ── ECDF ──────────────────────────────────────────────────────────────
+        # ── ECDF (chart-mode options only) ────────────────────────────────────
         self.ecdf_group = QGroupBox('ECDF Options')
         ecg = QVBoxLayout(self.ecdf_group)
         self.ecdf_complementary = QCheckBox('Complementary (1 − F)'); self.ecdf_complementary.stateChanged.connect(self.update_preview); ecg.addWidget(self.ecdf_complementary)
-        self.ecdf_markers       = QCheckBox('Show markers');           self.ecdf_markers.stateChanged.connect(self.update_preview);       ecg.addWidget(self.ecdf_markers)
-        ecg.addLayout(_row(QLabel('Line width:'), self._make_dbl_spin('ecdf_lw', 0.5, 6.0, 1.8, 0.25)))
-        ecg.addLayout(_row(QLabel('Alpha:'),      self._make_dbl_spin('ecdf_alpha', 0.05, 1.0, 1.0, 0.05)))
         layout.addWidget(self.ecdf_group)
 
         # ── Quiver ────────────────────────────────────────────────────────────
@@ -686,8 +608,8 @@ class TabBuildersMixin:
         qvg = QVBoxLayout(self.quiver_group)
         qvg.addLayout(_row(QLabel('U col (dx):'), self._make_col_combo('quiver_u_combo', '(none)')))
         qvg.addLayout(_row(QLabel('V col (dy):'), self._make_col_combo('quiver_v_combo', '(none)')))
-        qvg.addLayout(_row(QLabel('Scale:'),      self._make_dbl_spin('quiver_scale', 0.01, 1000, 1.0, 0.1)))
-        qvg.addLayout(_row(QLabel('Arrow width:'), self._make_dbl_spin('quiver_width', 0.001, 0.05, 0.005, 0.001)))
+        qvg.addLayout(_row(QLabel('Scale:'),      self._make_dbl_spin('quiver_scale', 0.01, 1000, 1.0, 0.01)))
+        qvg.addLayout(_row(QLabel('Arrow width:'), self._make_dbl_spin('quiver_width', 0.001, 0.05, 0.005, 0.001, decimals=3)))
         self.quiver_color_by_mag = QCheckBox('Color by magnitude'); self.quiver_color_by_mag.stateChanged.connect(self.update_preview); qvg.addWidget(self.quiver_color_by_mag)
         qvg.addLayout(_row(QLabel('Colormap:'), self._make_combo('quiver_cmap_combo', _CMAP_LIST)))
         layout.addWidget(self.quiver_group)
@@ -697,8 +619,9 @@ class TabBuildersMixin:
         w = QSpinBox(); w.setRange(lo, hi); w.setValue(val)
         setattr(self, attr, w); w.valueChanged.connect(self.update_preview); return w
 
-    def _make_dbl_spin(self, attr, lo, hi, val, step):
+    def _make_dbl_spin(self, attr, lo, hi, val, step, decimals=None):
         w = QDoubleSpinBox(); w.setRange(lo, hi); w.setValue(val); w.setSingleStep(step)
+        if decimals is not None: w.setDecimals(decimals)
         setattr(self, attr, w); w.valueChanged.connect(self.update_preview); return w
 
     def _make_combo(self, attr, items):
@@ -1309,6 +1232,121 @@ class TabBuildersMixin:
         cwm.addWidget(QLabel('Color:')); cwm.addWidget(self.curve_marker_color_label)
         cwm.addWidget(btn_mc)
         cwm.addStretch(); layout.addLayout(cwm)
+
+        def _srow(*widgets):
+            h = QHBoxLayout()
+            for w in widgets: h.addWidget(w)
+            return h
+
+        # Line series options
+        self.st_line_group = QWidget()
+        stlg = QVBoxLayout(self.st_line_group); stlg.setContentsMargins(0, 0, 0, 0); stlg.setSpacing(4)
+        self.line_drawstyle = QComboBox()
+        self.line_drawstyle.addItems(['default', 'steps-pre', 'steps-post', 'steps-mid'])
+        self.line_drawstyle.currentTextChanged.connect(self.update_preview)
+        stlg.addLayout(_srow(QLabel('Draw style:'), self.line_drawstyle))
+        layout.addWidget(self.st_line_group)
+
+        # Scatter series options
+        self.st_scatter_group = QWidget()
+        stsg = QVBoxLayout(self.st_scatter_group); stsg.setContentsMargins(0, 0, 0, 0); stsg.setSpacing(4)
+        stsg.addLayout(_srow(QLabel('Point size:'), self._make_spin('scatter_size', 1, 500, 20)))
+        stsg.addLayout(_srow(QLabel('Alpha:'),       self._make_dbl_spin('scatter_alpha', 0.05, 1.0, 0.7, 0.05)))
+        stsg.addLayout(_srow(QLabel('Edge color:'),  self._make_edgecolor_combo('scatter_edgecolor', 'none')))
+        stsg.addLayout(_srow(QLabel('Edge width:'),  self._make_dbl_spin('scatter_lw', 0.0, 5.0, 0.5, 0.25)))
+        self.scatter_colorby_check = QCheckBox('Color by Z column')
+        self.scatter_colorby_check.stateChanged.connect(self.update_preview)
+        stsg.addWidget(self.scatter_colorby_check)
+        stsg.addLayout(_srow(QLabel('Colormap:'), self._make_combo('scatter_cmap_combo', _CMAP_LIST)))
+        layout.addWidget(self.st_scatter_group)
+
+        # Bar series options
+        self.st_bar_group = QWidget()
+        stbg = QVBoxLayout(self.st_bar_group); stbg.setContentsMargins(0, 0, 0, 0); stbg.setSpacing(4)
+        stbg.addLayout(_srow(QLabel('Width:'),      self._make_dbl_spin('bar_width', 0.05, 1.0, 0.8, 0.05)))
+        stbg.addLayout(_srow(QLabel('Alpha:'),      self._make_dbl_spin('bar_alpha', 0.05, 1.0, 1.0, 0.05)))
+        stbg.addLayout(_srow(QLabel('Edge color:'), self._make_edgecolor_combo('bar_edgecolor', 'none')))
+        stbg.addLayout(_srow(QLabel('Edge width:'), self._make_dbl_spin('bar_edge_lw', 0.0, 4.0, 0.5, 0.25)))
+        self.bar_colorbyval = QCheckBox('Color bars by value')
+        self.bar_colorbyval.stateChanged.connect(self.update_preview)
+        stbg.addWidget(self.bar_colorbyval)
+        layout.addWidget(self.st_bar_group)
+
+        # Histogram series options
+        self.st_hist_group = QWidget()
+        sthg = QVBoxLayout(self.st_hist_group); sthg.setContentsMargins(0, 0, 0, 0); sthg.setSpacing(4)
+        sthg.addLayout(_srow(QLabel('Alpha:'),      self._make_dbl_spin('hist_alpha', 0.05, 1.0, 0.7, 0.05)))
+        sthg.addLayout(_srow(QLabel('Edge color:'), self._make_edgecolor_combo('hist_edgecolor', 'white')))
+        layout.addWidget(self.st_hist_group)
+
+        # Errorbar series options
+        self.st_err_group = QWidget()
+        steg = QVBoxLayout(self.st_err_group); steg.setContentsMargins(0, 0, 0, 0); steg.setSpacing(4)
+        steg.addLayout(_srow(QLabel('Cap size:'),    self._make_spin('err_capsize', 0, 20, 4)))
+        steg.addLayout(_srow(QLabel('Cap thick:'),   self._make_dbl_spin('err_capthick', 0.5, 8.0, 1.5, 0.5)))
+        steg.addLayout(_srow(QLabel('Err lw:'),      self._make_dbl_spin('err_elinewidth', 0.5, 8.0, 1.5, 0.5)))
+        steg.addLayout(_srow(QLabel('X errors:'),    self._make_combo('err_xerr_combo', ['(none)'])))
+        self.err_barsabove = QCheckBox('Bars above line')
+        self.err_barsabove.stateChanged.connect(self.update_preview)
+        steg.addWidget(self.err_barsabove)
+        layout.addWidget(self.st_err_group)
+
+        # Area series options
+        self.st_area_group = QWidget()
+        stag = QVBoxLayout(self.st_area_group); stag.setContentsMargins(0, 0, 0, 0); stag.setSpacing(4)
+        stag.addLayout(_srow(QLabel('Fill alpha:'), self._make_dbl_spin('area_alpha', 0.05, 1.0, 0.4, 0.05)))
+        stag.addLayout(_srow(QLabel('Line width:'), self._make_dbl_spin('area_lw', 0.0, 5.0, 0.8, 0.25)))
+        self.area_showline = QCheckBox('Show edge line')
+        self.area_showline.setChecked(True)
+        self.area_showline.stateChanged.connect(self.update_preview)
+        stag.addWidget(self.area_showline)
+        layout.addWidget(self.st_area_group)
+
+        # Step series options
+        self.st_step_group = QWidget()
+        ststg = QVBoxLayout(self.st_step_group); ststg.setContentsMargins(0, 0, 0, 0); ststg.setSpacing(4)
+        self.step_fill = QCheckBox('Fill under')
+        self.step_fill.stateChanged.connect(self.update_preview)
+        ststg.addWidget(self.step_fill)
+        ststg.addLayout(_srow(QLabel('Fill alpha:'), self._make_dbl_spin('step_fill_alpha', 0.05, 1.0, 0.2, 0.05)))
+        layout.addWidget(self.st_step_group)
+
+        # Bubble series options
+        self.st_bubble_group = QWidget()
+        stbug = QVBoxLayout(self.st_bubble_group); stbug.setContentsMargins(0, 0, 0, 0); stbug.setSpacing(4)
+        stbug.addLayout(_srow(QLabel('Size col:'),   self._make_col_combo('bubble_size_combo', '(uniform)')))
+        stbug.addLayout(_srow(QLabel('Scale:'),      self._make_dbl_spin('bubble_scale', 1, 5000, 200, 50)))
+        stbug.addLayout(_srow(QLabel('Alpha:'),      self._make_dbl_spin('bubble_alpha', 0.05, 1.0, 0.6, 0.05)))
+        stbug.addLayout(_srow(QLabel('Edge color:'), self._make_edgecolor_combo('bubble_edgecolor', 'none')))
+        layout.addWidget(self.st_bubble_group)
+
+        # Polar series options
+        self.st_polar_group = QWidget()
+        stplg = QVBoxLayout(self.st_polar_group); stplg.setContentsMargins(0, 0, 0, 0); stplg.setSpacing(4)
+        self.polar_fill = QCheckBox('Fill')
+        self.polar_fill.stateChanged.connect(self.update_preview)
+        stplg.addWidget(self.polar_fill)
+        stplg.addLayout(_srow(QLabel('Fill alpha:'), self._make_dbl_spin('polar_fill_alpha', 0.05, 1.0, 0.2, 0.05)))
+        layout.addWidget(self.st_polar_group)
+
+        # Radar series options
+        self.st_radar_group = QWidget()
+        strdr = QVBoxLayout(self.st_radar_group); strdr.setContentsMargins(0, 0, 0, 0); strdr.setSpacing(4)
+        self.radar_fill = QCheckBox('Fill')
+        self.radar_fill.setChecked(True)
+        self.radar_fill.stateChanged.connect(self.update_preview)
+        strdr.addWidget(self.radar_fill)
+        strdr.addLayout(_srow(QLabel('Fill alpha:'), self._make_dbl_spin('radar_fill_alpha', 0.05, 1.0, 0.25, 0.05)))
+        layout.addWidget(self.st_radar_group)
+
+        # ECDF series options
+        self.st_ecdf_group = QWidget()
+        stecg = QVBoxLayout(self.st_ecdf_group); stecg.setContentsMargins(0, 0, 0, 0); stecg.setSpacing(4)
+        self.ecdf_markers = QCheckBox('Show markers')
+        self.ecdf_markers.stateChanged.connect(self.update_preview)
+        stecg.addWidget(self.ecdf_markers)
+        stecg.addLayout(_srow(QLabel('Alpha:'),      self._make_dbl_spin('ecdf_alpha', 0.05, 1.0, 1.0, 0.05)))
+        layout.addWidget(self.st_ecdf_group)
 
         layout.addWidget(self._hline())
 

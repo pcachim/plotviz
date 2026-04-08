@@ -245,8 +245,14 @@ class SeabornExplorer(QDialog):
         gb, fl = self._section('Data columns')
         self._x_combo = QComboBox(); self._x_combo.addItem('(none)')
         self._y_combo = QComboBox(); self._y_combo.addItem('(none)')
+        self._hue_combo = QComboBox(); self._hue_combo.addItem('(none)')
+        self._style_combo = QComboBox(); self._style_combo.addItem('(none)')
+        self._size_combo = QComboBox(); self._size_combo.addItem('(none)')
         fl.addRow('X column:', self._x_combo)
         fl.addRow('Y column:', self._y_combo)
+        fl.addRow('Hue (category):', self._hue_combo)
+        fl.addRow('Size (category):', self._size_combo)
+        fl.addRow('Style (category):', self._style_combo)
         self._col_group = gb
 
     def _build_col_picker(self):
@@ -372,6 +378,8 @@ class SeabornExplorer(QDialog):
         self._pair_diag  = _combo(['auto', 'hist', 'kde'])
         self._pair_kind  = _combo(['scatter', 'kde', 'hist', 'reg'])
         self._pair_alpha = _Spin(0.05, 1.0, 0.7)
+        fl.addRow('Hue:', self._hue_combo)
+        fl.addRow('Size:', self._size_combo)
         fl.addRow('Diagonal:', self._pair_diag)
         fl.addRow('Off-diag:', self._pair_kind)
         fl.addRow('Alpha:',    self._pair_alpha)
@@ -431,8 +439,16 @@ class SeabornExplorer(QDialog):
         numeric_cols = [k for k, v in self.datasets.items()
                         if v is not None and len(v) > 0 and not self._is_cat(v)]
         all_cols = list(self.datasets.keys())
+        cat_cols = [k for k, v in self.datasets.items()
+                    if v is not None and len(v) > 0 and self._is_cat(v)]
 
-        for combo, cols in [(self._x_combo, all_cols), (self._y_combo, numeric_cols)]:
+        for combo, cols in [
+                (self._x_combo, all_cols),
+                (self._y_combo, numeric_cols),
+                (self._hue_combo, cat_cols),
+                (self._size_combo, cat_cols),
+                (self._style_combo, cat_cols),
+                ]:
             prev = combo.currentText()
             combo.blockSignals(True)
             combo.clear()
@@ -454,6 +470,24 @@ class SeabornExplorer(QDialog):
             if not prev_selected or col in prev_selected:
                 item.setSelected(True)
         self._col_list.blockSignals(False)
+
+    def _get_hue(self):
+        name = self._hue_combo.currentText()
+        if name == '(none)' or name not in self.datasets:
+            return None, ''
+        return self.datasets[name], name
+
+    def _get_size(self):
+        name = self._size_combo.currentText()
+        if name == '(none)' or name not in self.datasets:
+            return None, ''
+        return self.datasets[name], name
+
+    def _get_style(self):
+        name = self._style_combo.currentText()
+        if name == '(none)' or name not in self.datasets:
+            return None, ''
+        return self.datasets[name], name
 
     @staticmethod
     def _is_cat(arr):
@@ -802,11 +836,40 @@ class SeabornExplorer(QDialog):
             self._show_error('Pairplot needs >= 2 numeric columns.\nSelect them in the Columns list.')
             return
         _pal = self._sns_palette_name() or self._sns_palette(df.shape[1])
+        hd, hn = self._get_hue()
+        if hd is not None:
+            df[hn] = hd[:].astype(str)
+            hue_val = hn
+        else:
+            hue_val = None
+        szd, szn = self._get_style()
+        if szd is not None:
+            df[szn] = szd[:].astype(str)
+            size_val = szn
+        else:
+            size_val = None
+
         pg = sns.pairplot(df,
-                          diag_kind=self._pair_diag.currentText(),
-                          kind=self._pair_kind.currentText(),
-                          palette=_pal,
-                          plot_kws={'alpha': self._pair_alpha.value()})
+                        hue=hue_val,
+                        size=size_val,
+                        diag_kind=self._pair_diag.currentText(),
+                        kind=self._pair_kind.currentText(),
+                        palette=_pal,
+                        plot_kws={'alpha': self._pair_alpha.value()})
+        # if hd is not None:
+        #     df['hue'] = hd[:].astype(str)
+        #     pg = sns.pairplot(df,
+        #                     hue='hue',
+        #                     diag_kind=self._pair_diag.currentText(),
+        #                     kind=self._pair_kind.currentText(),
+        #                     palette=_pal,
+        #                     plot_kws={'alpha': self._pair_alpha.value()})
+        # else:
+        #     pg = sns.pairplot(df,
+        #                     diag_kind=self._pair_diag.currentText(),
+        #                     kind=self._pair_kind.currentText(),
+        #                     palette=_pal,
+        #                     plot_kws={'alpha': self._pair_alpha.value()})
         self._swap_figure(pg.figure)
 
     def _draw_joint(self):

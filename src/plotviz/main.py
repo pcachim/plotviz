@@ -85,7 +85,7 @@ def _app_icon() -> QIcon:
         base = Path(__file__).parent.parent.parent  # repo root
 
     assets = base / 'assets'
-
+   
     # Prefer .ico on Windows, .icns on macOS/Linux
     candidates = (
         [assets / 'plotviz.ico', assets / 'plotviz.icns']
@@ -144,7 +144,6 @@ class PlotVizQApplication(QApplication):
                 self._window._open_pvizx_in_code_runner(fp)
             return True
         return super().event(e)
-
 
 def main():
     _set_win_appusermodel_id()   # must be before QApplication on Windows
