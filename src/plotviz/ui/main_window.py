@@ -585,6 +585,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_cols  = 1
         self.subplot_chart_types  = {0: 'Line'}
         self.subplot_plot_modes   = {0: 'Standard'}
+        self.subplot_chart_opts   = {}      # {subplot_idx: {opt_key: value}}
         self.sp_titles            = {0: ''}
         self.subplot_title_show   = {0: True}
         self.subplot_title_font   = {0: 'sans-serif'}
@@ -631,6 +632,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._colour_mode  = 'system'  # track current scheme for serialization
         self._color_palette = settings.get('color_palette', 'Matplotlib')
         self.subplot_ann_visible  = {0: True}   # per-subplot annotation visibility
+        self.subplot_equal_aspect = {0: False}  # per-subplot equal-scale (set_aspect('equal'))
         # fit_color / fit_linestyle / fit_linewidth removed in 2.0.0 —
         # fit curves are now styled via curve_styles like any other series.
 
@@ -933,8 +935,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         self.tabs = QTabWidget()
         self.create_file_tab()
-        self.create_data_tab()       # datasets + series table + chart-type options
         self.create_style_tab()      # figure size, margins, colours, grid
+        self.create_data_tab()       # series table + chart-type options
         self.create_series_tab()     # per-curve style
         self.create_axes_tab()       # per-subplot selector + titles, labels, limits, legend
         self.create_annotations_tab()
@@ -951,7 +953,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.tabs.setCurrentIndex(0)   # Chart / File tab
 
         def _go_data_tab():
-            self.tabs.setCurrentIndex(1)   # Data tab
+            self.tabs.setCurrentIndex(2)   # Data tab
 
         # ── New ───────────────────────────────────────────────────────────────
         act_new = QAction('New Plot', self)
@@ -1102,8 +1104,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # Tooltips
         for i, tip in enumerate([
             'Chart — open/save/export, subplot layout, colour palette',
-            'Data — load datasets, series table, chart type options',
             'Style — figure size, margins, colours, grid',
+            'Data — load datasets, series table, chart type options',
             'Series — per-curve line style, colour, marker and curve fitting',
             'Axes — per-subplot titles, labels, axis limits and legend',
             'Annotations — subplot title, legend, text/arrow/image annotations',
@@ -1137,6 +1139,20 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         btn_new.setToolTip('Start a new blank plot (Ctrl+N)')
         btn_new.clicked.connect(lambda: (self.tabs.setCurrentIndex(0), self._reset_app()))
         top_bar_layout.addWidget(btn_new)
+
+        # ── Global subplot selector (hidden when n == 1) ──────────────────────
+        self._global_sp_container = QWidget()
+        _gsp_lay = QHBoxLayout(self._global_sp_container)
+        _gsp_lay.setContentsMargins(8, 0, 0, 0); _gsp_lay.setSpacing(4)
+        _gsp_lay.addWidget(QLabel('Subplot:'))
+        self.global_sp_active = QComboBox()
+        self.global_sp_active.addItem('Subplot 1')
+        self.global_sp_active.setMinimumWidth(100)
+        self.global_sp_active.setToolTip('Active subplot — affects Data, Axes, Series and Annotation tabs')
+        self.global_sp_active.currentIndexChanged.connect(self._on_global_sp_changed)
+        _gsp_lay.addWidget(self.global_sp_active)
+        self._global_sp_container.setVisible(False)
+        top_bar_layout.addWidget(self._global_sp_container)
 
         top_bar_layout.addStretch()
 
@@ -1237,38 +1253,42 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── Data tab: chart-mode groups ───────────────────────────────────────
         data_vis = {
-            self.bar_group:       ct == 'Bar',
-            self.hist_group:      ct == 'Histogram',
-            self.heat_group:      ct in ('Heatmap', 'Contour', '3D Surface'),
-            self.pie_group:       ct == 'Pie',
-            self.area_group:      ct == 'Area',
-            self.violin_group:    ct == 'Violin',
-            self.boxplot_group:   ct == 'Boxplot',
-            self.step_group:      ct == 'Step',
-            self.stem_group:      ct == 'Stem',
-            self.waterfall_group: ct == 'Waterfall',
-            self.hist2d_group:    ct == 'Hist2D',
-            self.hexbin_group:    ct == 'Hexbin',
-            self.radar_group:     ct == 'Radar',
-            self.ecdf_group:      ct == 'ECDF',
-            self.quiver_group:    ct == 'Quiver',
+            self.bar_group:          ct == 'Bar',
+            self.hist_group:         ct == 'Histogram',
+            self.heat_group:         ct in ('Heatmap', 'Contour', '3D Surface'),
+            self.pie_group:          ct == 'Pie',
+            self.area_group:         ct == 'Area',
+            self.fill_between_group: ct == 'Fill Between',
+            self.violin_group:       ct == 'Violin',
+            self.boxplot_group:      ct == 'Boxplot',
+            self.step_group:         ct == 'Step',
+            self.stem_group:         ct == 'Stem',
+            self.waterfall_group:    ct == 'Waterfall',
+            self.hist2d_group:       ct == 'Hist2D',
+            self.hexbin_group:       ct == 'Hexbin',
+            self.radar_group:        ct == 'Radar',
+            self.ecdf_group:         ct == 'ECDF',
+            self.quiver_group:       ct == 'Quiver',
+            self.barbs_group:        ct == 'Barbs',
+            self.streamplot_group:   ct == 'Streamplot',
         }
         for grp, show in data_vis.items():
             grp.setVisible(show)
 
         # ── Series tab: per-series type groups ────────────────────────────────
         for attr, show in [
-            ('st_line_group',    ct == 'Line'),
-            ('st_scatter_group', ct == 'Scatter'),
-            ('st_bar_group',     ct == 'Bar'),
-            ('st_hist_group',    ct == 'Histogram'),
-            ('st_err_group',     ct == 'Errorbar'),
-            ('st_area_group',    ct == 'Area'),
-            ('st_step_group',    ct == 'Step'),
-            ('st_bubble_group',  ct == 'Bubble'),
-            ('st_polar_group',   ct == 'Polar'),
-            ('st_radar_group',   ct == 'Radar'),
-            ('st_ecdf_group',    ct == 'ECDF'),
+            ('st_line_group',         ct == 'Line'),
+            ('st_scatter_group',      ct == 'Scatter'),
+            ('st_bar_group',          ct == 'Bar'),
+            ('st_hist_group',         ct == 'Histogram'),
+            ('st_err_group',          ct == 'Errorbar'),
+            ('st_area_group',         ct == 'Area'),
+            ('st_fill_between_group', ct == 'Fill Between'),
+            ('st_step_group',         ct == 'Step'),
+            ('st_bubble_group',       ct == 'Bubble'),
+            ('st_polar_group',        ct == 'Polar'),
+            ('st_radar_group',        ct == 'Radar'),
+            ('st_ecdf_group',         ct == 'ECDF'),
         ]:
             grp = getattr(self, attr, None)
             if grp is not None:
@@ -1279,6 +1299,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self._combo_z_widget.setVisible(ct in ('Heatmap', 'Contour', '3D Surface'))
         if hasattr(self, '_combo_err_widget'):
             self._combo_err_widget.setVisible(ct == 'Errorbar')
+        if hasattr(self, '_combo_fill_y2_widget'):
+            self._combo_fill_y2_widget.setVisible(ct == 'Fill Between')
 
     def _on_chart_type_changed(self, ct):
         """Hidden chart_type_combo changed — update subplot_chart_types and option groups.
@@ -1345,12 +1367,157 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         if hasattr(self, 'datasets'):
             self.update_preview()
 
+    # ── Per-subplot chart-option fields ──────────────────────────────────────
+    # Each entry: (widget_attr, storage_key, default_value, widget_kind)
+    # widget_kind: 'spin' | 'dbl' | 'check' | 'combo' | 'color'
+    # These are the Data-tab chart-level option groups; each subplot stores its
+    # own copy in self.subplot_chart_opts[subplot_idx].
+    CHART_OPT_FIELDS = [
+        # Bar
+        ('bar_stacked',         'bar_stacked',         False,     'check'),
+        ('bar_horizontal',      'bar_horizontal',       False,     'check'),
+        # Histogram
+        ('hist_bins',           'hist_bins',            20,        'spin'),
+        ('hist_density',        'hist_density',         False,     'check'),
+        ('hist_cumulative',     'hist_cumulative',      False,     'check'),
+        ('hist_histtype',       'hist_histtype',        'bar',     'combo'),
+        ('hist_orientation',    'hist_orientation',     'vertical','combo'),
+        # Heatmap / Contour / 3D
+        ('cmap_combo',          'cmap',                 'viridis', 'combo'),
+        ('contour_levels',      'contour_levels',       10,        'spin'),
+        ('heat_alpha',          'heat_alpha',           1.0,       'dbl'),
+        ('heat_interpolation',  'heat_interpolation',   'nearest', 'combo'),
+        ('heat_colorbar',       'heat_colorbar',        True,      'check'),
+        ('heat_filled_contour', 'heat_filled_contour',  True,      'check'),
+        ('heat_contour_lines',  'heat_contour_lines',   True,      'check'),
+        ('surf_stride',         'surf_stride',          1,         'spin'),
+        ('surf_wireframe',      'surf_wireframe',       False,     'check'),
+        # Pie
+        ('pie_autopct',         'pie_autopct',          True,      'check'),
+        ('pie_shadow',          'pie_shadow',           False,     'check'),
+        ('pie_donut',           'pie_donut',            False,     'check'),
+        ('pie_explode_first',   'pie_explode_first',    False,     'check'),
+        ('pie_startangle',      'pie_startangle',       90.0,      'dbl'),
+        ('pie_labeldistance',   'pie_labeldistance',    1.1,       'dbl'),
+        ('pie_pctdistance',     'pie_pctdistance',      0.6,       'dbl'),
+        # Area
+        ('area_stacked',        'area_stacked',         False,     'check'),
+        ('area_baseline',       'area_baseline',        0.0,       'dbl'),
+        # Violin
+        ('violin_show_means',   'violin_show_means',    True,      'check'),
+        ('violin_show_medians', 'violin_show_medians',  True,      'check'),
+        ('violin_show_extrema', 'violin_show_extrema',  False,     'check'),
+        ('violin_points',       'violin_points',        '100',     'combo'),
+        ('violin_bw',           'violin_bw',            'scott',   'combo'),
+        ('violin_vert',         'violin_vert',          True,      'check'),
+        # Boxplot
+        ('box_show_means',      'box_show_means',       False,     'check'),
+        ('box_show_medians',    'box_show_medians',     True,      'check'),
+        ('box_notch',           'box_notch',            False,     'check'),
+        ('box_showfliers',      'box_showfliers',       True,      'check'),
+        ('box_vert',            'box_vert',             True,      'check'),
+        ('box_whis',            'box_whis',             1.5,       'dbl'),
+        ('box_alpha',           'box_alpha',            0.7,       'dbl'),
+        # Step
+        ('step_where',          'step_where',           'pre',     'combo'),
+        # Stem
+        ('stem_baseline',       'stem_baseline',        0.0,       'dbl'),
+        # Waterfall
+        ('waterfall_connector', 'waterfall_connector',  True,      'check'),
+        ('waterfall_width',     'waterfall_width',      0.6,       'dbl'),
+        ('waterfall_alpha',     'waterfall_alpha',      1.0,       'dbl'),
+        ('waterfall_pos_color', 'waterfall_pos_color',  '#2ecc71', 'color'),
+        ('waterfall_neg_color', 'waterfall_neg_color',  '#e74c3c', 'color'),
+        # Hist2D
+        ('hist2d_bins_x',       'hist2d_bins_x',        20,        'spin'),
+        ('hist2d_bins_y',       'hist2d_bins_y',        20,        'spin'),
+        ('hist2d_alpha',        'hist2d_alpha',         1.0,       'dbl'),
+        ('hist2d_cmap_combo',   'hist2d_cmap',          'viridis', 'combo'),
+        ('hist2d_colorbar',     'hist2d_colorbar',      True,      'check'),
+        ('hist2d_log',          'hist2d_log',           False,     'check'),
+        # Hexbin
+        ('hexbin_gridsize',     'hexbin_gridsize',      20,        'spin'),
+        ('hexbin_alpha',        'hexbin_alpha',         1.0,       'dbl'),
+        ('hexbin_cmap_combo',   'hexbin_cmap',          'viridis', 'combo'),
+        ('hexbin_colorbar',     'hexbin_colorbar',      True,      'check'),
+        ('hexbin_log',          'hexbin_log',           False,     'check'),
+        # Radar
+        ('radar_gridlevels',    'radar_gridlevels',     5,         'spin'),
+        # ECDF
+        ('ecdf_complementary',  'ecdf_complementary',   False,     'check'),
+        # Quiver
+        ('quiver_scale',        'quiver_scale',         1.0,       'dbl'),
+        ('quiver_width',        'quiver_width',         0.005,     'dbl'),
+        ('quiver_color_by_mag', 'quiver_color_by_mag',  False,     'check'),
+        ('quiver_cmap_combo',   'quiver_cmap',          'viridis', 'combo'),
+        # Barbs
+        ('barbs_length',        'barbs_length',         7.0,       'dbl'),
+        ('barbs_pivot_combo',   'barbs_pivot',          'tip',     'combo'),
+        ('barbs_alpha',         'barbs_alpha',          0.85,      'dbl'),
+        ('barbs_color_by_mag',  'barbs_color_by_mag',   False,     'check'),
+        ('barbs_cmap_combo',    'barbs_cmap',           'viridis', 'combo'),
+        # Streamplot
+        ('stream_density',      'stream_density',       1.0,       'dbl'),
+        ('stream_arrowsize',    'stream_arrowsize',     1.0,       'dbl'),
+        ('stream_linewidth',    'stream_linewidth',     1.5,       'dbl'),
+        ('stream_color_by_mag', 'stream_color_by_mag',  False,     'check'),
+        ('stream_cmap_combo',   'stream_cmap',          'viridis', 'combo'),
+    ]
+
+    def _default_chart_opts(self):
+        """Return a dict of chart option defaults for a fresh subplot."""
+        return {key: default for _, key, default, _ in self.CHART_OPT_FIELDS}
+
+    def _save_chart_opts(self, idx):
+        """Read all chart option widgets and persist to subplot_chart_opts[idx]."""
+        opts = self.subplot_chart_opts.setdefault(idx, self._default_chart_opts())
+        for attr, key, default, kind in self.CHART_OPT_FIELDS:
+            w = getattr(self, attr, None)
+            if w is None:
+                continue
+            if kind == 'spin':
+                opts[key] = w.value()
+            elif kind == 'dbl':
+                opts[key] = w.value()
+            elif kind == 'check':
+                opts[key] = w.isChecked()
+            elif kind == 'combo':
+                opts[key] = w.currentText()
+            elif kind == 'color':
+                opts[key] = getattr(self, attr, default)
+
+    def _load_chart_opts(self, idx):
+        """Load subplot_chart_opts[idx] values into the chart option widgets."""
+        opts = self.subplot_chart_opts.get(idx, self._default_chart_opts())
+        for attr, key, default, kind in self.CHART_OPT_FIELDS:
+            w = getattr(self, attr, None)
+            val = opts.get(key, default)
+            if w is None:
+                if kind == 'color':
+                    setattr(self, attr, val)
+                continue
+            if kind == 'spin':
+                w.blockSignals(True); w.setValue(int(val)); w.blockSignals(False)
+            elif kind == 'dbl':
+                w.blockSignals(True); w.setValue(float(val)); w.blockSignals(False)
+            elif kind == 'check':
+                w.blockSignals(True); w.setChecked(bool(val)); w.blockSignals(False)
+            elif kind == 'combo':
+                w.blockSignals(True)
+                i = w.findText(str(val))
+                if i >= 0: w.setCurrentIndex(i)
+                w.blockSignals(False)
+            elif kind == 'color':
+                setattr(self, attr, val)
+                btn = getattr(self, attr + '_btn', None)
+                if btn: btn.setStyleSheet(f'background-color:{val};border:1px solid #888;')
+
     # ── Per-series option fields ──────────────────────────────────────────────
     # Each entry: (widget_attr, storage_key, default_value, widget_kind)
     # widget_kind: 'spin' | 'dbl' | 'check' | 'combo'
     # Only per-series visual params live here (Series tab groups).
-    # Chart-mode params (bar_stacked, hist_bins, etc.) are saved at chart level
-    # via _collect_settings / _apply_settings in serialization.py.
+    # Chart-mode params (bar_stacked, hist_bins, etc.) are now per-subplot
+    # via subplot_chart_opts / _save_chart_opts / _load_chart_opts.
     _SERIES_OPTION_FIELDS = [
         # Line (per-series visual) — linestyle/lw/marker/markersize from Per-Curve
         ('line_drawstyle',          'line_drawstyle',   'default', 'combo'),
@@ -1379,6 +1546,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ('area_alpha',              'area_alpha',       0.4,       'dbl'),
         ('area_lw',                 'area_lw',          0.8,       'dbl'),
         ('area_showline',           'area_showline',    True,      'check'),
+        # Fill Between (per-series visual; Y2 column is saved separately via _save_fill_y2)
+        ('fill_between_alpha',      'fill_between_alpha',   0.4,   'dbl'),
+        ('fill_between_lw',         'fill_between_lw',      0.8,   'dbl'),
+        ('fill_between_showline',   'fill_between_showline', True,  'check'),
         # Step (per-series visual only; where saved at chart level) — lw from Per-Curve
         ('step_fill',               'step_fill',        False,     'check'),
         ('step_fill_alpha',         'step_fill_alpha',  0.2,       'dbl'),
@@ -1550,20 +1721,23 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             if hasattr(self, 'hist_group'):
                 # Data tab chart-mode groups
                 for grp in (self.bar_group, self.hist_group, self.heat_group,
-                            self.pie_group, self.area_group, self.violin_group,
-                            self.boxplot_group, self.step_group, self.stem_group,
-                            self.waterfall_group, self.hist2d_group, self.hexbin_group,
-                            self.radar_group, self.ecdf_group, self.quiver_group):
+                            self.pie_group, self.area_group, self.fill_between_group,
+                            self.violin_group, self.boxplot_group, self.step_group,
+                            self.stem_group, self.waterfall_group, self.hist2d_group,
+                            self.hexbin_group, self.radar_group, self.ecdf_group,
+                            self.quiver_group, self.barbs_group, self.streamplot_group):
                     grp.setVisible(False)
                 # Series tab per-series groups
                 for _attr in ('st_line_group','st_scatter_group','st_bar_group',
                               'st_hist_group','st_err_group','st_area_group',
-                              'st_step_group','st_stem_group','st_bubble_group',
-                              'st_polar_group','st_radar_group','st_ecdf_group'):
+                              'st_fill_between_group','st_step_group','st_stem_group',
+                              'st_bubble_group','st_polar_group','st_radar_group',
+                              'st_ecdf_group'):
                     _g = getattr(self, _attr, None)
                     if _g: _g.setVisible(False)
-            if hasattr(self, '_combo_z_widget'):   self._combo_z_widget.setVisible(False)
-            if hasattr(self, '_combo_err_widget'): self._combo_err_widget.setVisible(False)
+            if hasattr(self, '_combo_z_widget'):        self._combo_z_widget.setVisible(False)
+            if hasattr(self, '_combo_err_widget'):      self._combo_err_widget.setVisible(False)
+            if hasattr(self, '_combo_fill_y2_widget'):  self._combo_fill_y2_widget.setVisible(False)
             return
         row = min(selected_rows)
         # Update the selected-series label
@@ -1588,6 +1762,14 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.plot_mode_combo.blockSignals(False)
         # Series type options are driven by curve_select on the Series tab, not
         # by data-tab row selection — see load_curve_style / _save_series_options.
+
+    def _on_series_label_double_click(self, item):
+        """Explicitly start in-place editing when the user double-clicks the
+        Label column (col 2) in the series table.  This is a belt-and-suspenders
+        fix for PyQt6 environments where the default DoubleClicked edit trigger
+        is not reliably firing for items inside a QScrollArea."""
+        if item is not None and item.column() == 2:
+            self.series_table.editItem(item)
 
     def _sync_combo_from_type(self, ct):
         """Sync the hidden chart_type_combo and option groups to the given type.
@@ -2787,6 +2969,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # otherwise stale rows referencing cleared datasets cause a crash.
         self.series_table.setRowCount(0)
         self._refresh_curve_select()
+        # Clear chart-type tracking so _apply_settings always initialises a
+        # fresh Cartesian/Line state, regardless of what was loaded before.
+        self.subplot_chart_types.clear()
+        if hasattr(self, 'subplot_plot_modes'):
+            self.subplot_plot_modes.clear()
+        if hasattr(self, 'subplot_chart_opts'):
+            self.subplot_chart_opts.clear()
         # Reset all UI widgets to fresh defaults via _apply_settings
         self._undo_suspended = True
         self._applying_settings = True
@@ -2839,29 +3028,49 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def update_lists(self, keep_selections=False):
         """Refresh dataset list, combo_z, combo_err, and series table combos."""
         cols = sorted(self.datasets)
-        zp = self.combo_z.currentText(); ep = self.combo_err.currentText()
-        qup = getattr(self.quiver_u_combo, 'currentText', lambda: '(none)')()
-        qvp = getattr(self.quiver_v_combo, 'currentText', lambda: '(none)')()
+        zp  = self.combo_z.currentText(); ep = self.combo_err.currentText()
+        fy2p = getattr(self, 'combo_fill_y2', None)
+        fy2p = fy2p.currentText() if fy2p else '(none)'
+        qup = getattr(self.quiver_u_combo,  'currentText', lambda: '(none)')()
+        qvp = getattr(self.quiver_v_combo,  'currentText', lambda: '(none)')()
+        bup = getattr(self.barbs_u_combo,   'currentText', lambda: '(none)')()
+        bvp = getattr(self.barbs_v_combo,   'currentText', lambda: '(none)')()
+        sup = getattr(self.stream_u_combo,  'currentText', lambda: '(none)')()
+        svp = getattr(self.stream_v_combo,  'currentText', lambda: '(none)')()
         bsp = getattr(self.bubble_size_combo, 'currentText', lambda: '(uniform)')()
 
         self.dataset_list.clear(); self.combo_x.clear()
         self.y_list.clear()
         self.combo_z.clear(); self.combo_z.addItem('(none)')
         self.combo_err.clear(); self.combo_err.addItem('(none)')
+        if hasattr(self, 'combo_fill_y2'):
+            self.combo_fill_y2.blockSignals(True)
+            self.combo_fill_y2.clear(); self.combo_fill_y2.addItem('(none)')
 
         for col in cols:
             self.dataset_list.addItem(col)
             self.combo_x.addItem(col); self.y_list.addItem(col)
             self.combo_z.addItem(col); self.combo_err.addItem(col)
+            if hasattr(self, 'combo_fill_y2'):
+                self.combo_fill_y2.addItem(col)
+
+        if hasattr(self, 'combo_fill_y2'):
+            i = self.combo_fill_y2.findText(fy2p)
+            self.combo_fill_y2.setCurrentIndex(i if i >= 0 else 0)
+            self.combo_fill_y2.blockSignals(False)
 
         for combo, prev in [(self.combo_z, zp), (self.combo_err, ep)]:
             i = combo.findText(prev)
             if i >= 0: combo.setCurrentIndex(i)
 
-        # Refresh quiver U/V and bubble size combos
+        # Refresh quiver/barbs/streamplot U/V and bubble size combos
         for combo, sentinel, prev in [
-            (self.quiver_u_combo, '(none)',    qup),
-            (self.quiver_v_combo, '(none)',    qvp),
+            (self.quiver_u_combo,    '(none)',    qup),
+            (self.quiver_v_combo,    '(none)',    qvp),
+            (self.barbs_u_combo,     '(none)',    bup),
+            (self.barbs_v_combo,     '(none)',    bvp),
+            (self.stream_u_combo,    '(none)',    sup),
+            (self.stream_v_combo,    '(none)',    svp),
             (self.bubble_size_combo, '(uniform)', bsp),
             (self.err_xerr_combo, '(none)', getattr(self.err_xerr_combo, '_prev', '(none)')),
         ]:
@@ -2929,6 +3138,34 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             return
         # Only respond to label (col 2) and Y2 checkbox (col 5)
         if item.column() in (2, 5):
+            # When label (col 2) is edited, rename the curve_styles key so
+            # per-series style, color, opts etc. follow the new label.
+            if item.column() == 2:
+                new_label = item.text()
+                # Find what the old label was — any curve_styles key that
+                # isn't the new name and whose row still maps to this row.
+                # Heuristic: scan curve_styles for a key that no other row
+                # currently uses and rename it to new_label.
+                current_labels = set()
+                for r in range(self.series_table.rowCount()):
+                    if r == row:
+                        continue
+                    it = self.series_table.item(r, 2)
+                    current_labels.add(it.text() if it else f'Series {r+1}')
+                # The old key is the one in curve_styles that is neither the
+                # new label nor any other current row label.  Fallback: look
+                # for the previous text stored by Qt before the edit — we do
+                # this by finding any key that would be orphaned after rename.
+                orphaned = [k for k in list(self.curve_styles)
+                            if k not in current_labels and k != new_label]
+                if len(orphaned) == 1:
+                    old_label = orphaned[0]
+                    self.curve_styles[new_label] = self.curve_styles.pop(old_label)
+                elif new_label not in self.curve_styles:
+                    # Try to inherit from a key with "Series N" pattern for this row
+                    fallback_key = f'Series {row + 1}'
+                    if fallback_key in self.curve_styles:
+                        self.curve_styles[new_label] = self.curve_styles.pop(fallback_key)
             # When Y2 is checked for the first time, preserve the series color
             if item.column() == 5 and item.checkState() == Qt.CheckState.Checked:
                 lbl_item = self.series_table.item(row, 2)
@@ -3026,8 +3263,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         cb_y.currentIndexChanged.connect(lambda _: self._update_label_placeholders())
         self.series_table.setCellWidget(row, 1, cb_y)
 
-        # Label
-        self.series_table.setItem(row, 2, QTableWidgetItem(f'Series {row+1}'))
+        # Label — explicitly set editable flag so double-click editing works reliably
+        _lbl_item = QTableWidgetItem(f'Series {row+1}')
+        _lbl_item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsEnabled)
+        self.series_table.setItem(row, 2, _lbl_item)
 
         # Type combo — constrained to the current plot mode's allowed types
         allowed_types = list(PLOT_MODE_GROUPS.get(
@@ -3245,7 +3484,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ── Series tab: select the curve for style editing ───────────────────
         idx = self.curve_select.findText(label)
         if idx >= 0:
-            # Series tab is index 3 (Chart/Data/Style/Series/Axes/Annotations/Advanced)
+            # Series tab is index 3 (Chart/Axes/Style/Series/Data/Annotations/Advanced)
             self.tabs.setCurrentIndex(3)
             if self.curve_select.currentIndex() == idx:
                 self.load_curve_style()
@@ -3432,6 +3671,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         n = n_override if n_override is not None else r * c
         # Ensure all dicts have entries for every subplot slot
         for i in range(n):
+            self.subplot_chart_opts.setdefault(i, self._default_chart_opts())
             self.subplot_chart_types.setdefault(i, 'Line')
             self.subplot_plot_modes.setdefault(i, 'Standard')
             self.sp_titles.setdefault(i, '')
@@ -3477,7 +3717,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.subplot_yticks_show.setdefault(i, True)
             self.subplot_ann_visible.setdefault(i, True)
         # Prune entries beyond current grid
-        all_dicts = (self.subplot_chart_types, self.subplot_plot_modes, self.sp_titles, self.subplot_title_show,
+        all_dicts = (self.subplot_chart_types, self.subplot_plot_modes, self.subplot_chart_opts,
+                     self.sp_titles, self.subplot_title_show,
                      self.subplot_title_font, self.subplot_title_size, self.subplot_title_color,
                      self.subplot_xlabels, self.subplot_xlabel_show,
                      self.subplot_ylabels, self.subplot_ylabel_show,
@@ -3504,7 +3745,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     d.pop(i, None)
         # Update Plot spinbox range on every series row
         self._update_plot_spin_ranges(n)
-        # Rebuild all subplot selectors and show/hide them
+        # Rebuild all subplot selectors — per-tab rows stay hidden (global combo handles it)
         for combo, vis_attr in [
             (self.sp_active,              '_axes_sp_row_widget'),
             (self.series_sp_active,       '_series_sp_row_widget'),
@@ -3513,10 +3754,19 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ]:
             combo.blockSignals(True); combo.clear()
             for i in range(n): combo.addItem(f'Subplot {i+1}')
+            combo.setCurrentIndex(0)          # set index while signals still blocked
             combo.blockSignals(False)
-            combo.setCurrentIndex(0)
             widget = getattr(self, vis_attr, None)
-            if widget: widget.setVisible(n > 1)
+            if widget: widget.setVisible(False)   # always hidden; global_sp_active used instead
+        # Rebuild and show/hide the global subplot selector above the tabs
+        if hasattr(self, 'global_sp_active'):
+            self.global_sp_active.blockSignals(True)
+            self.global_sp_active.clear()
+            for i in range(n): self.global_sp_active.addItem(f'Subplot {i+1}')
+            self.global_sp_active.setCurrentIndex(0)  # set index while signals still blocked
+            self.global_sp_active.blockSignals(False)
+        if hasattr(self, '_global_sp_container'):
+            self._global_sp_container.setVisible(n > 1)
         if hasattr(self, '_axes_title_section'):
             _was_single = not self._axes_title_section.isVisible()
             self._axes_title_section.setVisible(n > 1)
@@ -3600,11 +3850,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         idx = self.sp_active.currentIndex()
         if idx < 0: idx = 0
 
-        # ── Sync the other subplot selectors silently ─────────────────────────
+        # ── Sync all subplot selectors silently (including global top-bar combo) ─
         for combo in (self.ann_sp_active, self.series_sp_active, self.series_curve_sp_active):
             combo.blockSignals(True)
             combo.setCurrentIndex(idx)
             combo.blockSignals(False)
+        if hasattr(self, 'global_sp_active'):
+            self.global_sp_active.blockSignals(True)
+            self.global_sp_active.setCurrentIndex(idx)
+            self.global_sp_active.blockSignals(False)
 
         def _load(widget, value):
             widget.blockSignals(True)
@@ -3653,6 +3907,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _load(self.ytick_step,     self.subplot_ytick_step.get(idx, 0.0))
         _load(self.y_formatter,    self.subplot_y_formatter.get(idx, 'auto'))
         _load(self.yticks_show,    self.subplot_yticks_show.get(idx, True))
+        _load(self.equal_scale_check, self.subplot_equal_aspect.get(idx, False))
         # Y2 axis
         _load(self.y2label_show_check, self.subplot_y2label_show.get(idx, True))
         _load(self.y2label_input,      self.subplot_y2labels.get(idx, ''))
@@ -3699,6 +3954,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.refresh_annotation_list()
         # Filter series table to only show rows for this subplot
         self._filter_series_table_by_subplot(idx)
+        # Load per-subplot chart option group values into their widgets
+        self._load_chart_opts(idx)
 
         # ── Sync chart_type_combo / plot_mode_combo to this subplot's state ─────
         # For whole-chart types (Polar, Heatmap, Pie, etc.) the type lives in
@@ -3780,6 +4037,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_y_formatter[idx]   = self.y_formatter.currentText()
         self.subplot_xticks_show[idx]   = self.xticks_show.isChecked()
         self.subplot_yticks_show[idx]   = self.yticks_show.isChecked()
+        self.subplot_equal_aspect[idx]  = self.equal_scale_check.isChecked()
         self.update_preview()
 
     # Legacy aliases kept so existing signal connections don't need changes
@@ -3826,22 +4084,43 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _on_sp_legend_changed(self):      self._save_axes_state()
     def _on_sp_lim_changed(self):         self._save_axes_state()
 
+    # ── Global subplot selector (above the tabs) ────────────────────────────
+    def _on_global_sp_changed(self, idx):
+        """Global subplot selector in the top bar changed — sync all tab selectors."""
+        if idx < 0:
+            return
+        for combo in (self.sp_active, self.series_sp_active, self.ann_sp_active, self.series_curve_sp_active):
+            combo.blockSignals(True)
+            combo.setCurrentIndex(idx)
+            combo.blockSignals(False)
+        self.on_active_subplot_changed()
+
     # ── Series-tab subplot selector ──────────────────────────────────────────
     def _on_series_subplot_changed(self, idx):
         """Data-tab subplot selector changed.
 
         1. Silently sync the other selectors so they stay consistent.
-        2. Update plot_mode_combo to this subplot's stored mode (silently).
-        3. Call _on_plot_mode_changed so type combos for this subplot are correct.
+        2. Save chart opts for the OLD subplot, load chart opts for the NEW one.
+        3. Update plot_mode_combo to this subplot's stored mode (silently).
         4. Filter the series table to show only this subplot's rows.
         """
         if idx < 0:
             return
-        # Keep all three selectors in sync silently
+        # Save current widget values into the OLD subplot before switching
+        old_idx = self.sp_active.currentIndex()
+        if old_idx >= 0:
+            self._save_chart_opts(old_idx)
+        # Keep all selectors in sync silently
         for combo in (self.sp_active, self.ann_sp_active, self.series_curve_sp_active):
             combo.blockSignals(True)
             combo.setCurrentIndex(idx)
             combo.blockSignals(False)
+        if hasattr(self, 'global_sp_active'):
+            self.global_sp_active.blockSignals(True)
+            self.global_sp_active.setCurrentIndex(idx)
+            self.global_sp_active.blockSignals(False)
+        # Load chart opts for the new subplot into the widgets
+        self._load_chart_opts(idx)
         # Restore the plot mode for this subplot
         if hasattr(self, 'plot_mode_combo'):
             stored_mode = self.subplot_plot_modes.get(idx, 'Standard')
@@ -3872,6 +4151,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             combo.blockSignals(True)
             combo.setCurrentIndex(idx)
             combo.blockSignals(False)
+        if hasattr(self, 'global_sp_active'):
+            self.global_sp_active.blockSignals(True)
+            self.global_sp_active.setCurrentIndex(idx)
+            self.global_sp_active.blockSignals(False)
         # Keep the Data-tab series table filtered to the same subplot
         self._filter_series_table_by_subplot(idx)
         # Refresh curve_select to show only series on this subplot

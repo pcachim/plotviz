@@ -22,14 +22,14 @@ from data.scientific import CurveFitter
 
 ALL_CHART_TYPES = [
     # ── Per-series mixable ────────────────────────────────────────────
-    'Line', 'Scatter', 'Bar', 'Errorbar', 'Area',
+    'Line', 'Scatter', 'Bar', 'Errorbar', 'Area', 'Fill Between',
     'Step', 'Stem', 'Bubble', 'Waterfall',
     # ── Whole-chart / specialised ─────────────────────────────────────
     'Histogram', 'Hist2D', 'Hexbin',
     'Boxplot', 'Violin',
     'Pie', 'Polar', 'Radar',
     'Heatmap', 'Contour', '3D Surface',
-    'ECDF', 'Quiver',
+    'ECDF', 'Quiver', 'Barbs', 'Streamplot',
 ]
 
 # Types available per-series in the table Type column (all types)
@@ -41,7 +41,7 @@ WHOLE_CHART_TYPES = {
     'Boxplot', 'Violin',
     'Pie', 'Polar', 'Radar',
     'Heatmap', 'Contour', '3D Surface',
-    'ECDF', 'Quiver',
+    'ECDF', 'Quiver', 'Barbs', 'Streamplot',
 }
 
 _NO_X_TYPES = {'Histogram', 'Boxplot', 'Violin', 'Pie', 'ECDF',
@@ -69,14 +69,14 @@ _CMAP_LIST = [
 # "Standard" covers all freely-mixable per-series types. The remaining modes
 # are for whole-chart exclusive types that can't be mixed with anything else.
 PLOT_MODE_GROUPS = {
-    'Standard':          ['Line', 'Scatter', 'Bar', 'Area', 'Errorbar',
-                          'Step', 'Stem', 'Bubble', 'Waterfall'],
+    'Standard':          ['Line', 'Scatter', 'Bar', 'Area', 'Fill Between',
+                          'Errorbar', 'Step', 'Stem', 'Bubble', 'Waterfall'],
     'Histogram':         ['Histogram'],
     'Statistical':       ['Boxplot', 'Violin', 'ECDF'],
     'Heatmap & Contour': ['Heatmap', 'Contour', 'Hist2D', 'Hexbin', '3D Surface'],
     'Polar & Radar':     ['Polar', 'Radar'],
     'Pie':               ['Pie'],
-    'Quiver':            ['Quiver'],
+    'Quiver':            ['Quiver', 'Barbs', 'Streamplot'],
 }
 
 # Reverse: given a series type, which plot mode contains it?
@@ -240,6 +240,24 @@ class TabBuildersMixin:
 
         layout.addWidget(self._hline())
 
+        # ── Datasets ──────────────────────────────────────────────────────────
+        layout.addWidget(self._sec_label('Datasets'))
+        btn_load = QPushButton('📂  Browse Files  (CSV, Excel, JSON, TXT)')
+        btn_load.clicked.connect(self.load_data); layout.addWidget(btn_load)
+        self.dataset_list = QListWidget(); self.dataset_list.setMinimumHeight(120); self.dataset_list.setMaximumHeight(220)
+        self.dataset_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        layout.addWidget(self.dataset_list)
+        ds_btn_row = QHBoxLayout(); ds_btn_row.setSpacing(4)
+        btn_remove_ds = QPushButton('🗑 Remove selected')
+        btn_remove_ds.clicked.connect(self._remove_selected_datasets)
+        btn_inspect = QPushButton('🔍 Inspect values')
+        btn_inspect.setToolTip('Inspect selected column(s), or all if none selected')
+        btn_inspect.clicked.connect(self._inspect_series)
+        ds_btn_row.addWidget(btn_remove_ds); ds_btn_row.addWidget(btn_inspect)
+        layout.addLayout(ds_btn_row)
+
+        layout.addWidget(self._hline())
+
         # ── Colour palette ────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('Colour Palette'))
         pal_row = QHBoxLayout(); pal_row.setSpacing(6)
@@ -346,24 +364,6 @@ class TabBuildersMixin:
         content = QWidget()
         layout = QVBoxLayout(content)
 
-        # ── Datasets ──────────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Datasets'))
-        btn_load = QPushButton('📂  Browse Files  (CSV, Excel, JSON, TXT)')
-        btn_load.clicked.connect(self.load_data); layout.addWidget(btn_load)
-        self.dataset_list = QListWidget(); self.dataset_list.setMinimumHeight(220); self.dataset_list.setMaximumHeight(320)
-        self.dataset_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        layout.addWidget(self.dataset_list)
-        ds_btn_row = QHBoxLayout(); ds_btn_row.setSpacing(4)
-        btn_remove_ds = QPushButton('🗑 Remove selected')
-        btn_remove_ds.clicked.connect(self._remove_selected_datasets)
-        btn_inspect = QPushButton('🔍 Inspect values')
-        btn_inspect.setToolTip('Inspect selected column(s), or all if none selected')
-        btn_inspect.clicked.connect(self._inspect_series)
-        ds_btn_row.addWidget(btn_remove_ds); ds_btn_row.addWidget(btn_inspect)
-        layout.addLayout(ds_btn_row)
-
-        layout.addWidget(self._hline())
-
         # ── Active subplot selector (shown when n > 1) ───────────────────────
         sp_sel_row = QHBoxLayout(); sp_sel_row.setSpacing(6)
         sp_sel_row.addWidget(QLabel('Subplot:'))
@@ -401,6 +401,7 @@ class TabBuildersMixin:
         )
         self.series_table.itemChanged.connect(self._on_series_item_changed)
         self.series_table.itemSelectionChanged.connect(self._on_series_selection_changed)
+        self.series_table.itemDoubleClicked.connect(self._on_series_label_double_click)
         layout.addWidget(self.series_table)
 
         sr = QHBoxLayout(); sr.setSpacing(4)
@@ -446,6 +447,15 @@ class TabBuildersMixin:
         _el.addWidget(self.combo_err)
         self._combo_err_widget.setVisible(False)
         layout.addWidget(self._combo_err_widget)
+
+        self._combo_fill_y2_widget = QWidget()
+        _fy2l = QVBoxLayout(self._combo_fill_y2_widget); _fy2l.setContentsMargins(0,0,0,0); _fy2l.setSpacing(2)
+        _fy2l.addWidget(QLabel('Y2 column  (Fill Between):'))
+        self.combo_fill_y2 = QComboBox(); self.combo_fill_y2.addItem('(none)')
+        self.combo_fill_y2.currentIndexChanged.connect(self.update_preview)
+        _fy2l.addWidget(self.combo_fill_y2)
+        self._combo_fill_y2_widget.setVisible(False)
+        layout.addWidget(self._combo_fill_y2_widget)
 
         layout.addWidget(self._hline())
 
@@ -524,6 +534,15 @@ class TabBuildersMixin:
         ag.addLayout(_row(QLabel('Baseline:'), self._make_dbl_spin('area_baseline', -1e6, 1e6, 0.0, 1.0)))
         self.area_stacked = QCheckBox('Stacked'); self.area_stacked.stateChanged.connect(self.update_preview); ag.addWidget(self.area_stacked)
         layout.addWidget(self.area_group)
+
+        # ── Fill Between (no chart-mode options; Y2 column is in the dedicated
+        #    column-picker widget above; per-series options live in the Series tab)
+        self.fill_between_group = QGroupBox('Fill Between Options')
+        fbg = QVBoxLayout(self.fill_between_group)
+        _fb_hint = QLabel('Select a Y2 column above.\nStyle options are in the Series tab.')
+        _fb_hint.setStyleSheet('color:#888; font-size:10px;')
+        fbg.addWidget(_fb_hint)
+        layout.addWidget(self.fill_between_group)
 
         # ── Violin ────────────────────────────────────────────────────────────
         self.violin_group = QGroupBox('Violin Options')
@@ -613,6 +632,30 @@ class TabBuildersMixin:
         self.quiver_color_by_mag = QCheckBox('Color by magnitude'); self.quiver_color_by_mag.stateChanged.connect(self.update_preview); qvg.addWidget(self.quiver_color_by_mag)
         qvg.addLayout(_row(QLabel('Colormap:'), self._make_combo('quiver_cmap_combo', _CMAP_LIST)))
         layout.addWidget(self.quiver_group)
+
+        # ── Barbs ─────────────────────────────────────────────────────────────
+        self.barbs_group = QGroupBox('Barbs (Wind Barb) Options')
+        brg = QVBoxLayout(self.barbs_group)
+        brg.addLayout(_row(QLabel('U col (dx):'), self._make_col_combo('barbs_u_combo', '(none)')))
+        brg.addLayout(_row(QLabel('V col (dy):'), self._make_col_combo('barbs_v_combo', '(none)')))
+        brg.addLayout(_row(QLabel('Length:'),     self._make_dbl_spin('barbs_length', 1.0, 30.0, 7.0, 0.5)))
+        brg.addLayout(_row(QLabel('Pivot:'),      self._make_combo('barbs_pivot_combo', ['tip', 'middle', 'tail'])))
+        brg.addLayout(_row(QLabel('Alpha:'),      self._make_dbl_spin('barbs_alpha', 0.05, 1.0, 0.85, 0.05)))
+        self.barbs_color_by_mag = QCheckBox('Color by magnitude'); self.barbs_color_by_mag.stateChanged.connect(self.update_preview); brg.addWidget(self.barbs_color_by_mag)
+        brg.addLayout(_row(QLabel('Colormap:'),   self._make_combo('barbs_cmap_combo', _CMAP_LIST)))
+        layout.addWidget(self.barbs_group)
+
+        # ── Streamplot ────────────────────────────────────────────────────────
+        self.streamplot_group = QGroupBox('Streamplot Options')
+        spg = QVBoxLayout(self.streamplot_group)
+        spg.addLayout(_row(QLabel('U col (dx):'), self._make_col_combo('stream_u_combo', '(none)')))
+        spg.addLayout(_row(QLabel('V col (dy):'), self._make_col_combo('stream_v_combo', '(none)')))
+        spg.addLayout(_row(QLabel('Density:'),    self._make_dbl_spin('stream_density', 0.1, 10.0, 1.0, 0.1)))
+        spg.addLayout(_row(QLabel('Arrow size:'), self._make_dbl_spin('stream_arrowsize', 0.1, 5.0, 1.0, 0.1)))
+        spg.addLayout(_row(QLabel('Line width:'), self._make_dbl_spin('stream_linewidth', 0.2, 5.0, 1.5, 0.1)))
+        self.stream_color_by_mag = QCheckBox('Color by magnitude'); self.stream_color_by_mag.stateChanged.connect(self.update_preview); spg.addWidget(self.stream_color_by_mag)
+        spg.addLayout(_row(QLabel('Colormap:'),   self._make_combo('stream_cmap_combo', _CMAP_LIST)))
+        layout.addWidget(self.streamplot_group)
 
     # ── Widget factory helpers ─────────────────────────────────────────────────
     def _make_spin(self, attr, lo, hi, val):
@@ -868,6 +911,20 @@ class TabBuildersMixin:
         self.y_formatter.currentTextChanged.connect(self._save_axes_state)
         yfmt_row.addWidget(self.y_formatter); yfmt_row.addStretch()
         layout.addLayout(yfmt_row)
+
+        layout.addWidget(self._hline())
+
+        # ── Equal Scale ───────────────────────────────────────────────────────
+        equal_scale_row = QHBoxLayout()
+        self.equal_scale_check = QCheckBox('Equal scale (1:1 aspect ratio)')
+        self.equal_scale_check.setToolTip(
+            'Force X and Y axes to use the same scale length (ax.set_aspect("equal")).\n'
+            'Useful for scatter plots, maps, and any data where distances should be preserved.'
+        )
+        self.equal_scale_check.stateChanged.connect(self._save_axes_state)
+        equal_scale_row.addWidget(self.equal_scale_check)
+        equal_scale_row.addStretch()
+        layout.addLayout(equal_scale_row)
 
         layout.addWidget(self._hline())
 
@@ -1301,6 +1358,17 @@ class TabBuildersMixin:
         self.area_showline.stateChanged.connect(self.update_preview)
         stag.addWidget(self.area_showline)
         layout.addWidget(self.st_area_group)
+
+        # Fill Between series options
+        self.st_fill_between_group = QWidget()
+        stfbg = QVBoxLayout(self.st_fill_between_group); stfbg.setContentsMargins(0, 0, 0, 0); stfbg.setSpacing(4)
+        stfbg.addLayout(_srow(QLabel('Fill alpha:'), self._make_dbl_spin('fill_between_alpha', 0.05, 1.0, 0.4, 0.05)))
+        stfbg.addLayout(_srow(QLabel('Line width:'), self._make_dbl_spin('fill_between_lw', 0.0, 5.0, 0.8, 0.25)))
+        self.fill_between_showline = QCheckBox('Show edge lines')
+        self.fill_between_showline.setChecked(True)
+        self.fill_between_showline.stateChanged.connect(self.update_preview)
+        stfbg.addWidget(self.fill_between_showline)
+        layout.addWidget(self.st_fill_between_group)
 
         # Step series options
         self.st_step_group = QWidget()

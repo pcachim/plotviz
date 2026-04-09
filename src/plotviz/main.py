@@ -132,7 +132,7 @@ class PlotVizQApplication(QApplication):
     def event(self, e: QEvent) -> bool:
         if e.type() == QEvent.Type.FileOpen and self._window is not None:
             fp = e.file()                           # type: ignore[attr-defined]
-            if fp.endswith(_CHART_EXT):
+            if fp.endswith(_CHART_EXT) or fp.endswith('.zip'):
                 self._window._load_project_from_path(fp)
             elif fp.endswith(_TEMPLATE_EXT):
                 self._window._load_template_from_path(fp)
@@ -191,7 +191,7 @@ def main():
     # macOS passes the file path in argv when the app is launched by opening a
     # document from Finder (and the app was not already running).
     for arg in sys.argv[1:]:
-        if arg.endswith(_CHART_EXT) and Path(arg).is_file():
+        if (arg.endswith(_CHART_EXT) or arg.endswith('.zip')) and Path(arg).is_file():
             window._load_project_from_path(arg)
             break
         if arg.endswith(_TEMPLATE_EXT) and Path(arg).is_file():

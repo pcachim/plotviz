@@ -88,6 +88,7 @@ class SerializationMixin:
         s['subplot_y_formatter']   = _ser(self.subplot_y_formatter)
         s['subplot_xticks_show']   = _ser(self.subplot_xticks_show)
         s['subplot_yticks_show']   = _ser(self.subplot_yticks_show)
+        s['subplot_equal_aspect']  = _ser(self.subplot_equal_aspect)
         s['subplot_ann_visible']   = _ser(self.subplot_ann_visible)
 
         # Axis label fonts/colors (global – same for all subplots, stored in Axes tab)
@@ -247,6 +248,18 @@ class SerializationMixin:
         s['quiver_width']        = self.quiver_width.value()
         s['quiver_color_by_mag'] = self.quiver_color_by_mag.isChecked()
         s['quiver_cmap']         = self.quiver_cmap_combo.currentText()
+        # Barbs
+        s['barbs_length']        = self.barbs_length.value()
+        s['barbs_pivot']         = self.barbs_pivot_combo.currentText()
+        s['barbs_alpha']         = self.barbs_alpha.value()
+        s['barbs_color_by_mag']  = self.barbs_color_by_mag.isChecked()
+        s['barbs_cmap']          = self.barbs_cmap_combo.currentText()
+        # Streamplot
+        s['stream_density']      = self.stream_density.value()
+        s['stream_arrowsize']    = self.stream_arrowsize.value()
+        s['stream_linewidth']    = self.stream_linewidth.value()
+        s['stream_color_by_mag'] = self.stream_color_by_mag.isChecked()
+        s['stream_cmap']         = self.stream_cmap_combo.currentText()
 
         # Default annotation style (applied to new annotations; not per-annotation)
         s['ann_fontcolor']  = getattr(self, 'ann_fontcolor',  '#000000')
@@ -280,13 +293,19 @@ class SerializationMixin:
             'series':               series_data,
             'z_col':                self.combo_z.currentText(),
             'err_col':              self.combo_err.currentText(),
+            'fill_y2_col':          self.combo_fill_y2.currentText() if hasattr(self, 'combo_fill_y2') else '(none)',
             'quiver_u_col':         self.quiver_u_combo.currentText() if hasattr(self, 'quiver_u_combo') else '(none)',
             'quiver_v_col':         self.quiver_v_combo.currentText() if hasattr(self, 'quiver_v_combo') else '(none)',
+            'barbs_u_col':          self.barbs_u_combo.currentText()  if hasattr(self, 'barbs_u_combo')  else '(none)',
+            'barbs_v_col':          self.barbs_v_combo.currentText()  if hasattr(self, 'barbs_v_combo')  else '(none)',
+            'stream_u_col':         self.stream_u_combo.currentText() if hasattr(self, 'stream_u_combo') else '(none)',
+            'stream_v_col':         self.stream_v_combo.currentText() if hasattr(self, 'stream_v_combo') else '(none)',
             'bubble_size_col':      self.bubble_size_combo.currentText() if hasattr(self, 'bubble_size_combo') else '(uniform)',
             'err_xerr_col':         self.err_xerr_combo.currentText() if hasattr(self, 'err_xerr_combo') else '(none)',
             'subplot_chart_types':  {str(k): v for k, v in self.subplot_chart_types.items()},
             'subplot_plot_modes':   {str(k): v for k, v in self.subplot_plot_modes.items()},
             'subplot_legend_locs':  {str(k): v for k, v in self.subplot_legend_locs.items()},
+            'subplot_chart_opts':   {str(k): v for k, v in self.subplot_chart_opts.items()},
         }
 
     def _apply_settings(self, s):
@@ -468,6 +487,7 @@ class SerializationMixin:
         self.subplot_y_formatter   = _di('subplot_y_formatter', {'0': 'auto'})
         self.subplot_xticks_show   = _di('subplot_xticks_show', {'0': True})
         self.subplot_yticks_show   = _di('subplot_yticks_show', {'0': True})
+        self.subplot_equal_aspect  = _di('subplot_equal_aspect', {'0': False})
         self.subplot_ann_visible   = _di('subplot_ann_visible', {'0': True})
         self.sp_sharex.setChecked(s.get('sp_sharex', False))
         self.sp_sharey.setChecked(s.get('sp_sharey', False))
@@ -508,7 +528,8 @@ class SerializationMixin:
         def _cb(w, key, default): w.setChecked(s.get(key, default))
         def _sp(w, key, default): w.setValue(s.get(key, default))
         def _co(w, key, default):
-            i = w.findText(s.get(key, default))
+            # str() guard: legacy files may store combo values as int/float
+            i = w.findText(str(s.get(key, default)))
             if i >= 0: w.setCurrentIndex(i)
 
         # Bar
@@ -593,6 +614,18 @@ class SerializationMixin:
         _sp(self.quiver_width,       'quiver_width',       0.005)
         _cb(self.quiver_color_by_mag,'quiver_color_by_mag',False)
         _co(self.quiver_cmap_combo,  'quiver_cmap',        'viridis')
+        # Barbs
+        _sp(self.barbs_length,       'barbs_length',       7.0)
+        _co(self.barbs_pivot_combo,  'barbs_pivot',        'tip')
+        _sp(self.barbs_alpha,        'barbs_alpha',        0.85)
+        _cb(self.barbs_color_by_mag, 'barbs_color_by_mag', False)
+        _co(self.barbs_cmap_combo,   'barbs_cmap',         'viridis')
+        # Streamplot
+        _sp(self.stream_density,     'stream_density',     1.0)
+        _sp(self.stream_arrowsize,   'stream_arrowsize',   1.0)
+        _sp(self.stream_linewidth,   'stream_linewidth',   1.5)
+        _cb(self.stream_color_by_mag,'stream_color_by_mag',False)
+        _co(self.stream_cmap_combo,  'stream_cmap',        'viridis')
 
         # ── Annotation default style ─────────────────────────────────────────
         def _set_ann_color(attr, default):
@@ -670,7 +703,10 @@ class SerializationMixin:
             cb_y.currentIndexChanged.connect(self.update_preview)
             self.series_table.setCellWidget(row, 1, cb_y)
 
-            self.series_table.setItem(row, 2, QTableWidgetItem(sd.get('label', f'Series {row+1}')))
+            # Label — explicitly set editable flag so double-click editing works reliably
+            _lbl_item = QTableWidgetItem(sd.get('label', f'Series {row+1}'))
+            _lbl_item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsEnabled)
+            self.series_table.setItem(row, 2, _lbl_item)
 
             # Type combo — restricted to the plot mode of this series' subplot,
             # matching the behaviour when rows are added interactively.
@@ -719,8 +755,11 @@ class SerializationMixin:
         if i >= 0: self.combo_z.setCurrentIndex(i)
         i = self.combo_err.findText(m.get('err_col', '(none)'))
         if i >= 0: self.combo_err.setCurrentIndex(i)
+        if hasattr(self, 'combo_fill_y2'):
+            i = self.combo_fill_y2.findText(m.get('fill_y2_col', '(none)'))
+            if i >= 0: self.combo_fill_y2.setCurrentIndex(i)
 
-        # Restore subplot chart types, plot modes, and legend locs
+        # Restore subplot chart types, plot modes, legend locs, and chart opts
         saved_ct = m.get('subplot_chart_types', {})
         self.subplot_chart_types = {int(k): v for k, v in saved_ct.items()}
         saved_ll = m.get('subplot_legend_locs', {})
@@ -728,15 +767,30 @@ class SerializationMixin:
         saved_pm = m.get('subplot_plot_modes', {})
         _mode_compat = {'Lines & Scatter': 'Standard', 'Bar & Histogram': 'Histogram', 'normal': 'Standard'}
         self.subplot_plot_modes = {int(k): _mode_compat.get(v, v) for k, v in saved_pm.items()}
+        # Restore per-subplot chart options (backward-compat: old files won't have this key)
+        saved_co = m.get('subplot_chart_opts', {})
+        self.subplot_chart_opts = {int(k): v for k, v in saved_co.items()}
+        _defaults = self._default_chart_opts() if hasattr(self, '_default_chart_opts') else {}
         for idx in range(n_subplots):
             self.subplot_chart_types.setdefault(idx, 'Line')
             self.subplot_legend_locs.setdefault(idx, 'best')
             self.subplot_plot_modes.setdefault(idx, 'Standard')
+            # Merge saved opts with defaults so any newly-added keys are present
+            if idx not in self.subplot_chart_opts:
+                self.subplot_chart_opts[idx] = dict(_defaults)
+            else:
+                merged = dict(_defaults)
+                merged.update(self.subplot_chart_opts[idx])
+                self.subplot_chart_opts[idx] = merged
 
-        # Restore extra column combos (quiver U/V, bubble size, X error)
+        # Restore extra column combos (quiver/barbs/streamplot U/V, bubble size, X error)
         for attr, key, sentinel in [
             ('quiver_u_combo',    'quiver_u_col',    '(none)'),
             ('quiver_v_combo',    'quiver_v_col',    '(none)'),
+            ('barbs_u_combo',     'barbs_u_col',     '(none)'),
+            ('barbs_v_combo',     'barbs_v_col',     '(none)'),
+            ('stream_u_combo',    'stream_u_col',    '(none)'),
+            ('stream_v_combo',    'stream_v_col',    '(none)'),
             ('bubble_size_combo', 'bubble_size_col', '(uniform)'),
             ('err_xerr_combo',    'err_xerr_col',    '(none)'),
         ]:
@@ -747,6 +801,12 @@ class SerializationMixin:
                 w.blockSignals(True)
                 w.setCurrentIndex(i if i >= 0 else 0)
                 w.blockSignals(False)
+
+        # Load the chart-option widgets for the active subplot so the UI
+        # immediately reflects the restored per-subplot values.
+        if hasattr(self, '_load_chart_opts') and hasattr(self, 'sp_active'):
+            _active = self.sp_active.currentIndex()
+            self._load_chart_opts(max(0, _active))
 
         self._refresh_curve_select()
 
@@ -858,10 +918,12 @@ class SerializationMixin:
             _default_dir = _os.path.join(_os.path.dirname(self._current_filepath), _stem)
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Save Chart', _default_dir,
-            'plotviz File (*.pviz);;All Files (*)')
+            'plotviz File (*.pviz);;zip Archive (*.zip);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
-        if not fp.endswith('.pviz'): fp += '.pviz'
+        # Accept .pviz or .zip; fall back to .pviz for any other extension
+        if not (fp.endswith('.pviz') or fp.endswith('.zip')):
+            fp += '.pviz'
         self._current_filepath = fp
         self._update_window_title()
         self._is_dirty = False
@@ -876,13 +938,17 @@ class SerializationMixin:
                     txt = cb.currentText()
                     if txt and txt in self.datasets:
                         used_cols.add(txt)
-        # Also include z, err, bubble-size, quiver U/V, and x-error columns
+        # Also include z, err, bubble-size, quiver/barbs/streamplot U/V, and x-error columns
         for attr, sentinel in [
             ('combo_z',           '(none)'),
             ('combo_err',         '(none)'),
             ('bubble_size_combo', '(uniform)'),
             ('quiver_u_combo',    '(none)'),
             ('quiver_v_combo',    '(none)'),
+            ('barbs_u_combo',     '(none)'),
+            ('barbs_v_combo',     '(none)'),
+            ('stream_u_combo',    '(none)'),
+            ('stream_v_combo',    '(none)'),
             ('err_xerr_combo',    '(none)'),
         ]:
             cb = getattr(self, attr, None)
@@ -929,13 +995,17 @@ class SerializationMixin:
                         col = sd.get(key, '')
                         if col and col in self.datasets:
                             keep.add(col)
-                # Also keep z, err, bubble-size, quiver U/V, and x-error columns
+                # Also keep z, err, bubble-size, quiver/barbs/streamplot U/V, and x-error columns
                 for key, sentinel in [
                     ('z_col',           '(none)'),
                     ('err_col',         '(none)'),
                     ('bubble_size_col', '(uniform)'),
                     ('quiver_u_col',    '(none)'),
                     ('quiver_v_col',    '(none)'),
+                    ('barbs_u_col',     '(none)'),
+                    ('barbs_v_col',     '(none)'),
+                    ('stream_u_col',    '(none)'),
+                    ('stream_v_col',    '(none)'),
                     ('err_xerr_col',    '(none)'),
                 ]:
                     col = series_meta.get(key, '')
@@ -1018,7 +1088,7 @@ class SerializationMixin:
     def _load_project(self):
         """Load a full .pviz: restore datasets, settings, series and annotations."""
         fp, _ = QFileDialog.getOpenFileName(
-            self, 'Open Chart', _get_dir(), 'plotviz File (*.pviz);;All Files (*)')
+            self, 'Open Chart', _get_dir(), 'plotviz File (*.pviz);;zip File (*.zip);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
         import config.settings as _cfg
@@ -1048,6 +1118,7 @@ class SerializationMixin:
         # calls never see stale values from a previously loaded file.
         self.subplot_chart_types.clear()
         self.subplot_plot_modes.clear()
+        self.subplot_chart_opts.clear()
         # Clear the series table BEFORE _apply_settings or any signal-triggered
         # redraws can reference the now-empty datasets and crash.
         if hasattr(self, 'series_table'):

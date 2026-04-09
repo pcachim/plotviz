@@ -50,11 +50,16 @@ def _latex_safe(text: str) -> str:
 
 
 _3D_TYPES = {'3D Surface'}
-_NO_LEGEND_TYPES = {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Contour', '3D Surface', 'Violin', 'Boxplot', 'Radar', 'Quiver'}
+_NO_LEGEND_TYPES = {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Contour', '3D Surface', 'Violin', 'Boxplot', 'Radar', 'Quiver', 'Barbs', 'Streamplot'}
 
 
 class PlotEngineMixin:
-    def _plot_on(self, ax, series, ct, row_offset=0):
+    def _sp_opt(self, subplot_idx, key, fallback=None):
+        """Return a per-subplot chart option, falling back to *fallback* when absent."""
+        opts = getattr(self, 'subplot_chart_opts', {}).get(subplot_idx, {})
+        return opts.get(key, fallback)
+
+    def _plot_on(self, ax, series, ct, row_offset=0, subplot_idx=0):
         """
         series: list of (xd, yd, label, series_ct) tuples.
         ct: the global/whole-chart type (used for whole-chart types).
@@ -63,6 +68,7 @@ class PlotEngineMixin:
         X/Y arrays are truncated to min(len(x), len(y)) so temporary column
         mismatches during editing never cause an exception.
         row_offset: ignored — colours restart from index 0 on every subplot.
+        subplot_idx: which subplot's chart opts to use when rendering.
         """
 
         # Truncate every series to the shorter of its two arrays
@@ -78,11 +84,19 @@ class PlotEngineMixin:
         # so every subplot's first series gets the first palette colour.
         C = self._tab10(max(len(series), 1))
 
-        def _cmap(type_attr):
-            """Return the cmap string for a given chart type's dedicated combo,
-            falling back to the shared heat/contour combo."""
+        def _cmap(type_attr, sp_key=None):
+            """Return the cmap string for a given subplot, using per-subplot opts
+            when available and falling back to the shared combo widget."""
+            if sp_key:
+                val = self._sp_opt(subplot_idx, sp_key, None)
+                if val:
+                    return val
             combo = getattr(self, type_attr, None) or getattr(self, 'cmap_combo', None)
             return combo.currentText() if combo else 'viridis'
+
+        def _o(key, default):
+            """Shorthand: read a per-subplot chart option with a default."""
+            return self._sp_opt(subplot_idx, key, default)
 
         # Guard: all series must agree on X categorical vs numeric.
         # Use the majority type so one stray numeric series doesn't drop all categoricals.
@@ -98,9 +112,9 @@ class PlotEngineMixin:
                 for i, (xd, yd, lbl, _) in enumerate(series):
                     s = self.curve_styles.get(lbl, {})
                     o = s.get('opts', {})
-                    ec_val = o.get('hist_edgecolor', self.hist_edgecolor.currentText())
+                    ec_val = o.get('hist_edgecolor', _o('hist_edgecolor', 'white'))
                     if ec_val == 'auto': ec_val = s.get('color', C[i])
-                    h_alpha = o.get('hist_alpha', self.hist_alpha.value())
+                    h_alpha = o.get('hist_alpha', _o('hist_alpha', 0.7))
                     if self._is_categorical(yd):
                         vals, counts = np.unique(yd, return_counts=True)
                         ax.bar(vals, counts, label=lbl, color=s.get('color', C[i]),
@@ -108,11 +122,11 @@ class PlotEngineMixin:
                                edgecolor=ec_val if ec_val != 'none' else None)
                         ax.tick_params(axis='x', rotation=45)
                     else:
-                        ax.hist(yd, bins=self.hist_bins.value(),
-                                density=self.hist_density.isChecked(),
-                                cumulative=self.hist_cumulative.isChecked(),
-                                histtype=self.hist_histtype.currentText(),
-                                orientation=self.hist_orientation.currentText(),
+                        ax.hist(yd, bins=_o('hist_bins', 20),
+                                density=_o('hist_density', False),
+                                cumulative=_o('hist_cumulative', False),
+                                histtype=_o('hist_histtype', 'bar'),
+                                orientation=_o('hist_orientation', 'vertical'),
                                 alpha=h_alpha,
                                 edgecolor=ec_val if ec_val != 'none' else None,
                                 label=lbl, color=s.get('color', C[i]))
@@ -122,30 +136,30 @@ class PlotEngineMixin:
                 if num_series:
                     bp = ax.boxplot(
                         [v for _, v in num_series], labels=[k for k, _ in num_series],
-                        patch_artist=True, notch=self.box_notch.isChecked(),
-                        vert=self.box_vert.isChecked(),
-                        showmeans=self.box_show_means.isChecked(),
-                        showfliers=self.box_showfliers.isChecked(),
-                        whis=self.box_whis.value(),
-                        medianprops=dict(color='black', linewidth=2) if self.box_show_medians.isChecked() else dict(linewidth=0),
+                        patch_artist=True, notch=_o('box_notch', False),
+                        vert=_o('box_vert', True),
+                        showmeans=_o('box_show_means', False),
+                        showfliers=_o('box_showfliers', True),
+                        whis=_o('box_whis', 1.5),
+                        medianprops=dict(color='black', linewidth=2) if _o('box_show_medians', True) else dict(linewidth=0),
                     )
                     for patch, c in zip(bp['boxes'], C):
-                        patch.set_facecolor(c); patch.set_alpha(self.box_alpha.value())
+                        patch.set_facecolor(c); patch.set_alpha(_o('box_alpha', 0.7))
 
             elif ct == 'Violin':
                 num_series = [(k, v) for k, v in yd_dict.items() if not self._is_categorical(v)]
                 if num_series:
                     parts = ax.violinplot(
                         [v for _, v in num_series],
-                        showmeans=self.violin_show_means.isChecked(),
-                        showmedians=self.violin_show_medians.isChecked(),
-                        showextrema=self.violin_show_extrema.isChecked(),
-                        bw_method=self.violin_bw.currentText(),
-                        points=int(self.violin_points.currentText()),
-                        vert=self.violin_vert.isChecked(),
+                        showmeans=_o('violin_show_means', True),
+                        showmedians=_o('violin_show_medians', True),
+                        showextrema=_o('violin_show_extrema', False),
+                        bw_method=_o('violin_bw', 'scott'),
+                        points=int(_o('violin_points', '100')),
+                        vert=_o('violin_vert', True),
                     )
                     for pc, c in zip(parts['bodies'], C): pc.set_facecolor(c); pc.set_alpha(0.7)
-                    if self.violin_vert.isChecked():
+                    if _o('violin_vert', True):
                         ax.set_xticks(range(1, len(num_series)+1))
                         ax.set_xticklabels([k for k, _ in num_series])
                     else:
@@ -156,8 +170,8 @@ class PlotEngineMixin:
                 if series:
                     xd, yd, lbl, _ = series[0]
                     labels = list(xd) if self._is_categorical(xd) else [f'{v:.4g}' for v in xd]
-                    explode = [0.08] + [0.0]*(len(yd)-1) if self.pie_explode_first.isChecked() else None
-                    wedge_kw = {'width': 0.5} if self.pie_donut.isChecked() else {}
+                    explode = [0.08] + [0.0]*(len(yd)-1) if _o('pie_explode_first', False) else None
+                    wedge_kw = {'width': 0.5} if _o('pie_donut', False) else {}
                     # Per-wedge colors: use curve_styles[segment] if present (set by the
                     # palette system or user edits), otherwise assign from palette and store
                     # so future palette changes have an entry to update.
@@ -177,11 +191,11 @@ class PlotEngineMixin:
                             self.curve_styles[key] = s
                             wedge_colors.append(c)
                     ax.pie(np.abs(yd), labels=labels,
-                           autopct='%1.1f%%' if self.pie_autopct.isChecked() else None,
-                           shadow=self.pie_shadow.isChecked(),
-                           startangle=self.pie_startangle.value(),
-                           labeldistance=self.pie_labeldistance.value(),
-                           pctdistance=self.pie_pctdistance.value(),
+                           autopct='%1.1f%%' if _o('pie_autopct', True) else None,
+                           shadow=_o('pie_shadow', False),
+                           startangle=_o('pie_startangle', 90.0),
+                           labeldistance=_o('pie_labeldistance', 1.1),
+                           pctdistance=_o('pie_pctdistance', 0.6),
                            explode=explode, wedgeprops=wedge_kw,
                            colors=wedge_colors)
                     ax.set_aspect('equal')
@@ -193,10 +207,10 @@ class PlotEngineMixin:
                     n = int(np.ceil(np.sqrt(len(z))))
                     Z = np.full((n, n), np.nan)
                     for k in range(len(z)): Z[k//n, k%n] = z[k]
-                    im = ax.imshow(Z, aspect='auto', cmap=_cmap('cmap_combo'), origin='lower',
-                                   alpha=self.heat_alpha.value(),
-                                   interpolation=self.heat_interpolation.currentText())
-                    if self.heat_colorbar.isChecked(): self.canvas.figure.colorbar(im, ax=ax)
+                    im = ax.imshow(Z, aspect='auto', cmap=_cmap('cmap_combo', 'cmap'), origin='lower',
+                                   alpha=_o('heat_alpha', 1.0),
+                                   interpolation=_o('heat_interpolation', 'nearest'))
+                    if _o('heat_colorbar', True): self.canvas.figure.colorbar(im, ax=ax)
 
             elif ct == 'Contour':
                 zc = self.combo_z.currentText()
@@ -210,12 +224,12 @@ class PlotEngineMixin:
                         xi = np.linspace(np.min(xd), np.max(xd), n)
                         yi = np.linspace(np.min(yd), np.max(yd), n)
                         X, Y = np.meshgrid(xi, yi)
-                        lvl = self.contour_levels.value()
-                        alp = self.heat_alpha.value()
-                        if self.heat_filled_contour.isChecked():
-                            cf = ax.contourf(X, Y, Z, levels=lvl, cmap=_cmap('cmap_combo'), alpha=alp)
-                            if self.heat_colorbar.isChecked(): self.canvas.figure.colorbar(cf, ax=ax)
-                        if self.heat_contour_lines.isChecked():
+                        lvl = _o('contour_levels', 10)
+                        alp = _o('heat_alpha', 1.0)
+                        if _o('heat_filled_contour', True):
+                            cf = ax.contourf(X, Y, Z, levels=lvl, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp)
+                            if _o('heat_colorbar', True): self.canvas.figure.colorbar(cf, ax=ax)
+                        if _o('heat_contour_lines', True):
                             ax.contour(X, Y, Z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
 
             elif ct == '3D Surface':
@@ -229,22 +243,22 @@ class PlotEngineMixin:
                         xi = np.linspace(np.min(xd), np.max(xd), n)
                         yi = np.linspace(np.min(yd), np.max(yd), n)
                         X, Y = np.meshgrid(xi, yi)
-                        st = self.surf_stride.value(); alp = self.heat_alpha.value()
-                        if self.surf_wireframe.isChecked():
+                        st = _o('surf_stride', 1); alp = _o('heat_alpha', 1.0)
+                        if _o('surf_wireframe', False):
                             ax.plot_wireframe(X, Y, Z, rstride=st, cstride=st, alpha=alp)
                         else:
-                            ax.plot_surface(X, Y, Z, cmap=_cmap('cmap_combo'), alpha=alp, rstride=st, cstride=st)
+                            ax.plot_surface(X, Y, Z, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp, rstride=st, cstride=st)
 
             elif ct == 'Hist2D':
                 if series:
                     xd, yd, lbl, _ = series[0]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        norm = matplotlib.colors.LogNorm() if self.hist2d_log.isChecked() else None
+                        norm = matplotlib.colors.LogNorm() if _o('hist2d_log', False) else None
                         _, _, _, img = ax.hist2d(
                             xd.astype(float), yd.astype(float),
-                            bins=[self.hist2d_bins_x.value(), self.hist2d_bins_y.value()],
-                            cmap=_cmap('hist2d_cmap_combo'), alpha=self.hist2d_alpha.value(), norm=norm)
-                        if self.hist2d_colorbar.isChecked():
+                            bins=[_o('hist2d_bins_x', 20), _o('hist2d_bins_y', 20)],
+                            cmap=_cmap('hist2d_cmap_combo', 'hist2d_cmap'), alpha=_o('hist2d_alpha', 1.0), norm=norm)
+                        if _o('hist2d_colorbar', True):
                             self.canvas.figure.colorbar(img, ax=ax)
 
             elif ct == 'Hexbin':
@@ -252,10 +266,10 @@ class PlotEngineMixin:
                     xd, yd, lbl, _ = series[0]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
                         hb = ax.hexbin(xd.astype(float), yd.astype(float),
-                                       gridsize=self.hexbin_gridsize.value(), cmap=_cmap('hexbin_cmap_combo'),
-                                       bins='log' if self.hexbin_log.isChecked() else None,
-                                       alpha=self.hexbin_alpha.value())
-                        if self.hexbin_colorbar.isChecked():
+                                       gridsize=_o('hexbin_gridsize', 20), cmap=_cmap('hexbin_cmap_combo', 'hexbin_cmap'),
+                                       bins='log' if _o('hexbin_log', False) else None,
+                                       alpha=_o('hexbin_alpha', 1.0))
+                        if _o('hexbin_colorbar', True):
                             self.canvas.figure.colorbar(hb, ax=ax)
 
             elif ct == 'Polar':
@@ -285,15 +299,15 @@ class PlotEngineMixin:
                         all_vals = np.concatenate([s[1].astype(float) for s in series])
                         vmax = np.nanmax(np.abs(all_vals)) if len(all_vals) else 1
                         ax.set_ylim(0, vmax*1.1)
-                        ax.set_yticks(np.linspace(0, vmax, self.radar_gridlevels.value()+1)[1:])
+                        ax.set_yticks(np.linspace(0, vmax, _o('radar_gridlevels', 5)+1)[1:])
                         for i, (xd_s, yd_s, lbl_s, _) in enumerate(series):
                             s = self.curve_styles.get(lbl_s, {})
                             o_s = s.get('opts', {})
                             color = s.get('color', C[i])
                             vals = list(yd_s.astype(float)) + [float(yd_s[0])]
                             ax.plot(angles, vals, color=color, linewidth=s.get('linewidth', 1.8), label=lbl_s)
-                            if o_s.get('rad_fill', self.radar_fill.isChecked()):
-                                ax.fill(angles, vals, color=color, alpha=o_s.get('rad_fill_alpha', self.radar_fill_alpha.value()))
+                            if o_s.get('rad_fill', _o('rad_fill', True)):
+                                ax.fill(angles, vals, color=color, alpha=o_s.get('rad_fill_alpha', _o('rad_fill_alpha', 0.25)))
 
             elif ct == 'ECDF':
                 for i, (xd, yd, lbl, _) in enumerate(series):
@@ -303,12 +317,12 @@ class PlotEngineMixin:
                     color = s.get('color', C[i])
                     sorted_d = np.sort(yd.astype(float))
                     ecdf = np.arange(1, len(sorted_d)+1) / len(sorted_d)
-                    if self.ecdf_complementary.isChecked(): ecdf = 1.0 - ecdf
+                    if _o('ecdf_complementary', False): ecdf = 1.0 - ecdf
                     ax.step(sorted_d, ecdf, color=color,
                             linewidth=s.get('linewidth', 1.8),
-                            alpha=o.get('ecdf_alpha', self.ecdf_alpha.value()),
+                            alpha=o.get('ecdf_alpha', _o('ecdf_alpha', 1.0)),
                             label=lbl, where='post')
-                    if o.get('ecdf_markers', self.ecdf_markers.isChecked()):
+                    if o.get('ecdf_markers', _o('ecdf_markers', False)):
                         ax.scatter(sorted_d, ecdf, color=color, s=12, zorder=4)
                 ax.set_ylim(-0.02, 1.02); ax.set_ylabel('F(x)')
 
@@ -321,28 +335,92 @@ class PlotEngineMixin:
                         U = self.datasets[uc].astype(float)
                         V = self.datasets[vc].astype(float)
                         n = min(len(xd), len(yd), len(U), len(V))
-                        sc = self.quiver_scale.value()
+                        sc = _o('quiver_scale', 1.0)
                         _x, _y = xd[:n].astype(float), yd[:n].astype(float)
                         _U, _V = U[:n].astype(float), V[:n].astype(float)
                         _kw = dict(scale=sc if sc != 1.0 else None,
                                    scale_units='xy' if sc != 1.0 else None,
-                                   width=self.quiver_width.value(), alpha=0.85)
-                        if self.quiver_color_by_mag.isChecked():
+                                   width=_o('quiver_width', 0.005), alpha=0.85)
+                        if _o('quiver_color_by_mag', False):
                             ax.quiver(_x, _y, _U, _V, np.hypot(_U, _V),
-                                      cmap=_cmap('quiver_cmap_combo'), **_kw)
+                                      cmap=_cmap('quiver_cmap_combo', 'quiver_cmap'), **_kw)
                         else:
                             ax.quiver(_x, _y, _U, _V, **_kw)
+
+            elif ct == 'Barbs':
+                if series:
+                    xd, yd, lbl, _ = series[0]
+                    uc = self.barbs_u_combo.currentText()
+                    vc = self.barbs_v_combo.currentText()
+                    if uc != '(none)' and vc != '(none)' and uc in self.datasets and vc in self.datasets:
+                        U = self.datasets[uc].astype(float)
+                        V = self.datasets[vc].astype(float)
+                        n = min(len(xd), len(yd), len(U), len(V))
+                        _x, _y = xd[:n].astype(float), yd[:n].astype(float)
+                        _U, _V = U[:n].astype(float), V[:n].astype(float)
+                        _kw = dict(
+                            length=_o('barbs_length', 7.0),
+                            pivot=_o('barbs_pivot', 'tip'),
+                            alpha=_o('barbs_alpha', 0.85),
+                        )
+                        if _o('barbs_color_by_mag', False):
+                            mag = np.hypot(_U, _V)
+                            ax.barbs(_x, _y, _U, _V, mag,
+                                     cmap=_cmap('barbs_cmap_combo', 'barbs_cmap'), **_kw)
+                        else:
+                            ax.barbs(_x, _y, _U, _V, **_kw)
+
+            elif ct == 'Streamplot':
+                if series:
+                    xd, yd, lbl, _ = series[0]
+                    uc = self.stream_u_combo.currentText()
+                    vc = self.stream_v_combo.currentText()
+                    if uc != '(none)' and vc != '(none)' and uc in self.datasets and vc in self.datasets:
+                        try:
+                            U_flat = self.datasets[uc].astype(float)
+                            V_flat = self.datasets[vc].astype(float)
+                            _xf = xd.astype(float)
+                            _yf = yd.astype(float)
+                            n = min(len(_xf), len(_yf), len(U_flat), len(V_flat))
+                            _xf = _xf[:n]; _yf = _yf[:n]
+                            U_flat = U_flat[:n]; V_flat = V_flat[:n]
+                            # Build a regular 2-D grid from the flat point columns.
+                            xs_u = np.unique(_xf)
+                            ys_u = np.unique(_yf)
+                            nx, ny = len(xs_u), len(ys_u)
+                            xi = np.searchsorted(xs_u, _xf)
+                            yi = np.searchsorted(ys_u, _yf)
+                            U_grid = np.zeros((ny, nx))
+                            V_grid = np.zeros((ny, nx))
+                            for k in range(n):
+                                if xi[k] < nx and yi[k] < ny:
+                                    U_grid[yi[k], xi[k]] = U_flat[k]
+                                    V_grid[yi[k], xi[k]] = V_flat[k]
+                            _kw = dict(
+                                density=_o('stream_density', 1.0),
+                                arrowsize=_o('stream_arrowsize', 1.0),
+                                linewidth=_o('stream_linewidth', 1.5),
+                            )
+                            if _o('stream_color_by_mag', False):
+                                speed = np.sqrt(U_grid**2 + V_grid**2)
+                                _kw['color'] = speed
+                                _kw['cmap'] = _cmap('stream_cmap_combo', 'stream_cmap')
+                                del _kw['linewidth']  # can't combine with color array
+                            ax.streamplot(xs_u, ys_u, U_grid, V_grid, **_kw)
+                        except Exception:
+                            pass  # silently skip if data is not grid-compatible
+
             return
 
         # ── Per-series mixable types ─────────────────────────────────────────
         bar_series  = [(i, xd, yd, lbl) for i, (xd, yd, lbl, sct) in enumerate(series) if sct == 'Bar']
         n_bar    = len(bar_series)
-        bar_w    = self.bar_width.value()
-        bar_stk  = self.bar_stacked.isChecked()
-        bar_horiz= self.bar_horizontal.isChecked()
-        bar_ec   = self.bar_edgecolor.currentText()
-        bar_elw  = self.bar_edge_lw.value()
-        bar_al   = self.bar_alpha.value()
+        bar_w    = _o('bar_width', 0.8)
+        bar_stk  = _o('bar_stacked', False)
+        bar_horiz= _o('bar_horizontal', False)
+        bar_ec   = _o('bar_edgecolor', 'none')
+        bar_elw  = _o('bar_edge_lw', 0.5)
+        bar_al   = _o('bar_alpha', 1.0)
 
         def _bar(ax, positions, values, width, bottom=None, **kw):
             ec_kw = {'edgecolor': bar_ec if bar_ec != 'none' else 'none',
@@ -460,7 +538,7 @@ class PlotEngineMixin:
                 b_ec  = o.get('bar_edgecolor', bar_ec)
                 b_elw = o.get('bar_edge_lw',  bar_elw)
                 b_al  = o.get('bar_alpha',    bar_al)
-                b_cbv = o.get('bar_colorbyval', self.bar_colorbyval.isChecked())
+                b_cbv = o.get('bar_colorbyval', _o('bar_colorbyval', False))
                 # Color bars by value if requested
                 def _bar_colors(vals, base_color, _cbv=b_cbv):
                     if _cbv:
@@ -505,10 +583,10 @@ class PlotEngineMixin:
                                color=_bar_colors(yd_f, color), alpha=b_al)
 
             elif sct == 'Area':
-                al  = o.get('area_alpha',   self.area_alpha.value())
-                lw  = o.get('area_lw',      self.area_lw.value())
-                stk = o.get('area_stacked', self.area_stacked.isChecked())
-                bl  = o.get('area_baseline',self.area_baseline.value())
+                al  = o.get('area_alpha',   _o('area_alpha', 0.4))
+                lw  = o.get('area_lw',      _o('area_lw', 0.8))
+                stk = o.get('area_stacked', _o('area_stacked', False))
+                bl  = o.get('area_baseline', _o('area_baseline', 0.0))
                 xplot = _cat_xplot(xd) if is_cat else xd
                 base_key = '_area_base'
                 base = getattr(ax, base_key, None)
@@ -516,13 +594,45 @@ class PlotEngineMixin:
                     base = np.full(len(xplot), bl)
                 if stk:
                     ax.fill_between(xplot, base, base + yd, alpha=al, label=lbl, color=color)
-                    if o.get('area_showline', self.area_showline.isChecked()):
+                    if o.get('area_showline', _o('area_showline', True)):
                         ax.plot(xplot, base + yd, color=color, lw=lw)
                     setattr(ax, base_key, base + yd)
                 else:
                     ax.fill_between(xplot, bl, yd, alpha=al, label=lbl, color=color)
-                    if o.get('area_showline', self.area_showline.isChecked()):
+                    if o.get('area_showline', _o('area_showline', True)):
                         ax.plot(xplot, yd, color=color, lw=lw)
+
+            elif sct == 'Fill Between':
+                if self._is_categorical(yd): continue
+                xplot = _cat_xplot(xd) if is_cat else xd
+                al        = o.get('fill_between_alpha',   _o('fill_between_alpha',   0.4))
+                lw        = o.get('fill_between_lw',      _o('fill_between_lw',      0.8))
+                show_line = o.get('fill_between_showline', True)
+                if hasattr(show_line, '__bool__'):
+                    pass  # already bool from opts
+                elif hasattr(self, 'fill_between_showline'):
+                    show_line = self.fill_between_showline.isChecked()
+                # Resolve Y2 column: per-series opts first, then chart-level combo
+                y2_col = o.get('fill_between_y2_col') or None
+                if not y2_col and hasattr(self, 'combo_fill_y2'):
+                    raw = self.combo_fill_y2.currentText()
+                    if raw and raw != '(none)':
+                        y2_col = raw
+                if y2_col and y2_col in self.datasets:
+                    y2d = self.datasets[y2_col]
+                    n   = min(len(xplot), len(yd), len(y2d))
+                    xp, y1, y2 = xplot[:n], yd[:n], y2d[:n]
+                    ax.fill_between(xp, y1, y2, alpha=al, label=lbl, color=color)
+                    if show_line:
+                        ax.plot(xp, y1, color=color, lw=lw, alpha=0.8)
+                        ax.plot(xp, y2, color=color, lw=lw, alpha=0.8)
+                else:
+                    # No Y2 selected — fill between series and y=0 as a fallback
+                    n = min(len(xplot), len(yd))
+                    xp, yp = xplot[:n], yd[:n]
+                    ax.fill_between(xp, 0, yp, alpha=al, label=lbl, color=color)
+                    if show_line:
+                        ax.plot(xp, yp, color=color, lw=lw, alpha=0.8)
 
             elif sct == 'Errorbar':
                 ec   = self.combo_err.currentText()
@@ -542,17 +652,17 @@ class PlotEngineMixin:
             elif sct == 'Step':
                 if self._is_categorical(yd): continue
                 xplot = _cat_xplot(xd) if is_cat else xd
-                where = self.step_where.currentText()
+                where = _o('step_where', 'pre')
                 lw = s.get('linewidth', 1.5)
                 ax.step(xplot, yd, where=where, label=lbl, color=color, linewidth=lw)
-                if o.get('step_fill', self.step_fill.isChecked()):
+                if o.get('step_fill', _o('step_fill', False)):
                     ax.fill_between(xplot, yd, step=where,
-                                    alpha=o.get('step_fill_alpha', self.step_fill_alpha.value()), color=color)
+                                    alpha=o.get('step_fill_alpha', _o('step_fill_alpha', 0.2)), color=color)
 
             elif sct == 'Stem':
                 if self._is_categorical(yd): continue
                 xplot = _cat_xplot(xd) if is_cat else xd
-                baseline = self.stem_baseline.value()
+                baseline = _o('stem_baseline', 0.0)
                 mk = s.get('marker', 'o')
                 mk_color = s.get('marker_color', color)
                 lw = s.get('linewidth', 1.2)
@@ -608,10 +718,10 @@ class PlotEngineMixin:
                 xd_f, yd_f = xd_f[:n], yd_f[:n]
                 if x_labels is not None:
                     x_labels = x_labels[:n]
-                w   = self.waterfall_width.value()
-                al  = self.waterfall_alpha.value()
-                pos_c = getattr(self, 'waterfall_pos_color', None) or '#2ecc71'
-                neg_c = getattr(self, 'waterfall_neg_color', None) or '#e74c3c'
+                w   = _o('waterfall_width', 0.6)
+                al  = _o('waterfall_alpha', 1.0)
+                pos_c = _o('waterfall_pos_color', None) or '#2ecc71'
+                neg_c = _o('waterfall_neg_color', None) or '#e74c3c'
                 running = 0.0; prev_top = None
                 for k in range(n):
                     val = float(yd_f[k])
@@ -620,7 +730,7 @@ class PlotEngineMixin:
                            color=fc, edgecolor='white', linewidth=0.5, alpha=al,
                            label=(lbl if k == 0 else '_nolegend_'))
                     top = running + val
-                    if self.waterfall_connector.isChecked() and prev_top is not None:
+                    if _o('waterfall_connector', True) and prev_top is not None:
                         ax.plot([xd_f[k-1]+w/2, xd_f[k]-w/2], [prev_top, prev_top],
                                 color='#555', linewidth=0.8, linestyle='--')
                     prev_top = top; running = top
@@ -896,7 +1006,7 @@ class PlotEngineMixin:
                     sct = self._get_series_type(row)
                     y2_series.append((self.datasets[xc_row], self.datasets[yc_row], label, sct))
                 if y2_series:
-                    self._plot_on(ax2, y2_series, ct, row_offset=self._get_series_row_offset(0))
+                    self._plot_on(ax2, y2_series, ct, row_offset=self._get_series_row_offset(0), subplot_idx=0)
                 if self.subplot_y2label_show.get(subplot_idx, True):
                     y2l = self.subplot_y2labels.get(subplot_idx, '') or ', '.join(y2_cols)
                     if y2l:
@@ -919,7 +1029,7 @@ class PlotEngineMixin:
         _x_is_cat = bool(_series) and self._is_categorical(_series[0][0])
         if not is3d:
             if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}:
-                _horiz = ct == 'Bar' and self.bar_horizontal.isChecked()
+                _horiz = ct == 'Bar' and self._sp_opt(subplot_idx, 'bar_horizontal', False)
                 _protect_y = _x_is_cat and _horiz
                 xs = self.subplot_xscales.get(subplot_idx, 'linear')
                 ys = self.subplot_yscales.get(subplot_idx, 'linear')
@@ -937,6 +1047,9 @@ class PlotEngineMixin:
             ylim = self.subplot_ylims.get(subplot_idx)
             if ylim and ct != 'Pie':
                 ax.set_ylim(ylim[0], ylim[1])
+            if self.subplot_equal_aspect.get(subplot_idx, False) and ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
+                except Exception: pass
         # ── Legend (no Y2) ──
         # Pie is in _NO_LEGEND_TYPES to suppress auto-legend, but if the user
         # explicitly enables "Show legend" we honour it via ax.legend().
@@ -980,6 +1093,12 @@ class PlotEngineMixin:
             # Refresh placeholder text so it always reflects the current series columns
             if hasattr(self, '_update_label_placeholders'):
                 self._update_label_placeholders()
+            # Persist current chart-option widgets into the active subplot's dict so
+            # plot_engine always reads up-to-date per-subplot values when rendering.
+            if hasattr(self, '_save_chart_opts') and hasattr(self, 'series_sp_active'):
+                _active_sp = self.series_sp_active.currentIndex()
+                if _active_sp >= 0:
+                    self._save_chart_opts(_active_sp)
             series = self._get_series(primary_only=True)
             ct = self.chart_type_combo.currentText()
             is3d = ct in _3D_TYPES
@@ -999,7 +1118,7 @@ class PlotEngineMixin:
                     ax = self.canvas.figure.add_subplot(111, projection=_proj)
                     axes_list.append(ax)
                     if series or ct in _NO_X_TYPES:
-                        cat_info = self._plot_on(ax, series, ct)
+                        cat_info = self._plot_on(ax, series, ct, subplot_idx=0)
                     else:
                         cat_info = None
                     # For _decorate compat: build yd dict and use first x col name
@@ -1024,12 +1143,12 @@ class PlotEngineMixin:
                             sub_ct = self.subplot_chart_types.get(idx, 'Line')
                             sub_series, sub_y2_series = self._get_series_for_subplot(idx)
                             x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
-                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx)) if (sub_series or sub_ct in _NO_X_TYPES) else None
+                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
                             ax2 = None
                             if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
                                 ax2 = ax.twinx()
                                 ax2_map[idx] = ax2
-                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx))
+                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx,'') or ', '.join(y2_cols)
                                     if y2lbl: ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
@@ -1072,6 +1191,9 @@ class PlotEngineMixin:
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+                                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
+                                except Exception: pass
                             self._apply_canvas_style(ax, idx)
                             if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
                             self._apply_cat_ticks(ax, cat_info)
@@ -1109,12 +1231,12 @@ class PlotEngineMixin:
                             default_xl  = ', '.join(x_cols)
                             default_yl  = ', '.join(y_cols)
                             default_y2l = ', '.join(y2_cols)
-                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx)) if (sub_series or sub_ct in _NO_X_TYPES) else None
+                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
                             ax2 = None
                             if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
                                 ax2 = ax.twinx()
                                 ax2_map[idx] = ax2
-                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx))
+                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx, '') or default_y2l
                                     if y2lbl:
@@ -1131,7 +1253,7 @@ class PlotEngineMixin:
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
                                 color=self.subplot_title_color.get(idx, '#000000'))
-                            _horiz_bar = (sub_ct == 'Bar' and self.bar_horizontal.isChecked())
+                            _horiz_bar = (sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False))
                             _default_xl_eff  = default_yl if _horiz_bar else default_xl
                             _default_yl_eff  = default_xl if _horiz_bar else default_yl
                             _custom_xl = self.subplot_xlabels.get(idx, '')
@@ -1157,7 +1279,7 @@ class PlotEngineMixin:
                                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
                                     except Exception: ax.set_xscale('linear')
                                     if xs == 'inverted': ax.invert_xaxis()
-                                _sub_horiz = sub_ct == 'Bar' and self.bar_horizontal.isChecked()
+                                _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
                                 _sub_x_is_cat = cat_info is not None
                                 _protect_y = _sub_x_is_cat and _sub_horiz
                                 if not _protect_y:
@@ -1168,6 +1290,9 @@ class PlotEngineMixin:
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx, None)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+                                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
+                                except Exception: pass
                             self._apply_cat_ticks(ax, cat_info)
                             show_leg = self.subplot_legends.get(idx, True)
                             sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
@@ -1306,7 +1431,7 @@ class PlotEngineMixin:
                 _proj = 'polar' if ct in ('Polar', 'Radar') else ('3d' if is3d else None)
                 ax = exp_fig.add_subplot(111, projection=_proj)
                 axes_list.append(ax)
-                cat_info = self._plot_on(ax, series, ct, row_offset=self._get_series_row_offset(0)) if (series or ct in _NO_X_TYPES) else None
+                cat_info = self._plot_on(ax, series, ct, row_offset=self._get_series_row_offset(0), subplot_idx=0) if (series or ct in _NO_X_TYPES) else None
                 yd = {s[2]: s[1] for s in series}
                 self._decorate(ax, xc, yd, is3d, subplot_idx=0)
                 self._apply_cat_ticks(ax, cat_info)
@@ -1322,12 +1447,12 @@ class PlotEngineMixin:
                             sub_ct = self.subplot_chart_types.get(idx, 'Line')
                             sub_series, sub_y2_series = self._get_series_for_subplot(idx)
                             x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
-                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx)) if (sub_series or sub_ct in _NO_X_TYPES) else None
+                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
                             ax2 = None
                             if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
                                 ax2 = ax.twinx()
                                 ax2_map[idx] = ax2
-                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx))
+                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx,'') or ', '.join(y2_cols)
                                     if y2lbl: ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
@@ -1367,6 +1492,9 @@ class PlotEngineMixin:
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+                                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
+                                except Exception: pass
                             self._apply_canvas_style(ax, idx)
                             if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
                             self._apply_cat_ticks(ax, cat_info)
@@ -1405,12 +1533,12 @@ class PlotEngineMixin:
                             default_xl  = ', '.join(x_cols)
                             default_yl  = ', '.join(y_cols)
                             default_y2l = ', '.join(y2_cols)
-                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx)) if (sub_series or sub_ct in _NO_X_TYPES) else None
+                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
                             ax2 = None
                             if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
                                 ax2 = ax.twinx()
                                 ax2_map[idx] = ax2
-                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx))
+                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx, '') or default_y2l
                                     if y2lbl:
@@ -1427,7 +1555,7 @@ class PlotEngineMixin:
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
                                 color=self.subplot_title_color.get(idx, '#000000'))
-                            _horiz_bar = (sub_ct == 'Bar' and self.bar_horizontal.isChecked())
+                            _horiz_bar = (sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False))
                             _default_xl_eff = default_yl if _horiz_bar else default_xl
                             _default_yl_eff = default_xl if _horiz_bar else default_yl
                             _custom_xl = self.subplot_xlabels.get(idx, '')
@@ -1451,7 +1579,7 @@ class PlotEngineMixin:
                                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
                                     except Exception: ax.set_xscale('linear')
                                     if xs == 'inverted': ax.invert_xaxis()
-                                _sub_horiz = sub_ct == 'Bar' and self.bar_horizontal.isChecked()
+                                _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
                                 _protect_y = (cat_info is not None) and _sub_horiz
                                 if not _protect_y:
                                     try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
@@ -1461,6 +1589,9 @@ class PlotEngineMixin:
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+                                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
+                                except Exception: pass
                             self._apply_cat_ticks(ax, cat_info)
                             show_leg = self.subplot_legends.get(idx, True)
                             sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')

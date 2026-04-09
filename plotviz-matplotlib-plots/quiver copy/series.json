@@ -1,0 +1,27 @@
+{
+  "series": [
+    {
+      "x_col": "x",
+      "y_col": "y",
+      "label": "Flow",
+      "series_type": "Quiver",
+      "plot_num": 1,
+      "y2": false
+    }
+  ],
+  "z_col": "(none)",
+  "err_col": "(none)",
+  "quiver_u_col": "u",
+  "quiver_v_col": "v",
+  "bubble_size_col": "(uniform)",
+  "err_xerr_col": "(none)",
+  "subplot_chart_types": {
+    "0": "Quiver"
+  },
+  "subplot_plot_modes": {
+    "0": "Quiver"
+  },
+  "subplot_legend_locs": {
+    "0": "best"
+  }
+}

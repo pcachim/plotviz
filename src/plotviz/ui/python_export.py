@@ -93,6 +93,24 @@ def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palett
             lines.append(f"{ax_var}.bar({xexpr}, {yexpr}, label='{lbl}', color={col})")
         elif ct == 'Area':
             lines.append(f"{ax_var}.fill_between({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={aal})")
+        elif ct == 'Fill Between':
+            curve_opts  = ((settings.get('curve_styles') or {}).get(s.get('label', '')) or {}).get('opts', {})
+            fb_al       = curve_opts.get('fill_between_alpha',   settings.get('fill_between_alpha',   0.4))
+            fb_lw       = curve_opts.get('fill_between_lw',      settings.get('fill_between_lw',      0.8))
+            fb_showline = curve_opts.get('fill_between_showline', settings.get('fill_between_showline', True))
+            y2_col      = curve_opts.get('fill_between_y2_col') or settings.get('_fill_y2_col', '')
+            if y2_col and y2_col in datasets:
+                y2expr = _col_ref(y2_col)
+                lines.append(f"# Fill Between: '{lbl}' vs '{y2_col}'")
+                lines.append(f"{ax_var}.fill_between({xexpr}, {yexpr}, {y2expr}, label='{lbl}', color={col}, alpha={fb_al})")
+                if fb_showline:
+                    lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, color={col}, lw={fb_lw}, alpha=0.8)")
+                    lines.append(f"{ax_var}.plot({xexpr}, {y2expr}, color={col}, lw={fb_lw}, alpha=0.8)")
+            else:
+                lines.append(f"# Fill Between: '{lbl}' vs y=0 (no Y2 column selected)")
+                lines.append(f"{ax_var}.fill_between({xexpr}, 0, {yexpr}, label='{lbl}', color={col}, alpha={fb_al})")
+                if fb_showline:
+                    lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, color={col}, lw={fb_lw}, alpha=0.8)")
         elif ct == 'Step':
             lines.append(f"{ax_var}.step({xexpr}, {yexpr}, label='{lbl}', color={col}, linewidth={lw}, where='mid')")
         elif ct == 'Stem':
@@ -325,10 +343,68 @@ def _gen_quiver(settings, series, datasets, palette, ax_var):
     if series:
         s = series[0]
         xc, yc = s.get('x_col',''), s.get('y_col','')
-        if xc and yc:
-            lines.append(f"# Quiver: dx and dy should be separate columns; adjust as needed")
+        uc = settings.get('quiver_u_col', '(none)')
+        vc = settings.get('quiver_v_col', '(none)')
+        if xc and yc and uc != '(none)' and vc != '(none)':
+            sc    = settings.get('quiver_scale', 1.0)
+            width = settings.get('quiver_width', 0.005)
+            scale_kw = f', scale={sc}, scale_units="xy"' if sc != 1.0 else ''
             lines.append(f"{ax_var}.quiver({_col_ref(xc)}, {_col_ref(yc)}, "
-                         f"{_col_ref(xc)}.diff().fillna(0), {_col_ref(yc)}.diff().fillna(0))")
+                         f"{_col_ref(uc)}, {_col_ref(vc)}"
+                         f", width={width}{scale_kw})")
+        elif xc and yc:
+            lines.append(f"# Quiver: set U/V columns in app; shown as placeholder")
+            lines.append(f"# {ax_var}.quiver({_col_ref(xc)}, {_col_ref(yc)}, U, V)")
+    return lines
+
+
+def _gen_barbs(settings, series, datasets, palette, ax_var):
+    lines = []
+    if series:
+        s = series[0]
+        xc, yc = s.get('x_col',''), s.get('y_col','')
+        uc = settings.get('barbs_u_col', '(none)')
+        vc = settings.get('barbs_v_col', '(none)')
+        if xc and yc and uc != '(none)' and vc != '(none)':
+            length = settings.get('barbs_length', 7.0)
+            pivot  = settings.get('barbs_pivot',  'tip')
+            alpha  = settings.get('barbs_alpha',  0.85)
+            lines.append(f"{ax_var}.barbs({_col_ref(xc)}, {_col_ref(yc)}, "
+                         f"{_col_ref(uc)}, {_col_ref(vc)}"
+                         f", length={length}, pivot='{pivot}', alpha={alpha})")
+        elif xc and yc:
+            lines.append(f"# Barbs: set U/V columns in app")
+            lines.append(f"# {ax_var}.barbs({_col_ref(xc)}, {_col_ref(yc)}, U, V)")
+    return lines
+
+
+def _gen_streamplot(settings, series, datasets, palette, ax_var):
+    lines = []
+    if series:
+        s = series[0]
+        xc, yc = s.get('x_col',''), s.get('y_col','')
+        uc = settings.get('stream_u_col', '(none)')
+        vc = settings.get('stream_v_col', '(none)')
+        if xc and yc and uc != '(none)' and vc != '(none)':
+            density   = settings.get('stream_density',   1.0)
+            arrowsize = settings.get('stream_arrowsize', 1.0)
+            linewidth = settings.get('stream_linewidth', 1.5)
+            lines.append(f"import numpy as _np")
+            lines.append(f"# Streamplot: re-grid flat columns onto a 2-D mesh")
+            lines.append(f"_xf = df[{_col_ref(xc)!r}].values.astype(float)")
+            lines.append(f"_yf = df[{_col_ref(yc)!r}].values.astype(float)")
+            lines.append(f"_U  = df[{_col_ref(uc)!r}].values.astype(float)")
+            lines.append(f"_V  = df[{_col_ref(vc)!r}].values.astype(float)")
+            lines.append(f"_xs, _ys = _np.unique(_xf), _np.unique(_yf)")
+            lines.append(f"_UG = _np.zeros((len(_ys), len(_xs)))")
+            lines.append(f"_VG = _np.zeros((len(_ys), len(_xs)))")
+            lines.append(f"for _k in range(len(_xf)):")
+            lines.append(f"    _i=_np.searchsorted(_xs,_xf[_k]); _j=_np.searchsorted(_ys,_yf[_k])")
+            lines.append(f"    if _i<len(_xs) and _j<len(_ys): _UG[_j,_i]=_U[_k]; _VG[_j,_i]=_V[_k]")
+            lines.append(f"{ax_var}.streamplot(_xs, _ys, _UG, _VG"
+                         f", density={density}, arrowsize={arrowsize}, linewidth={linewidth})")
+        elif xc and yc:
+            lines.append(f"# Streamplot: set U/V columns and build 2-D grids")
     return lines
 
 
@@ -380,6 +456,8 @@ _GENERATORS = {
     '3D Surface': _gen_surface3d,
     'ECDF':       _gen_ecdf,
     'Quiver':     _gen_quiver,
+    'Barbs':      _gen_barbs,
+    'Streamplot': _gen_streamplot,
 }
 
 _3D_TYPES    = {'3D Surface'}
@@ -436,8 +514,9 @@ def generate_plot_script(settings: dict, series_meta: dict,
 
     # Inject top-level z/err columns so generators can access them via settings
     settings = dict(settings)
-    settings['_z_col']   = series_meta.get('z_col', '')
-    settings['_err_col'] = series_meta.get('err_col', '')
+    settings['_z_col']       = series_meta.get('z_col', '')
+    settings['_err_col']     = series_meta.get('err_col', '')
+    settings['_fill_y2_col'] = series_meta.get('fill_y2_col', '')
     # subplot_chart_types lives in series_meta, not settings — merge it in
     if not settings.get('subplot_chart_types'):
         settings['subplot_chart_types'] = series_meta.get('subplot_chart_types', {})

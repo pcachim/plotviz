@@ -2,13 +2,13 @@
 
 General:
 
-- edit the 'settings' form to include the appearance dropdown that in 'chart' tab.
-- create a menu bar item named 'Configurations' after 'tools'.
-- in this item place the buttons for the settings button and the about button
-- also place the about button in the main bar item (the one that says python on vscode or plotviz in bundled app)
-- do the same with 'settings' name it preferences on macos
-- create a space over the tabs section and move the 'new plot', 'undo' and 'redo' buttons to that space.
-- bump version to 2.4.0
+- in the log file, only write what the app sent to terminal. reroute the output to terminal to the log file
+- add more matplotlib charts to the app:
+  1. to the 'heatmap & contour': tricontour, tricountourf, triplot, tripcolor
+  2. create a '3D plots' mode and add: 'scatter3d', 'bar3d', 'pie3d', 'boxplot3d'
+
+- add more examples in the documentation
+- update the docs on how to use plotviz with pandas and matplotlib
 
 Serious issues:
 

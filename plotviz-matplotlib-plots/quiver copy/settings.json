@@ -1,0 +1,333 @@
+{
+  "_app": "plotviz",
+  "_version": "1.2",
+  "chart_type": "Quiver",
+  "title_show": true,
+  "title_text": "quiver(X, Y, U, V) \u2014 Quiver / Vector Field",
+  "title_font": "sans-serif",
+  "title_size": 14,
+  "title_color": "#000000",
+  "sp_titles": {
+    "0": ""
+  },
+  "subplot_title_show": {
+    "0": true
+  },
+  "subplot_title_font": {
+    "0": "sans-serif"
+  },
+  "subplot_title_size": {
+    "0": 11
+  },
+  "subplot_title_color": {
+    "0": "#000000"
+  },
+  "title_x": 0.5,
+  "title_y": 0.97,
+  "sp_hspace": 0.35,
+  "sp_wspace": 0.35,
+  "subplot_xlabels": {
+    "0": "x"
+  },
+  "subplot_xlabel_show": {
+    "0": true
+  },
+  "subplot_ylabels": {
+    "0": "y"
+  },
+  "subplot_ylabel_show": {
+    "0": true
+  },
+  "subplot_y2labels": {
+    "0": ""
+  },
+  "subplot_y2label_show": {
+    "0": true
+  },
+  "subplot_legends": {
+    "0": true
+  },
+  "subplot_legend_locs": {
+    "0": "best"
+  },
+  "subplot_legend_x": {
+    "0": 0.01
+  },
+  "subplot_legend_y": {
+    "0": 0.99
+  },
+  "subplot_legend_fontsize": {
+    "0": 9
+  },
+  "subplot_legend_ncols": {
+    "0": 1
+  },
+  "subplot_legend_frameon": {
+    "0": true
+  },
+  "subplot_legend_color": {
+    "0": "#000000"
+  },
+  "subplot_legend_facecolor": {
+    "0": "#ffffff"
+  },
+  "subplot_legend_alpha": {
+    "0": 0.8
+  },
+  "subplot_legend_edgecolor": {
+    "0": "#cccccc"
+  },
+  "subplot_xlims": {
+    "0": null
+  },
+  "subplot_ylims": {
+    "0": null
+  },
+  "subplot_y2lims": {
+    "0": null
+  },
+  "subplot_xscales": {
+    "0": "linear"
+  },
+  "subplot_yscales": {
+    "0": "linear"
+  },
+  "subplot_xtick_sizes": {
+    "0": 9
+  },
+  "subplot_ytick_sizes": {
+    "0": 9
+  },
+  "subplot_xtick_dir": {
+    "0": "out"
+  },
+  "subplot_ytick_dir": {
+    "0": "out"
+  },
+  "subplot_xtick_minor": {
+    "0": false
+  },
+  "subplot_ytick_minor": {
+    "0": false
+  },
+  "subplot_xtick_rotation": {
+    "0": 0
+  },
+  "subplot_ytick_rotation": {
+    "0": 0
+  },
+  "subplot_xtick_step": {
+    "0": 0.0
+  },
+  "subplot_ytick_step": {
+    "0": 0.0
+  },
+  "subplot_x_formatter": {
+    "0": "auto"
+  },
+  "subplot_y_formatter": {
+    "0": "auto"
+  },
+  "subplot_xticks_show": {
+    "0": true
+  },
+  "subplot_yticks_show": {
+    "0": true
+  },
+  "subplot_ann_visible": {
+    "0": true
+  },
+  "xlabel_font": "sans-serif",
+  "xlabel_size": 11,
+  "xlabel_color": "#000000",
+  "ylabel_font": "sans-serif",
+  "ylabel_size": 11,
+  "ylabel_color": "#000000",
+  "y2label_font": "sans-serif",
+  "y2label_size": 11,
+  "y2label_color": "#000000",
+  "color_palette": "Matplotlib",
+  "preset": "",
+  "chart_bg_color": "#ffffff",
+  "chart_fg_color": "#000000",
+  "plot_bg_color": "#ffffff",
+  "border_top": true,
+  "border_bottom": true,
+  "border_left": true,
+  "border_right": true,
+  "curve_styles": {
+    "Flow": {
+      "color": "#1f77b4",
+      "marker_color": "#1f77b4",
+      "opts": {
+        "line_style": "-",
+        "line_lw": 1.5,
+        "line_marker": "None",
+        "line_markersize": 6,
+        "line_drawstyle": "default",
+        "sc_size": 20,
+        "sc_alpha": 0.7,
+        "sc_marker": "o",
+        "sc_edgecolor": "none",
+        "sc_lw": 0.5,
+        "sc_colorby": false,
+        "sc_cmap": "viridis",
+        "bar_width": 0.8,
+        "bar_alpha": 1.0,
+        "bar_edgecolor": "none",
+        "bar_edge_lw": 0.5,
+        "bar_stacked": false,
+        "bar_horizontal": false,
+        "bar_colorbyval": false,
+        "hist_bins": 20,
+        "hist_density": false,
+        "hist_cumulative": false,
+        "hist_histtype": "bar",
+        "hist_orientation": "vertical",
+        "hist_alpha": 0.7,
+        "hist_edgecolor": "white",
+        "err_capsize": 4,
+        "err_capthick": 1.5,
+        "err_elinewidth": 1.5,
+        "err_marker": "o",
+        "err_barsabove": false,
+        "cmap": "viridis",
+        "contour_levels": 10,
+        "heat_alpha": 1.0,
+        "heat_interp": "nearest",
+        "heat_colorbar": true,
+        "heat_filled": true,
+        "heat_contour_lines": true,
+        "surf_stride": 1,
+        "surf_wireframe": false,
+        "pie_autopct": true,
+        "pie_shadow": false,
+        "pie_donut": false,
+        "pie_explode": false,
+        "pie_startangle": 90.0,
+        "pie_labeldist": 1.1,
+        "pie_pctdist": 0.6,
+        "area_alpha": 0.4,
+        "area_lw": 0.8,
+        "area_baseline": 0.0,
+        "area_stacked": false,
+        "area_showline": true,
+        "vio_means": true,
+        "vio_medians": true,
+        "vio_extrema": false,
+        "vio_points": "100",
+        "vio_bw": "scott",
+        "vio_vert": true,
+        "box_means": false,
+        "box_medians": true,
+        "box_notch": false,
+        "box_fliers": true,
+        "box_vert": true,
+        "box_whis": 1.5,
+        "box_alpha": 0.7,
+        "step_where": "pre",
+        "step_lw": 1.5,
+        "step_fill": false,
+        "step_fill_alpha": 0.2,
+        "stem_baseline": 0.0,
+        "stem_marker": "o",
+        "stem_lw": 1.2,
+        "stem_markersize": 8,
+        "bubble_scale": 200.0,
+        "bubble_alpha": 0.6,
+        "bubble_marker": "o",
+        "bubble_edgecolor": "none",
+        "wf_width": 0.6,
+        "wf_alpha": 1.0,
+        "wf_connector": true,
+        "wf_pos_color": "#2ecc71",
+        "wf_neg_color": "#e74c3c",
+        "h2d_bins_x": 20,
+        "h2d_bins_y": 20,
+        "h2d_alpha": 1.0,
+        "h2d_cmap": "viridis",
+        "h2d_colorbar": true,
+        "h2d_log": false,
+        "hx_gridsize": 20,
+        "hx_alpha": 1.0,
+        "hx_cmap": "viridis",
+        "hx_colorbar": true,
+        "hx_log": false,
+        "pol_style": "-",
+        "pol_lw": 1.5,
+        "pol_marker": "None",
+        "pol_fill": false,
+        "pol_fill_alpha": 0.2,
+        "rad_fill": true,
+        "rad_fill_alpha": 0.25,
+        "rad_lw": 1.8,
+        "rad_gridlevels": 5,
+        "ecdf_comp": false,
+        "ecdf_markers": false,
+        "ecdf_lw": 1.8,
+        "ecdf_alpha": 1.0,
+        "qv_scale": 0.9,
+        "qv_width": 0.006,
+        "qv_colorby": false,
+        "qv_cmap": "viridis"
+      }
+    }
+  },
+  "fig_preset": "20 \u00d7 15 cm",
+  "fig_unit": "cm",
+  "fig_width": 20.0,
+  "fig_height": 15.0,
+  "fig_left": 0.1,
+  "fig_right": 0.95,
+  "fig_bottom": 0.1,
+  "fig_top": 0.95,
+  "grid_on": true,
+  "grid_color": "#cccccc",
+  "grid_linestyle": "--",
+  "grid_linewidth": 0.5,
+  "grid_alpha": 0.4,
+  "minor_grid_on": false,
+  "minor_grid_color": "#e8e8e8",
+  "minor_grid_linestyle": ":",
+  "minor_grid_linewidth": 0.3,
+  "minor_grid_alpha": 0.2,
+  "dpi": 150,
+  "fit_ci_index": 0,
+  "fit_pi_index": 0,
+  "fit_ci_alpha": 0.25,
+  "fit_result": null,
+  "subplot_rows": 1,
+  "subplot_cols": 1,
+  "subplot_mosaic": null,
+  "sp_sharex": false,
+  "sp_sharey": false,
+  "hist_bins": 20,
+  "hist_density": false,
+  "bar_width": 0.8,
+  "bar_stacked": false,
+  "bar_horizontal": false,
+  "scatter_size": 20,
+  "scatter_alpha": 0.7,
+  "err_capsize": 4,
+  "cmap": "viridis",
+  "contour_levels": 10,
+  "heat_colorbar": true,
+  "pie_autopct": true,
+  "pie_shadow": false,
+  "area_alpha": 0.4,
+  "area_stacked": false,
+  "violin_show_means": true,
+  "violin_show_medians": true,
+  "ann_fontcolor": "#000000",
+  "ann_fontsize": 10,
+  "ann_font": "sans-serif",
+  "ann_bgcolor": "#ffffcc",
+  "ann_bg_alpha": 0.9,
+  "ann_edgecolor": "#aaaaaa",
+  "line_default_style": "-",
+  "line_default_marker": "None",
+  "line_default_lw": 1.5,
+  "line_default_markersize": 6,
+  "_file_type": "project",
+  "annotations": []
+}
