@@ -5161,6 +5161,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
             self._update_confidence_band_for(nm)
             self._refresh_fit_results_panel(nm)
+            if hasattr(self, '_fit_export_widget'):
+                self._fit_export_widget.setEnabled(True)
             # Switch the Per-Curve selector to the fit curve so the user can
             # immediately style it — no ambiguity about which curve is active.
             if hasattr(self, 'curve_select'):
@@ -5269,13 +5271,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         """Called when curve_select changes — refresh CI/PI combos and results panel."""
         label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
         is_fit = label in self._fits
+        has_any_fits = bool(self._fits)
         if hasattr(self, '_fit_controls_widget'):
             self._fit_controls_widget.setEnabled(is_fit)
+        if hasattr(self, '_fit_export_widget'):
+            self._fit_export_widget.setEnabled(has_any_fits)
         if not is_fit:
-            # Original series selected — clear results; CI/PI combos not relevant
             if hasattr(self, 'fit_results_text'):
                 self.fit_results_text.setPlainText('Run a fit to see results.')
-            self._load_fit_combos_for('')   # resets combos to Off
+            self._load_fit_combos_for('')
             return
         self._load_fit_combos_for(label)
         self._refresh_fit_results_panel(label)
