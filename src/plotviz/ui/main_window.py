@@ -581,6 +581,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.datasets      = {}
         self.curve_styles  = {}
         self._last_fit     = None
+        self._fits         = {}    # per-series: label -> fit dict
         self.subplot_rows  = 1
         self.subplot_cols  = 1
         self.subplot_chart_types  = {0: 'Line'}
@@ -868,8 +869,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         settings.set('window_geometry', [geo.x(), geo.y(), geo.width(), geo.height()])
         settings.set('window_maximised', self.isMaximized())
         settings.set('color_palette', getattr(self, '_color_palette', 'Matplotlib'))
-        settings.set('theme', self.colour_scheme_combo.currentText()
-                     if hasattr(self, 'colour_scheme_combo') else 'System')
+        settings.set('theme', getattr(self, '_colour_mode', 'system').capitalize()
+                     if not hasattr(self, 'colour_scheme_combo')
+                     else self.colour_scheme_combo.currentText())
         if hasattr(self, '_export_fmt_combo'):
             settings.set('export_format', self._export_fmt_combo.currentText())
         if hasattr(self, 'dpi_spin'):
@@ -884,11 +886,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         """Apply persisted preferences to UI widgets after init_ui() has run."""
         # Theme
         theme = settings.get('theme') or 'System'
-        idx = self.colour_scheme_combo.findText(theme)
-        if idx >= 0:
-            self.colour_scheme_combo.blockSignals(True)
-            self.colour_scheme_combo.setCurrentIndex(idx)
-            self.colour_scheme_combo.blockSignals(False)
+        if hasattr(self, 'colour_scheme_combo'):
+            idx = self.colour_scheme_combo.findText(theme)
+            if idx >= 0:
+                self.colour_scheme_combo.blockSignals(True)
+                self.colour_scheme_combo.setCurrentIndex(idx)
+                self.colour_scheme_combo.blockSignals(False)
         self._apply_colour_scheme(theme)
 
         # Colour palette
@@ -936,10 +939,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.tabs = QTabWidget()
         self.create_file_tab()
         self.create_style_tab()      # figure size, margins, colours, grid
-        self.create_data_tab()       # series table + chart-type options
-        self.create_series_tab()     # per-curve style
-        self.create_axes_tab()       # per-subplot selector + titles, labels, limits, legend
-        self.create_annotations_tab()
+        self.create_plots_tab()      # subplot selector + Data, Series, Axes, Annotations
         self.create_advanced_tab()
 
         # ── Menu bar — File ───────────────────────────────────────────────────
@@ -953,7 +953,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.tabs.setCurrentIndex(0)   # Chart / File tab
 
         def _go_data_tab():
-            self.tabs.setCurrentIndex(2)   # Data tab
+            self.tabs.setCurrentIndex(2)   # Plots tab
+            if hasattr(self, 'plots_inner_tabs'):
+                self.plots_inner_tabs.setCurrentIndex(0)  # Data inner tab
 
         # ── New ───────────────────────────────────────────────────────────────
         act_new = QAction('New Plot', self)
@@ -1105,10 +1107,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         for i, tip in enumerate([
             'Chart — open/save/export, subplot layout, colour palette',
             'Style — figure size, margins, colours, grid',
-            'Data — load datasets, series table, chart type options',
-            'Series — per-curve line style, colour, marker and curve fitting',
-            'Axes — per-subplot titles, labels, axis limits and legend',
-            'Annotations — subplot title, legend, text/arrow/image annotations',
+            'Plots — subplot selector, data series, axes and annotations',
             'Advanced — function generator and manual data table',
         ]):
             self.tabs.setTabToolTip(i, tip)
@@ -1139,20 +1138,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         btn_new.setToolTip('Start a new blank plot (Ctrl+N)')
         btn_new.clicked.connect(lambda: (self.tabs.setCurrentIndex(0), self._reset_app()))
         top_bar_layout.addWidget(btn_new)
-
-        # ── Global subplot selector (hidden when n == 1) ──────────────────────
-        self._global_sp_container = QWidget()
-        _gsp_lay = QHBoxLayout(self._global_sp_container)
-        _gsp_lay.setContentsMargins(8, 0, 0, 0); _gsp_lay.setSpacing(4)
-        _gsp_lay.addWidget(QLabel('Subplot:'))
-        self.global_sp_active = QComboBox()
-        self.global_sp_active.addItem('Subplot 1')
-        self.global_sp_active.setMinimumWidth(100)
-        self.global_sp_active.setToolTip('Active subplot — affects Data, Axes, Series and Annotation tabs')
-        self.global_sp_active.currentIndexChanged.connect(self._on_global_sp_changed)
-        _gsp_lay.addWidget(self.global_sp_active)
-        self._global_sp_container.setVisible(False)
-        top_bar_layout.addWidget(self._global_sp_container)
 
         top_bar_layout.addStretch()
 
@@ -1546,7 +1531,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ('area_alpha',              'area_alpha',       0.4,       'dbl'),
         ('area_lw',                 'area_lw',          0.8,       'dbl'),
         ('area_showline',           'area_showline',    True,      'check'),
-        # Fill Between (per-series visual; Y2 column is saved separately via _save_fill_y2)
+        # Fill Between (per-series visual; Y2 column saved via combo_fill_y2)
         ('fill_between_alpha',      'fill_between_alpha',   0.4,   'dbl'),
         ('fill_between_lw',         'fill_between_lw',      0.8,   'dbl'),
         ('fill_between_showline',   'fill_between_showline', True,  'check'),
@@ -2117,8 +2102,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     s['marker_color'] = new_color
                     self.curve_color = new_color
                     self.curve_marker_color = new_color
-                    self.curve_color_label.setStyleSheet(f'color:{new_color};font-size:16px;')
-                    self.curve_marker_color_label.setStyleSheet(f'color:{new_color};font-size:16px;')
+                    _sw_css = 'background-color:{};border:1px solid #888;border-radius:2px;'
+                    self.curve_color_label.setStyleSheet(_sw_css.format(new_color))
+                    self.curve_marker_color_label.setStyleSheet(_sw_css.format(new_color))
                     break
             self.curve_styles[curve] = s
         self._refresh_lock_indicator()
@@ -2162,8 +2148,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         if target in ('chart_bg', 'chart_fg', 'plot_bg'):
             attr = target + '_color'
             setattr(self, attr, hx)
-            getattr(self, attr + '_swatch').setStyleSheet(f'color:{hx};font-size:18px;')
-            getattr(self, attr + '_hex').setText(hx)
+            getattr(self, attr + '_swatch').setStyleSheet(
+                f'background-color:{hx};border:1px solid #888;border-radius:2px;')
             self.update_preview()
             return
         mapping = {
@@ -2177,11 +2163,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         attr, lbl_attr, mode = mapping[target]
         setattr(self, attr, hx)
         lbl = getattr(self, lbl_attr)
-        if mode == 'style':
-            lbl.setStyleSheet(f'color:{hx};font-size:16px;')
-        else:  # swatch — force the square to render in the chosen color
-            lbl.setText('■')
-            lbl.setStyleSheet(f'color:{hx};font-size:16px;')
+        lbl.setStyleSheet(f'background-color:{hx};border:1px solid #888;border-radius:2px;')
         if target in ('curve', 'curve_marker'):
             self.save_curve_style(lock_color=True)
         self.update_preview()
@@ -2268,10 +2250,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         hx = color.name()
         if which == 'major':
             self.grid_color = hx
-            self.grid_color_sw.setStyleSheet(f'color:{hx};font-size:16px;')
+            self.grid_color_sw.setStyleSheet(f'background-color:{hx};border:1px solid #888;border-radius:2px;')
         else:
             self.minor_grid_color = hx
-            self.minor_grid_color_sw.setStyleSheet(f'color:{hx};font-size:16px;')
+            self.minor_grid_color_sw.setStyleSheet(f'background-color:{hx};border:1px solid #888;border-radius:2px;')
         self.update_preview()
 
     def _pick_ann_color_attr(self, attr):
@@ -2283,7 +2265,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         hx = color.name()
         setattr(self, attr, hx)
         sw = getattr(self, attr + '_sw', None)
-        if sw: sw.setStyleSheet(f'color:{hx};font-size:16px;')
+        if sw: sw.setStyleSheet(f'background-color:{hx};border:1px solid #888;border-radius:2px;')
         self._sync_ann_style()
 
     def _pick_ann_color(self, target):
@@ -2394,6 +2376,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     # Built-in named schemes: name → partial settings dict
     _BUILTIN_COLOR_SCHEMES = {
+        # ── Light → Dark (ordered by background luminance) ────────────────────
         'Default (white)': {
             'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
             'grid_color': '#cccccc', 'grid_on': True, 'grid_linestyle': '--',
@@ -2401,6 +2384,40 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'minor_grid_color': '#e8e8e8', 'minor_grid_on': False,
             'title_color': '#000000', 'xlabel_color': '#000000', 'ylabel_color': '#000000',
             'color_palette': 'Matplotlib',
+        },
+        'Nature / print': {
+            'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
+            'grid_color': '#cccccc', 'grid_on': False, 'grid_linestyle': '--',
+            'grid_linewidth': 0.4, 'grid_alpha': 0.3,
+            'minor_grid_color': '#eeeeee', 'minor_grid_on': False,
+            'title_color': '#000000', 'xlabel_color': '#000000', 'ylabel_color': '#000000',
+            'border_top': False, 'border_right': False,
+            'color_palette': 'Matplotlib',
+        },
+        'Scientific (minimal)': {
+            'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
+            'grid_color': '#dddddd', 'grid_on': True, 'grid_linestyle': '--',
+            'grid_linewidth': 0.4, 'grid_alpha': 0.3,
+            'minor_grid_color': '#eeeeee', 'minor_grid_on': False,
+            'title_color': '#111111', 'xlabel_color': '#333333', 'ylabel_color': '#333333',
+            'border_top': False, 'border_right': False,
+            'color_palette': 'Matplotlib',
+        },
+        'Pastel soft': {
+            'chart_bg_color': '#fdfbf7', 'chart_fg_color': '#444444', 'plot_bg_color': '#fdfbf7',
+            'grid_color': '#ddd5e8', 'grid_on': True, 'grid_linestyle': '--',
+            'grid_linewidth': 0.5, 'grid_alpha': 0.5,
+            'minor_grid_color': '#f0ecf5', 'minor_grid_on': False,
+            'title_color': '#444444', 'xlabel_color': '#666666', 'ylabel_color': '#666666',
+            'color_palette': 'Pastel',
+        },
+        'Warm parchment': {
+            'chart_bg_color': '#f5f0e8', 'chart_fg_color': '#3d2b1f', 'plot_bg_color': '#faf7f0',
+            'grid_color': '#c8b89a', 'grid_on': True, 'grid_linestyle': '--',
+            'grid_linewidth': 0.5, 'grid_alpha': 0.4,
+            'minor_grid_color': '#e0d5c2', 'minor_grid_on': False,
+            'title_color': '#3d2b1f', 'xlabel_color': '#5c4033', 'ylabel_color': '#5c4033',
+            'color_palette': 'Pastel',
         },
         'Dark (charcoal)': {
             'chart_bg_color': '#1e1e2e', 'chart_fg_color': '#cdd6f4', 'plot_bg_color': '#181825',
@@ -2420,24 +2437,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'border_top': False, 'border_right': False,
             'color_palette': 'Bold',
         },
-        'Scientific (minimal)': {
-            'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
-            'grid_color': '#dddddd', 'grid_on': True, 'grid_linestyle': '--',
-            'grid_linewidth': 0.4, 'grid_alpha': 0.3,
-            'minor_grid_color': '#eeeeee', 'minor_grid_on': False,
-            'title_color': '#111111', 'xlabel_color': '#333333', 'ylabel_color': '#333333',
-            'border_top': False, 'border_right': False,
-            'color_palette': 'Matplotlib',
-        },
-        'Nature / print': {
-            'chart_bg_color': '#ffffff', 'chart_fg_color': '#000000', 'plot_bg_color': '#ffffff',
-            'grid_color': '#cccccc', 'grid_on': False, 'grid_linestyle': '--',
-            'grid_linewidth': 0.4, 'grid_alpha': 0.3,
-            'minor_grid_color': '#eeeeee', 'minor_grid_on': False,
-            'title_color': '#000000', 'xlabel_color': '#000000', 'ylabel_color': '#000000',
-            'border_top': False, 'border_right': False,
-            'color_palette': 'Matplotlib',
-        },
         'Midnight blue': {
             'chart_bg_color': '#0d1b2a', 'chart_fg_color': '#e0e0e0', 'plot_bg_color': '#0d1b2a',
             'grid_color': '#1b3a5c', 'grid_on': True, 'grid_linestyle': '-',
@@ -2447,14 +2446,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'border_top': False, 'border_right': False,
             'color_palette': 'Bold',
         },
-        'Warm parchment': {
-            'chart_bg_color': '#f5f0e8', 'chart_fg_color': '#3d2b1f', 'plot_bg_color': '#faf7f0',
-            'grid_color': '#c8b89a', 'grid_on': True, 'grid_linestyle': '--',
-            'grid_linewidth': 0.5, 'grid_alpha': 0.4,
-            'minor_grid_color': '#e0d5c2', 'minor_grid_on': False,
-            'title_color': '#3d2b1f', 'xlabel_color': '#5c4033', 'ylabel_color': '#5c4033',
-            'color_palette': 'Pastel',
-        },
         'High contrast': {
             'chart_bg_color': '#000000', 'chart_fg_color': '#ffffff', 'plot_bg_color': '#000000',
             'grid_color': '#444444', 'grid_on': True, 'grid_linestyle': ':',
@@ -2463,14 +2454,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'title_color': '#ffffff', 'xlabel_color': '#cccccc', 'ylabel_color': '#cccccc',
             'border_top': True, 'border_right': True,
             'color_palette': 'Bold',
-        },
-        'Pastel soft': {
-            'chart_bg_color': '#fdfbf7', 'chart_fg_color': '#444444', 'plot_bg_color': '#fdfbf7',
-            'grid_color': '#ddd5e8', 'grid_on': True, 'grid_linestyle': '--',
-            'grid_linewidth': 0.5, 'grid_alpha': 0.5,
-            'minor_grid_color': '#f0ecf5', 'minor_grid_on': False,
-            'title_color': '#444444', 'xlabel_color': '#666666', 'ylabel_color': '#666666',
-            'color_palette': 'Pastel',
         },
     }
 
@@ -2964,6 +2947,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.curve_styles.clear()
         self.canvas.annotations.clear()
         self._last_fit = None
+        self._fits = {}
         self._subplot_mosaic = None
         # Clear series table BEFORE _apply_settings triggers any redraws,
         # otherwise stale rows referencing cleared datasets cause a crash.
@@ -3084,7 +3068,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._refresh_series_combos()
         self._refresh_curve_select()
 
-        # Keep fn_source_combo in sync (Advanced tab)
+        # Keep fn_source_combo and fxy combos in sync (Advanced tab)
         prev_fn = self.fn_source_combo.currentText()
         self.fn_source_combo.blockSignals(True)
         self.fn_source_combo.clear()
@@ -3092,6 +3076,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         i_fn = self.fn_source_combo.findText(prev_fn)
         self.fn_source_combo.setCurrentIndex(i_fn if i_fn >= 0 else 0)
         self.fn_source_combo.blockSignals(False)
+        for _fxy_attr, _fxy_prev in [
+            ('fxy_x_combo', getattr(getattr(self, 'fxy_x_combo', None), 'currentText', lambda: '')()),
+            ('fxy_y_combo', getattr(getattr(self, 'fxy_y_combo', None), 'currentText', lambda: '')()),
+        ]:
+            _cb = getattr(self, _fxy_attr, None)
+            if _cb is None: continue
+            _cb.blockSignals(True); _cb.clear(); _cb.addItems(cols)
+            _i = _cb.findText(_fxy_prev); _cb.setCurrentIndex(_i if _i >= 0 else 0)
+            _cb.blockSignals(False)
 
         # Notify Seaborn Explorer if it is open
         self._notify_sns_explorer()
@@ -3209,6 +3202,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.curve_select.setCurrentIndex(idx if idx >= 0 else 0)
         self.curve_select.blockSignals(False)
         self.load_curve_style()
+        self._on_fit_series_changed()
 
     def _add_series_row(self):
         cols = sorted(self.datasets)
@@ -3415,8 +3409,17 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     def _del_series_row(self):
         rows = sorted({idx.row() for idx in self.series_table.selectedIndexes()}, reverse=True)
+        # Collect labels before removing rows so we can cascade to fitted curves
+        labels_to_remove = []
+        for r in rows:
+            item = self.series_table.item(r, 2)
+            if item:
+                labels_to_remove.append(item.text())
         for r in rows:
             self.series_table.removeRow(r)
+        # Remove any fitted curves derived from the deleted series
+        if labels_to_remove:
+            self._remove_fits_for_labels(labels_to_remove)
         self._refresh_curve_select()
         self.update_preview()
 
@@ -3484,8 +3487,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ── Series tab: select the curve for style editing ───────────────────
         idx = self.curve_select.findText(label)
         if idx >= 0:
-            # Series tab is index 3 (Chart/Axes/Style/Series/Data/Annotations/Advanced)
-            self.tabs.setCurrentIndex(3)
+            # Navigate to Plots tab (2) → Series inner tab (1)
+            self.tabs.setCurrentIndex(2)
+            if hasattr(self, 'plots_inner_tabs'):
+                self.plots_inner_tabs.setCurrentIndex(1)
             if self.curve_select.currentIndex() == idx:
                 self.load_curve_style()
             else:
@@ -3531,10 +3536,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.curve_markersize.setValue(s.get('markersize', 6))
         self.curve_markersize.blockSignals(False)
         self.curve_marker_color = s.get('marker_color', self.curve_color)
-        self.curve_color_label.setText('■')
-        self.curve_color_label.setStyleSheet(f'color:{self.curve_color};font-size:16px;')
-        self.curve_marker_color_label.setText('■')
-        self.curve_marker_color_label.setStyleSheet(f'color:{self.curve_marker_color};font-size:16px;')
+        _sw_css = 'background-color:{};border:1px solid #888;border-radius:2px;'
+        self.curve_color_label.setStyleSheet(_sw_css.format(self.curve_color))
+        self.curve_marker_color_label.setStyleSheet(_sw_css.format(self.curve_marker_color))
         self._refresh_lock_indicator()
         # Load per-series type options (fill, alpha, linewidth, etc.) for this series
         # and update which type-option group is visible.  Entirely driven by curve_select.
@@ -3876,7 +3880,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         sp_tc = self.subplot_title_color.get(idx, '#000000')
         self.sp_title_color = sp_tc
         if hasattr(self, 'sp_title_color_label'):
-            self.sp_title_color_label.setStyleSheet(f'color:{sp_tc};font-size:16px;')
+            self.sp_title_color_label.setStyleSheet(
+                f'background-color:{sp_tc};border:1px solid #888;border-radius:2px;')
         # X axis
         _load(self.xlabel_show_check, self.subplot_xlabel_show.get(idx, True))
         _load(self.xlabel_input,      self.subplot_xlabels.get(idx, ''))
@@ -3942,7 +3947,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             }[attr].get(idx, default)
             setattr(self, attr, val)
             sw = getattr(self, sw_attr, None)
-            if sw: sw.setStyleSheet(f'color:{val};font-size:15px;')
+            if sw: sw.setStyleSheet(
+                f'background-color:{val};border:1px solid #888;border-radius:2px;')
         _load(self.legend_alpha, self.subplot_legend_alpha.get(idx, 0.8))
 
         self._update_label_placeholders()
@@ -4052,7 +4058,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         col = _show_color_dialog(QColor(cur), self, palette_colors=self._active_palette_colors())
         if col.isValid():
             self.sp_title_color = col.name()
-            self.sp_title_color_label.setStyleSheet(f'color:{col.name()};font-size:16px;')
+            self.sp_title_color_label.setStyleSheet(
+                f'background-color:{col.name()};border:1px solid #888;border-radius:2px;')
             self._save_axes_state()
             self.update_preview()
 
@@ -4070,7 +4077,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             setattr(self, attr, col.name())
             sw = getattr(self, sw_attr, None)
             if sw:
-                sw.setStyleSheet(f'color:{col.name()};font-size:15px;')
+                sw.setStyleSheet(
+                    f'background-color:{col.name()};border:1px solid #888;border-radius:2px;')
             self._on_sp_legend_changed()
 
     def _on_sp_title_changed(self):       self._save_axes_state(); self.update_preview()
@@ -4540,10 +4548,28 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             expr  = self.gen_expr.text().strip()
             xname = self.gen_x_name.text().strip() or 'x'
             yname = self.gen_y_name.text().strip() or 'y'
-            if x_min >= x_max:
+            spacing = self.gen_x_spacing.currentText() if hasattr(self, 'gen_x_spacing') else 'linspace'
+            if spacing != 'logspace' and x_min >= x_max:
                 self.gen_status.setText('❌  x_min must be less than x_max'); return
+            if spacing == 'logspace' and x_min >= x_max:
+                self.gen_status.setText('❌  exponent start must be less than stop'); return
 
-            xarr = np.linspace(x_min, x_max, n)
+            if spacing == 'linspace':
+                xarr = np.linspace(x_min, x_max, n)
+            elif spacing == 'logspace':
+                xarr = np.logspace(x_min, x_max, n)
+            elif spacing == 'geomspace':
+                if x_min <= 0 or x_max <= 0:
+                    self.gen_status.setText('❌  geomspace requires start and stop > 0'); return
+                xarr = np.geomspace(x_min, x_max, n)
+            elif spacing == 'random':
+                mid   = (x_min + x_max) / 2
+                sigma = (x_max - x_min) / 6
+                xarr  = np.sort(np.random.normal(mid, sigma, n))
+            elif spacing == 'uniform':
+                xarr = np.sort(np.random.uniform(x_min, x_max, n))
+            else:
+                xarr = np.linspace(x_min, x_max, n)
             ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
             ns.update({'x': xarr, 'pi': np.pi, 'e': np.e,
                        'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
@@ -4602,6 +4628,108 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.gen_status.setText(f'❌  {e}')
 
     # ── Apply function to column ───────────────────────────────────────────────
+    def _generate_fxy(self):
+        """Generate z = f(x, y) — supports per-axis range/column input and meshgrid."""
+        try:
+            expr   = self.fxy_expr.text().strip()           if hasattr(self, 'fxy_expr')   else ''
+            z_name = self.fxy_z_name.text().strip() or 'z' if hasattr(self, 'fxy_z_name') else 'z'
+            if not expr:
+                self.fxy_status.setText('❌  Expression is empty'); return
+            meshgrid = getattr(self, 'fxy_meshgrid', None) and self.fxy_meshgrid.isChecked()
+
+            def _make_spacing(arr_min, arr_max, n, spacing):
+                """Build a 1-D array from range params and spacing mode."""
+                if spacing == 'linspace':
+                    return np.linspace(arr_min, arr_max, n)
+                elif spacing == 'logspace':
+                    if arr_min >= arr_max:
+                        raise ValueError('logspace: start exponent must be < stop')
+                    return np.logspace(arr_min, arr_max, n)
+                elif spacing == 'geomspace':
+                    if arr_min <= 0 or arr_max <= 0:
+                        raise ValueError('geomspace: start and stop must be > 0')
+                    return np.geomspace(arr_min, arr_max, n)
+                elif spacing == 'random':
+                    mid = (arr_min + arr_max) / 2; sigma = (arr_max - arr_min) / 6
+                    return np.sort(np.random.normal(mid, sigma, n))
+                elif spacing == 'uniform':
+                    return np.sort(np.random.uniform(arr_min, arr_max, n))
+                return np.linspace(arr_min, arr_max, n)
+
+            # ── Resolve x array ────────────────────────────────────────────────
+            x_use_range = getattr(self, 'fxy_x_mode_range', None) and self.fxy_x_mode_range.isChecked()
+            if x_use_range:
+                x_min = self.fxy_x_min.value(); x_max = self.fxy_x_max.value()
+                if x_min >= x_max and getattr(self, 'fxy_x_spacing', None) and self.fxy_x_spacing.currentText() not in ('logspace',):
+                    self.fxy_status.setText('❌  x: min must be < max'); return
+                x_arr = _make_spacing(x_min, x_max, self.fxy_x_n.value(),
+                                      self.fxy_x_spacing.currentText() if hasattr(self, 'fxy_x_spacing') else 'linspace')
+                x_var = self.fxy_x_col_name.text().strip() or 'x' if hasattr(self, 'fxy_x_col_name') else 'x'
+                x_col_out = x_var
+            else:
+                x_col = self.fxy_x_combo.currentText() if hasattr(self, 'fxy_x_combo') else ''
+                if x_col not in self.datasets:
+                    self.fxy_status.setText('❌  x column not found'); return
+                x_arr = self.datasets[x_col].astype(float)
+                x_var = self.fxy_x_var.text().strip() or 'x' if hasattr(self, 'fxy_x_var') else 'x'
+                x_col_out = x_col
+
+            # ── Resolve y array ────────────────────────────────────────────────
+            y_use_range = getattr(self, 'fxy_y_mode_range', None) and self.fxy_y_mode_range.isChecked()
+            if y_use_range:
+                y_min = self.fxy_y_min.value(); y_max = self.fxy_y_max.value()
+                if y_min >= y_max and getattr(self, 'fxy_y_spacing', None) and self.fxy_y_spacing.currentText() not in ('logspace',):
+                    self.fxy_status.setText('❌  y: min must be < max'); return
+                y_arr = _make_spacing(y_min, y_max, self.fxy_y_n.value(),
+                                      self.fxy_y_spacing.currentText() if hasattr(self, 'fxy_y_spacing') else 'linspace')
+                y_var = self.fxy_y_col_name.text().strip() or 'y' if hasattr(self, 'fxy_y_col_name') else 'y'
+                y_col_out = y_var
+            else:
+                y_col = self.fxy_y_combo.currentText() if hasattr(self, 'fxy_y_combo') else ''
+                if y_col not in self.datasets:
+                    self.fxy_status.setText('❌  y column not found'); return
+                y_arr = self.datasets[y_col].astype(float)
+                y_var = self.fxy_y_var.text().strip() or 'y' if hasattr(self, 'fxy_y_var') else 'y'
+                y_col_out = y_col
+
+            # ── Meshgrid expansion ─────────────────────────────────────────────
+            if meshgrid:
+                X, Y = np.meshgrid(x_arr, y_arr)
+                x_eval = X.ravel(); y_eval = Y.ravel()
+                n = len(x_eval)
+            else:
+                n = min(len(x_arr), len(y_arr))
+                x_eval = x_arr[:n]; y_eval = y_arr[:n]
+
+            # ── Evaluate expression ────────────────────────────────────────────
+            ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
+            ns.update({x_var: x_eval, y_var: y_eval,
+                       'pi': np.pi, 'e': np.e,
+                       'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
+                       'exp': np.exp, 'log': np.log, 'log10': np.log10,
+                       'sqrt': np.sqrt, 'abs': np.abs})
+            z_arr = eval(expr, {'__builtins__': {}}, ns)
+            z_arr = np.asarray(z_arr, dtype=float)
+            if z_arr.shape == (): z_arr = np.full(n, float(z_arr))
+
+            # ── Store datasets ─────────────────────────────────────────────────
+            def _store(name, arr):
+                base, cnt, nm = name, 1, name
+                while nm in self.datasets: nm = f'{base}_{cnt}'; cnt += 1
+                self.datasets[nm] = arr; return nm
+
+            stored_x = _store(x_col_out, x_eval) if x_use_range or meshgrid else x_col_out
+            if x_use_range: self.datasets[stored_x] = x_eval
+            stored_y = _store(y_col_out, y_eval) if y_use_range or meshgrid else y_col_out
+            if y_use_range: self.datasets[stored_y] = y_eval
+            stored_z = _store(z_name, z_arr)
+            self.update_lists()
+            mode_str = 'meshgrid ' if meshgrid else ''
+            self.fxy_status.setText(f'\u2713  {mode_str}Created x={stored_x}, y={stored_y}, z={stored_z}  ({n} pts)')
+        except Exception as e:
+            if hasattr(self, 'fxy_status'):
+                self.fxy_status.setText(f'\u274c  {e}')
+
     def _apply_col_function(self):
         try:
             src_col = self.fn_source_combo.currentText()
@@ -4917,7 +5045,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.table_status.setText(f'❌  {e}')
 
     def _on_ci_changed(self):
-        self._update_confidence_band()
+        label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        if label and label in self._fits:
+            self._fits[label]['ci_idx'] = self.fit_ci_combo.currentIndex()
+            self._fits[label]['pi_idx'] = self.fit_pi_combo.currentIndex()
+        self._update_confidence_band_for(label)
         self.update_preview()
 
     def apply_fit(self):
@@ -4959,6 +5091,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # Add fit curve as a new dataset
             nm = f'{lbl} ({model} fit)'
             self.datasets[nm] = func(xd, *popt)
+
+            # Store per-series fit for independent CI/PI bands
+            existing = self._fits.get(nm, {})
+            self._fits[nm] = dict(xd=xd, yd=yd, popt=popt, pcov=pcov, func=func,
+                                  model=model, xc=xc, yc=yc, lbl=lbl,
+                                  eq_str=eq_str, r2=r2, stats=stats,
+                                  ci_idx=existing.get('ci_idx', 0),
+                                  pi_idx=existing.get('pi_idx', 0))
+            self._last_fit = self._fits[nm]
 
             # Seed a default style for the fit curve if it has none yet.
             # This makes it immediately editable via the Per-Curve section
@@ -5018,23 +5159,26 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                             spin.blockSignals(False)
                         break
 
-            self._update_confidence_band()
-            self._refresh_fit_results_panel()
+            self._update_confidence_band_for(nm)
+            self._refresh_fit_results_panel(nm)
             # Switch the Per-Curve selector to the fit curve so the user can
             # immediately style it — no ambiguity about which curve is active.
             if hasattr(self, 'curve_select'):
                 idx = self.curve_select.findText(nm)
                 if idx >= 0:
                     self.curve_select.setCurrentIndex(idx)
+            self._load_fit_combos_for(nm)
             self.update_preview()
         except Exception as e:
             QMessageBox.critical(self, 'Error', str(e))
 
-    def _refresh_fit_results_panel(self):
+    def _refresh_fit_results_panel(self, label=None):
         """Populate the fit results QTextEdit with full regression output."""
-        if not hasattr(self, '_last_fit') or self._last_fit is None:
+        if label is None:
+            label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        fit = self._fits.get(label) or self._last_fit
+        if fit is None:
             return
-        fit  = self._last_fit
         st   = fit.get('stats', {})
         if not st:
             self.fit_results_text.setPlainText('No results.')
@@ -5084,32 +5228,291 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.fit_results_text.setPlainText('\n'.join(lines))
 
     def _update_confidence_band(self):
-        """Add/refresh confidence band and prediction band datasets based on _last_fit."""
-        if not hasattr(self, '_last_fit') or self._last_fit is None: return
-        ci_idx = self.fit_ci_combo.currentIndex()   # 0=off, 1/2/3 = n_sigma
-        pi_idx = self.fit_pi_combo.currentIndex()
-        fit = self._last_fit
-        base = fit['lbl'] + f" ({fit['model']} fit)"
+        """Legacy shim — delegates to the per-series implementation."""
+        label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        self._update_confidence_band_for(label)
 
-        # Remove all existing band datasets
+    def _update_confidence_band_for(self, label):
+        """Recompute CI/PI band datasets for one fit-curve label."""
+        if not label:
+            return
+        fit = self._fits.get(label)
+        if fit is None:
+            return
+        base = label
+        ci_idx = fit.get('ci_idx', 0)
+        pi_idx = fit.get('pi_idx', 0)
         for suffix in (' CI upper', ' CI lower', ' PI upper', ' PI lower'):
             self.datasets.pop(base + suffix, None)
-
         if ci_idx > 0:
             y_ci_hi, y_ci_lo = CurveFitter.confidence_band(
                 fit['xd'], fit['popt'], fit['pcov'], fit['func'], ci_idx)
             self.datasets[base + ' CI upper'] = y_ci_hi
             self.datasets[base + ' CI lower'] = y_ci_lo
-
         if pi_idx > 0 and 'yd' in fit:
             y_pi_hi, y_pi_lo = CurveFitter.prediction_band(
                 fit['xd'], fit['yd'], fit['popt'], fit['pcov'], fit['func'], pi_idx)
             self.datasets[base + ' PI upper'] = y_pi_hi
             self.datasets[base + ' PI lower'] = y_pi_lo
 
-        self.update_lists()
+    def _load_fit_combos_for(self, label):
+        """Sync CI/PI combos to the stored state for a given fit-curve label."""
+        fit = self._fits.get(label)
+        self.fit_ci_combo.blockSignals(True)
+        self.fit_pi_combo.blockSignals(True)
+        self.fit_ci_combo.setCurrentIndex(fit['ci_idx'] if fit else 0)
+        self.fit_pi_combo.setCurrentIndex(fit['pi_idx'] if fit else 0)
+        self.fit_ci_combo.blockSignals(False)
+        self.fit_pi_combo.blockSignals(False)
 
-    # ═══════════════════════════════════════════════════════════════════════════
+    def _on_fit_series_changed(self):
+        """Called when curve_select changes — refresh CI/PI combos and results panel."""
+        label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        is_fit = label in self._fits
+        if hasattr(self, '_fit_controls_widget'):
+            self._fit_controls_widget.setEnabled(is_fit)
+        if not is_fit:
+            # Original series selected — clear results; CI/PI combos not relevant
+            if hasattr(self, 'fit_results_text'):
+                self.fit_results_text.setPlainText('Run a fit to see results.')
+            self._load_fit_combos_for('')   # resets combos to Off
+            return
+        self._load_fit_combos_for(label)
+        self._refresh_fit_results_panel(label)
+
+    def _remove_fits_for_labels(self, source_labels):
+        """Remove all fitted curves whose source series is in source_labels.
+
+        Does NOT call update_preview — callers are responsible for that.
+        Returns True if anything was removed.
+        """
+        targets = []
+        for lbl in source_labels:
+            if lbl in self._fits:
+                targets.append(lbl)          # fit curve itself selected
+            else:
+                targets += [nm for nm in list(self._fits) if self._fits[nm].get('lbl') == lbl]
+
+        if not targets:
+            return False
+
+        for nm in targets:
+            for suffix in ('', ' CI upper', ' CI lower', ' PI upper', ' PI lower'):
+                self.datasets.pop(nm + suffix, None)
+            self._fits.pop(nm, None)
+            self.curve_styles.pop(nm, None)
+            for row in range(self.series_table.rowCount() - 1, -1, -1):
+                item = self.series_table.item(row, 2)
+                if item and item.text() == nm:
+                    self.series_table.removeRow(row)
+                    break
+
+        if hasattr(self, 'fit_results_text'):
+            self.fit_results_text.setPlainText('Run a fit to see results.')
+        return True
+
+    def _remove_fit(self):
+        """Remove the fitted curve(s) associated with the currently selected series."""
+        label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        if not label:
+            return
+
+        removed = self._remove_fits_for_labels([label])
+        if not removed:
+            QMessageBox.information(self, 'No Fit', 'No fitted curve found for the selected series.')
+            return
+
+        self.update_lists()
+        self.update_preview()
+
+    def _export_fit_results(self):
+        """Save fit results to .txt — either the current fit or all fits if the checkbox is ticked."""
+        import math
+        from PyQt6.QtWidgets import QFileDialog
+
+        # ── Glossary tables (shared) ──────────────────────────────────────────
+        _MODEL_GLOSSARY = {
+            'Linear': [
+                ('a', 'Slope — change in y per unit change in x'),
+                ('b', 'Intercept — value of y when x = 0'),
+            ],
+            'Quadratic': [
+                ('a', 'Coefficient of x² — controls the curvature and opening direction'),
+                ('b', 'Coefficient of x — controls the tilt of the parabola'),
+                ('c', 'Constant — value of y when x = 0'),
+            ],
+            'Cubic': [
+                ('a', 'Coefficient of x³ — controls the dominant curvature at large |x|'),
+                ('b', 'Coefficient of x² — controls secondary curvature'),
+                ('c', 'Coefficient of x — controls the slope near x = 0'),
+                ('d', 'Constant — value of y when x = 0'),
+            ],
+            'Exponential': [
+                ('a', 'Amplitude — scaling factor / value of y when x = 0'),
+                ('b', 'Rate — positive = growth, negative = decay; half-life = ln(2)/|b|'),
+            ],
+            'Power Law': [
+                ('a', 'Coefficient — scaling factor'),
+                ('b', 'Exponent — b > 1: super-linear, 0 < b < 1: sub-linear, b < 0: inverse'),
+            ],
+            'Logarithmic': [
+                ('a', 'Log coefficient — steepness of the log curve'),
+                ('b', 'Offset — vertical shift'),
+            ],
+            'Sigmoid': [
+                ('a', 'Ceiling — upper asymptote (maximum value the curve approaches)'),
+                ('b (midpoint)', 'Midpoint — x value at 50% of the ceiling (inflection point)'),
+                ('c (scale)', 'Scale — steepness; small |c| = steep, large |c| = gradual'),
+            ],
+        }
+        _STATS_GLOSSARY = [
+            ('n',           'Number of data points used in the fit'),
+            ('Parameters',  'Number of free parameters estimated by the model'),
+            ('DoF',         'Degrees of freedom = n − Parameters'),
+            ('R²',          'Coefficient of determination — fraction of variance explained (0–1; closer to 1 is better)'),
+            ('Adj. R²',     'R² penalised for extra parameters; more reliable for comparing models with different complexity'),
+            ('RMSE',        'Root Mean Squared Error — typical size of residuals in y-units (lower is better)'),
+            ('MSE',         'Mean Squared Error = RMSE²'),
+            ('SSE',         'Sum of Squared Errors — total squared deviation of fitted values from data'),
+            ('SST',         'Total Sum of Squares — total squared deviation of data from its mean'),
+            ('F-statistic', 'Tests whether the model explains significantly more variance than a flat mean'),
+            ('F p-value',   'Probability of observing this F under the null hypothesis; < 0.05 is conventionally significant'),
+            ('AIC',         'Akaike Information Criterion — lower = better trade-off of fit quality vs. model complexity'),
+            ('BIC',         'Bayesian Information Criterion — like AIC but penalises complexity more heavily'),
+        ]
+        _PARAM_STATS_GLOSSARY = [
+            ('value ± SE',  'Estimated parameter value and its standard error'),
+            ('t',           't-statistic for H₀: parameter = 0 (larger |t| = stronger evidence the parameter matters)'),
+            ('p',           'p-value for the t-test; < 0.05 suggests the parameter is statistically significant'),
+            ('CI',          'Confidence interval — range likely to contain the true parameter value at the stated confidence level'),
+        ]
+
+        def _build_glossary(models_used):
+            gl = ['', '═' * 52, 'GLOSSARY', '═' * 52]
+            shown = set()
+            for model in models_used:
+                if model in _MODEL_GLOSSARY and model not in shown:
+                    shown.add(model)
+                    gl.append('')
+                    gl.append(f'── Model parameters  ({model}) ──────────────')
+                    for name, meaning in _MODEL_GLOSSARY[model]:
+                        gl.append(f'  {name:<20}  {meaning}')
+            gl.append('')
+            gl.append('── Goodness-of-fit statistics ────────────────')
+            for name, meaning in _STATS_GLOSSARY:
+                gl.append(f'  {name:<16}  {meaning}')
+            gl.append('')
+            gl.append('── Per-parameter statistics ──────────────────')
+            for name, meaning in _PARAM_STATS_GLOSSARY:
+                gl.append(f'  {name:<16}  {meaning}')
+            return gl
+
+        def _fit_block(nm, fit):
+            """Return lines for one fit result, including series/axis context."""
+            st = fit.get('stats', {})
+            if not st:
+                return [f'  (no statistics available for {nm})']
+            ci_pct = int((1 - st.get('alpha', 0.05)) * 100)
+            lines = []
+            lines.append(f'Series:    {fit.get("lbl", nm)}')
+            lines.append(f'X column:  {fit.get("xc", "—")}')
+            lines.append(f'Y column:  {fit.get("yc", "—")}')
+            lines.append(f'Fit name:  {nm}')
+            lines.append(f'Model:     {fit["model"]}')
+            lines.append(f'Equation:  {fit.get("eq_str", "")}')
+            lines.append('')
+            lines.append('── Goodness of Fit ──────────────────')
+            lines.append(f'  n            = {st["n"]}')
+            lines.append(f'  Parameters   = {st["p"]}')
+            lines.append(f'  DoF          = {st["dof"]}')
+            lines.append(f'  R²           = {st["r2"]:.6f}')
+            lines.append(f'  Adj. R²      = {st["r2_adj"]:.6f}')
+            lines.append(f'  RMSE         = {st["rmse"]:.6g}')
+            lines.append(f'  MSE          = {st["mse"]:.6g}')
+            lines.append(f'  SSE          = {st["sse"]:.6g}')
+            lines.append(f'  SST          = {st["sst"]:.6g}')
+            fv = st.get('f_stat', float('nan'))
+            fp = st.get('f_pvalue', float('nan'))
+            lines.append(f'  F-statistic  = {fv:.4g}' if not math.isnan(fv) else '  F-statistic  = —')
+            lines.append(f'  F p-value    = {fp:.4g}' if not math.isnan(fp) else '  F p-value    = —')
+            lines.append(f'  AIC          = {st["aic"]:.4g}')
+            lines.append(f'  BIC          = {st["bic"]:.4g}')
+            lines.append('')
+            lines.append(f'── Parameters  ({ci_pct}% CI) ──────────────')
+            names  = st['param_names']
+            vals   = st['param_values']
+            ses    = st['param_se']
+            tstats = st['param_tstat']
+            pvals  = st['param_pvalue']
+            cilo   = st['param_ci_lo']
+            cihi   = st['param_ci_hi']
+            for i in range(st['p']):
+                pv = pvals[i]; tv = tstats[i]
+                pv_str = f'{pv:.4g}' if not math.isnan(pv) else '—'
+                tv_str = f'{tv:.4g}' if not math.isnan(tv) else '—'
+                lo_str = f'{cilo[i]:.4g}' if not math.isnan(cilo[i]) else '—'
+                hi_str = f'{cihi[i]:.4g}' if not math.isnan(cihi[i]) else '—'
+                lines.append(f'  {names[i]}')
+                lines.append(f'    value  = {vals[i]:.6g}  ±{ses[i]:.4g}')
+                lines.append(f'    t      = {tv_str}    p = {pv_str}')
+                lines.append(f'    CI     = [{lo_str}, {hi_str}]')
+            return lines
+
+        # ── Determine what to export ──────────────────────────────────────────
+        export_all = (hasattr(self, 'fit_export_all_check') and
+                      self.fit_export_all_check.isChecked())
+
+        if export_all:
+            if not self._fits:
+                QMessageBox.information(self, 'No Results', 'No fitted curves found.')
+                return
+            fits_to_export = list(self._fits.items())
+            default_name = 'all_fits_results.txt'
+        else:
+            label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+            fit = self._fits.get(label) or self._last_fit
+            if fit is None or not fit.get('stats'):
+                QMessageBox.information(self, 'No Results', 'Run a fit first.')
+                return
+            fits_to_export = [(label, fit)]
+            safe = ''.join(c if c.isalnum() or c in ' _-' else '_' for c in label).strip() or 'fit'
+            default_name = f'{safe}_results.txt'
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, 'Export Fit Results', default_name, 'Text files (*.txt);;All files (*)')
+        if not path:
+            return
+
+        # ── Build full output ─────────────────────────────────────────────────
+        all_lines = []
+        models_used = []
+        sep = '─' * 52
+
+        if export_all:
+            all_lines.append('═' * 52)
+            all_lines.append(f'  CURVE FIT RESULTS  —  {len(fits_to_export)} fit(s)')
+            all_lines.append('═' * 52)
+
+        for i, (nm, fit) in enumerate(fits_to_export):
+            if export_all and i > 0:
+                all_lines.append('')
+                all_lines.append(sep)
+            all_lines += _fit_block(nm, fit)
+            model = fit.get('model', '')
+            if model and model not in models_used:
+                models_used.append(model)
+
+        all_lines += _build_glossary(models_used)
+
+        try:
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write('\n'.join(all_lines))
+            if hasattr(self, 'statusBar'):
+                self.statusBar().showMessage(f'Fit results saved to {path}', 4000)
+        except Exception as e:
+            QMessageBox.critical(self, 'Export Failed', str(e))
+
+        # ═══════════════════════════════════════════════════════════════════════════
     # PLOTTING
     # ═══════════════════════════════════════════════════════════════════════════
     @staticmethod

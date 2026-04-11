@@ -107,7 +107,7 @@ def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palett
                     lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, color={col}, lw={fb_lw}, alpha=0.8)")
                     lines.append(f"{ax_var}.plot({xexpr}, {y2expr}, color={col}, lw={fb_lw}, alpha=0.8)")
             else:
-                lines.append(f"# Fill Between: '{lbl}' vs y=0 (no Y2 column selected)")
+                lines.append(f"# Fill Between: '{lbl}' vs y=0")
                 lines.append(f"{ax_var}.fill_between({xexpr}, 0, {yexpr}, label='{lbl}', color={col}, alpha={fb_al})")
                 if fb_showline:
                     lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, color={col}, lw={fb_lw}, alpha=0.8)")

@@ -145,23 +145,26 @@ class SerializationMixin:
         s['fit_ci_alpha']  = self.fit_ci_alpha_spin.value()
 
         # Fit results (JSON-serializable subset — func is reconstructed from model name)
-        if hasattr(self, '_last_fit') and self._last_fit is not None:
-            fit = self._last_fit
-            s['fit_result'] = {
-                'model':    fit.get('model', ''),
-                'eq_str':   fit.get('eq_str', ''),
-                'r2':       float(fit['r2']) if fit.get('r2') is not None else None,
-                'xc':       fit.get('xc', ''),
-                'yc':       fit.get('yc', ''),
-                'lbl':      fit.get('lbl', ''),
-                'popt':     [float(v) for v in fit['popt']] if fit.get('popt') is not None else [],
-                'pcov':     [[float(v) for v in row] for row in fit['pcov']] if fit.get('pcov') is not None else [],
-                'xd':       [float(v) for v in fit['xd']] if fit.get('xd') is not None else [],
-                'yd':       [float(v) for v in fit['yd']] if fit.get('yd') is not None else [],
-                'stats':    fit.get('stats', {}),
-            }
-        else:
-            s['fit_result'] = None
+        _fits_raw = {}
+        for _nm, fit in (getattr(self, '_fits', None) or {}).items():
+            if fit.get('popt') is not None:
+                _fits_raw[_nm] = {
+                    'model':  fit.get('model', ''),
+                    'eq_str': fit.get('eq_str', ''),
+                    'r2':     float(fit['r2']) if fit.get('r2') is not None else None,
+                    'xc':     fit.get('xc', ''),
+                    'yc':     fit.get('yc', ''),
+                    'lbl':    fit.get('lbl', ''),
+                    'popt':   [float(v) for v in fit['popt']],
+                    'pcov':   [[float(v) for v in row] for row in fit['pcov']] if fit.get('pcov') is not None else [],
+                    'xd':     [float(v) for v in fit['xd']] if fit.get('xd') is not None else [],
+                    'yd':     [float(v) for v in fit['yd']] if fit.get('yd') is not None else [],
+                    'stats':  fit.get('stats', {}),
+                    'ci_idx': fit.get('ci_idx', 0),
+                    'pi_idx': fit.get('pi_idx', 0),
+                }
+        s['fits']       = _fits_raw
+        s['fit_result'] = None  # legacy sentinel
 
         # Subplots layout
         s['subplot_rows']   = self.subplot_rows
@@ -341,16 +344,17 @@ class SerializationMixin:
             self.preset_combo.setCurrentIndex(i)
             self.preset_combo.blockSignals(False)
 
-        # Colors (update internal attr + swatch/hex labels if they exist)
-        for attr, default, sw, hx in [
-            ('chart_bg_color','#ffffff','chart_bg_color_swatch','chart_bg_color_hex'),
-            ('chart_fg_color','#000000','chart_fg_color_swatch','chart_fg_color_hex'),
-            ('plot_bg_color', '#ffffff','plot_bg_color_swatch', 'plot_bg_color_hex'),
+        _SW_CSS = 'background-color:{};border:1px solid #888;border-radius:2px;'
+
+        # Colors (update internal attr + swatch labels if they exist)
+        for attr, default, sw in [
+            ('chart_bg_color','#ffffff','chart_bg_color_swatch'),
+            ('chart_fg_color','#000000','chart_fg_color_swatch'),
+            ('plot_bg_color', '#ffffff','plot_bg_color_swatch'),
         ]:
             v = s.get(attr, default)
             setattr(self, attr, v)
-            if hasattr(self, sw): getattr(self, sw).setStyleSheet(f'color:{v};font-size:18px;')
-            if hasattr(self, hx): getattr(self, hx).setText(v)
+            if hasattr(self, sw): getattr(self, sw).setStyleSheet(_SW_CSS.format(v))
 
         self.border_top.setChecked(s.get('border_top', True))
         self.border_bottom.setChecked(s.get('border_bottom', True))
@@ -382,14 +386,14 @@ class SerializationMixin:
 
         self.grid_check.setChecked(s.get('grid_on', True))
         self.grid_color = s.get('grid_color','#cccccc')
-        self.grid_color_sw.setStyleSheet(f"color:{self.grid_color};font-size:15px;")
+        self.grid_color_sw.setStyleSheet(_SW_CSS.format(self.grid_color))
         i = self.grid_linestyle.findText(s.get('grid_linestyle','--'))
         if i >= 0: self.grid_linestyle.setCurrentIndex(i)
         self.grid_linewidth.setValue(s.get('grid_linewidth', 0.5))
         self.grid_alpha.setValue(s.get('grid_alpha', 0.4))
         self.minor_grid_check.setChecked(s.get('minor_grid_on', False))
         self.minor_grid_color = s.get('minor_grid_color','#e8e8e8')
-        self.minor_grid_color_sw.setStyleSheet(f"color:{self.minor_grid_color};font-size:15px;")
+        self.minor_grid_color_sw.setStyleSheet(_SW_CSS.format(self.minor_grid_color))
         i = self.minor_grid_linestyle.findText(s.get('minor_grid_linestyle',':'))
         if i >= 0: self.minor_grid_linestyle.setCurrentIndex(i)
         self.minor_grid_linewidth.setValue(s.get('minor_grid_linewidth', 0.3))
@@ -406,22 +410,22 @@ class SerializationMixin:
         tc = s.get('title_color', '#000000')
         self.title_color = tc
         if hasattr(self, 'title_color_label'):
-            self.title_color_label.setStyleSheet(f'color:{tc};font-size:16px;')
+            self.title_color_label.setStyleSheet(_SW_CSS.format(tc))
         i = self.xlabel_font.findText(s.get('xlabel_font','sans-serif'))
         if i >= 0: self.xlabel_font.setCurrentIndex(i)
         self.xlabel_size.setValue(s.get('xlabel_size', 11))
         self.xlabel_color = s.get('xlabel_color','#000000')
-        self.xlabel_color_label.setStyleSheet(f'color:{self.xlabel_color};font-size:16px;')
+        self.xlabel_color_label.setStyleSheet(_SW_CSS.format(self.xlabel_color))
         i = self.ylabel_font.findText(s.get('ylabel_font','sans-serif'))
         if i >= 0: self.ylabel_font.setCurrentIndex(i)
         self.ylabel_size.setValue(s.get('ylabel_size', 11))
         self.ylabel_color = s.get('ylabel_color','#000000')
-        self.ylabel_color_label.setStyleSheet(f'color:{self.ylabel_color};font-size:16px;')
+        self.ylabel_color_label.setStyleSheet(_SW_CSS.format(self.ylabel_color))
         i = self.y2label_font.findText(s.get('y2label_font','sans-serif'))
         if i >= 0: self.y2label_font.setCurrentIndex(i)
         self.y2label_size.setValue(s.get('y2label_size', 11))
         self.y2label_color = s.get('y2label_color','#000000')
-        self.y2label_color_label.setStyleSheet(f'color:{self.y2label_color};font-size:16px;')
+        self.y2label_color_label.setStyleSheet(_SW_CSS.format(self.y2label_color))
 
         # Subplots (layout + appearance only — column assignments come from series.json)
         mosaic = s.get('subplot_mosaic', None)
@@ -494,35 +498,40 @@ class SerializationMixin:
         # Reload Axes tab widgets for subplot 0
         self.on_active_subplot_changed()
 
-        # Fit CI/PI bands (fit_color/fit_linestyle/fit_linewidth removed in 2.0.0)
-        self.fit_ci_combo.setCurrentIndex(s.get('fit_ci_index', 0))
-        self.fit_pi_combo.setCurrentIndex(s.get('fit_pi_index', 0))
-        self.fit_ci_alpha_spin.setValue(s.get('fit_ci_alpha', 0.25))
-
-        # Restore fit results
-        fr = s.get('fit_result')
-        if fr and fr.get('model') and fr.get('popt'):
-            import numpy as _np
-            from data.scientific import CurveFitter as _CF
+        # Restore per-series fits
+        import numpy as _np
+        from data.scientific import CurveFitter as _CF
+        self._fits = {}; self._last_fit = None
+        _fits_saved = s.get('fits') or {}
+        _legacy_fr  = s.get('fit_result')
+        if _legacy_fr and _legacy_fr.get('model') and _legacy_fr.get('popt'):
+            _nm_leg = _legacy_fr.get('lbl', '') + f" ({_legacy_fr.get('model','')} fit)"
+            if _nm_leg not in _fits_saved:
+                _fits_saved[_nm_leg] = _legacy_fr
+        for _nm, fr in _fits_saved.items():
+            if not (fr.get('model') and fr.get('popt')): continue
             try:
-                model   = fr['model']
-                func    = _CF.MODELS.get(model)
-                popt    = _np.array(fr['popt'])
-                pcov    = _np.array(fr['pcov']) if fr.get('pcov') else _np.zeros((len(popt), len(popt)))
-                xd      = _np.array(fr['xd'])
-                yd      = _np.array(fr['yd']) if fr.get('yd') else _np.zeros_like(xd)
-                self._last_fit = dict(
-                    model=model, func=func, popt=popt, pcov=pcov,
-                    xd=xd, yd=yd,
-                    xc=fr.get('xc',''), yc=fr.get('yc',''), lbl=fr.get('lbl',''),
-                    eq_str=fr.get('eq_str',''), r2=fr.get('r2'),
-                    stats=fr.get('stats', {}),
-                )
+                model = fr['model']; func = _CF.MODELS.get(model)
+                popt  = _np.array(fr['popt'])
+                pcov  = _np.array(fr['pcov']) if fr.get('pcov') else _np.zeros((len(popt), len(popt)))
+                xd    = _np.array(fr['xd'])
+                yd    = _np.array(fr['yd']) if fr.get('yd') else _np.zeros_like(xd)
+                self._fits[_nm] = dict(model=model, func=func, popt=popt, pcov=pcov,
+                    xd=xd, yd=yd, xc=fr.get('xc',''), yc=fr.get('yc',''), lbl=fr.get('lbl',''),
+                    eq_str=fr.get('eq_str',''), r2=fr.get('r2'), stats=fr.get('stats',{}),
+                    ci_idx=fr.get('ci_idx',0), pi_idx=fr.get('pi_idx',0))
+            except Exception: pass
+        for _nm in list(self._fits):
+            if hasattr(self, '_update_confidence_band_for'):
+                self._update_confidence_band_for(_nm)
+        if self._fits:
+            self._last_fit = next(iter(self._fits.values()))
+            if hasattr(self, '_refresh_fit_results_panel'):
                 self._refresh_fit_results_panel()
-            except Exception:
-                self._last_fit = None
-        else:
-            self._last_fit = None
+        # CI/PI combo display state
+        self.fit_ci_combo.blockSignals(True); self.fit_pi_combo.blockSignals(True)
+        self.fit_ci_alpha_spin.setValue(s.get('fit_ci_alpha', 0.25))
+        self.fit_ci_combo.blockSignals(False); self.fit_pi_combo.blockSignals(False)
 
         # ── Chart-mode params ────────────────────────────────────────────────────
         def _cb(w, key, default): w.setChecked(s.get(key, default))
@@ -590,8 +599,9 @@ class SerializationMixin:
             ('waterfall_neg_color', 'waterfall_neg_color', '#e74c3c'),
         ]:
             _v = s.get(_key, _def); setattr(self, _attr, _v)
-            _btn = getattr(self, _attr + '_btn', None)
-            if _btn: _btn.setStyleSheet(f'background-color:{_v};border:1px solid #888;')
+            _sw = getattr(self, _attr + '_sw', None)
+            if _sw: _sw.setStyleSheet(
+                f'background-color:{_v};border:1px solid #888;border-radius:2px;')
         # Hist2D
         _sp(self.hist2d_bins_x,  'hist2d_bins_x',  20)
         _sp(self.hist2d_bins_y,  'hist2d_bins_y',  20)
@@ -633,7 +643,8 @@ class SerializationMixin:
             setattr(self, attr, v)
             sw = getattr(self, attr + '_sw', None)
             if sw:
-                sw.setStyleSheet(f'color:{v};font-size:16px;')
+                sw.setStyleSheet(
+                    f'background-color:{v};border:1px solid #888;border-radius:2px;')
 
         _set_ann_color('ann_fontcolor', '#000000')
         _set_ann_color('ann_bgcolor',   '#ffffcc')

@@ -158,19 +158,20 @@ def main():
         _log_dir = Path.home() / '.config' / 'plotviz'
     _log_dir.mkdir(parents=True, exist_ok=True)
     _log_file = _log_dir / 'plotviz.log'
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s  %(levelname)-8s  %(name)s  %(message)s',
-        datefmt='%H:%M:%S',
-        handlers=[
-            # 'w' truncates on each restart — fresh log every run
-            logging.FileHandler(_log_file, mode='w', encoding='utf-8'),
-            logging.StreamHandler(),          # also echoes to console/terminal
-        ],
-        force=True,
-    )
+    _log_fh = open(_log_file, 'w', encoding='utf-8', buffering=1)
+    sys.stdout = _log_fh
+    sys.stderr = _log_fh
+    _file_handler = logging.FileHandler(_log_file, mode='a', encoding='utf-8')
+    _file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s  %(levelname)-8s  %(name)s  %(message)s', datefmt='%H:%M:%S'))
+    logging.root.handlers.clear()
+    logging.root.addHandler(_file_handler)
+    logging.root.setLevel(logging.WARNING)
+    for _noisy in ('matplotlib', 'PIL', 'PyQt6', 'fontTools'):
+        logging.getLogger(_noisy).setLevel(logging.ERROR)
     log = logging.getLogger('plotviz')
-    log.info('plotviz starting — log: %s', _log_file)
+    log.setLevel(logging.WARNING)
+    log.warning('plotviz starting — log: %s', _log_file)
     # ─────────────────────────────────────────────────────────────────────────
 
     app = PlotVizQApplication(sys.argv)

@@ -47,23 +47,17 @@ WHOLE_CHART_TYPES = {
 _NO_X_TYPES = {'Histogram', 'Boxplot', 'Violin', 'Pie', 'ECDF',
 }
 
-# Master colormap list — used by every chart type that accepts a colormap.
-_CMAP_LIST = [
-    # Perceptually uniform sequential
+# Master colormap list — sorted alphabetically (case-insensitive).
+_CMAP_LIST = sorted([
     'viridis', 'plasma', 'inferno', 'magma', 'cividis', 'turbo',
-    # Sequential single-hue
     'Blues', 'Greens', 'Reds', 'Purples', 'Oranges', 'Greys',
     'YlOrRd', 'YlGnBu', 'BuPu', 'RdPu', 'PuBu',
-    # Classic / misc sequential
     'hot', 'cool', 'copper', 'bone', 'gray',
-    # Diverging
     'coolwarm', 'RdBu', 'RdYlBu', 'RdYlGn', 'Spectral',
     'PiYG', 'PRGn', 'BrBG', 'PuOr', 'bwr', 'seismic',
-    # Cyclic
     'twilight', 'hsv',
-    # Miscellaneous / legacy
-    'jet', 'rainbow', 'nipy_spectral',
-]
+    'rainbow', 'nipy_spectral',
+], key=str.casefold)
 
 # ── Plot-mode groups ──────────────────────────────────────────────────────────
 # "Standard" covers all freely-mixable per-series types. The remaining modes
@@ -150,18 +144,6 @@ class TabBuildersMixin:
     def create_file_tab(self):
         widget = QWidget(); scroll = QScrollArea(); scroll.setWidgetResizable(True)
         content = QWidget(); layout = QVBoxLayout(content); layout.setSpacing(6)
-
-        # ── Appearance (Dark / Light / System) ──────────────────────────────
-        app_row = QHBoxLayout(); app_row.setSpacing(6)
-        app_row.addWidget(QLabel('Appearance:'))
-        self.colour_scheme_combo = QComboBox()
-        self.colour_scheme_combo.addItems(['System', 'Light', 'Dark'])
-        self.colour_scheme_combo.currentTextChanged.connect(self._apply_colour_scheme)
-        app_row.addWidget(self.colour_scheme_combo)
-
-        app_row.addStretch()
-        layout.addLayout(app_row)
-        layout.addWidget(self._hline())
 
         # ── Open row ──────────────────────────────────────────────────────────
         open_row = QHBoxLayout(); open_row.setSpacing(4)
@@ -262,7 +244,9 @@ class TabBuildersMixin:
         layout.addWidget(self._sec_label('Colour Palette'))
         pal_row = QHBoxLayout(); pal_row.setSpacing(6)
         self.palette_combo = QComboBox()
-        self.palette_combo.addItems(list(COLOR_PALETTES.keys()))
+        self.palette_combo.addItems(sorted(COLOR_PALETTES.keys(), key=str.casefold))
+        idx = self.palette_combo.findText('Matplotlib')
+        if idx >= 0: self.palette_combo.setCurrentIndex(idx)
         self.palette_combo.currentTextChanged.connect(self._on_palette_changed)
         pal_row.addWidget(self.palette_combo)
         pal_row.addStretch()
@@ -471,7 +455,7 @@ class TabBuildersMixin:
         layout.addStretch()
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
-        self.tabs.addTab(widget, 'Data')
+        self.plots_inner_tabs.addTab(widget, 'Data')
         self._on_plot_mode_changed('Standard')
 
         # Dummy sp_chart_type — kept for compat
@@ -504,7 +488,7 @@ class TabBuildersMixin:
         # ── Heatmap / Contour / 3D Surface ────────────────────────────────────
         self.heat_group = QGroupBox('Heatmap / Contour / 3D Options')
         hgb = QVBoxLayout(self.heat_group)
-        hgb.addLayout(_row(QLabel('Colormap:'), self._make_combo('cmap_combo', _CMAP_LIST)))
+        hgb.addLayout(_row(QLabel('Colormap:'), self._make_combo('cmap_combo', _CMAP_LIST, default='rainbow')))
         hgb.addLayout(_row(QLabel('Contour levels:'), self._make_spin('contour_levels', 3, 100, 10)))
         hgb.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('heat_alpha', 0.05, 1.0, 1.0, 0.05)))
         hgb.addLayout(_row(QLabel('Interpolation:'), self._make_combo('heat_interpolation',
@@ -595,7 +579,7 @@ class TabBuildersMixin:
         h2g.addLayout(_row(QLabel('Bins X:'), self._make_spin('hist2d_bins_x', 2, 200, 20),
                            QLabel('Y:'),      self._make_spin('hist2d_bins_y', 2, 200, 20)))
         h2g.addLayout(_row(QLabel('Alpha:'),  self._make_dbl_spin('hist2d_alpha', 0.05, 1.0, 1.0, 0.05)))
-        h2g.addLayout(_row(QLabel('Colormap:'), self._make_combo('hist2d_cmap_combo', _CMAP_LIST)))
+        h2g.addLayout(_row(QLabel('Colormap:'), self._make_combo('hist2d_cmap_combo', _CMAP_LIST, default='rainbow')))
         self.hist2d_colorbar = QCheckBox('Show colorbar'); self.hist2d_colorbar.setChecked(True); self.hist2d_colorbar.stateChanged.connect(self.update_preview); h2g.addWidget(self.hist2d_colorbar)
         self.hist2d_log      = QCheckBox('Log color scale'); self.hist2d_log.stateChanged.connect(self.update_preview); h2g.addWidget(self.hist2d_log)
         layout.addWidget(self.hist2d_group)
@@ -605,7 +589,7 @@ class TabBuildersMixin:
         hxg = QVBoxLayout(self.hexbin_group)
         hxg.addLayout(_row(QLabel('Grid size:'), self._make_spin('hexbin_gridsize', 5, 100, 20)))
         hxg.addLayout(_row(QLabel('Alpha:'),     self._make_dbl_spin('hexbin_alpha', 0.05, 1.0, 1.0, 0.05)))
-        hxg.addLayout(_row(QLabel('Colormap:'),  self._make_combo('hexbin_cmap_combo', _CMAP_LIST)))
+        hxg.addLayout(_row(QLabel('Colormap:'),  self._make_combo('hexbin_cmap_combo', _CMAP_LIST, default='rainbow')))
         self.hexbin_colorbar = QCheckBox('Show colorbar'); self.hexbin_colorbar.setChecked(True); self.hexbin_colorbar.stateChanged.connect(self.update_preview); hxg.addWidget(self.hexbin_colorbar)
         self.hexbin_log      = QCheckBox('Log scale counts'); self.hexbin_log.stateChanged.connect(self.update_preview); hxg.addWidget(self.hexbin_log)
         layout.addWidget(self.hexbin_group)
@@ -630,7 +614,7 @@ class TabBuildersMixin:
         qvg.addLayout(_row(QLabel('Scale:'),      self._make_dbl_spin('quiver_scale', 0.01, 1000, 1.0, 0.01)))
         qvg.addLayout(_row(QLabel('Arrow width:'), self._make_dbl_spin('quiver_width', 0.001, 0.05, 0.005, 0.001, decimals=3)))
         self.quiver_color_by_mag = QCheckBox('Color by magnitude'); self.quiver_color_by_mag.stateChanged.connect(self.update_preview); qvg.addWidget(self.quiver_color_by_mag)
-        qvg.addLayout(_row(QLabel('Colormap:'), self._make_combo('quiver_cmap_combo', _CMAP_LIST)))
+        qvg.addLayout(_row(QLabel('Colormap:'), self._make_combo('quiver_cmap_combo', _CMAP_LIST, default='rainbow')))
         layout.addWidget(self.quiver_group)
 
         # ── Barbs ─────────────────────────────────────────────────────────────
@@ -642,7 +626,7 @@ class TabBuildersMixin:
         brg.addLayout(_row(QLabel('Pivot:'),      self._make_combo('barbs_pivot_combo', ['tip', 'middle', 'tail'])))
         brg.addLayout(_row(QLabel('Alpha:'),      self._make_dbl_spin('barbs_alpha', 0.05, 1.0, 0.85, 0.05)))
         self.barbs_color_by_mag = QCheckBox('Color by magnitude'); self.barbs_color_by_mag.stateChanged.connect(self.update_preview); brg.addWidget(self.barbs_color_by_mag)
-        brg.addLayout(_row(QLabel('Colormap:'),   self._make_combo('barbs_cmap_combo', _CMAP_LIST)))
+        brg.addLayout(_row(QLabel('Colormap:'),   self._make_combo('barbs_cmap_combo', _CMAP_LIST, default='rainbow')))
         layout.addWidget(self.barbs_group)
 
         # ── Streamplot ────────────────────────────────────────────────────────
@@ -654,7 +638,7 @@ class TabBuildersMixin:
         spg.addLayout(_row(QLabel('Arrow size:'), self._make_dbl_spin('stream_arrowsize', 0.1, 5.0, 1.0, 0.1)))
         spg.addLayout(_row(QLabel('Line width:'), self._make_dbl_spin('stream_linewidth', 0.2, 5.0, 1.5, 0.1)))
         self.stream_color_by_mag = QCheckBox('Color by magnitude'); self.stream_color_by_mag.stateChanged.connect(self.update_preview); spg.addWidget(self.stream_color_by_mag)
-        spg.addLayout(_row(QLabel('Colormap:'),   self._make_combo('stream_cmap_combo', _CMAP_LIST)))
+        spg.addLayout(_row(QLabel('Colormap:'),   self._make_combo('stream_cmap_combo', _CMAP_LIST, default='rainbow')))
         layout.addWidget(self.streamplot_group)
 
     # ── Widget factory helpers ─────────────────────────────────────────────────
@@ -667,8 +651,11 @@ class TabBuildersMixin:
         if decimals is not None: w.setDecimals(decimals)
         setattr(self, attr, w); w.valueChanged.connect(self.update_preview); return w
 
-    def _make_combo(self, attr, items):
+    def _make_combo(self, attr, items, default=None):
         w = QComboBox(); w.addItems(items)
+        if default is not None:
+            idx = w.findText(default)
+            if idx >= 0: w.setCurrentIndex(idx)
         setattr(self, attr, w); w.currentTextChanged.connect(self.update_preview); return w
 
     def _make_linestyle_combo(self, attr, default='-'):
@@ -692,38 +679,61 @@ class TabBuildersMixin:
         w = QComboBox(); w.addItem(sentinel)
         setattr(self, attr, w); w.currentTextChanged.connect(self.update_preview); return w
 
-    def _make_color_btn(self, attr, default_hex):
-        """Small colour swatch QPushButton that opens a colour picker and stores hex in self.<attr>.
+    # ── Shared color-picker helpers ───────────────────────────────────────────
+    _SW_CSS = 'background-color:{};border:1px solid #888;border-radius:2px;'
 
-        Does NOT overwrite self.<attr> if it is already set — this prevents the widget
-        construction (which runs at startup and after _apply_settings) from clobbering
-        a colour that serialization_apply already restored from a saved file.
+    def _color_sw(self, hex_color='#000000'):
+        """Create a 22×22 solid-square swatch QLabel."""
+        sw = QLabel()
+        sw.setFixedSize(22, 22)
+        sw.setStyleSheet(self._SW_CSS.format(hex_color))
+        return sw
+
+    def _make_color_btn(self, attr, default_hex):
+        """Return a QWidget [■ swatch | … btn] for attr; swatch stored as self.<attr>_sw.
+
+        Does NOT overwrite self.<attr> if it is already set — prevents widget
+        construction from clobbering a colour restored from a saved file.
         """
-        from PyQt6.QtWidgets import QPushButton, QColorDialog
+        from PyQt6.QtWidgets import QPushButton
         from PyQt6.QtGui import QColor
         from ui.helpers import _show_color_dialog
         if not getattr(self, attr, None):
             setattr(self, attr, default_hex)
         current = getattr(self, attr, default_hex)
-        btn = QPushButton()
-        btn.setFixedSize(60, 20)
-        btn.setStyleSheet(f'background-color:{current};border:1px solid #888;')
-        setattr(self, attr + '_btn', btn)          # store so serialization can sync it
+        sw = self._color_sw(current)
+        setattr(self, attr + '_sw', sw)
+        btn = QPushButton('…')
+        btn.setFixedWidth(28)
         def _pick():
             pal = self._active_palette_colors() if hasattr(self, '_active_palette_colors') else None
             col = _show_color_dialog(QColor(getattr(self, attr)), self, pal)
             if col.isValid():
                 setattr(self, attr, col.name())
-                btn.setStyleSheet(f'background-color:{col.name()};border:1px solid #888;')
+                sw.setStyleSheet(self._SW_CSS.format(col.name()))
                 self.update_preview()
         btn.clicked.connect(_pick)
-        return btn
+        container = QWidget()
+        h = QHBoxLayout(container)
+        h.setContentsMargins(0, 0, 0, 0); h.setSpacing(4)
+        h.addWidget(sw); h.addWidget(btn); h.addStretch()
+        return container
 
     # ─── Axes tab ─────────────────────────────────────────────────────────────
     def create_axes_tab(self):
         widget = QWidget()
-        scroll = QScrollArea(); scroll.setWidgetResizable(True)
-        content = QWidget(); layout = QVBoxLayout(content); layout.setSpacing(5)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setSpacing(5)
+        layout.setContentsMargins(6, 6, 6, 6)
+
+        # Helper: compact spinbox widths
+        _SW = 60   # narrow spinbox (sizes, rotation)
+        _LW = 82   # wider spinbox (limits)
+        _DW = 65   # direction/format combo
 
         # ── Subplot selector (hidden when n == 1) ─────────────────────────────
         sp_sel_row = QHBoxLayout(); sp_sel_row.setSpacing(6)
@@ -733,155 +743,224 @@ class TabBuildersMixin:
         sp_sel_row.addWidget(self.sp_active); sp_sel_row.addStretch()
         self._axes_sp_row_widget = QWidget()
         self._axes_sp_row_widget.setLayout(sp_sel_row)
-        self._axes_sp_row_widget.setVisible(False)   # shown only when n > 1
+        self._axes_sp_row_widget.setVisible(False)
         layout.addWidget(self._axes_sp_row_widget)
 
         layout.addWidget(self._hline())
 
-        # ── X Axis ───────────────────────────────────────────────────────────
+        # ══════════════════════════════════════════════════════════════════════
+        # ── X Axis ────────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('X Axis'))
-        xlabel_vis_row = QHBoxLayout()
-        self.xlabel_show_check = QCheckBox('Show X label'); self.xlabel_show_check.setChecked(True)
+
+        # Show checkbox
+        self.xlabel_show_check = QCheckBox('Show X label')
+        self.xlabel_show_check.setChecked(True)
         self.xlabel_show_check.stateChanged.connect(self._on_sp_xlabel_show_changed)
-        xlabel_vis_row.addWidget(self.xlabel_show_check); xlabel_vis_row.addStretch()
-        layout.addLayout(xlabel_vis_row)
-        self.xlabel_input = QLineEdit(); self.xlabel_input.setPlaceholderText('X label (optional)')
+        layout.addWidget(self.xlabel_show_check)
+
+        # Label text
+        self.xlabel_input = QLineEdit()
+        self.xlabel_input.setPlaceholderText('X label (optional)')
         self.xlabel_input.textChanged.connect(self._on_sp_xlabel_changed)
         layout.addWidget(self.xlabel_input)
 
-        xfont_row = QHBoxLayout(); xfont_row.setSpacing(4)
-        xfont_row.addWidget(QLabel('Font:'))
+        # Font + Size  (row 1 of 2)
+        xfont_row1 = QHBoxLayout(); xfont_row1.setSpacing(4)
+        xfont_row1.addWidget(QLabel('Font:'))
         self.xlabel_font = QComboBox(); self.xlabel_font.addItems(_FONTS)
         self.xlabel_font.currentTextChanged.connect(self.update_preview)
-        xfont_row.addWidget(self.xlabel_font)
-        xfont_row.addWidget(QLabel('Sz:'))
+        xfont_row1.addWidget(self.xlabel_font, 1)
+        xfont_row1.addWidget(QLabel('Size:'))
         self.xlabel_size = QSpinBox(); self.xlabel_size.setRange(6, 32); self.xlabel_size.setValue(11)
-        self.xlabel_size.valueChanged.connect(self.update_preview); xfont_row.addWidget(self.xlabel_size)
-        btn_xc = QPushButton('Color'); btn_xc.clicked.connect(lambda: self.pick_color('xlabel'))
-        xfont_row.addWidget(btn_xc)
-        self.xlabel_color_label = QLabel('■'); self.xlabel_color_label.setStyleSheet('color:black;font-size:16px;')
-        xfont_row.addWidget(self.xlabel_color_label); self.xlabel_color = '#000000'
-        xfont_row.addStretch(); layout.addLayout(xfont_row)
+        self.xlabel_size.setFixedWidth(_SW)
+        self.xlabel_size.valueChanged.connect(self.update_preview)
+        xfont_row1.addWidget(self.xlabel_size)
+        layout.addLayout(xfont_row1)
 
+        # Color  (row 2 of 2)
+        xfont_row2 = QHBoxLayout(); xfont_row2.setSpacing(4)
+        xfont_row2.addWidget(QLabel('Color:'))
+        self.xlabel_color = '#000000'
+        self.xlabel_color_label = self._color_sw('#000000')
+        xfont_row2.addWidget(self.xlabel_color_label)
+        btn_xc = QPushButton('…'); btn_xc.setFixedWidth(28)
+        btn_xc.clicked.connect(lambda: self.pick_color('xlabel'))
+        xfont_row2.addWidget(btn_xc)
+        xfont_row2.addStretch()
+        layout.addLayout(xfont_row2)
+
+        # Limits  (min / max on same row, Auto below)
         xlim_row = QHBoxLayout(); xlim_row.setSpacing(4)
         xlim_row.addWidget(QLabel('X min:'))
         self.x_min = QDoubleSpinBox(); self.x_min.setRange(-1e10, 1e10); self.x_min.setSingleStep(0.1)
-        self.x_min.editingFinished.connect(self._on_sp_lim_changed); xlim_row.addWidget(self.x_min)
+        self.x_min.setFixedWidth(_LW)
+        self.x_min.editingFinished.connect(self._on_sp_lim_changed)
+        xlim_row.addWidget(self.x_min)
         xlim_row.addWidget(QLabel('max:'))
         self.x_max = QDoubleSpinBox(); self.x_max.setRange(-1e10, 1e10); self.x_max.setValue(1); self.x_max.setSingleStep(0.1)
-        self.x_max.editingFinished.connect(self._on_sp_lim_changed); xlim_row.addWidget(self.x_max)
-        self.x_auto = QCheckBox('Auto'); self.x_auto.setChecked(True)
-        self.x_auto.stateChanged.connect(self._on_sp_lim_changed); xlim_row.addWidget(self.x_auto)
-        xlim_row.addStretch(); layout.addLayout(xlim_row)
+        self.x_max.setFixedWidth(_LW)
+        self.x_max.editingFinished.connect(self._on_sp_lim_changed)
+        xlim_row.addWidget(self.x_max)
+        xlim_row.addStretch()
+        layout.addLayout(xlim_row)
 
+        xauto_row = QHBoxLayout()
+        self.x_auto = QCheckBox('Auto limits'); self.x_auto.setChecked(True)
+        self.x_auto.stateChanged.connect(self._on_sp_lim_changed)
+        xauto_row.addWidget(self.x_auto); xauto_row.addStretch()
+        layout.addLayout(xauto_row)
+
+        # Scale radio buttons
         layout.addWidget(QLabel('Scale:'))
         self.xscale_group = QButtonGroup(self)
-        xsr = QHBoxLayout()
+        xsr = QHBoxLayout(); xsr.setSpacing(6)
         for lbl, val in [('Linear', 'linear'), ('Log', 'log'), ('Logit', 'logit'), ('Inverted', 'inverted')]:
             rb = QRadioButton(lbl); rb.setProperty('scale_value', val)
             if val == 'linear': rb.setChecked(True)
             rb.toggled.connect(self._save_axes_state)
             self.xscale_group.addButton(rb); xsr.addWidget(rb)
+        xsr.addStretch()
         layout.addLayout(xsr)
 
-        tick_x_row = QHBoxLayout()
-        tick_x_row.addWidget(QLabel('Tick size:'))
+        # Tick size + direction
+        xtick_row1 = QHBoxLayout(); xtick_row1.setSpacing(4)
+        xtick_row1.addWidget(QLabel('Tick size:'))
         self.xtick_size = QSpinBox(); self.xtick_size.setRange(4, 24); self.xtick_size.setValue(9)
+        self.xtick_size.setFixedWidth(_SW)
         self.xtick_size.valueChanged.connect(self._save_axes_state)
-        tick_x_row.addWidget(self.xtick_size)
-        tick_x_row.addWidget(QLabel('Direction:'))
+        xtick_row1.addWidget(self.xtick_size)
+        xtick_row1.addWidget(QLabel('Direction:'))
         self.xtick_dir = QComboBox(); self.xtick_dir.addItems(['out', 'in', 'inout'])
+        self.xtick_dir.setFixedWidth(_DW)
         self.xtick_dir.currentTextChanged.connect(self._save_axes_state)
-        tick_x_row.addWidget(self.xtick_dir); tick_x_row.addStretch()
-        layout.addLayout(tick_x_row)
+        xtick_row1.addWidget(self.xtick_dir)
+        xtick_row1.addStretch()
+        layout.addLayout(xtick_row1)
 
+        # Show ticks + minor ticks
         xtick_row2 = QHBoxLayout()
         self.xticks_show = QCheckBox('Show ticks'); self.xticks_show.setChecked(True)
         self.xticks_show.stateChanged.connect(self._save_axes_state)
         xtick_row2.addWidget(self.xticks_show)
         self.xtick_minor = QCheckBox('Minor ticks'); self.xtick_minor.setChecked(False)
         self.xtick_minor.stateChanged.connect(self._save_axes_state)
-        xtick_row2.addWidget(self.xtick_minor); xtick_row2.addStretch()
+        xtick_row2.addWidget(self.xtick_minor)
+        xtick_row2.addStretch()
         layout.addLayout(xtick_row2)
 
-        xtick_row3 = QHBoxLayout()
-        xtick_row3.addWidget(QLabel('Rotation:'))
+        # Rotation
+        xtick_rot_row = QHBoxLayout(); xtick_rot_row.setSpacing(4)
+        xtick_rot_row.addWidget(QLabel('Rotation:'))
         self.xtick_rotation = QSpinBox(); self.xtick_rotation.setRange(-90, 90); self.xtick_rotation.setValue(0)
+        self.xtick_rotation.setFixedWidth(_SW)
         self.xtick_rotation.valueChanged.connect(self._save_axes_state)
-        xtick_row3.addWidget(self.xtick_rotation)
-        xtick_row3.addWidget(QLabel('Step (0=auto):'))
-        self.xtick_step = QDoubleSpinBox(); self.xtick_step.setRange(0, 1e9); self.xtick_step.setValue(0); self.xtick_step.setSingleStep(0.1)
-        self.xtick_step.editingFinished.connect(self._save_axes_state)
-        xtick_row3.addWidget(self.xtick_step); xtick_row3.addStretch()
-        layout.addLayout(xtick_row3)
+        xtick_rot_row.addWidget(self.xtick_rotation)
+        xtick_rot_row.addStretch()
+        layout.addLayout(xtick_rot_row)
 
-        xfmt_row = QHBoxLayout()
+        # Step
+        xtick_step_row = QHBoxLayout(); xtick_step_row.setSpacing(4)
+        xtick_step_row.addWidget(QLabel('Step (0 = auto):'))
+        self.xtick_step = QDoubleSpinBox(); self.xtick_step.setRange(0, 1e9); self.xtick_step.setValue(0); self.xtick_step.setSingleStep(0.1)
+        self.xtick_step.setFixedWidth(_LW)
+        self.xtick_step.editingFinished.connect(self._save_axes_state)
+        xtick_step_row.addWidget(self.xtick_step)
+        xtick_step_row.addStretch()
+        layout.addLayout(xtick_step_row)
+
+        # Format
+        xfmt_row = QHBoxLayout(); xfmt_row.setSpacing(4)
         xfmt_row.addWidget(QLabel('Format:'))
         self.x_formatter = QComboBox()
         self.x_formatter.addItems(['auto', 'plain', 'sci', 'percent', '{x:.2f}', '{x:.0f}'])
         self.x_formatter.setEditable(True)
         self.x_formatter.currentTextChanged.connect(self._save_axes_state)
-        xfmt_row.addWidget(self.x_formatter); xfmt_row.addStretch()
+        xfmt_row.addWidget(self.x_formatter, 1)
         layout.addLayout(xfmt_row)
 
         layout.addWidget(self._hline())
 
+        # ══════════════════════════════════════════════════════════════════════
         # ── Y Axis (Left) ─────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('Y Axis (Left)'))
-        ylabel_vis_row = QHBoxLayout()
-        self.ylabel_show_check = QCheckBox('Show Y label'); self.ylabel_show_check.setChecked(True)
+
+        self.ylabel_show_check = QCheckBox('Show Y label')
+        self.ylabel_show_check.setChecked(True)
         self.ylabel_show_check.stateChanged.connect(self._on_sp_ylabel_show_changed)
-        ylabel_vis_row.addWidget(self.ylabel_show_check); ylabel_vis_row.addStretch()
-        layout.addLayout(ylabel_vis_row)
-        self.ylabel_input = QLineEdit(); self.ylabel_input.setPlaceholderText('Y label (optional)')
+        layout.addWidget(self.ylabel_show_check)
+
+        self.ylabel_input = QLineEdit()
+        self.ylabel_input.setPlaceholderText('Y label (optional)')
         self.ylabel_input.textChanged.connect(self._on_sp_ylabel_changed)
         layout.addWidget(self.ylabel_input)
 
-        yfont_row = QHBoxLayout(); yfont_row.setSpacing(4)
-        yfont_row.addWidget(QLabel('Font:'))
+        yfont_row1 = QHBoxLayout(); yfont_row1.setSpacing(4)
+        yfont_row1.addWidget(QLabel('Font:'))
         self.ylabel_font = QComboBox(); self.ylabel_font.addItems(_FONTS)
         self.ylabel_font.currentTextChanged.connect(self.update_preview)
-        yfont_row.addWidget(self.ylabel_font)
-        yfont_row.addWidget(QLabel('Sz:'))
+        yfont_row1.addWidget(self.ylabel_font, 1)
+        yfont_row1.addWidget(QLabel('Size:'))
         self.ylabel_size = QSpinBox(); self.ylabel_size.setRange(6, 32); self.ylabel_size.setValue(11)
-        self.ylabel_size.valueChanged.connect(self.update_preview); yfont_row.addWidget(self.ylabel_size)
-        btn_yc = QPushButton('Color'); btn_yc.clicked.connect(lambda: self.pick_color('ylabel'))
-        yfont_row.addWidget(btn_yc)
-        self.ylabel_color_label = QLabel('■'); self.ylabel_color_label.setStyleSheet('color:black;font-size:16px;')
-        yfont_row.addWidget(self.ylabel_color_label); self.ylabel_color = '#000000'
-        yfont_row.addStretch(); layout.addLayout(yfont_row)
+        self.ylabel_size.setFixedWidth(_SW)
+        self.ylabel_size.valueChanged.connect(self.update_preview)
+        yfont_row1.addWidget(self.ylabel_size)
+        layout.addLayout(yfont_row1)
+
+        yfont_row2 = QHBoxLayout(); yfont_row2.setSpacing(4)
+        yfont_row2.addWidget(QLabel('Color:'))
+        self.ylabel_color = '#000000'
+        self.ylabel_color_label = self._color_sw('#000000')
+        yfont_row2.addWidget(self.ylabel_color_label)
+        btn_yc = QPushButton('…'); btn_yc.setFixedWidth(28)
+        btn_yc.clicked.connect(lambda: self.pick_color('ylabel'))
+        yfont_row2.addWidget(btn_yc)
+        yfont_row2.addStretch()
+        layout.addLayout(yfont_row2)
 
         ylim_row = QHBoxLayout(); ylim_row.setSpacing(4)
         ylim_row.addWidget(QLabel('Y min:'))
         self.y_min = QDoubleSpinBox(); self.y_min.setRange(-1e10, 1e10); self.y_min.setSingleStep(0.1)
-        self.y_min.editingFinished.connect(self._on_sp_lim_changed); ylim_row.addWidget(self.y_min)
+        self.y_min.setFixedWidth(_LW)
+        self.y_min.editingFinished.connect(self._on_sp_lim_changed)
+        ylim_row.addWidget(self.y_min)
         ylim_row.addWidget(QLabel('max:'))
         self.y_max = QDoubleSpinBox(); self.y_max.setRange(-1e10, 1e10); self.y_max.setValue(1); self.y_max.setSingleStep(0.1)
-        self.y_max.editingFinished.connect(self._on_sp_lim_changed); ylim_row.addWidget(self.y_max)
-        self.y_auto = QCheckBox('Auto'); self.y_auto.setChecked(True)
-        self.y_auto.stateChanged.connect(self._on_sp_lim_changed); ylim_row.addWidget(self.y_auto)
-        ylim_row.addStretch(); layout.addLayout(ylim_row)
+        self.y_max.setFixedWidth(_LW)
+        self.y_max.editingFinished.connect(self._on_sp_lim_changed)
+        ylim_row.addWidget(self.y_max)
+        ylim_row.addStretch()
+        layout.addLayout(ylim_row)
+
+        yauto_row = QHBoxLayout()
+        self.y_auto = QCheckBox('Auto limits'); self.y_auto.setChecked(True)
+        self.y_auto.stateChanged.connect(self._on_sp_lim_changed)
+        yauto_row.addWidget(self.y_auto); yauto_row.addStretch()
+        layout.addLayout(yauto_row)
 
         layout.addWidget(QLabel('Scale:'))
         self.yscale_group = QButtonGroup(self)
-        ysr = QHBoxLayout()
+        ysr = QHBoxLayout(); ysr.setSpacing(6)
         for lbl, val in [('Linear', 'linear'), ('Log', 'log'), ('Logit', 'logit'), ('Inverted', 'inverted')]:
             rb = QRadioButton(lbl); rb.setProperty('scale_value', val)
             if val == 'linear': rb.setChecked(True)
             rb.toggled.connect(self._save_axes_state)
             self.yscale_group.addButton(rb); ysr.addWidget(rb)
+        ysr.addStretch()
         layout.addLayout(ysr)
 
-        tick_y_row = QHBoxLayout()
-        tick_y_row.addWidget(QLabel('Tick size:'))
+        ytick_row1 = QHBoxLayout(); ytick_row1.setSpacing(4)
+        ytick_row1.addWidget(QLabel('Tick size:'))
         self.ytick_size = QSpinBox(); self.ytick_size.setRange(4, 24); self.ytick_size.setValue(9)
+        self.ytick_size.setFixedWidth(_SW)
         self.ytick_size.valueChanged.connect(self._save_axes_state)
-        tick_y_row.addWidget(self.ytick_size)
-        tick_y_row.addWidget(QLabel('Direction:'))
+        ytick_row1.addWidget(self.ytick_size)
+        ytick_row1.addWidget(QLabel('Direction:'))
         self.ytick_dir = QComboBox(); self.ytick_dir.addItems(['out', 'in', 'inout'])
+        self.ytick_dir.setFixedWidth(_DW)
         self.ytick_dir.currentTextChanged.connect(self._save_axes_state)
-        tick_y_row.addWidget(self.ytick_dir); tick_y_row.addStretch()
-        layout.addLayout(tick_y_row)
+        ytick_row1.addWidget(self.ytick_dir)
+        ytick_row1.addStretch()
+        layout.addLayout(ytick_row1)
 
         ytick_row2 = QHBoxLayout()
         self.yticks_show = QCheckBox('Show ticks'); self.yticks_show.setChecked(True)
@@ -889,87 +968,114 @@ class TabBuildersMixin:
         ytick_row2.addWidget(self.yticks_show)
         self.ytick_minor = QCheckBox('Minor ticks'); self.ytick_minor.setChecked(False)
         self.ytick_minor.stateChanged.connect(self._save_axes_state)
-        ytick_row2.addWidget(self.ytick_minor); ytick_row2.addStretch()
+        ytick_row2.addWidget(self.ytick_minor)
+        ytick_row2.addStretch()
         layout.addLayout(ytick_row2)
 
-        ytick_row3 = QHBoxLayout()
-        ytick_row3.addWidget(QLabel('Rotation:'))
+        ytick_rot_row = QHBoxLayout(); ytick_rot_row.setSpacing(4)
+        ytick_rot_row.addWidget(QLabel('Rotation:'))
         self.ytick_rotation = QSpinBox(); self.ytick_rotation.setRange(-90, 90); self.ytick_rotation.setValue(0)
+        self.ytick_rotation.setFixedWidth(_SW)
         self.ytick_rotation.valueChanged.connect(self._save_axes_state)
-        ytick_row3.addWidget(self.ytick_rotation)
-        ytick_row3.addWidget(QLabel('Step (0=auto):'))
-        self.ytick_step = QDoubleSpinBox(); self.ytick_step.setRange(0, 1e9); self.ytick_step.setValue(0); self.ytick_step.setSingleStep(0.1)
-        self.ytick_step.editingFinished.connect(self._save_axes_state)
-        ytick_row3.addWidget(self.ytick_step); ytick_row3.addStretch()
-        layout.addLayout(ytick_row3)
+        ytick_rot_row.addWidget(self.ytick_rotation)
+        ytick_rot_row.addStretch()
+        layout.addLayout(ytick_rot_row)
 
-        yfmt_row = QHBoxLayout()
+        ytick_step_row = QHBoxLayout(); ytick_step_row.setSpacing(4)
+        ytick_step_row.addWidget(QLabel('Step (0 = auto):'))
+        self.ytick_step = QDoubleSpinBox(); self.ytick_step.setRange(0, 1e9); self.ytick_step.setValue(0); self.ytick_step.setSingleStep(0.1)
+        self.ytick_step.setFixedWidth(_LW)
+        self.ytick_step.editingFinished.connect(self._save_axes_state)
+        ytick_step_row.addWidget(self.ytick_step)
+        ytick_step_row.addStretch()
+        layout.addLayout(ytick_step_row)
+
+        yfmt_row = QHBoxLayout(); yfmt_row.setSpacing(4)
         yfmt_row.addWidget(QLabel('Format:'))
         self.y_formatter = QComboBox()
         self.y_formatter.addItems(['auto', 'plain', 'sci', 'percent', '{x:.2f}', '{x:.0f}'])
         self.y_formatter.setEditable(True)
         self.y_formatter.currentTextChanged.connect(self._save_axes_state)
-        yfmt_row.addWidget(self.y_formatter); yfmt_row.addStretch()
+        yfmt_row.addWidget(self.y_formatter, 1)
         layout.addLayout(yfmt_row)
 
         layout.addWidget(self._hline())
 
         # ── Equal Scale ───────────────────────────────────────────────────────
-        equal_scale_row = QHBoxLayout()
         self.equal_scale_check = QCheckBox('Equal scale (1:1 aspect ratio)')
         self.equal_scale_check.setToolTip(
             'Force X and Y axes to use the same scale length (ax.set_aspect("equal")).\n'
             'Useful for scatter plots, maps, and any data where distances should be preserved.'
         )
         self.equal_scale_check.stateChanged.connect(self._save_axes_state)
-        equal_scale_row.addWidget(self.equal_scale_check)
-        equal_scale_row.addStretch()
-        layout.addLayout(equal_scale_row)
+        layout.addWidget(self.equal_scale_check)
 
         layout.addWidget(self._hline())
 
+        # ══════════════════════════════════════════════════════════════════════
         # ── Y Axis (Right / Secondary) ────────────────────────────────────────
         layout.addWidget(self._sec_label('Y Axis (Right / Secondary)'))
         layout.addWidget(QLabel('(Activate by ticking Y2 in the Series table)'))
-        y2label_vis_row = QHBoxLayout()
-        self.y2label_show_check = QCheckBox('Show Y2 label'); self.y2label_show_check.setChecked(True)
+
+        self.y2label_show_check = QCheckBox('Show Y2 label')
+        self.y2label_show_check.setChecked(True)
         self.y2label_show_check.stateChanged.connect(self._on_sp_y2label_show_changed)
-        y2label_vis_row.addWidget(self.y2label_show_check); y2label_vis_row.addStretch()
-        layout.addLayout(y2label_vis_row)
-        self.y2label_input = QLineEdit(); self.y2label_input.setPlaceholderText('Y2 label (optional)')
+        layout.addWidget(self.y2label_show_check)
+
+        self.y2label_input = QLineEdit()
+        self.y2label_input.setPlaceholderText('Y2 label (optional)')
         self.y2label_input.textChanged.connect(self._on_sp_y2label_changed)
         layout.addWidget(self.y2label_input)
 
-        y2font_row = QHBoxLayout(); y2font_row.setSpacing(4)
-        y2font_row.addWidget(QLabel('Font:'))
+        y2font_row1 = QHBoxLayout(); y2font_row1.setSpacing(4)
+        y2font_row1.addWidget(QLabel('Font:'))
         self.y2label_font = QComboBox(); self.y2label_font.addItems(_FONTS)
         self.y2label_font.currentTextChanged.connect(self.update_preview)
-        y2font_row.addWidget(self.y2label_font)
-        y2font_row.addWidget(QLabel('Sz:'))
+        y2font_row1.addWidget(self.y2label_font, 1)
+        y2font_row1.addWidget(QLabel('Size:'))
         self.y2label_size = QSpinBox(); self.y2label_size.setRange(6, 32); self.y2label_size.setValue(11)
-        self.y2label_size.valueChanged.connect(self.update_preview); y2font_row.addWidget(self.y2label_size)
-        btn_y2c = QPushButton('Color'); btn_y2c.clicked.connect(lambda: self.pick_color('y2label'))
-        y2font_row.addWidget(btn_y2c)
-        self.y2label_color_label = QLabel('■'); self.y2label_color_label.setStyleSheet('color:black;font-size:16px;')
-        y2font_row.addWidget(self.y2label_color_label); self.y2label_color = '#000000'
-        y2font_row.addStretch(); layout.addLayout(y2font_row)
+        self.y2label_size.setFixedWidth(_SW)
+        self.y2label_size.valueChanged.connect(self.update_preview)
+        y2font_row1.addWidget(self.y2label_size)
+        layout.addLayout(y2font_row1)
+
+        y2font_row2 = QHBoxLayout(); y2font_row2.setSpacing(4)
+        y2font_row2.addWidget(QLabel('Color:'))
+        self.y2label_color = '#000000'
+        self.y2label_color_label = self._color_sw('#000000')
+        y2font_row2.addWidget(self.y2label_color_label)
+        btn_y2c = QPushButton('…'); btn_y2c.setFixedWidth(28)
+        btn_y2c.clicked.connect(lambda: self.pick_color('y2label'))
+        y2font_row2.addWidget(btn_y2c)
+        y2font_row2.addStretch()
+        layout.addLayout(y2font_row2)
 
         y2lim_row = QHBoxLayout(); y2lim_row.setSpacing(4)
         y2lim_row.addWidget(QLabel('Y2 min:'))
         self.y2_min = QDoubleSpinBox(); self.y2_min.setRange(-1e10, 1e10); self.y2_min.setSingleStep(0.1)
-        self.y2_min.editingFinished.connect(self._on_sp_lim_changed); y2lim_row.addWidget(self.y2_min)
+        self.y2_min.setFixedWidth(_LW)
+        self.y2_min.editingFinished.connect(self._on_sp_lim_changed)
+        y2lim_row.addWidget(self.y2_min)
         y2lim_row.addWidget(QLabel('max:'))
         self.y2_max = QDoubleSpinBox(); self.y2_max.setRange(-1e10, 1e10); self.y2_max.setValue(1); self.y2_max.setSingleStep(0.1)
-        self.y2_max.editingFinished.connect(self._on_sp_lim_changed); y2lim_row.addWidget(self.y2_max)
-        self.y2_auto = QCheckBox('Auto'); self.y2_auto.setChecked(True)
-        self.y2_auto.stateChanged.connect(self._on_sp_lim_changed); y2lim_row.addWidget(self.y2_auto)
-        y2lim_row.addStretch(); layout.addLayout(y2lim_row)
+        self.y2_max.setFixedWidth(_LW)
+        self.y2_max.editingFinished.connect(self._on_sp_lim_changed)
+        y2lim_row.addWidget(self.y2_max)
+        y2lim_row.addStretch()
+        layout.addLayout(y2lim_row)
+
+        y2auto_row = QHBoxLayout()
+        self.y2_auto = QCheckBox('Auto limits'); self.y2_auto.setChecked(True)
+        self.y2_auto.stateChanged.connect(self._on_sp_lim_changed)
+        y2auto_row.addWidget(self.y2_auto); y2auto_row.addStretch()
+        layout.addLayout(y2auto_row)
 
         layout.addWidget(self._hline())
 
         layout.addStretch()
-        scroll.setWidget(content); mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
-        self.tabs.addTab(widget, 'Axes')
+        scroll.setWidget(content)
+        mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
+        self.plots_inner_tabs.addTab(widget, 'Axes')
 
 
     # ─── Style tab ────────────────────────────────────────────────────────────
@@ -988,10 +1094,8 @@ class TabBuildersMixin:
         def color_row(label_text, attr_name, default_hex, pick_target=None):
             r = QHBoxLayout(); r.setSpacing(6)
             lbl = QLabel(label_text); lbl.setFixedWidth(90); r.addWidget(lbl)
-            swatch = QLabel('■'); swatch.setStyleSheet(f'color:{default_hex};font-size:18px;')
-            setattr(self, attr_name + '_swatch', swatch); r.addWidget(swatch)
-            hex_lbl = QLabel(default_hex); hex_lbl.setFixedWidth(58)
-            setattr(self, attr_name + '_hex', hex_lbl); r.addWidget(hex_lbl)
+            sw = self._color_sw(default_hex)
+            setattr(self, attr_name + '_swatch', sw); r.addWidget(sw)
             setattr(self, attr_name, default_hex)
             btn = QPushButton('…'); btn.setFixedWidth(28)
             target = pick_target or attr_name
@@ -1012,10 +1116,15 @@ class TabBuildersMixin:
         tfont_row.addWidget(QLabel('Size:'))
         self.title_size = QSpinBox(); self.title_size.setRange(6,32); self.title_size.setValue(14)
         self.title_size.valueChanged.connect(self.update_preview); tfont_row.addWidget(self.title_size)
-        tbtn = QPushButton('Color'); tbtn.clicked.connect(lambda: self.pick_color('title')); tfont_row.addWidget(tbtn)
-        self.title_color_label = QLabel('■'); self.title_color_label.setStyleSheet('color:#000000;font-size:16px;')
-        tfont_row.addWidget(self.title_color_label); self.title_color = '#000000'
         tfont_row.addStretch(); layout.addLayout(tfont_row)
+        tcolor_row = QHBoxLayout(); tcolor_row.setSpacing(6)
+        tcolor_row.addWidget(QLabel('Color:'))
+        self.title_color_label = self._color_sw('#000000')
+        tcolor_row.addWidget(self.title_color_label)
+        self.title_color = '#000000'
+        tbtn = QPushButton('…'); tbtn.setFixedWidth(28)
+        tbtn.clicked.connect(lambda: self.pick_color('title'))
+        tcolor_row.addWidget(tbtn); tcolor_row.addStretch(); layout.addLayout(tcolor_row)
 
         # Chart title X / Y position (figure-normalised coords)
         tpos_row = QHBoxLayout(); tpos_row.setSpacing(4)
@@ -1148,10 +1257,11 @@ class TabBuildersMixin:
         self.grid_check.stateChanged.connect(self.update_preview)
         maj_lay.addWidget(self.grid_check)
         # color
-        c1 = QHBoxLayout(); c1.setSpacing(3)
+        c1 = QHBoxLayout(); c1.setSpacing(4)
+        c1.addWidget(QLabel('Color:'))
         self.grid_color = '#cccccc'
-        self.grid_color_sw = QLabel('■'); self.grid_color_sw.setStyleSheet('color:#cccccc;font-size:15px;')
-        g_btn = QPushButton('…'); g_btn.setFixedWidth(22)
+        self.grid_color_sw = self._color_sw('#cccccc')
+        g_btn = QPushButton('…'); g_btn.setFixedWidth(28)
         g_btn.clicked.connect(lambda: self._pick_grid_color('major'))
         c1.addWidget(self.grid_color_sw); c1.addWidget(g_btn); c1.addStretch()
         maj_lay.addLayout(c1)
@@ -1181,10 +1291,11 @@ class TabBuildersMixin:
         self.minor_grid_check.stateChanged.connect(self.update_preview)
         min_lay.addWidget(self.minor_grid_check)
         # color
-        c2 = QHBoxLayout(); c2.setSpacing(3)
+        c2 = QHBoxLayout(); c2.setSpacing(4)
+        c2.addWidget(QLabel('Color:'))
         self.minor_grid_color = '#e8e8e8'
-        self.minor_grid_color_sw = QLabel('■'); self.minor_grid_color_sw.setStyleSheet('color:#e8e8e8;font-size:15px;')
-        sg_btn = QPushButton('…'); sg_btn.setFixedWidth(22)
+        self.minor_grid_color_sw = self._color_sw('#e8e8e8')
+        sg_btn = QPushButton('…'); sg_btn.setFixedWidth(28)
         sg_btn.clicked.connect(lambda: self._pick_grid_color('minor'))
         c2.addWidget(self.minor_grid_color_sw); c2.addWidget(sg_btn); c2.addStretch()
         min_lay.addLayout(c2)
@@ -1243,6 +1354,7 @@ class TabBuildersMixin:
         self.curve_select.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.curve_select.currentIndexChanged.connect(lambda _: self.load_curve_style())
+        self.curve_select.currentIndexChanged.connect(lambda _: self._on_fit_series_changed())
         layout.addWidget(self.curve_select)
 
         # Line style
@@ -1254,8 +1366,9 @@ class TabBuildersMixin:
         # Curve color inline
         cr = QHBoxLayout(); cr.setSpacing(6)
         lbl_cc = QLabel('Color:'); lbl_cc.setFixedWidth(90); cr.addWidget(lbl_cc)
-        self.curve_color_label = QLabel('■ #1f77b4'); cr.addWidget(self.curve_color_label)
         self.curve_color = '#1f77b4'
+        self.curve_color_label = self._color_sw('#1f77b4')
+        cr.addWidget(self.curve_color_label)
         btn_cc = QPushButton('…'); btn_cc.setFixedWidth(28)
         btn_cc.clicked.connect(lambda: self.pick_color('curve')); cr.addWidget(btn_cc)
         self.curve_lock_label = QLabel('🔒'); self.curve_lock_label.setToolTip('Color is manually locked')
@@ -1279,16 +1392,19 @@ class TabBuildersMixin:
         self.curve_markersize.setValue(6); self.curve_markersize.setSingleStep(0.5)
         self.curve_markersize.editingFinished.connect(self.save_curve_style)
 
-        self.curve_marker_color_label = QLabel('■ #1f77b4')
         self.curve_marker_color = '#1f77b4'
+        self.curve_marker_color_label = self._color_sw('#1f77b4')
         btn_mc = QPushButton('…'); btn_mc.setFixedWidth(28)
         btn_mc.clicked.connect(lambda: self.pick_color('curve_marker'))
         cwm = QHBoxLayout(); cwm.setSpacing(4)
         cwm.addWidget(QLabel('W:')); cwm.addWidget(self.curve_linewidth)
         cwm.addWidget(QLabel('Size:')); cwm.addWidget(self.curve_markersize)
-        cwm.addWidget(QLabel('Color:')); cwm.addWidget(self.curve_marker_color_label)
-        cwm.addWidget(btn_mc)
         cwm.addStretch(); layout.addLayout(cwm)
+        mc_row = QHBoxLayout(); mc_row.setSpacing(4)
+        lbl_mc = QLabel('Marker color:'); lbl_mc.setFixedWidth(90); mc_row.addWidget(lbl_mc)
+        mc_row.addWidget(self.curve_marker_color_label)
+        mc_row.addWidget(btn_mc)
+        mc_row.addStretch(); layout.addLayout(mc_row)
 
         def _srow(*widgets):
             h = QHBoxLayout()
@@ -1314,7 +1430,7 @@ class TabBuildersMixin:
         self.scatter_colorby_check = QCheckBox('Color by Z column')
         self.scatter_colorby_check.stateChanged.connect(self.update_preview)
         stsg.addWidget(self.scatter_colorby_check)
-        stsg.addLayout(_srow(QLabel('Colormap:'), self._make_combo('scatter_cmap_combo', _CMAP_LIST)))
+        stsg.addLayout(_srow(QLabel('Colormap:'), self._make_combo('scatter_cmap_combo', _CMAP_LIST, default='rainbow')))
         layout.addWidget(self.st_scatter_group)
 
         # Bar series options
@@ -1430,26 +1546,37 @@ class TabBuildersMixin:
         fr.addWidget(self.fit_combo); fr.addStretch(); layout.addLayout(fr)
 
         btn_fit = QPushButton('▶  Apply Fit')
-        btn_fit.clicked.connect(self.apply_fit); layout.addWidget(btn_fit)
+        btn_fit.clicked.connect(self.apply_fit)
+        btn_remove_fit = QPushButton('✕  Remove Fit')
+        btn_remove_fit.clicked.connect(self._remove_fit)
+        btn_remove_fit.setToolTip('Remove the fitted curve for the currently selected series')
+        fit_btn_row = QHBoxLayout(); fit_btn_row.setSpacing(4)
+        fit_btn_row.addWidget(btn_fit); fit_btn_row.addWidget(btn_remove_fit)
+        layout.addLayout(fit_btn_row)
 
-        ci_row = QHBoxLayout(); ci_row.setSpacing(6); ci_row.addWidget(QLabel('Conf. band:'))
+        # ── Fit-specific controls (disabled when an original series is selected) ──
+        self._fit_controls_widget = QWidget()
+        fc_lay = QVBoxLayout(self._fit_controls_widget)
+        fc_lay.setContentsMargins(0, 0, 0, 0); fc_lay.setSpacing(4)
+
+        ci_row = QHBoxLayout(); ci_row.setSpacing(6); ci_row.addWidget(QLabel('Confidence limits:'))
         self.fit_ci_combo = QComboBox()
         self.fit_ci_combo.addItems(['Off', '1σ  (68%)', '2σ  (95%)', '3σ  (99.7%)'])
         self.fit_ci_combo.currentIndexChanged.connect(self._on_ci_changed)
-        ci_row.addWidget(self.fit_ci_combo); ci_row.addStretch(); layout.addLayout(ci_row)
+        ci_row.addWidget(self.fit_ci_combo); ci_row.addStretch(); fc_lay.addLayout(ci_row)
 
-        pi_row = QHBoxLayout(); pi_row.setSpacing(6); pi_row.addWidget(QLabel('Pred. band:'))
+        pi_row = QHBoxLayout(); pi_row.setSpacing(6); pi_row.addWidget(QLabel('Prediction band:'))
         self.fit_pi_combo = QComboBox()
         self.fit_pi_combo.addItems(['Off', '1σ  (68%)', '2σ  (95%)', '3σ  (99.7%)'])
         self.fit_pi_combo.currentIndexChanged.connect(self._on_ci_changed)
-        pi_row.addWidget(self.fit_pi_combo); pi_row.addStretch(); layout.addLayout(pi_row)
+        pi_row.addWidget(self.fit_pi_combo); pi_row.addStretch(); fc_lay.addLayout(pi_row)
 
         self.fit_ci_alpha_spin = QDoubleSpinBox()
         self.fit_ci_alpha_spin.setRange(0.05, 1.0); self.fit_ci_alpha_spin.setSingleStep(0.05); self.fit_ci_alpha_spin.setValue(0.25)
         self.fit_ci_alpha_spin.valueChanged.connect(self.update_preview)
         ci_alpha_row = QHBoxLayout(); ci_alpha_row.setSpacing(6)
         ci_alpha_row.addWidget(QLabel('Band opacity:')); ci_alpha_row.addWidget(self.fit_ci_alpha_spin)
-        ci_alpha_row.addStretch(); layout.addLayout(ci_alpha_row)
+        ci_alpha_row.addStretch(); fc_lay.addLayout(ci_alpha_row)
 
         res_box = QGroupBox('Fit Results')
         res_lay = QVBoxLayout(res_box); res_lay.setSpacing(2); res_lay.setContentsMargins(4, 4, 4, 4)
@@ -1462,11 +1589,22 @@ class TabBuildersMixin:
         self.fit_eq_label = QLabel(''); self.fit_eq_label.setVisible(False)
         self.fit_r2_label = QLabel(''); self.fit_r2_label.setVisible(False)
         res_lay.addWidget(self.fit_results_text)
-        layout.addWidget(res_box)
+        export_row = QHBoxLayout(); export_row.setSpacing(6)
+        self.fit_export_all_check = QCheckBox('All fits')
+        self.fit_export_all_check.setToolTip('Export results for every fitted curve, not just the currently selected one')
+        export_row.addWidget(self.fit_export_all_check)
+        btn_export_fit = QPushButton('⬇  Export Results (.txt)')
+        btn_export_fit.clicked.connect(self._export_fit_results)
+        export_row.addWidget(btn_export_fit)
+        res_lay.addLayout(export_row)
+        fc_lay.addWidget(res_box)
+
+        self._fit_controls_widget.setEnabled(False)
+        layout.addWidget(self._fit_controls_widget)
 
         layout.addStretch()
         scroll.setWidget(content); mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
-        self.tabs.addTab(widget, 'Series')
+        self.plots_inner_tabs.addTab(widget, 'Series')
 
     # ─── Annotations tab ──────────────────────────────────────────────────────
     def create_annotations_tab(self):
@@ -1486,10 +1624,10 @@ class TabBuildersMixin:
             r.addStretch(); layout.addLayout(r)
 
         def color_btn(attr, default):
-            sw = QLabel('■'); sw.setStyleSheet(f'color:{default};font-size:16px;')
+            sw = self._color_sw(default)
             setattr(self, attr, default)
             setattr(self, attr + '_sw', sw)
-            btn = QPushButton('…'); btn.setFixedWidth(24)
+            btn = QPushButton('…'); btn.setFixedWidth(28)
             btn.clicked.connect(lambda _=False, a=attr: self._pick_ann_color_attr(a))
             return sw, btn
 
@@ -1528,10 +1666,10 @@ class TabBuildersMixin:
         self.sp_title_size.valueChanged.connect(lambda _: self._on_sp_title_changed())
         sp_tf_row.addWidget(self.sp_title_size)
         self.sp_title_color = '#000000'
-        self.sp_title_color_label = QLabel('■')
-        self.sp_title_color_label.setStyleSheet('color:#000000;font-size:16px;')
-        btn_sp_tc = QPushButton('Color'); btn_sp_tc.setFixedWidth(46)
+        self.sp_title_color_label = self._color_sw('#000000')
+        btn_sp_tc = QPushButton('…'); btn_sp_tc.setFixedWidth(28)
         btn_sp_tc.clicked.connect(lambda: self._pick_sp_title_color())
+        sp_tf_row.addWidget(QLabel('Color:'))
         sp_tf_row.addWidget(self.sp_title_color_label); sp_tf_row.addWidget(btn_sp_tc)
         sp_tf_row.addStretch(); _ts_lay.addLayout(sp_tf_row)
         _ts_lay.addWidget(self._hline())
@@ -1590,33 +1728,28 @@ class TabBuildersMixin:
         leg_style_row.addWidget(self.legend_frameon)
         leg_style_row.addStretch(); layout.addLayout(leg_style_row)
 
-        # Colors — text, background, edge
-        leg_color_row = QHBoxLayout(); leg_color_row.setSpacing(4)
-        leg_color_row.addWidget(QLabel('Text:'))
+        # Colors — text, background, edge (one row each, using lrow like annotations)
         self.legend_color = '#000000'
-        self.legend_color_sw = QLabel('■'); self.legend_color_sw.setStyleSheet('color:#000000;font-size:15px;')
-        btn_leg_tc = QPushButton('…'); btn_leg_tc.setFixedWidth(24)
+        self.legend_color_sw = self._color_sw('#000000')
+        btn_leg_tc = QPushButton('…'); btn_leg_tc.setFixedWidth(28)
         btn_leg_tc.clicked.connect(lambda: self._pick_legend_color('text'))
-        leg_color_row.addWidget(self.legend_color_sw); leg_color_row.addWidget(btn_leg_tc)
-        leg_color_row.addWidget(QLabel('BG:'))
+        lrow('Text color:', self.legend_color_sw, btn_leg_tc)
+
         self.legend_facecolor = '#ffffff'
-        self.legend_facecolor_sw = QLabel('■'); self.legend_facecolor_sw.setStyleSheet('color:#ffffff;font-size:15px;')
-        btn_leg_bg = QPushButton('…'); btn_leg_bg.setFixedWidth(24)
+        self.legend_facecolor_sw = self._color_sw('#ffffff')
+        btn_leg_bg = QPushButton('…'); btn_leg_bg.setFixedWidth(28)
         btn_leg_bg.clicked.connect(lambda: self._pick_legend_color('bg'))
-        leg_color_row.addWidget(self.legend_facecolor_sw); leg_color_row.addWidget(btn_leg_bg)
-        leg_color_row.addWidget(QLabel('α:'))
         self.legend_alpha = QDoubleSpinBox(); self.legend_alpha.setRange(0.0, 1.0)
         self.legend_alpha.setSingleStep(0.05); self.legend_alpha.setValue(0.8)
         self.legend_alpha.setFixedWidth(54)
         self.legend_alpha.valueChanged.connect(self._on_sp_legend_changed)
-        leg_color_row.addWidget(self.legend_alpha)
-        leg_color_row.addWidget(QLabel('Edge:'))
+        lrow('BG color:', self.legend_facecolor_sw, btn_leg_bg, QLabel('α:'), self.legend_alpha)
+
         self.legend_edgecolor = '#cccccc'
-        self.legend_edgecolor_sw = QLabel('■'); self.legend_edgecolor_sw.setStyleSheet('color:#cccccc;font-size:15px;')
-        btn_leg_ec = QPushButton('…'); btn_leg_ec.setFixedWidth(24)
+        self.legend_edgecolor_sw = self._color_sw('#cccccc')
+        btn_leg_ec = QPushButton('…'); btn_leg_ec.setFixedWidth(28)
         btn_leg_ec.clicked.connect(lambda: self._pick_legend_color('edge'))
-        leg_color_row.addWidget(self.legend_edgecolor_sw); leg_color_row.addWidget(btn_leg_ec)
-        leg_color_row.addStretch(); layout.addLayout(leg_color_row)
+        lrow('Edge color:', self.legend_edgecolor_sw, btn_leg_ec)
 
         layout.addWidget(self._hline())
 
@@ -1711,7 +1844,41 @@ class TabBuildersMixin:
 
         layout.addStretch()
         scroll.setWidget(content); mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
-        self.tabs.addTab(widget, 'Annotations')
+        self.plots_inner_tabs.addTab(widget, 'Annotations')
+
+    # ─── Plots tab (container for subplot selector + inner tabs) ──────────────
+    def create_plots_tab(self):
+        outer = QWidget()
+        outer_lay = QVBoxLayout(outer)
+        outer_lay.setContentsMargins(4, 4, 4, 4)
+        outer_lay.setSpacing(4)
+
+        # ── Subplot selector (shown only when n > 1) ──────────────────────────
+        self._global_sp_container = QWidget()
+        _gsp_lay = QHBoxLayout(self._global_sp_container)
+        _gsp_lay.setContentsMargins(4, 2, 4, 2)
+        _gsp_lay.setSpacing(4)
+        _gsp_lay.addWidget(QLabel('Active Subplot:'))
+        self.global_sp_active = QComboBox()
+        self.global_sp_active.addItem('Subplot 1')
+        self.global_sp_active.setMinimumWidth(110)
+        self.global_sp_active.setToolTip(
+            'Active subplot — affects Data, Axes, Series and Annotation tabs')
+        self.global_sp_active.currentIndexChanged.connect(self._on_global_sp_changed)
+        _gsp_lay.addWidget(self.global_sp_active)
+        _gsp_lay.addStretch()
+        self._global_sp_container.setVisible(False)
+        outer_lay.addWidget(self._global_sp_container)
+
+        # ── Inner tab widget ──────────────────────────────────────────────────
+        self.plots_inner_tabs = QTabWidget()
+        self.create_data_tab()
+        self.create_series_tab()
+        self.create_axes_tab()
+        self.create_annotations_tab()
+        outer_lay.addWidget(self.plots_inner_tabs)
+
+        self.tabs.addTab(outer, 'Plots')
 
     # ─── Advanced tab ─────────────────────────────────────────────────────────
     def create_advanced_tab(self):
@@ -1758,6 +1925,19 @@ class TabBuildersMixin:
         xr.addWidget(self.gen_x_max); xr.addWidget(QLabel('n:'))
         self.gen_x_n = QSpinBox(); self.gen_x_n.setRange(2,100000); self.gen_x_n.setValue(200); self.gen_x_n.setFixedWidth(60)
         xr.addWidget(self.gen_x_n); xr.addStretch(); rw_lay.addLayout(xr)
+        sp_row = QHBoxLayout(); sp_row.setSpacing(4)
+        sp_row.addWidget(QLabel('spacing:'))
+        self.gen_x_spacing = QComboBox()
+        self.gen_x_spacing.addItems(['linspace', 'logspace', 'geomspace', 'random', 'uniform'])
+        self.gen_x_spacing.setToolTip(
+            'linspace  — evenly spaced in linear scale\n'
+            'logspace  — evenly spaced in log₁₀ scale (start/stop are exponents)\n'
+            'geomspace — evenly spaced in log scale (start/stop must be > 0)\n'
+            'random    — Normal(μ=mid, σ=(max−min)/6), sorted ascending\n'
+            'uniform   — Uniform(start, stop), sorted ascending')
+        self.gen_x_spacing.setFixedWidth(100)
+        sp_row.addWidget(self.gen_x_spacing); sp_row.addStretch()
+        rw_lay.addLayout(sp_row)
         nr = QHBoxLayout(); nr.setSpacing(4); nr.addWidget(QLabel('x col:'))
         self.gen_x_name = QLineEdit('x'); self.gen_x_name.setFixedWidth(70); nr.addWidget(self.gen_x_name)
         nr.addStretch(); rw_lay.addLayout(nr)
@@ -1790,9 +1970,101 @@ class TabBuildersMixin:
             self._adv_col_widget.setVisible(not use_range)
         self._adv_mode_range.toggled.connect(_on_mode_toggle)
         fg_lay.addStretch()
-        inner_tabs.addTab(fg_content, '𝑓(x)')
+        inner_tabs.addTab(fg_content, 'y=f(x)')
 
-        # ── Inner tab 2 — Manual Data Table ───────────────────────────────────
+        # ── Inner tab 2 — z = f(x, y) generator ──────────────────────────────────────
+        fxy_content = QWidget()
+        fxy_lay = QVBoxLayout(fxy_content); fxy_lay.setSpacing(4); fxy_lay.setContentsMargins(8,8,8,8)
+        fxy_lay.addWidget(self._sec_label('z = f(x, y)  Generator'))
+        _sp_tip = ('linspace  — evenly spaced in linear scale\n'
+                   'logspace  — evenly spaced in log₁₀ scale (start/stop are exponents)\n'
+                   'geomspace — evenly spaced in log scale (start/stop must be > 0)\n'
+                   'random    — Normal(μ=mid, σ=(max−min)/6), sorted ascending\n'
+                   'uniform   — Uniform(start, stop), sorted ascending')
+        # ─ X series ─
+        fxy_lay.addWidget(self._sec_label('x series'))
+        _fxm = QHBoxLayout(); _fxm.setSpacing(4); _fxm.addWidget(QLabel('Input:'))
+        self.fxy_x_mode_range = QRadioButton('range'); self.fxy_x_mode_range.setChecked(True)
+        self.fxy_x_mode_col   = QRadioButton('column')
+        _fxm.addWidget(self.fxy_x_mode_range); _fxm.addWidget(self.fxy_x_mode_col); _fxm.addStretch(); fxy_lay.addLayout(_fxm)
+        self._fxy_x_range_widget = QWidget()
+        _xrw = QVBoxLayout(self._fxy_x_range_widget); _xrw.setContentsMargins(0,0,0,0); _xrw.setSpacing(2)
+        _xr = QHBoxLayout(); _xr.setSpacing(4); _xr.addWidget(QLabel('x:'))
+        self.fxy_x_min = QDoubleSpinBox(); self.fxy_x_min.setRange(-1e9,1e9); self.fxy_x_min.setValue(0); self.fxy_x_min.setDecimals(3); self.fxy_x_min.setFixedWidth(68)
+        _xr.addWidget(self.fxy_x_min); _xr.addWidget(QLabel('→'))
+        self.fxy_x_max = QDoubleSpinBox(); self.fxy_x_max.setRange(-1e9,1e9); self.fxy_x_max.setValue(10); self.fxy_x_max.setDecimals(3); self.fxy_x_max.setFixedWidth(68)
+        _xr.addWidget(self.fxy_x_max); _xr.addWidget(QLabel('n:'))
+        self.fxy_x_n = QSpinBox(); self.fxy_x_n.setRange(2,100000); self.fxy_x_n.setValue(50); self.fxy_x_n.setFixedWidth(56)
+        _xr.addWidget(self.fxy_x_n); _xr.addStretch(); _xrw.addLayout(_xr)
+        _xsp = QHBoxLayout(); _xsp.setSpacing(4); _xsp.addWidget(QLabel('spacing:'))
+        self.fxy_x_spacing = QComboBox(); self.fxy_x_spacing.addItems(['linspace','logspace','geomspace','random','uniform'])
+        self.fxy_x_spacing.setToolTip(_sp_tip); self.fxy_x_spacing.setFixedWidth(96)
+        _xsp.addWidget(self.fxy_x_spacing); _xsp.addStretch(); _xrw.addLayout(_xsp)
+        _xcn = QHBoxLayout(); _xcn.setSpacing(4); _xcn.addWidget(QLabel('x col:'))
+        self.fxy_x_col_name = QLineEdit('x'); self.fxy_x_col_name.setFixedWidth(60)
+        _xcn.addWidget(self.fxy_x_col_name); _xcn.addStretch(); _xrw.addLayout(_xcn)
+        fxy_lay.addWidget(self._fxy_x_range_widget)
+        self._fxy_x_col_widget = QWidget()
+        _xcw = QHBoxLayout(self._fxy_x_col_widget); _xcw.setContentsMargins(0,0,0,0); _xcw.setSpacing(4)
+        _xcw.addWidget(QLabel('x col:')); self.fxy_x_combo = QComboBox(); self.fxy_x_combo.setMinimumWidth(90)
+        _xcw.addWidget(self.fxy_x_combo); _xcw.addWidget(QLabel('as:'))
+        self.fxy_x_var = QLineEdit('x'); self.fxy_x_var.setFixedWidth(36)
+        _xcw.addWidget(self.fxy_x_var); _xcw.addStretch()
+        fxy_lay.addWidget(self._fxy_x_col_widget); self._fxy_x_col_widget.setVisible(False)
+        # ─ Y series ─
+        fxy_lay.addWidget(self._sec_label('y series'))
+        _fym = QHBoxLayout(); _fym.setSpacing(4); _fym.addWidget(QLabel('Input:'))
+        self.fxy_y_mode_range = QRadioButton('range'); self.fxy_y_mode_range.setChecked(True)
+        self.fxy_y_mode_col   = QRadioButton('column')
+        _fym.addWidget(self.fxy_y_mode_range); _fym.addWidget(self.fxy_y_mode_col); _fym.addStretch(); fxy_lay.addLayout(_fym)
+        self._fxy_y_range_widget = QWidget()
+        _yrw = QVBoxLayout(self._fxy_y_range_widget); _yrw.setContentsMargins(0,0,0,0); _yrw.setSpacing(2)
+        _yr = QHBoxLayout(); _yr.setSpacing(4); _yr.addWidget(QLabel('y:'))
+        self.fxy_y_min = QDoubleSpinBox(); self.fxy_y_min.setRange(-1e9,1e9); self.fxy_y_min.setValue(0); self.fxy_y_min.setDecimals(3); self.fxy_y_min.setFixedWidth(68)
+        _yr.addWidget(self.fxy_y_min); _yr.addWidget(QLabel('→'))
+        self.fxy_y_max = QDoubleSpinBox(); self.fxy_y_max.setRange(-1e9,1e9); self.fxy_y_max.setValue(10); self.fxy_y_max.setDecimals(3); self.fxy_y_max.setFixedWidth(68)
+        _yr.addWidget(self.fxy_y_max); _yr.addWidget(QLabel('n:'))
+        self.fxy_y_n = QSpinBox(); self.fxy_y_n.setRange(2,100000); self.fxy_y_n.setValue(50); self.fxy_y_n.setFixedWidth(56)
+        _yr.addWidget(self.fxy_y_n); _yr.addStretch(); _yrw.addLayout(_yr)
+        _ysp = QHBoxLayout(); _ysp.setSpacing(4); _ysp.addWidget(QLabel('spacing:'))
+        self.fxy_y_spacing = QComboBox(); self.fxy_y_spacing.addItems(['linspace','logspace','geomspace','random','uniform'])
+        self.fxy_y_spacing.setToolTip(_sp_tip); self.fxy_y_spacing.setFixedWidth(96)
+        _ysp.addWidget(self.fxy_y_spacing); _ysp.addStretch(); _yrw.addLayout(_ysp)
+        _ycn = QHBoxLayout(); _ycn.setSpacing(4); _ycn.addWidget(QLabel('y col:'))
+        self.fxy_y_col_name = QLineEdit('y'); self.fxy_y_col_name.setFixedWidth(60)
+        _ycn.addWidget(self.fxy_y_col_name); _ycn.addStretch(); _yrw.addLayout(_ycn)
+        fxy_lay.addWidget(self._fxy_y_range_widget)
+        self._fxy_y_col_widget = QWidget()
+        _ycw = QHBoxLayout(self._fxy_y_col_widget); _ycw.setContentsMargins(0,0,0,0); _ycw.setSpacing(4)
+        _ycw.addWidget(QLabel('y col:')); self.fxy_y_combo = QComboBox(); self.fxy_y_combo.setMinimumWidth(90)
+        _ycw.addWidget(self.fxy_y_combo); _ycw.addWidget(QLabel('as:'))
+        self.fxy_y_var = QLineEdit('y'); self.fxy_y_var.setFixedWidth(36)
+        _ycw.addWidget(self.fxy_y_var); _ycw.addStretch()
+        fxy_lay.addWidget(self._fxy_y_col_widget); self._fxy_y_col_widget.setVisible(False)
+        # ─ Meshgrid ─
+        self.fxy_meshgrid = QCheckBox('Meshgrid  (expand x × y → n² points)')
+        self.fxy_meshgrid.setToolTip(
+            'When checked, a full meshgrid is created (every x_i × y_j combination).\n'
+            'x, y, and z columns are all flattened to length nx * ny.\n'
+            'Ideal for Heatmap, Contour, 3D Surface, or Scatter with Z colour.')
+        fxy_lay.addWidget(self.fxy_meshgrid)
+        # ─ Expression & output ─
+        fxy_lay.addWidget(QLabel('z = expr (np, sin, cos, exp, log, pi …):'))
+        self.fxy_expr = QLineEdit('x**2 + sin(y)'); fxy_lay.addWidget(self.fxy_expr)
+        _zn = QHBoxLayout(); _zn.setSpacing(4); _zn.addWidget(QLabel('z col:'))
+        self.fxy_z_name = QLineEdit('z'); self.fxy_z_name.setFixedWidth(60)
+        _zn.addWidget(self.fxy_z_name); _zn.addStretch(); fxy_lay.addLayout(_zn)
+        btn_fxy = QPushButton('▶  Generate z')
+        btn_fxy.clicked.connect(self._generate_fxy); fxy_lay.addWidget(btn_fxy)
+        self.fxy_status = QLabel(''); self.fxy_status.setStyleSheet('color:#555;font-size:11px;')
+        fxy_lay.addWidget(self.fxy_status); fxy_lay.addStretch()
+        def _fxy_xtog(): r = self.fxy_x_mode_range.isChecked(); self._fxy_x_range_widget.setVisible(r); self._fxy_x_col_widget.setVisible(not r)
+        def _fxy_ytog(): r = self.fxy_y_mode_range.isChecked(); self._fxy_y_range_widget.setVisible(r); self._fxy_y_col_widget.setVisible(not r)
+        self.fxy_x_mode_range.toggled.connect(_fxy_xtog)
+        self.fxy_y_mode_range.toggled.connect(_fxy_ytog)
+        inner_tabs.addTab(fxy_content, 'z=f(x,y)')
+
+        # ── Inner tab 3 — Manual Data Table ───────────────────────────────────
         dt_widget = QWidget()
         dt_lay = QVBoxLayout(dt_widget); dt_lay.setSpacing(5); dt_lay.setContentsMargins(8,8,8,8)
 

@@ -472,7 +472,6 @@ class PlotEngineMixin:
                 if ls in ('default', ''): ls = '-'
                 mk = s.get('marker', 'None')
                 if mk in ('default', 'None', 'none', ''): mk = None
-                if ls == 'none' and mk is None: mk = 'o'
                 lw = s.get('linewidth', 1.5)
                 mk_color = s.get('marker_color', color)
                 xplot = _cat_xplot(xd) if is_cat else xd
@@ -494,7 +493,7 @@ class PlotEngineMixin:
                 if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
                                     alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
-                                    linestyle='--', label=f'{lbl} PI')
+                                    label=f'{lbl} PI')
 
             elif sct == 'Scatter':
                 xplot = _cat_xplot(xd) if is_cat else xd
@@ -528,7 +527,7 @@ class PlotEngineMixin:
                 if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
                                     alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
-                                    linestyle='--', label=f'{lbl} PI')
+                                    label=f'{lbl} PI')
 
             elif sct == 'Bar':
                 bi = bar_idx_counter; bar_idx_counter += 1
@@ -608,16 +607,10 @@ class PlotEngineMixin:
                 al        = o.get('fill_between_alpha',   _o('fill_between_alpha',   0.4))
                 lw        = o.get('fill_between_lw',      _o('fill_between_lw',      0.8))
                 show_line = o.get('fill_between_showline', True)
-                if hasattr(show_line, '__bool__'):
-                    pass  # already bool from opts
-                elif hasattr(self, 'fill_between_showline'):
-                    show_line = self.fill_between_showline.isChecked()
-                # Resolve Y2 column: per-series opts first, then chart-level combo
                 y2_col = o.get('fill_between_y2_col') or None
                 if not y2_col and hasattr(self, 'combo_fill_y2'):
                     raw = self.combo_fill_y2.currentText()
-                    if raw and raw != '(none)':
-                        y2_col = raw
+                    if raw and raw != '(none)': y2_col = raw
                 if y2_col and y2_col in self.datasets:
                     y2d = self.datasets[y2_col]
                     n   = min(len(xplot), len(yd), len(y2d))
@@ -627,7 +620,6 @@ class PlotEngineMixin:
                         ax.plot(xp, y1, color=color, lw=lw, alpha=0.8)
                         ax.plot(xp, y2, color=color, lw=lw, alpha=0.8)
                 else:
-                    # No Y2 selected — fill between series and y=0 as a fallback
                     n = min(len(xplot), len(yd))
                     xp, yp = xplot[:n], yd[:n]
                     ax.fill_between(xp, 0, yp, alpha=al, label=lbl, color=color)
