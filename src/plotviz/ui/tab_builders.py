@@ -28,7 +28,7 @@ ALL_CHART_TYPES = [
     'Histogram', 'Hist2D', 'Hexbin',
     'Boxplot', 'Violin',
     'Pie', 'Polar', 'Radar',
-    'Heatmap', 'Contour', '3D Surface',
+    'Heatmap', 'Contour', 'Tricontour', '3D Surface',
     'ECDF', 'Quiver', 'Barbs', 'Streamplot',
 ]
 
@@ -40,7 +40,7 @@ WHOLE_CHART_TYPES = {
     'Histogram', 'Hist2D', 'Hexbin',
     'Boxplot', 'Violin',
     'Pie', 'Polar', 'Radar',
-    'Heatmap', 'Contour', '3D Surface',
+    'Heatmap', 'Contour', 'Tricontour', '3D Surface',
     'ECDF', 'Quiver', 'Barbs', 'Streamplot',
 }
 
@@ -67,7 +67,7 @@ PLOT_MODE_GROUPS = {
                           'Errorbar', 'Step', 'Stem', 'Bubble', 'Waterfall'],
     'Histogram':         ['Histogram'],
     'Statistical':       ['Boxplot', 'Violin', 'ECDF'],
-    'Heatmap & Contour': ['Heatmap', 'Contour', 'Hist2D', 'Hexbin', '3D Surface'],
+    'Heatmap & Contour': ['Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin', '3D Surface'],
     'Polar & Radar':     ['Polar', 'Radar'],
     'Pie':               ['Pie'],
     'Quiver':            ['Quiver', 'Barbs', 'Streamplot'],
@@ -416,7 +416,7 @@ class TabBuildersMixin:
 
         self._combo_z_widget = QWidget()
         _zl = QVBoxLayout(self._combo_z_widget); _zl.setContentsMargins(0,0,0,0); _zl.setSpacing(2)
-        _zl.addWidget(QLabel('Z / Color column  (Heatmap, Contour, 3D):'))
+        _zl.addWidget(QLabel('Z / Color column  (Heatmap, Contour, Tricontour, 3D):'))
         self.combo_z = QComboBox(); self.combo_z.addItem('(none)')
         self.combo_z.currentIndexChanged.connect(self.update_preview)
         _zl.addWidget(self.combo_z)
@@ -489,10 +489,21 @@ class TabBuildersMixin:
         self.heat_group = QGroupBox('Heatmap / Contour / 3D Options')
         hgb = QVBoxLayout(self.heat_group)
         hgb.addLayout(_row(QLabel('Colormap:'), self._make_combo('cmap_combo', _CMAP_LIST, default='rainbow')))
-        hgb.addLayout(_row(QLabel('Contour levels:'), self._make_spin('contour_levels', 3, 100, 10)))
+        # Bug 9: wrap Contour-levels and Interpolation rows in QWidget containers so
+        # each can be independently shown/hidden depending on the active chart type.
+        # - Contour levels: relevant for Contour only (not Heatmap, not 3D Surface)
+        # - Interpolation:  relevant for Heatmap only (imshow uses it; the others don't)
+        self._heat_contour_levels_row = QWidget()
+        _cl_h = QHBoxLayout(self._heat_contour_levels_row); _cl_h.setContentsMargins(0, 0, 0, 0)
+        _cl_h.addWidget(QLabel('Contour levels:')); _cl_h.addWidget(self._make_spin('contour_levels', 3, 100, 10))
+        hgb.addWidget(self._heat_contour_levels_row)
         hgb.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('heat_alpha', 0.05, 1.0, 1.0, 0.05)))
-        hgb.addLayout(_row(QLabel('Interpolation:'), self._make_combo('heat_interpolation',
-            ['nearest','bilinear','bicubic','lanczos','spline16','gaussian'])))
+        self._heat_interpolation_row = QWidget()
+        _hi_h = QHBoxLayout(self._heat_interpolation_row); _hi_h.setContentsMargins(0, 0, 0, 0)
+        _hi_h.addWidget(QLabel('Interpolation:'))
+        _hi_h.addWidget(self._make_combo('heat_interpolation',
+            ['nearest','bilinear','bicubic','lanczos','spline16','gaussian']))
+        hgb.addWidget(self._heat_interpolation_row)
         self.heat_colorbar     = QCheckBox('Show colorbar');         self.heat_colorbar.setChecked(True);     self.heat_colorbar.stateChanged.connect(self.update_preview);     hgb.addWidget(self.heat_colorbar)
         self.heat_filled_contour = QCheckBox('Filled contour');      self.heat_filled_contour.setChecked(True); self.heat_filled_contour.stateChanged.connect(self.update_preview); hgb.addWidget(self.heat_filled_contour)
         self.heat_contour_lines  = QCheckBox('Contour line overlay'); self.heat_contour_lines.setChecked(True);  self.heat_contour_lines.stateChanged.connect(self.update_preview);  hgb.addWidget(self.heat_contour_lines)
@@ -500,7 +511,18 @@ class TabBuildersMixin:
         self.surf_wireframe = QCheckBox('Wireframe (3D)'); self.surf_wireframe.stateChanged.connect(self.update_preview); hgb.addWidget(self.surf_wireframe)
         layout.addWidget(self.heat_group)
 
-        # ── Pie ───────────────────────────────────────────────────────────────
+        # ── Tricontour ────────────────────────────────────────────────────────
+        self.tri_group = QGroupBox('Tricontour Options')
+        tg = QVBoxLayout(self.tri_group)
+        tg.addLayout(_row(QLabel('Colormap:'),      self._make_combo('tri_cmap_combo', _CMAP_LIST, default='rainbow')))
+        tg.addLayout(_row(QLabel('Levels:'),         self._make_spin('tri_levels', 3, 100, 10)))
+        tg.addLayout(_row(QLabel('Alpha:'),          self._make_dbl_spin('tri_alpha', 0.05, 1.0, 1.0, 0.05)))
+        self.tri_filled    = QCheckBox('tricontourf  (filled contour)'); self.tri_filled.setChecked(True);   self.tri_filled.stateChanged.connect(self.update_preview);   tg.addWidget(self.tri_filled)
+        self.tri_lines     = QCheckBox('tricontour   (contour lines)');  self.tri_lines.setChecked(True);    self.tri_lines.stateChanged.connect(self.update_preview);    tg.addWidget(self.tri_lines)
+        self.tri_triplot   = QCheckBox('triplot       (mesh edges)');     self.tri_triplot.setChecked(False); self.tri_triplot.stateChanged.connect(self.update_preview);  tg.addWidget(self.tri_triplot)
+        self.tri_tripcolor = QCheckBox('tripcolor     (face colours)');   self.tri_tripcolor.setChecked(False); self.tri_tripcolor.stateChanged.connect(self.update_preview); tg.addWidget(self.tri_tripcolor)
+        self.tri_colorbar  = QCheckBox('Show colorbar');                   self.tri_colorbar.setChecked(True);   self.tri_colorbar.stateChanged.connect(self.update_preview);  tg.addWidget(self.tri_colorbar)
+        layout.addWidget(self.tri_group)
         self.pie_group = QGroupBox('Pie Options')
         pg = QVBoxLayout(self.pie_group)
         self.pie_autopct = QCheckBox('Show %');   self.pie_autopct.setChecked(True); self.pie_autopct.stateChanged.connect(self.update_preview); pg.addWidget(self.pie_autopct)

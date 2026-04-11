@@ -50,7 +50,7 @@ def _latex_safe(text: str) -> str:
 
 
 _3D_TYPES = {'3D Surface'}
-_NO_LEGEND_TYPES = {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Contour', '3D Surface', 'Violin', 'Boxplot', 'Radar', 'Quiver', 'Barbs', 'Streamplot'}
+_NO_LEGEND_TYPES = {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Contour', 'Tricontour', '3D Surface', 'Violin', 'Boxplot', 'Radar', 'Quiver', 'Barbs', 'Streamplot'}
 
 
 class PlotEngineMixin:
@@ -202,15 +202,23 @@ class PlotEngineMixin:
 
             elif ct == 'Heatmap':
                 zc = self.combo_z.currentText()
-                if zc != '(none)' and zc in self.datasets and series:
+                if zc != '(none)' and zc in self.datasets:
                     z = self.datasets[zc]
                     n = int(np.ceil(np.sqrt(len(z))))
-                    Z = np.full((n, n), np.nan)
-                    for k in range(len(z)): Z[k//n, k%n] = z[k]
-                    im = ax.imshow(Z, aspect='auto', cmap=_cmap('cmap_combo', 'cmap'), origin='lower',
-                                   alpha=_o('heat_alpha', 1.0),
-                                   interpolation=_o('heat_interpolation', 'nearest'))
-                    if _o('heat_colorbar', True): self.canvas.figure.colorbar(im, ax=ax)
+                    if n >= 2:  # Bug 19: guard against empty / single-point Z column
+                        Z = np.full((n, n), np.nan)
+                        for k in range(len(z)): Z[k//n, k%n] = z[k]
+                        # Bug 18: pass extent so axis ticks show data values, not pixel indices
+                        extent_kw = {}
+                        if series:
+                            xd, yd, lbl, _ = series[0]
+                            extent_kw = {'extent': [float(np.min(xd)), float(np.max(xd)),
+                                                    float(np.min(yd)), float(np.max(yd))]}
+                        im = ax.imshow(Z, aspect='auto', cmap=_cmap('cmap_combo', 'cmap'), origin='lower',
+                                       alpha=_o('heat_alpha', 1.0),
+                                       interpolation=_o('heat_interpolation', 'nearest'),
+                                       **extent_kw)
+                        if _o('heat_colorbar', True): self.canvas.figure.colorbar(im, ax=ax)
 
             elif ct == 'Contour':
                 zc = self.combo_z.currentText()
@@ -218,36 +226,75 @@ class PlotEngineMixin:
                     xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
                         n = int(np.ceil(np.sqrt(len(z))))
-                        Z = np.full((n, n), np.nan)
-                        for k in range(len(z)): Z[k//n, k%n] = z[k]
-                        Z = np.where(np.isnan(Z), np.nanmean(Z), Z)
-                        xi = np.linspace(np.min(xd), np.max(xd), n)
-                        yi = np.linspace(np.min(yd), np.max(yd), n)
-                        X, Y = np.meshgrid(xi, yi)
-                        lvl = _o('contour_levels', 10)
-                        alp = _o('heat_alpha', 1.0)
-                        if _o('heat_filled_contour', True):
-                            cf = ax.contourf(X, Y, Z, levels=lvl, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp)
-                            if _o('heat_colorbar', True): self.canvas.figure.colorbar(cf, ax=ax)
-                        if _o('heat_contour_lines', True):
-                            ax.contour(X, Y, Z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
+                        if n >= 2:  # Bug 19: guard against empty / single-point Z column
+                            Z = np.full((n, n), np.nan)
+                            for k in range(len(z)): Z[k//n, k%n] = z[k]
+                            Z = np.where(np.isnan(Z), np.nanmean(Z), Z)
+                            xi = np.linspace(np.min(xd), np.max(xd), n)
+                            yi = np.linspace(np.min(yd), np.max(yd), n)
+                            X, Y = np.meshgrid(xi, yi)
+                            lvl = _o('contour_levels', 10)
+                            alp = _o('heat_alpha', 1.0)
+                            # Bug 3: track last mappable so colorbar is drawn regardless of
+                            # which combination of filled/line contour is active.
+                            _last_contour_m = None
+                            if _o('heat_filled_contour', True):
+                                cf = ax.contourf(X, Y, Z, levels=lvl, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp)
+                                _last_contour_m = cf
+                            if _o('heat_contour_lines', True):
+                                cs = ax.contour(X, Y, Z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
+                                if _last_contour_m is None: _last_contour_m = cs
+                            if _last_contour_m is not None and _o('heat_colorbar', True):
+                                self.canvas.figure.colorbar(_last_contour_m, ax=ax)
+
+            elif ct == 'Tricontour':
+                zc = self.combo_z.currentText()
+                if zc != '(none)' and zc in self.datasets and series:
+                    xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
+                    if not self._is_categorical(xd) and not self._is_categorical(yd):
+                        x = xd.astype(float); y = yd.astype(float)
+                        z = np.array(z, dtype=float)
+                        n = min(len(x), len(y), len(z))
+                        x, y, z = x[:n], y[:n], z[:n]
+                        lvl  = _o('tri_levels', 10)
+                        alp  = _o('tri_alpha', 1.0)
+                        cmap = _cmap('tri_cmap_combo', 'tri_cmap')
+                        last_mappable = None
+                        if _o('tri_tripcolor', False):
+                            tc = ax.tripcolor(x, y, z, cmap=cmap, alpha=alp)
+                            last_mappable = tc
+                        if _o('tri_filled', True):
+                            cf = ax.tricontourf(x, y, z, levels=lvl, cmap=cmap, alpha=alp)
+                            last_mappable = cf
+                        if _o('tri_lines', True):
+                            # Bug 4: assign to last_mappable so colorbar works when
+                            # tri_filled is OFF and only contour lines are drawn.
+                            tl = ax.tricontour(x, y, z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
+                            if last_mappable is None: last_mappable = tl
+                        if _o('tri_triplot', False):
+                            ax.triplot(x, y, color='k', linewidth=0.4, alpha=0.5)
+                        if last_mappable is not None and _o('tri_colorbar', True):
+                            self.canvas.figure.colorbar(last_mappable, ax=ax)
 
             elif ct == '3D Surface':
+                # Bug 1: this block was previously stranded inside the Tricontour elif,
+                # causing 3D Surface to never render and Tricontour to crash on 2D axes.
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
                     xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
                         n = int(np.ceil(np.sqrt(min(len(xd), len(yd), len(z)))))
-                        Z = np.full((n, n), np.nanmean(z))
-                        for k in range(min(len(z), n*n)): Z[k//n, k%n] = z[k]
-                        xi = np.linspace(np.min(xd), np.max(xd), n)
-                        yi = np.linspace(np.min(yd), np.max(yd), n)
-                        X, Y = np.meshgrid(xi, yi)
-                        st = _o('surf_stride', 1); alp = _o('heat_alpha', 1.0)
-                        if _o('surf_wireframe', False):
-                            ax.plot_wireframe(X, Y, Z, rstride=st, cstride=st, alpha=alp)
-                        else:
-                            ax.plot_surface(X, Y, Z, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp, rstride=st, cstride=st)
+                        if n >= 2:  # Bug 19: guard against empty Z
+                            Z = np.full((n, n), np.nanmean(z))
+                            for k in range(min(len(z), n*n)): Z[k//n, k%n] = z[k]
+                            xi = np.linspace(np.min(xd), np.max(xd), n)
+                            yi = np.linspace(np.min(yd), np.max(yd), n)
+                            X, Y = np.meshgrid(xi, yi)
+                            st = _o('surf_stride', 1); alp = _o('heat_alpha', 1.0)
+                            if _o('surf_wireframe', False):
+                                ax.plot_wireframe(X, Y, Z, rstride=st, cstride=st, alpha=alp)
+                            else:
+                                ax.plot_surface(X, Y, Z, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp, rstride=st, cstride=st)
 
             elif ct == 'Hist2D':
                 if series:
@@ -934,22 +981,26 @@ class PlotEngineMixin:
             kw['bbox_to_anchor'] = (lx, ly)
         return kw
 
-    def _decorate(self, ax, xc, yd, is3d=False, subplot_idx=0):
+    def _decorate(self, ax, xc, yd, is3d=False, subplot_idx=0, ct=None):
         """Apply titles, labels, limits, scale, legend for one subplot panel."""
-        ct = self.chart_type_combo.currentText()
+        # Bug 12: accept ct as a parameter so callers can pass the per-subplot type
+        # rather than always reading the global combo (which breaks in multi-subplot mode).
+        if ct is None:
+            ct = self.chart_type_combo.currentText()
         # ── Title ──
         # n==1: chart title = ax title, controlled from Style tab (title_input)
         # n>1: per-subplot title from Axes tab (sp_titles[idx])
         _n_subplots = self.subplot_rows * self.subplot_cols
         if _n_subplots == 1:
-            # made by me
-            # show_title = self.title_check.isChecked()
-            # title_txt = (self.title_input.text().strip() or self.title_input.placeholderText()) if show_title else ''
-            # ax.set_title(_latex_safe(title_txt),
-            #              fontsize=self.title_size.value(),
-            #              color=self.title_color,
-            #              fontfamily=self.title_font.currentText())
-            ax.set_title('')   # main title is rendered via suptitle (below) for all n
+            # Bug 11: per-axis title was commented out and replaced with ax.set_title('').
+            # Restore it so title_input / title_size / title_color / title_font are honoured
+            # for single-subplot charts.  Suptitle is kept for n>1 layouts only.
+            show_title = self.title_check.isChecked()
+            title_txt = (self.title_input.text().strip() or self.title_input.placeholderText()) if show_title else ''
+            ax.set_title(_latex_safe(title_txt),
+                         fontsize=self.title_size.value(),
+                         color=self.title_color,
+                         fontfamily=self.title_font.currentText())
         else:
             show_title = self.subplot_title_show.get(subplot_idx, True)
             title_txt = (self.sp_titles.get(subplot_idx, '') or f'Subplot {subplot_idx+1}') if show_title else ''
@@ -978,7 +1029,8 @@ class PlotEngineMixin:
 
         # ── Secondary Y axis ──
         _y2_active = False
-        if not is3d:
+        _NO_Y2_TYPES = {'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin', 'Pie', 'Polar', 'Radar'}
+        if not is3d and ct not in _NO_Y2_TYPES:
             y2_cols = self._get_y2_cols_from_table()
             if y2_cols:
                 _y2_active = True
@@ -1020,7 +1072,7 @@ class PlotEngineMixin:
         _series = self._get_series(primary_only=True)
         _x_is_cat = bool(_series) and self._is_categorical(_series[0][0])
         if not is3d:
-            if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}:
+            if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
                 _horiz = ct == 'Bar' and self._sp_opt(subplot_idx, 'bar_horizontal', False)
                 _protect_y = _x_is_cat and _horiz
                 xs = self.subplot_xscales.get(subplot_idx, 'linear')
@@ -1034,10 +1086,11 @@ class PlotEngineMixin:
                     except Exception: ax.set_yscale('linear')
                     if ys == 'inverted': ax.invert_yaxis()
             xlim = self.subplot_xlims.get(subplot_idx)
-            if xlim and ct not in (_NO_X_TYPES | {'Pie'}) and not _x_is_cat:
+            _NO_LIMITS_TYPES = _NO_X_TYPES | {'Pie', 'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
+            if xlim and ct not in _NO_LIMITS_TYPES and not _x_is_cat:
                 ax.set_xlim(xlim[0], xlim[1])
             ylim = self.subplot_ylims.get(subplot_idx)
-            if ylim and ct != 'Pie':
+            if ylim and ct not in _NO_LIMITS_TYPES:
                 ax.set_ylim(ylim[0], ylim[1])
             if self.subplot_equal_aspect.get(subplot_idx, False) and ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
@@ -1051,7 +1104,7 @@ class PlotEngineMixin:
             ax.legend(**self._legend_kwargs(subplot_idx))
         if not is3d:
             self._apply_canvas_style(ax, subplot_idx)
-            if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}:
+            if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
                 self._apply_grid(ax)
             if _y2_active:
                 self._align_twinx_ticks(
@@ -1172,22 +1225,27 @@ class PlotEngineMixin:
                                 ax.set_ylabel('')
                             xs = self.subplot_xscales.get(idx, 'linear')
                             ys = self.subplot_yscales.get(idx, 'linear')
-                            if cat_info is None:  # don't set_xscale for categorical axes
-                                try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                                except Exception: ax.set_xscale('linear')
-                                if xs == 'inverted': ax.invert_xaxis()
-                            try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                            except Exception: ax.set_yscale('linear')
-                            if ys == 'inverted': ax.invert_yaxis()
-                            xlim = self.subplot_xlims.get(idx)
-                            if xlim: ax.set_xlim(xlim[0], xlim[1])
-                            ylim = self.subplot_ylims.get(idx)
-                            if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            # Bugs 15/16: guard scale and limits against heatmap-group types,
+                            # mirroring the existing guard in the regular-grid path.
+                            _mosaic_no_scale = {'Pie', 'Heatmap', 'Contour', 'Tricontour',
+                                                'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}
+                            if sub_ct not in _mosaic_no_scale:
+                                if cat_info is None:  # don't set_xscale for categorical axes
+                                    try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
+                                    except Exception: ax.set_xscale('linear')
+                                    if xs == 'inverted': ax.invert_xaxis()
+                                try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
+                                except Exception: ax.set_yscale('linear')
+                                if ys == 'inverted': ax.invert_yaxis()
+                                xlim = self.subplot_xlims.get(idx)
+                                if xlim: ax.set_xlim(xlim[0], xlim[1])
+                                ylim = self.subplot_ylims.get(idx)
+                                if ylim: ax.set_ylim(ylim[0], ylim[1])
                             if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass
                             self._apply_canvas_style(ax, idx)
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
+                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax)
                             self._apply_cat_ticks(ax, cat_info)
                             if ax2 is not None:
                                 self._align_twinx_ticks(ax, ax2, idx,
@@ -1211,7 +1269,11 @@ class PlotEngineMixin:
                             sub_is_polar = sub_ct in ('Polar', 'Radar')
                             sub_proj = 'polar' if sub_is_polar else ('3d' if sub_is3d else None)
                             kw = {}
-                            if not sub_is3d and not sub_is_polar and first:
+                            # Bug 21: exclude heatmap-group types from sharex/sharey —
+                            # imshow uses pixel-space (0..n-1) while adjacent charts use
+                            # data coordinates, so linking axes corrupts both scales.
+                            _no_share = sub_is3d or sub_is_polar or sub_ct in {'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
+                            if not _no_share and first:
                                 if self.sp_sharex.isChecked(): kw['sharex'] = first
                                 if self.sp_sharey.isChecked(): kw['sharey'] = first
                             ax = self.canvas.figure.add_subplot(rows, cols, idx+1,
@@ -1264,7 +1326,7 @@ class PlotEngineMixin:
                                               fontfamily=self.ylabel_font.currentText())
                             else:
                                 ax.set_ylabel('')
-                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}:
+                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
                                 xs = self.subplot_xscales.get(idx, 'linear')
                                 ys = self.subplot_yscales.get(idx, 'linear')
                                 if cat_info is None:  # skip set_xscale for categorical
@@ -1278,10 +1340,13 @@ class PlotEngineMixin:
                                     try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
                                     except Exception: ax.set_yscale('linear')
                                     if ys == 'inverted': ax.invert_yaxis()
+                            # Bug 13: exclude heatmap-group types from xlim/ylim — their
+                            # axes are managed internally by imshow/contourf/meshgrid.
+                            _grid_no_limits = {'Pie', 'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
                             xlim = self.subplot_xlims.get(idx, None)
-                            if xlim: ax.set_xlim(xlim[0], xlim[1])
+                            if xlim and sub_ct not in _grid_no_limits: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx, None)
-                            if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            if ylim and sub_ct not in _grid_no_limits: ax.set_ylim(ylim[0], ylim[1])
                             if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass
@@ -1305,7 +1370,7 @@ class PlotEngineMixin:
                         _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
                         if _ax_ct not in _3D_TYPES:
                             self._apply_canvas_style(_ax, _ax_i)
-                            if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(_ax)
+                            if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(_ax)
                     # Re-align twinx ticks after the late canvas-style pass
                     for _ax_i, _ax2 in ax2_map.items():
                         _ax_primary = axes_list[_ax_i] if _ax_i < len(axes_list) else None
@@ -1350,7 +1415,9 @@ class PlotEngineMixin:
 
                 # made by me
                 # if _show_sup and _sup_text and _n_sp > 1:
-                if _show_sup and _sup_text:
+                # Bug 11: suptitle is now n>1 only; the single-subplot title is rendered
+                # via ax.set_title inside _decorate to preserve per-axis styling controls.
+                if _show_sup and _sup_text and _n_sp > 1:
                     # Place suptitle at the user-set position (in canvas-box coords).
                     # Do NOT clamp adj_top here — title_y only controls where the text
                     # sits; subplot margins are controlled independently by fig_top.
@@ -1488,7 +1555,7 @@ class PlotEngineMixin:
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass
                             self._apply_canvas_style(ax, idx)
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(ax)
+                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax)
                             self._apply_cat_ticks(ax, cat_info)
                             if ax2 is not None:
                                 self._align_twinx_ticks(ax, ax2, idx,
@@ -1564,7 +1631,7 @@ class PlotEngineMixin:
                                               color=self.ylabel_color, fontfamily=self.ylabel_font.currentText())
                             else:
                                 ax.set_ylabel('')
-                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}:
+                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
                                 xs = self.subplot_xscales.get(idx, 'linear')
                                 ys = self.subplot_yscales.get(idx, 'linear')
                                 if cat_info is None:
@@ -1600,7 +1667,7 @@ class PlotEngineMixin:
                     _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
                     if _ax_ct not in _3D_TYPES:
                         self._apply_canvas_style(_ax, _ax_i)
-                        if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}: self._apply_grid(_ax)
+                        if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(_ax)
                 # Re-align twinx ticks after the late canvas-style pass
                 for _ax_i, _ax2 in ax2_map.items():
                     _ax_primary = axes_list[_ax_i] if _ax_i < len(axes_list) else None

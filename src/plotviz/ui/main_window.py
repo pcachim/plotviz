@@ -1257,8 +1257,18 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.barbs_group:        ct == 'Barbs',
             self.streamplot_group:   ct == 'Streamplot',
         }
+        if hasattr(self, 'tri_group'):
+            data_vis[self.tri_group] = ct == 'Tricontour'
         for grp, show in data_vis.items():
             grp.setVisible(show)
+
+        # Bug 9: within heat_group, show only the controls relevant to each type.
+        # Interpolation is an imshow parameter — only Heatmap uses it.
+        # Contour levels only apply to Contour (Tricontour has its own tri_levels control).
+        if hasattr(self, '_heat_interpolation_row'):
+            self._heat_interpolation_row.setVisible(ct == 'Heatmap')
+        if hasattr(self, '_heat_contour_levels_row'):
+            self._heat_contour_levels_row.setVisible(ct == 'Contour')
 
         # ── Series tab: per-series type groups ────────────────────────────────
         for attr, show in [
@@ -1281,7 +1291,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── Column-picker visibility ───────────────────────────────────────────
         if hasattr(self, '_combo_z_widget'):
-            self._combo_z_widget.setVisible(ct in ('Heatmap', 'Contour', '3D Surface'))
+            self._combo_z_widget.setVisible(ct in ('Heatmap', 'Contour', 'Tricontour', '3D Surface'))
         if hasattr(self, '_combo_err_widget'):
             self._combo_err_widget.setVisible(ct == 'Errorbar')
         if hasattr(self, '_combo_fill_y2_widget'):
@@ -1377,6 +1387,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ('heat_contour_lines',  'heat_contour_lines',   True,      'check'),
         ('surf_stride',         'surf_stride',          1,         'spin'),
         ('surf_wireframe',      'surf_wireframe',       False,     'check'),
+        # Tricontour
+        ('tri_cmap_combo',      'tri_cmap',             'rainbow', 'combo'),
+        ('tri_levels',          'tri_levels',           10,        'spin'),
+        ('tri_alpha',           'tri_alpha',            1.0,       'dbl'),
+        ('tri_filled',          'tri_filled',           True,      'check'),
+        ('tri_lines',           'tri_lines',            True,      'check'),
+        ('tri_triplot',         'tri_triplot',          False,     'check'),
+        ('tri_tripcolor',       'tri_tripcolor',        False,     'check'),
+        ('tri_colorbar',        'tri_colorbar',         True,      'check'),
         # Pie
         ('pie_autopct',         'pie_autopct',          True,      'check'),
         ('pie_shadow',          'pie_shadow',           False,     'check'),
@@ -1712,6 +1731,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                             self.hexbin_group, self.radar_group, self.ecdf_group,
                             self.quiver_group, self.barbs_group, self.streamplot_group):
                     grp.setVisible(False)
+                if hasattr(self, 'tri_group'):
+                    self.tri_group.setVisible(False)
                 # Series tab per-series groups
                 for _attr in ('st_line_group','st_scatter_group','st_bar_group',
                               'st_hist_group','st_err_group','st_area_group',

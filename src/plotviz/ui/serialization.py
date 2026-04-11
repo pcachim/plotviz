@@ -193,6 +193,15 @@ class SerializationMixin:
         s['heat_contour_lines']  = self.heat_contour_lines.isChecked()
         s['surf_stride']         = self.surf_stride.value()
         s['surf_wireframe']      = self.surf_wireframe.isChecked()
+        # Tricontour
+        s['tri_cmap']        = self.tri_cmap_combo.currentText()
+        s['tri_levels']      = self.tri_levels.value()
+        s['tri_alpha']       = self.tri_alpha.value()
+        s['tri_filled']      = self.tri_filled.isChecked()
+        s['tri_lines']       = self.tri_lines.isChecked()
+        s['tri_triplot']     = self.tri_triplot.isChecked()
+        s['tri_tripcolor']   = self.tri_tripcolor.isChecked()
+        s['tri_colorbar']    = self.tri_colorbar.isChecked()
         # Pie
         s['pie_autopct']         = self.pie_autopct.isChecked()
         s['pie_shadow']          = self.pie_shadow.isChecked()
@@ -551,7 +560,9 @@ class SerializationMixin:
         _co(self.hist_histtype,   'hist_histtype',   'bar')
         _co(self.hist_orientation,'hist_orientation','vertical')
         # Heatmap / Contour / 3D
-        _co(self.cmap_combo,          'cmap',             'viridis')
+        # Bug 10: restore default must match tab_builders initialisation (default='rainbow').
+        # Using 'viridis' here caused silently wrong cmap on files saved without a 'cmap' key.
+        _co(self.cmap_combo,          'cmap',             'rainbow')
         _sp(self.contour_levels,      'contour_levels',   10)
         _sp(self.heat_alpha,          'heat_alpha',       1.0)
         _co(self.heat_interpolation,  'heat_interpolation','nearest')
@@ -560,6 +571,15 @@ class SerializationMixin:
         _cb(self.heat_contour_lines,  'heat_contour_lines',  True)
         _sp(self.surf_stride,         'surf_stride',      1)
         _cb(self.surf_wireframe,      'surf_wireframe',   False)
+        # Tricontour
+        _co(self.tri_cmap_combo, 'tri_cmap',     'rainbow')
+        _sp(self.tri_levels,     'tri_levels',   10)
+        _sp(self.tri_alpha,      'tri_alpha',    1.0)
+        _cb(self.tri_filled,     'tri_filled',   True)
+        _cb(self.tri_lines,      'tri_lines',    True)
+        _cb(self.tri_triplot,    'tri_triplot',  False)
+        _cb(self.tri_tripcolor,  'tri_tripcolor',False)
+        _cb(self.tri_colorbar,   'tri_colorbar', True)
         # Pie
         _cb(self.pie_autopct,       'pie_autopct',      True)
         _cb(self.pie_shadow,        'pie_shadow',       False)

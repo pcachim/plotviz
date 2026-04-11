@@ -239,27 +239,52 @@ def _gen_polar(settings, series, datasets, palette, ax_var):
 
 
 def _gen_heatmap(settings, series, datasets, palette, ax_var):
-    # Build from all numeric datasets
-    cols = [k for k, v in datasets.items()
-            if hasattr(v, 'dtype') and v.dtype.kind not in ('U', 'S', 'O')]
-    if len(cols) < 2:
-        return [f"# Not enough numeric columns for heatmap"]
-    return [
+    # Bug 6: the old implementation generated a df.corr() correlation heatmap, which is
+    # completely different from what plot_engine renders (Z column reshaped into an n×n grid
+    # displayed with imshow). Rewritten to match the live renderer exactly.
+    zc = settings.get('_z_col', '')
+    if not zc:
+        return [f"# Heatmap: assign a Z column in plotviz to render."]
+    cmap   = settings.get('cmap', 'rainbow')
+    alpha  = settings.get('heat_alpha', 1.0)
+    interp = settings.get('heat_interpolation', 'nearest')
+    show_cb = settings.get('heat_colorbar', True)
+    lines = [
         f"import numpy as np",
-        f"_hm_cols = {[_esc(c) for c in cols]!r}",
-        f"_hm_corr = df[_hm_cols].corr()",
-        f"_hm_im = {ax_var}.imshow(_hm_corr.values, cmap='coolwarm', vmin=-1, vmax=1)",
-        f"{ax_var}.set_xticks(range(len(_hm_cols))); {ax_var}.set_xticklabels(_hm_cols, rotation=45, ha='right')",
-        f"{ax_var}.set_yticks(range(len(_hm_cols))); {ax_var}.set_yticklabels(_hm_cols)",
-        f"plt.colorbar(_hm_im, ax={ax_var})",
-        f"# Annotate cells",
-        f"for _r in range(len(_hm_cols)):",
-        f"    for _c in range(len(_hm_cols)):",
-        f"        {ax_var}.text(_c, _r, f'{{_hm_corr.values[_r, _c]:.2f}}', ha='center', va='center', fontsize=8)",
+        f"_hz = np.array({_col_ref(zc)}, dtype=float)",
+        f"_hn = int(np.ceil(np.sqrt(len(_hz))))",
+        f"_hZ = np.full((_hn, _hn), np.nan)",
+        f"for _hk in range(len(_hz)): _hZ[_hk // _hn, _hk % _hn] = _hz[_hk]",
     ]
+    # Add extent if X/Y columns are available
+    if series:
+        s = series[0]; xc = s.get('x_col', ''); yc = s.get('y_col', '')
+        if xc and yc:
+            lines.append(
+                f"_hext = [{_col_ref(xc)}.min(), {_col_ref(xc)}.max(), "
+                f"{_col_ref(yc)}.min(), {_col_ref(yc)}.max()]"
+            )
+            lines.append(
+                f"_him = {ax_var}.imshow(_hZ, aspect='auto', cmap='{_esc(cmap)}', "
+                f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}', extent=_hext)"
+            )
+        else:
+            lines.append(
+                f"_him = {ax_var}.imshow(_hZ, aspect='auto', cmap='{_esc(cmap)}', "
+                f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}')"
+            )
+    else:
+        lines.append(
+            f"_him = {ax_var}.imshow(_hZ, aspect='auto', cmap='{_esc(cmap)}', "
+            f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}')"
+        )
+    if show_cb:
+        lines.append(f"plt.colorbar(_him, ax={ax_var})")
+    return lines
 
 
 def _gen_contour(settings, series, datasets, palette, ax_var):
+    # Bug 7: was hardcoding levels=15, cmap='coolwarm' and ignoring all user settings.
     lines = []
     if series:
         s = series[0]
@@ -267,18 +292,93 @@ def _gen_contour(settings, series, datasets, palette, ax_var):
         yc = s.get('y_col', '')
         zc = settings.get('_z_col', '')   # top-level z from series_meta
         if xc and yc and zc:
+            lvl     = settings.get('contour_levels', 10)
+            cmap    = settings.get('cmap', 'rainbow')
+            alpha   = settings.get('heat_alpha', 1.0)
+            filled  = settings.get('heat_filled_contour', True)
+            lines_  = settings.get('heat_contour_lines', True)
+            show_cb = settings.get('heat_colorbar', True)
             lines += [
                 f"from scipy.interpolate import griddata",
                 f"import numpy as np",
-                f"_xi = np.linspace({_col_ref(xc)}.min(), {_col_ref(xc)}.max(), 100)",
-                f"_yi = np.linspace({_col_ref(yc)}.min(), {_col_ref(yc)}.max(), 100)",
-                f"_xi, _yi = np.meshgrid(_xi, _yi)",
-                f"_zi = griddata(({_col_ref(xc)}, {_col_ref(yc)}), {_col_ref(zc)}, (_xi, _yi), method='cubic')",
-                f"_ct = {ax_var}.contourf(_xi, _yi, _zi, levels=15, cmap='coolwarm')",
-                f"plt.colorbar(_ct, ax={ax_var})",
+                f"_cn = int(np.ceil(np.sqrt(len({_col_ref(zc)}))))",
+                f"_cZ = np.full((_cn, _cn), np.nan)",
+                f"for _ck in range(len({_col_ref(zc)})): _cZ[_ck // _cn, _ck % _cn] = {_col_ref(zc)}.iloc[_ck]",
+                f"_cZ = np.where(np.isnan(_cZ), np.nanmean(_cZ), _cZ)",
+                f"_cxi = np.linspace({_col_ref(xc)}.min(), {_col_ref(xc)}.max(), _cn)",
+                f"_cyi = np.linspace({_col_ref(yc)}.min(), {_col_ref(yc)}.max(), _cn)",
+                f"_cX, _cY = np.meshgrid(_cxi, _cyi)",
+                f"_last_cm = None",
             ]
+            if filled:
+                lines.append(
+                    f"_cf = {ax_var}.contourf(_cX, _cY, _cZ, levels={lvl}, "
+                    f"cmap='{_esc(cmap)}', alpha={alpha})"
+                )
+                lines.append(f"_last_cm = _cf")
+            if lines_:
+                lines.append(
+                    f"_cs = {ax_var}.contour(_cX, _cY, _cZ, levels={lvl}, "
+                    f"colors='k', linewidths=0.5, alpha=0.5)"
+                )
+                lines.append(f"_last_cm = _last_cm if _last_cm is not None else _cs")
+            if show_cb:
+                lines.append(f"if _last_cm is not None: plt.colorbar(_last_cm, ax={ax_var})")
         else:
             lines.append(f"# Contour: assign X, Y and Z columns in plotviz to render.")
+    return lines
+
+
+def _gen_tricontour(settings, series, datasets, palette, ax_var):
+    # Bug 7: was hardcoding levels=10, cmap='rainbow' and ignoring all user settings.
+    lines = []
+    if series:
+        s = series[0]
+        xc = s.get('x_col', '')
+        yc = s.get('y_col', '')
+        zc = settings.get('_z_col', '')
+        if xc and yc and zc:
+            lvl       = settings.get('tri_levels', 10)
+            cmap      = settings.get('tri_cmap', 'rainbow')
+            alpha     = settings.get('tri_alpha', 1.0)
+            filled    = settings.get('tri_filled', True)
+            tri_lines = settings.get('tri_lines', True)
+            triplot   = settings.get('tri_triplot', False)
+            tripcolor = settings.get('tri_tripcolor', False)
+            show_cb   = settings.get('tri_colorbar', True)
+            lines += [
+                f"import numpy as np",
+                f"_tx = np.array({_col_ref(xc)}, dtype=float)",
+                f"_ty = np.array({_col_ref(yc)}, dtype=float)",
+                f"_tz = np.array({_col_ref(zc)}, dtype=float)",
+                f"_tn = min(len(_tx), len(_ty), len(_tz)); _tx, _ty, _tz = _tx[:_tn], _ty[:_tn], _tz[:_tn]",
+                f"_last_tm = None",
+            ]
+            if tripcolor:
+                lines.append(
+                    f"_tc = {ax_var}.tripcolor(_tx, _ty, _tz, cmap='{_esc(cmap)}', alpha={alpha})"
+                )
+                lines.append(f"_last_tm = _tc")
+            if filled:
+                lines.append(
+                    f"_tcf = {ax_var}.tricontourf(_tx, _ty, _tz, levels={lvl}, "
+                    f"cmap='{_esc(cmap)}', alpha={alpha})"
+                )
+                lines.append(f"_last_tm = _tcf")
+            if tri_lines:
+                lines.append(
+                    f"_tcs = {ax_var}.tricontour(_tx, _ty, _tz, levels={lvl}, "
+                    f"colors='k', linewidths=0.5, alpha=0.5)"
+                )
+                lines.append(f"_last_tm = _last_tm if _last_tm is not None else _tcs")
+            if triplot:
+                lines.append(
+                    f"{ax_var}.triplot(_tx, _ty, color='k', linewidth=0.4, alpha=0.5)"
+                )
+            if show_cb:
+                lines.append(f"if _last_tm is not None: plt.colorbar(_last_tm, ax={ax_var})")
+        else:
+            lines.append(f"# Tricontour: assign X, Y and Z columns in plotviz to render.")
     return lines
 
 
@@ -324,6 +424,7 @@ def _gen_ecdf(settings, series, datasets, palette, ax_var):
 
 
 def _gen_hist2d_hexbin(settings, series, datasets, palette, ax_var):
+    # Bug 20: was hardcoding gridsize=30, bins=30, cmap='viridis' and always adding a colorbar.
     lines = []
     ct = settings.get('chart_type', 'Hist2D')
     if series:
@@ -331,10 +432,31 @@ def _gen_hist2d_hexbin(settings, series, datasets, palette, ax_var):
         xc, yc = s.get('x_col',''), s.get('y_col','')
         if xc and yc:
             if ct == 'Hexbin':
-                lines.append(f"{ax_var}.hexbin({_col_ref(xc)}, {_col_ref(yc)}, gridsize=30, cmap='viridis')")
-            else:
-                lines.append(f"{ax_var}.hist2d({_col_ref(xc)}, {_col_ref(yc)}, bins=30, cmap='viridis')")
-            lines.append(f"plt.colorbar({ax_var}.collections[0] if {ax_var}.collections else plt.cm.ScalarMappable(), ax={ax_var})")
+                gridsize = settings.get('hexbin_gridsize', 20)
+                cmap     = settings.get('hexbin_cmap', 'viridis')
+                alpha    = settings.get('hexbin_alpha', 1.0)
+                show_cb  = settings.get('hist2d_colorbar', True)   # shared checkbox key
+                lines.append(
+                    f"_hb = {ax_var}.hexbin({_col_ref(xc)}, {_col_ref(yc)}, "
+                    f"gridsize={gridsize}, cmap='{_esc(cmap)}', alpha={alpha})"
+                )
+                if show_cb:
+                    lines.append(f"plt.colorbar(_hb, ax={ax_var})")
+            else:  # Hist2D
+                bins_x  = settings.get('hist2d_bins_x', 20)
+                bins_y  = settings.get('hist2d_bins_y', 20)
+                cmap    = settings.get('hist2d_cmap', 'viridis')
+                alpha   = settings.get('hist2d_alpha', 1.0)
+                log     = settings.get('hist2d_log', False)
+                show_cb = settings.get('hist2d_colorbar', True)
+                norm_arg = ", norm=matplotlib.colors.LogNorm()" if log else ""
+                lines += [
+                    f"import matplotlib",
+                    f"_, _, _, _h2img = {ax_var}.hist2d({_col_ref(xc)}, {_col_ref(yc)}, "
+                    f"bins=[{bins_x}, {bins_y}], cmap='{_esc(cmap)}', alpha={alpha}{norm_arg})",
+                ]
+                if show_cb:
+                    lines.append(f"plt.colorbar(_h2img, ax={ax_var})")
     return lines
 
 
@@ -451,9 +573,10 @@ _GENERATORS = {
     'Pie':        _gen_pie,
     'Polar':      _gen_polar,
     'Radar':      _gen_radar,
-    'Heatmap':    _gen_heatmap,
-    'Contour':    _gen_contour,
-    '3D Surface': _gen_surface3d,
+    'Heatmap':      _gen_heatmap,
+    'Contour':      _gen_contour,
+    'Tricontour':   _gen_tricontour,
+    '3D Surface':   _gen_surface3d,
     'ECDF':       _gen_ecdf,
     'Quiver':     _gen_quiver,
     'Barbs':      _gen_barbs,
@@ -646,7 +769,7 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 ax_var     = f"ax{idx}"
                 sub_z      = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
                 if not sub_z:
-                    sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Surface3D', 'Hist2D', 'Hexbin') else ''
+                    sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Tricontour', '3D Surface', 'Hist2D', 'Hexbin') else ''
                 sub_settings = dict(settings)
                 sub_settings['chart_type'] = sub_ct
                 sub_settings['_z_col']     = sub_z
@@ -680,7 +803,7 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 ax_var      = f"ax{idx}"
                 sub_z       = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
                 if not sub_z:
-                    sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Surface3D', 'Hist2D', 'Hexbin') else ''
+                    sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Tricontour', '3D Surface', 'Hist2D', 'Hexbin') else ''
                 sub_settings = dict(settings)
                 sub_settings['chart_type'] = sub_ct
                 sub_settings['_z_col']     = sub_z
