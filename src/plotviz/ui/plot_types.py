@@ -81,7 +81,8 @@ class PlotTypesMixin:
                         medianprops=dict(color='black', linewidth=2) if self.box_show_medians.isChecked() else dict(linewidth=0),
                     )
                     for patch, c in zip(bp['boxes'], C):
-                        patch.set_facecolor(c); patch.set_alpha(self.box_alpha.value())
+                        patch.set_facecolor(c)
+                        patch.set_alpha(self.box_alpha.value())
 
             elif ct == 'Violin':
                 num_series = [(k, v) for k, v in yd_dict.items() if not self._is_categorical(v)]
@@ -95,7 +96,9 @@ class PlotTypesMixin:
                         points=int(self.violin_points.currentText()),
                         vert=self.violin_vert.isChecked(),
                     )
-                    for pc, c in zip(parts['bodies'], C): pc.set_facecolor(c); pc.set_alpha(0.7)
+                    for pc, c in zip(parts['bodies'], C):
+                        pc.set_facecolor(c)
+                        pc.set_alpha(0.7)
                     if self.violin_vert.isChecked():
                         ax.set_xticks(range(1, len(num_series)+1))
                         ax.set_xticklabels([k for k, _ in num_series])
@@ -149,7 +152,8 @@ class PlotTypesMixin:
             elif ct == 'Contour':
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
-                    xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
+                    xd, yd, lbl, _ = series[0]
+                    z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
                         n = int(np.ceil(np.sqrt(len(z))))
                         Z = np.full((n, n), np.nan)
@@ -169,7 +173,8 @@ class PlotTypesMixin:
             elif ct == '3D Surface':
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
-                    xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
+                    xd, yd, lbl, _ = series[0]
+                    z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
                         n = int(np.ceil(np.sqrt(min(len(xd), len(yd), len(z)))))
                         Z = np.full((n, n), np.nanmean(z))
@@ -177,7 +182,8 @@ class PlotTypesMixin:
                         xi = np.linspace(np.min(xd), np.max(xd), n)
                         yi = np.linspace(np.min(yd), np.max(yd), n)
                         X, Y = np.meshgrid(xi, yi)
-                        st = self.surf_stride.value(); alp = self.heat_alpha.value()
+                        st = self.surf_stride.value()
+                        alp = self.heat_alpha.value()
                         if self.surf_wireframe.isChecked():
                             ax.plot_wireframe(X, Y, Z, rstride=st, cstride=st, alpha=alp)
                         else:
@@ -212,8 +218,10 @@ class PlotTypesMixin:
                     s = self.curve_styles.get(lbl, {})
                     color = s.get('color', C[i])
                     ls = self.polar_linestyle.currentText()
-                    mk = self.polar_marker.currentText(); mk = None if mk == 'None' else mk
-                    theta = xd.astype(float); r = yd.astype(float)
+                    mk = self.polar_marker.currentText()
+                    mk = None if mk == 'None' else mk
+                    theta = xd.astype(float)
+                    r = yd.astype(float)
                     if ls != 'none':
                         ax.plot(theta, r, linestyle=ls, color=color,
                                 linewidth=self.polar_lw.value(), marker=mk, label=lbl)
@@ -227,8 +235,10 @@ class PlotTypesMixin:
                     if n_cat >= 3:
                         angles = np.linspace(0, 2*np.pi, n_cat, endpoint=False).tolist() + [0]
                         labels = list(xd) if self._is_categorical(xd) else [str(round(v,3)) for v in xd]
-                        ax.set_theta_offset(np.pi/2); ax.set_theta_direction(-1)
-                        ax.set_xticks(angles[:-1]); ax.set_xticklabels(labels, size=8)
+                        ax.set_theta_offset(np.pi/2)
+                        ax.set_theta_direction(-1)
+                        ax.set_xticks(angles[:-1])
+                        ax.set_xticklabels(labels, size=8)
                         all_vals = np.concatenate([s[1].astype(float) for s in series])
                         vmax = np.nanmax(np.abs(all_vals)) if len(all_vals) else 1
                         ax.set_ylim(0, vmax*1.1)
@@ -254,7 +264,8 @@ class PlotTypesMixin:
                             label=lbl, where='post')
                     if self.ecdf_markers.isChecked():
                         ax.scatter(sorted_d, ecdf, color=color, s=12, zorder=4)
-                ax.set_ylim(-0.02, 1.02); ax.set_ylabel('F(x)')
+                ax.set_ylim(-0.02, 1.02)
+                ax.set_ylabel('F(x)')
 
             elif ct == 'Quiver':
                 if series:
@@ -346,11 +357,13 @@ class PlotTypesMixin:
                     plot_kw['markeredgecolor'] = mk_color
                 _lines = ax.plot(xplot, yd, **plot_kw)
                 for _l in _lines: _l.set_pickradius(6)
-                upper_key = lbl + ' CI upper'; lower_key = lbl + ' CI lower'
+                upper_key = lbl + ' CI upper'
+                lower_key = lbl + ' CI lower'
                 if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
                                     alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-                pi_upper_key = lbl + ' PI upper'; pi_lower_key = lbl + ' PI lower'
+                pi_upper_key = lbl + ' PI upper'
+                pi_lower_key = lbl + ' PI lower'
                 if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
                                     alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
@@ -358,7 +371,8 @@ class PlotTypesMixin:
 
             elif sct == 'Scatter':
                 xplot = _cat_xplot(xd) if is_cat else xd
-                mk = self.scatter_marker.currentText(); mk = 'o' if mk == 'None' else mk
+                mk = self.scatter_marker.currentText()
+                mk = 'o' if mk == 'None' else mk
                 mk_color = s.get('marker_color', color)
                 sc_ec = self.scatter_edgecolor.currentText()
                 if sc_ec == 'auto': sc_ec = mk_color
@@ -370,7 +384,8 @@ class PlotTypesMixin:
                         z = self.datasets[zc]
                         n = min(len(xplot), len(yd), len(z))
                         c_arg = z[:n]
-                        xplot = xplot[:n]; yd = yd[:n]
+                        xplot = xplot[:n]
+                        yd = yd[:n]
                 _sc = ax.scatter(xplot, yd, label=lbl,
                            s=self.scatter_size.value(),
                            alpha=self.scatter_alpha.value(),
@@ -380,18 +395,21 @@ class PlotTypesMixin:
                            edgecolors=sc_ec,
                            linewidths=self.scatter_lw.value())
                 _sc.set_picker(True)
-                upper_key = lbl + ' CI upper'; lower_key = lbl + ' CI lower'
+                upper_key = lbl + ' CI upper'
+                lower_key = lbl + ' CI lower'
                 if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
                                     alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-                pi_upper_key = lbl + ' PI upper'; pi_lower_key = lbl + ' PI lower'
+                pi_upper_key = lbl + ' PI upper'
+                pi_lower_key = lbl + ' PI lower'
                 if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
                                     alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
                                     linestyle='--', label=f'{lbl} PI')
 
             elif sct == 'Bar':
-                bi = bar_idx_counter; bar_idx_counter += 1
+                bi = bar_idx_counter
+                bar_idx_counter += 1
                 # Color bars by value if requested
                 def _bar_colors(vals, base_color):
                     if self.bar_colorbyval.isChecked():
@@ -411,7 +429,8 @@ class PlotTypesMixin:
                 else:
                     if is_cat or self._is_categorical(yd): continue
                     try:
-                        xd_f = np.asarray(xd, dtype=float); yd_f = np.asarray(yd, dtype=float)
+                        xd_f = np.asarray(xd, dtype=float)
+                        yd_f = np.asarray(yd, dtype=float)
                     except (ValueError, TypeError): continue
                     if bar_bottoms_num is None: bar_bottoms_num = np.zeros(len(xd_f))
                     if bar_stk:
@@ -448,7 +467,8 @@ class PlotTypesMixin:
                 err  = self.datasets.get(ec)  if ec      != '(none)' else None
                 xerr = self.datasets.get(xerr_c) if xerr_c != '(none)' else None
                 xplot = _cat_xplot(xd) if is_cat else xd
-                mk = self.err_fmt_marker.currentText(); mk = 'o' if mk == 'None' else mk
+                mk = self.err_fmt_marker.currentText()
+                mk = 'o' if mk == 'None' else mk
                 ax.errorbar(xplot, yd, yerr=err, xerr=xerr, label=lbl,
                             capsize=self.err_capsize.value(),
                             capthick=self.err_capthick.value(),
@@ -498,7 +518,8 @@ class PlotTypesMixin:
                     n = min(len(xplot), len(yd))
                     sizes = self.bubble_scale.value() / 4
                 mk_color = s.get('marker_color', color)
-                mk = self.bubble_marker.currentText(); mk = 'o' if mk == 'None' else mk
+                mk = self.bubble_marker.currentText()
+                mk = 'o' if mk == 'None' else mk
                 b_ec = self.bubble_edgecolor.currentText()
                 if b_ec == 'auto': b_ec = mk_color
                 ax.scatter(xplot[:n], yd[:n], s=sizes, alpha=self.bubble_alpha.value(),
@@ -517,7 +538,8 @@ class PlotTypesMixin:
                 al  = self.waterfall_alpha.value()
                 pos_c = getattr(self, 'waterfall_pos_color', None) or '#2ecc71'
                 neg_c = getattr(self, 'waterfall_neg_color', None) or '#e74c3c'
-                running = 0.0; prev_top = None
+                running = 0.0
+                prev_top = None
                 for k in range(n):
                     val = float(yd_f[k])
                     fc = pos_c if val >= 0 else neg_c
@@ -528,7 +550,8 @@ class PlotTypesMixin:
                     if self.waterfall_connector.isChecked() and prev_top is not None:
                         ax.plot([xd_f[k-1]+w/2, xd_f[k]-w/2], [prev_top, prev_top],
                                 color='#555', linewidth=0.8, linestyle='--')
-                    prev_top = top; running = top
+                    prev_top = top
+                    running = top
 
         # Return categorical tick info — caller must apply AFTER set_xscale/set_yscale
         # so scale changes don't wipe out the FixedLocator set here.

@@ -47,7 +47,8 @@ class SubplotConfigMixin:
 
         dlg = QDialog(self)
         dlg.setWindowTitle('Subplot Layout')
-        dlg.setMinimumWidth(620); dlg.setMinimumHeight(520)
+        dlg.setMinimumWidth(620)
+        dlg.setMinimumHeight(520)
         dlg_lay = QVBoxLayout(dlg)
 
         inner_tabs = QTabWidget()
@@ -56,18 +57,23 @@ class SubplotConfigMixin:
         # ══════════════════════════════════════════════════════════════════════
         # TAB 1 — Presets gallery
         # ══════════════════════════════════════════════════════════════════════
-        presets_w = QWidget(); presets_lay = QVBoxLayout(presets_w)
+        presets_w = QWidget()
+        presets_lay = QVBoxLayout(presets_w)
 
         def _make_preview(rows, cols, mosaic, size=(88,60)):
-            w = QWidget(); w.setFixedSize(*size)
-            g = QGridLayout(w); g.setSpacing(2); g.setContentsMargins(3,3,3,3)
+            w = QWidget()
+            w.setFixedSize(*size)
+            g = QGridLayout(w)
+            g.setSpacing(2)
+            g.setContentsMargins(3,3,3,3)
             style = 'background:#cce;border:1px solid #77a;font-size:8px;border-radius:2px;'
             if mosaic is None:
                 for r in range(rows):
                     for c in range(cols):
                         lbl = QLabel(str(r*cols+c+1))
                         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                        lbl.setStyleSheet(style); g.addWidget(lbl, r, c)
+                        lbl.setStyleSheet(style)
+                        g.addWidget(lbl, r, c)
             else:
                 seen = {}
                 for ri, row in enumerate(mosaic):
@@ -87,7 +93,9 @@ class SubplotConfigMixin:
         card_group = []   # list of (preview_btn, label_btn) pairs
 
         per_row = 5
-        grid_w = QWidget(); grid = QGridLayout(grid_w); grid.setSpacing(10)
+        grid_w = QWidget()
+        grid = QGridLayout(grid_w)
+        grid.setSpacing(10)
 
         SELECTED_BORDER = '2px solid #3378ff'
         NORMAL_BORDER   = '1px solid #aaa'
@@ -110,7 +118,9 @@ class SubplotConfigMixin:
 
         for i, (name, rows, cols, mosaic) in enumerate(LAYOUTS):
             cell = QWidget()
-            cly = QVBoxLayout(cell); cly.setSpacing(2); cly.setContentsMargins(0,0,0,0)
+            cly = QVBoxLayout(cell)
+            cly.setSpacing(2)
+            cly.setContentsMargins(0,0,0,0)
             cly.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
             # Clickable preview container
@@ -118,7 +128,8 @@ class SubplotConfigMixin:
             prev_btn = QPushButton()
             prev_btn.setFixedSize(96, 68)
             prev_btn.setFlat(True)
-            inner = QVBoxLayout(prev_btn); inner.setContentsMargins(4,4,4,4)
+            inner = QVBoxLayout(prev_btn)
+            inner.setContentsMargins(4,4,4,4)
             inner.addWidget(prev_widget)
             prev_btn.clicked.connect(lambda _, idx=i: _select_preset(idx))
 
@@ -133,7 +144,8 @@ class SubplotConfigMixin:
             grid.addWidget(cell, i // per_row, i % per_row)
 
         _select_preset(0)
-        scroll_presets = QScrollArea(); scroll_presets.setWidgetResizable(True)
+        scroll_presets = QScrollArea()
+        scroll_presets.setWidgetResizable(True)
         scroll_presets.setWidget(grid_w)
         presets_lay.addWidget(scroll_presets)
         inner_tabs.addTab(presets_w, '🗂 Presets')
@@ -141,19 +153,29 @@ class SubplotConfigMixin:
         # ══════════════════════════════════════════════════════════════════════
         # TAB 2 — Custom mosaic editor
         # ══════════════════════════════════════════════════════════════════════
-        custom_w = QWidget(); custom_lay = QVBoxLayout(custom_w)
+        custom_w = QWidget()
+        custom_lay = QVBoxLayout(custom_w)
 
         # Grid size controls
-        size_row = QHBoxLayout(); size_row.setSpacing(8)
+        size_row = QHBoxLayout()
+        size_row.setSpacing(8)
         size_row.addWidget(QLabel('Rows:'))
-        custom_rows = QSpinBox(); custom_rows.setRange(1, 8); custom_rows.setValue(2); custom_rows.setFixedWidth(52)
+        custom_rows = QSpinBox()
+        custom_rows.setRange(1, 8)
+        custom_rows.setValue(2)
+        custom_rows.setFixedWidth(52)
         size_row.addWidget(custom_rows)
         size_row.addWidget(QLabel('Cols:'))
-        custom_cols = QSpinBox(); custom_cols.setRange(1, 8); custom_cols.setValue(2); custom_cols.setFixedWidth(52)
+        custom_cols = QSpinBox()
+        custom_cols.setRange(1, 8)
+        custom_cols.setValue(2)
+        custom_cols.setFixedWidth(52)
         size_row.addWidget(custom_cols)
-        btn_rebuild = QPushButton('↺ Rebuild grid'); btn_rebuild.setFixedWidth(110)
+        btn_rebuild = QPushButton('↺ Rebuild grid')
+        btn_rebuild.setFixedWidth(110)
         size_row.addWidget(btn_rebuild)
-        size_row.addStretch(); custom_lay.addLayout(size_row)
+        size_row.addStretch()
+        custom_lay.addLayout(size_row)
 
         custom_lay.addWidget(QLabel(
             'Click cells to assign them to a subplot panel (drag to paint). '
@@ -171,7 +193,8 @@ class SubplotConfigMixin:
         ALL_LETTERS = [chr(ord('A')+i) for i in range(26)]
 
         # Panel palette selector
-        palette_row = QHBoxLayout(); palette_row.setSpacing(4)
+        palette_row = QHBoxLayout()
+        palette_row.setSpacing(4)
         palette_row.addWidget(QLabel('Active panel:'))
         palette_btns = {}
 
@@ -180,7 +203,9 @@ class SubplotConfigMixin:
             return CELL_COLOURS[idx % len(CELL_COLOURS)]
 
         for letter in ALL_LETTERS[:8]:
-            pb = QPushButton(letter); pb.setFixedSize(30, 28); pb.setCheckable(True)
+            pb = QPushButton(letter)
+            pb.setFixedSize(30, 28)
+            pb.setCheckable(True)
             pb.setStyleSheet(f'background:{_letter_colour(letter)};border-radius:4px;font-weight:bold;')
             palette_btns[letter] = pb
             def _sel_letter(checked, l=letter):
@@ -190,13 +215,15 @@ class SubplotConfigMixin:
             pb.clicked.connect(_sel_letter)
             palette_row.addWidget(pb)
         palette_btns['A'].setChecked(True)
-        palette_row.addStretch(); custom_lay.addLayout(palette_row)
+        palette_row.addStretch()
+        custom_lay.addLayout(palette_row)
 
         # The cell grid container
         grid_frame = QFrame()
         grid_frame.setFrameShape(QFrame.Shape.StyledPanel)
         grid_frame_lay = QGridLayout(grid_frame)
-        grid_frame_lay.setSpacing(3); grid_frame_lay.setContentsMargins(6,6,6,6)
+        grid_frame_lay.setSpacing(3)
+        grid_frame_lay.setContentsMargins(6,6,6,6)
         custom_lay.addWidget(grid_frame)
 
         cell_btns = {}   # (r,c) → QPushButton
@@ -205,15 +232,18 @@ class SubplotConfigMixin:
         preview_container = QWidget()
         preview_container.setFixedSize(180, 120)
         preview_grid_lay = QGridLayout(preview_container)
-        preview_grid_lay.setSpacing(3); preview_grid_lay.setContentsMargins(4,4,4,4)
+        preview_grid_lay.setSpacing(3)
+        preview_grid_lay.setContentsMargins(4,4,4,4)
         preview_cells = {}  # (r,c) → QLabel
 
         def _update_preview_widget():
             """Rebuild the small preview to mirror current grid state."""
             for lbl in preview_cells.values():
-                preview_grid_lay.removeWidget(lbl); lbl.deleteLater()
+                preview_grid_lay.removeWidget(lbl)
+                lbl.deleteLater()
             preview_cells.clear()
-            rows = custom_state['rows']; cols = custom_state['cols']
+            rows = custom_state['rows']
+            cols = custom_state['cols']
             grid = custom_state['grid']
             # Compute spans by finding each letter's bounding box
             spans = {}
@@ -239,9 +269,11 @@ class SubplotConfigMixin:
         def _refresh_grid_ui():
             # Clear existing paint buttons
             for btn in cell_btns.values():
-                grid_frame_lay.removeWidget(btn); btn.deleteLater()
+                grid_frame_lay.removeWidget(btn)
+                btn.deleteLater()
             cell_btns.clear()
-            rows = custom_state['rows']; cols = custom_state['cols']
+            rows = custom_state['rows']
+            cols = custom_state['cols']
             grid = custom_state['grid']
             for r in range(rows):
                 for c in range(cols):
@@ -260,7 +292,8 @@ class SubplotConfigMixin:
             _update_preview_widget()
 
         def _rebuild_grid():
-            rows = custom_rows.value(); cols = custom_cols.value()
+            rows = custom_rows.value()
+            cols = custom_cols.value()
             old = custom_state['grid']
             new_grid = []
             for r in range(rows):
@@ -272,11 +305,13 @@ class SubplotConfigMixin:
                         used = {cell for row in new_grid for cell in row}
                         for l in ALL_LETTERS:
                             if l not in used:
-                                row_data.append(l); break
+                                row_data.append(l)
+                                break
                         else:
                             row_data.append('A')
                 new_grid.append(row_data)
-            custom_state['rows'] = rows; custom_state['cols'] = cols
+            custom_state['rows'] = rows
+            custom_state['cols'] = cols
             custom_state['grid'] = new_grid
             _refresh_grid_ui()
 
@@ -295,9 +330,13 @@ class SubplotConfigMixin:
 
         # ── Shared options ────────────────────────────────────────────────────
         share_row = QHBoxLayout()
-        share_x = QCheckBox('Share X axis'); share_x.setChecked(self.sp_sharex.isChecked())
-        share_y = QCheckBox('Share Y axis'); share_y.setChecked(self.sp_sharey.isChecked())
-        share_row.addWidget(share_x); share_row.addWidget(share_y); share_row.addStretch()
+        share_x = QCheckBox('Share X axis')
+        share_x.setChecked(self.sp_sharex.isChecked())
+        share_y = QCheckBox('Share Y axis')
+        share_y.setChecked(self.sp_sharey.isChecked())
+        share_row.addWidget(share_x)
+        share_row.addWidget(share_y)
+        share_row.addStretch()
         dlg_lay.addLayout(share_row)
 
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
@@ -318,7 +357,8 @@ class SubplotConfigMixin:
             _, rows, cols, mosaic = LAYOUTS[selected_preset[0]]
         else:
             # Custom mosaic
-            rows = custom_state['rows']; cols = custom_state['cols']
+            rows = custom_state['rows']
+            cols = custom_state['cols']
             raw_grid = custom_state['grid']
             # Validate: every cell must have same letter = forms a contiguous block
             # (matplotlib mosaic just needs the list-of-lists, contiguity checked at render)
@@ -332,10 +372,14 @@ class SubplotConfigMixin:
         else:
             cells = list(dict.fromkeys(c for row in mosaic for c in row))
             n = len(cells)
-            self.sp_rows.blockSignals(True); self.sp_cols.blockSignals(True)
-            self.sp_rows.setValue(rows); self.sp_cols.setValue(cols)
-            self.sp_rows.blockSignals(False); self.sp_cols.blockSignals(False)
-            self.subplot_rows = rows; self.subplot_cols = cols
+            self.sp_rows.blockSignals(True)
+            self.sp_cols.blockSignals(True)
+            self.sp_rows.setValue(rows)
+            self.sp_cols.setValue(cols)
+            self.sp_rows.blockSignals(False)
+            self.sp_cols.blockSignals(False)
+            self.subplot_rows = rows
+            self.subplot_cols = cols
             self.on_subplot_layout_changed(n_override=n)
             self.update_preview()
 

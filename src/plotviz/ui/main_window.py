@@ -1022,7 +1022,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         act_export_img.setShortcut('Ctrl+E')
         act_export_img.triggered.connect(
             lambda: (_go_chart_tab(),
-                     self.export_chart(self._export_fmt_combo.currentText().lower())))
+                     self.export_chart()))
         file_menu.addAction(act_export_img)
 
         act_export_py = QAction('Export Python Bundle (.pvizx)…', self)
@@ -1165,7 +1165,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._btn_redo = btn_redo
 
         # Separator line below top bar
-        top_sep = QFrame(); top_sep.setFrameShape(QFrame.Shape.HLine)
+        top_sep = QFrame()
+        top_sep.setFrameShape(QFrame.Shape.HLine)
         top_sep.setFrameShadow(QFrame.Shadow.Sunken)
 
         left_vbox.addWidget(top_bar)
@@ -1403,6 +1404,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ('heat_alpha',          'heat_alpha',           1.0,       'dbl'),
         ('heat_interpolation',  'heat_interpolation',   'nearest', 'combo'),
         ('heat_colorbar',       'heat_colorbar',        True,      'check'),
+        ('heat_colorbar_shrink','heat_colorbar_shrink', 1.0,       'dbl'),
         ('heat_filled_contour', 'heat_filled_contour',  True,      'check'),
         ('heat_contour_lines',  'heat_contour_lines',   True,      'check'),
         ('surf_stride',         'surf_stride',          1,         'spin'),
@@ -1421,6 +1423,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ('tri_lines',           'tri_lines',            True,               'check'),
         ('tri_triplot',         'tri_triplot',          False,              'check'),
         ('tri_colorbar',        'tri_colorbar',         True,               'check'),
+        ('tri_colorbar_shrink', 'tri_colorbar_shrink',  1.0,                'dbl'),
         # Pie
         ('pie_autopct',         'pie_autopct',          True,      'check'),
         ('pie_shadow',          'pie_shadow',           False,     'check'),
@@ -1529,11 +1532,17 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     setattr(self, attr, val)
                 continue
             if kind == 'spin':
-                w.blockSignals(True); w.setValue(int(val)); w.blockSignals(False)
+                w.blockSignals(True)
+                w.setValue(int(val))
+                w.blockSignals(False)
             elif kind == 'dbl':
-                w.blockSignals(True); w.setValue(float(val)); w.blockSignals(False)
+                w.blockSignals(True)
+                w.setValue(float(val))
+                w.blockSignals(False)
             elif kind == 'check':
-                w.blockSignals(True); w.setChecked(bool(val)); w.blockSignals(False)
+                w.blockSignals(True)
+                w.setChecked(bool(val))
+                w.blockSignals(False)
             elif kind == 'combo':
                 w.blockSignals(True)
                 i = w.findText(str(val))
@@ -1854,7 +1863,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # HELPERS
     # ═══════════════════════════════════════════════════════════════════════════
     def _hline(self):
-        ln = QFrame(); ln.setFrameShape(QFrame.Shape.HLine); ln.setFrameShadow(QFrame.Shadow.Sunken)
+        ln = QFrame()
+        ln.setFrameShape(QFrame.Shape.HLine)
+        ln.setFrameShadow(QFrame.Shadow.Sunken)
         return ln
 
     @staticmethod
@@ -1885,7 +1896,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         for scale, inv_fn, set_fn in [(xs, ax.invert_xaxis, ax.set_xscale),
                                        (ys, ax.invert_yaxis, ax.set_yscale)]:
             if scale == 'inverted':
-                set_fn('linear'); inv_fn()
+                set_fn('linear')
+                inv_fn()
             else:
                 try: set_fn(scale)
                 except Exception: set_fn('linear')
@@ -2044,7 +2056,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── 16 colour swatches ────────────────────────────────────────────────
         vlay.addWidget(QLabel('Colours (click to change):'))
-        swatch_grid = QHBoxLayout(); swatch_grid.setSpacing(4)
+        swatch_grid = QHBoxLayout()
+        swatch_grid.setSpacing(4)
 
         default_colors = list(self._active_palette_colors())
         # Pad or trim to 16
@@ -2210,13 +2223,17 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.update_preview()
             return
         mapping = {
-            'title':        ('title_color',        'title_color_label',        'style'),
+            'title':        ('title_color',        'title_color_swatch',       'style'),
             'xlabel':       ('xlabel_color',        'xlabel_color_label',       'style'),
             'ylabel':       ('ylabel_color',        'ylabel_color_label',       'style'),
             'y2label':      ('y2label_color',       'y2label_color_label',      'style'),
             'curve':        ('curve_color',         'curve_color_label',        'swatch'),
             'curve_marker': ('curve_marker_color',  'curve_marker_color_label', 'swatch'),
         }
+        if target not in mapping:
+            import logging
+            logging.getLogger('plotviz').warning('pick_color: unknown target %r — ignored', target)
+            return
         attr, lbl_attr, mode = mapping[target]
         setattr(self, attr, hx)
         lbl = getattr(self, lbl_attr)
@@ -2252,9 +2269,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _, w_cm, h_cm = self._fig_presets[idx]
         if w_cm is None: return  # Custom — don't touch spinboxes
         unit = self.fig_unit.currentText()
-        self.fig_width.blockSignals(True); self.fig_height.blockSignals(True)
+        self.fig_width.blockSignals(True)
+        self.fig_height.blockSignals(True)
         if unit == 'cm':
-            self.fig_width.setValue(w_cm); self.fig_height.setValue(h_cm)
+            self.fig_width.setValue(w_cm)
+            self.fig_height.setValue(h_cm)
         elif unit == 'inches':
             self.fig_width.setValue(round(w_cm / 2.54, 2))
             self.fig_height.setValue(round(h_cm / 2.54, 2))
@@ -2262,7 +2281,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             dpi = self.dpi_spin.value()
             self.fig_width.setValue(round(w_cm / 2.54 * dpi))
             self.fig_height.setValue(round(h_cm / 2.54 * dpi))
-        self.fig_width.blockSignals(False); self.fig_height.blockSignals(False)
+        self.fig_width.blockSignals(False)
+        self.fig_height.blockSignals(False)
         self.update_preview()
 
     def _on_figsize_manual_change(self):
@@ -2274,29 +2294,51 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     def _on_fig_unit_changed(self, unit):
         """When unit changes, convert current displayed values to the new unit."""
-        # First read current inches value
-        wi, hi = self._fig_size_in_inches()
-        self.fig_width.blockSignals(True); self.fig_height.blockSignals(True)
+        # Read the current size using the *previous* unit (before the combo updated).
+        # currentTextChanged fires after the combo already reflects the new value, so
+        # we must convert manually from _prev_fig_unit rather than via _fig_size_in_inches().
+        prev_unit = getattr(self, '_prev_fig_unit', 'cm')
+        w_raw, h_raw = self.fig_width.value(), self.fig_height.value()
+        if prev_unit == 'cm':
+            wi, hi = w_raw / 2.54, h_raw / 2.54
+        elif prev_unit == 'pixels':
+            dpi = self.dpi_spin.value()
+            wi, hi = w_raw / dpi, h_raw / dpi
+        else:
+            wi, hi = w_raw, h_raw
+        self._prev_fig_unit = unit
+        self.fig_width.blockSignals(True)
+        self.fig_height.blockSignals(True)
         if unit == 'cm':
-            self.fig_width.setRange(2, 500); self.fig_height.setRange(2, 500)
-            self.fig_width.setDecimals(1); self.fig_height.setDecimals(1)
-            self.fig_width.setSingleStep(0.5); self.fig_height.setSingleStep(0.5)
+            self.fig_width.setRange(2, 500)
+            self.fig_height.setRange(2, 500)
+            self.fig_width.setDecimals(1)
+            self.fig_height.setDecimals(1)
+            self.fig_width.setSingleStep(0.5)
+            self.fig_height.setSingleStep(0.5)
             self.fig_width.setValue(round(wi * 2.54, 1))
             self.fig_height.setValue(round(hi * 2.54, 1))
         elif unit == 'inches':
-            self.fig_width.setRange(1, 200); self.fig_height.setRange(1, 200)
-            self.fig_width.setDecimals(2); self.fig_height.setDecimals(2)
-            self.fig_width.setSingleStep(0.25); self.fig_height.setSingleStep(0.25)
+            self.fig_width.setRange(1, 200)
+            self.fig_height.setRange(1, 200)
+            self.fig_width.setDecimals(2)
+            self.fig_height.setDecimals(2)
+            self.fig_width.setSingleStep(0.25)
+            self.fig_height.setSingleStep(0.25)
             self.fig_width.setValue(round(wi, 2))
             self.fig_height.setValue(round(hi, 2))
         elif unit == 'pixels':
             dpi = self.dpi_spin.value()
-            self.fig_width.setRange(50, 20000); self.fig_height.setRange(50, 20000)
-            self.fig_width.setDecimals(0); self.fig_height.setDecimals(0)
-            self.fig_width.setSingleStep(10); self.fig_height.setSingleStep(10)
+            self.fig_width.setRange(50, 20000)
+            self.fig_height.setRange(50, 20000)
+            self.fig_width.setDecimals(0)
+            self.fig_height.setDecimals(0)
+            self.fig_width.setSingleStep(10)
+            self.fig_height.setSingleStep(10)
             self.fig_width.setValue(round(wi * dpi))
             self.fig_height.setValue(round(hi * dpi))
-        self.fig_width.blockSignals(False); self.fig_height.blockSignals(False)
+        self.fig_width.blockSignals(False)
+        self.fig_height.blockSignals(False)
         self.update_preview()
 
     def _pick_grid_color(self, which):
@@ -2334,7 +2376,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _place_at_override(self):
         try: x,y = float(self.ann_x_override.text()), float(self.ann_y_override.text())
         except ValueError:
-            QMessageBox.warning(self,'Invalid','Enter numeric X and Y.'); return
+            QMessageBox.warning(self,'Invalid','Enter numeric X and Y.')
+            return
         if not self.canvas.axes_list: return
         self._sync_ann_style()
         self.canvas._place_text_annotation(self.canvas.axes_list[0], 0, x, y)
@@ -2354,7 +2397,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self,'Select Image',_get_dir(),
             'Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff);;All (*)')
         if not fp:
-            self.ann_image_btn.setChecked(False); return
+            self.ann_image_btn.setChecked(False)
+            return
         _remember_dir(fp)
         self.canvas._pending_image_path = fp
         self.canvas.ann_image_zoom      = self.ann_image_zoom.value()
@@ -2396,7 +2440,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _edit_selected_annotation(self):
         idx = self._selected_ann_index()
         if idx < 0:
-            QMessageBox.information(self,'Edit','Select an annotation from the list first.'); return
+            QMessageBox.information(self,'Edit','Select an annotation from the list first.')
+            return
         ann = self.canvas.annotations[idx]
         dlg = AnnotationEditDialog(ann, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
@@ -2408,7 +2453,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _delete_selected_annotation(self):
         idx = self._selected_ann_index()
         if idx < 0:
-            QMessageBox.information(self,'Delete','Select an annotation first.'); return
+            QMessageBox.information(self,'Delete','Select an annotation first.')
+            return
         self.canvas.remove_annotation_at(idx)
 
 
@@ -2569,17 +2615,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _save_color_scheme(self):
         """Save the current chart colors as a .pvizc color-scheme file."""
         import zipfile as _zf, json as _json
-        from PyQt6.QtWidgets import QInputDialog
         from ui.helpers import _get_dir, _remember_dir
-
-        name, ok = QInputDialog.getText(
-            self, 'Save Color Scheme', 'Scheme name:', text='My Scheme')
-        if not ok or not name.strip():
-            return
-        name = name.strip()
 
         _stem = (os.path.splitext(os.path.basename(self._current_filepath))[0]
                  if getattr(self, '_current_filepath', None) else 'untitled')
+        name = _stem  # scheme name matches file stem; no separate prompt needed
+
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Save Color Scheme', os.path.join(_get_dir(), _stem + '.pvizc'),
             'plotviz Color Scheme (*.pvizc);;All Files (*)')
@@ -2588,6 +2629,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _remember_dir(fp)
         if not fp.endswith('.pvizc'):
             fp += '.pvizc'
+
+        # Use the actual saved filename stem as the scheme name (user may have
+        # changed it in the file dialog)
+        name = os.path.splitext(os.path.basename(fp))[0]
 
         try:
             scheme = self._scheme_from_current_settings()
@@ -2684,22 +2729,28 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         dlg = QDialog(self)
         dlg.setWindowTitle('Preferences' if sys.platform == 'darwin' else 'Settings')
         dlg.setMinimumWidth(520)
-        lay = QVBoxLayout(dlg); lay.setSpacing(12)
+        lay = QVBoxLayout(dlg)
+        lay.setSpacing(12)
 
         # ── Config paths ─────────────────────────────────────────────────────
         grp_paths = QGroupBox('Configuration files')
-        paths_form = QFormLayout(grp_paths); paths_form.setSpacing(6)
+        paths_form = QFormLayout(grp_paths)
+        paths_form.setSpacing(6)
 
         def _path_row(label, path_str):
-            row = QHBoxLayout(); row.setSpacing(4)
-            le = QLineEdit(path_str); le.setReadOnly(True)
+            row = QHBoxLayout()
+            row.setSpacing(4)
+            le = QLineEdit(path_str)
+            le.setReadOnly(True)
             le.setToolTip(path_str)
-            btn = QPushButton('📂'); btn.setFixedWidth(32)
+            btn = QPushButton('📂')
+            btn.setFixedWidth(32)
             btn.setToolTip('Open containing folder')
             import os as _os
             folder = _os.path.dirname(path_str)
             btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(folder)))
-            row.addWidget(le, 1); row.addWidget(btn)
+            row.addWidget(le, 1)
+            row.addWidget(btn)
             paths_form.addRow(label, row)
 
         _path_row('Settings file:', str(_cfg.CFG_FILE))
@@ -2709,7 +2760,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── Appearance ───────────────────────────────────────────────────────
         grp_appearance = QGroupBox('Appearance')
-        appearance_form = QFormLayout(grp_appearance); appearance_form.setSpacing(6)
+        appearance_form = QFormLayout(grp_appearance)
+        appearance_form.setSpacing(6)
 
         from PyQt6.QtWidgets import QComboBox as _QComboBox
         appearance_combo = _QComboBox()
@@ -2726,14 +2778,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── UI defaults ──────────────────────────────────────────────────────
         grp_ui = QGroupBox('Defaults')
-        ui_form = QFormLayout(grp_ui); ui_form.setSpacing(6)
+        ui_form = QFormLayout(grp_ui)
+        ui_form.setSpacing(6)
 
         chk_toolbar = QCheckBox()
         chk_toolbar.setChecked(_cfg.get('show_toolbar', True))
         chk_toolbar.setToolTip('Show the navigation toolbar below the chart canvas')
         ui_form.addRow('Show navigation toolbar:', chk_toolbar)
 
-        max_recent_spin = QSpinBox(); max_recent_spin.setRange(1, 30)
+        max_recent_spin = QSpinBox()
+        max_recent_spin.setRange(1, 30)
         max_recent_spin.setValue(_cfg.MAX_RECENT)
         max_recent_spin.setFixedWidth(60)
         ui_form.addRow('Max recent files:', max_recent_spin)
@@ -2742,7 +2796,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── Maintenance ──────────────────────────────────────────────────────
         grp_maint = QGroupBox('Maintenance')
-        maint_lay = QVBoxLayout(grp_maint); maint_lay.setSpacing(6)
+        maint_lay = QVBoxLayout(grp_maint)
+        maint_lay.setSpacing(6)
 
         recent_row = QHBoxLayout()
         lbl_recent = QLabel(f'{len(_cfg.get_recent_files())} recent file(s) stored')
@@ -2753,7 +2808,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             if hasattr(self, '_rebuild_recent_files_ui'):
                 self._rebuild_recent_files_ui()
         btn_clear_recent.clicked.connect(_clear_recent)
-        recent_row.addWidget(lbl_recent); recent_row.addStretch(); recent_row.addWidget(btn_clear_recent)
+        recent_row.addWidget(lbl_recent)
+        recent_row.addStretch()
+        recent_row.addWidget(btn_clear_recent)
         maint_lay.addLayout(recent_row)
 
         btn_reset_settings = QPushButton('Reset all settings to defaults…')
@@ -3048,7 +3105,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 for name, arr in dlg.get_selected_data().items():
                     base, cnt = name, 1
                     while name in self.datasets:
-                        name = f'{base}_{cnt}'; cnt += 1
+                        name = f'{base}_{cnt}'
+                        cnt += 1
                     self.datasets[name] = arr
             except Exception as e:
                 QMessageBox.critical(self, 'Error', f'Failed: {fp}\n{e}')
@@ -3072,7 +3130,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def update_lists(self, keep_selections=False):
         """Refresh dataset list, combo_z, combo_err, and series table combos."""
         cols = sorted(self.datasets)
-        zp  = self.combo_z.currentText(); ep = self.combo_err.currentText()
+        zp  = self.combo_z.currentText()
+        ep = self.combo_err.currentText()
         fy2p = getattr(self, 'combo_fill_y2', None)
         fy2p = fy2p.currentText() if fy2p else '(none)'
         qup = getattr(self.quiver_u_combo,  'currentText', lambda: '(none)')()
@@ -3083,18 +3142,24 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         svp = getattr(self.stream_v_combo,  'currentText', lambda: '(none)')()
         bsp = getattr(self.bubble_size_combo, 'currentText', lambda: '(uniform)')()
 
-        self.dataset_list.clear(); self.combo_x.clear()
+        self.dataset_list.clear()
+        self.combo_x.clear()
         self.y_list.clear()
-        self.combo_z.clear(); self.combo_z.addItem('(none)')
-        self.combo_err.clear(); self.combo_err.addItem('(none)')
+        self.combo_z.clear()
+        self.combo_z.addItem('(none)')
+        self.combo_err.clear()
+        self.combo_err.addItem('(none)')
         if hasattr(self, 'combo_fill_y2'):
             self.combo_fill_y2.blockSignals(True)
-            self.combo_fill_y2.clear(); self.combo_fill_y2.addItem('(none)')
+            self.combo_fill_y2.clear()
+            self.combo_fill_y2.addItem('(none)')
 
         for col in cols:
             self.dataset_list.addItem(col)
-            self.combo_x.addItem(col); self.y_list.addItem(col)
-            self.combo_z.addItem(col); self.combo_err.addItem(col)
+            self.combo_x.addItem(col)
+            self.y_list.addItem(col)
+            self.combo_z.addItem(col)
+            self.combo_err.addItem(col)
             if hasattr(self, 'combo_fill_y2'):
                 self.combo_fill_y2.addItem(col)
 
@@ -3118,10 +3183,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             (self.bubble_size_combo, '(uniform)', bsp),
             (self.err_xerr_combo, '(none)', getattr(self.err_xerr_combo, '_prev', '(none)')),
         ]:
-            combo.blockSignals(True); combo.clear()
+            combo.blockSignals(True)
+            combo.clear()
             combo.addItem(sentinel)
             combo.addItems(cols)
-            i = combo.findText(prev); combo.setCurrentIndex(i if i >= 0 else 0)
+            i = combo.findText(prev)
+            combo.setCurrentIndex(i if i >= 0 else 0)
             combo.blockSignals(False)
 
         # Refresh series table combos
@@ -3144,8 +3211,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ]:
             _cb = getattr(self, _fxy_attr, None)
             if _cb is None: continue
-            _cb.blockSignals(True); _cb.clear(); _cb.addItems(cols)
-            _i = _cb.findText(_fxy_prev); _cb.setCurrentIndex(_i if _i >= 0 else 0)
+            _cb.blockSignals(True)
+            _cb.clear()
+            _cb.addItems(cols)
+            _i = _cb.findText(_fxy_prev)
+            _cb.setCurrentIndex(_i if _i >= 0 else 0)
             _cb.blockSignals(False)
 
         # Notify Seaborn Explorer if it is open
@@ -3166,14 +3236,17 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     self.series_table.setCellWidget(row, col_idx, cb)
                 prev = cb.currentText()
                 cb.blockSignals(True)
-                cb.clear(); cb.addItems(cols)
+                cb.clear()
+                cb.addItems(cols)
                 i = cb.findText(prev)
                 cb.setCurrentIndex(i if i >= 0 else 0)
                 cb.blockSignals(False)
             # Keep Plot spinbox range in sync
             spin = self.series_table.cellWidget(row, 4)
             if spin:
-                spin.blockSignals(True); spin.setRange(1, n); spin.blockSignals(False)
+                spin.blockSignals(True)
+                spin.setRange(1, n)
+                spin.blockSignals(False)
         self.series_table.blockSignals(False)
 
     def _on_series_item_changed(self, item):
@@ -3289,18 +3362,21 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         for c in cols:
             if c == row0_y: continue
             if row0_y_is_cat is not None and self._is_categorical(self.datasets[c]) == row0_y_is_cat:
-                default_y_col = c; break
+                default_y_col = c
+                break
         # Pass 2: any column different from row0-Y
         if not default_y_col:
             for c in cols:
                 if c != row0_y:
-                    default_y_col = c; break
+                    default_y_col = c
+                    break
         if not default_y_col:
             default_y_col = row0_y or (cols[0] if cols else '')
 
         # ── Build all widgets with their signals BLOCKED, then setCellWidget ───
         # X combo
-        cb_x = QComboBox(); cb_x.blockSignals(True)
+        cb_x = QComboBox()
+        cb_x.blockSignals(True)
         cb_x.addItems(cols)
         idx_x = cb_x.findText(default_x_col)
         if idx_x >= 0: cb_x.setCurrentIndex(idx_x)
@@ -3310,7 +3386,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.series_table.setCellWidget(row, 0, cb_x)
 
         # Y combo
-        cb_y = QComboBox(); cb_y.blockSignals(True)
+        cb_y = QComboBox()
+        cb_y.blockSignals(True)
         cb_y.addItems(cols)
         idx_y = cb_y.findText(default_y_col)
         if idx_y >= 0: cb_y.setCurrentIndex(idx_y)
@@ -3329,7 +3406,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard',
             PER_SERIES_TYPES
         ))
-        type_cb = QComboBox(); type_cb.addItems(allowed_types)
+        type_cb = QComboBox()
+        type_cb.addItems(allowed_types)
         if hasattr(self, 'chart_type_combo'):
             current_type = self.chart_type_combo.currentText()
             i = type_cb.findText(current_type)
@@ -3393,7 +3471,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     break
 
         if changed_row < 0:
-            self.update_preview(); return
+            self.update_preview()
+            return
 
         changed_spin = self.series_table.cellWidget(changed_row, 4)
         changed_subplot = (changed_spin.value() - 1) if (changed_spin and n_subplots > 1) else 0
@@ -3411,12 +3490,14 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             row_types.append((row, self._is_categorical(self.datasets[col])))
 
         if len(row_types) < 2:
-            self.update_preview(); return
+            self.update_preview()
+            return
 
         has_cat = any(t for _, t in row_types)
         has_num = any(not t for _, t in row_types)
         if not (has_cat and has_num):
-            self.update_preview(); return
+            self.update_preview()
+            return
 
         # changed_type = the NEW type of the row that just changed
         changed_type = next((t for r, t in row_types if r == changed_row), row_types[-1][1])
@@ -3514,7 +3595,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 y2_item = self.series_table.item(row, 5)
                 if y2_item and y2_item.checkState() == Qt.CheckState.Checked:
                     continue
-            xc = xcb.currentText(); yc = ycb.currentText()
+            xc = xcb.currentText()
+            yc = ycb.currentText()
             if xc not in self.datasets or yc not in self.datasets: continue
             label = lbl_item.text() if lbl_item and lbl_item.text() else yc
             result.append((self.datasets[xc], self.datasets[yc], label, self._get_series_type(row)))
@@ -3528,7 +3610,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             ycb = self.series_table.cellWidget(row, 1)
             lbl_item = self.series_table.item(row, 2)
             if xcb is None or ycb is None: continue
-            xc = xcb.currentText(); yc = ycb.currentText()
+            xc = xcb.currentText()
+            yc = ycb.currentText()
             if xc not in self.datasets or yc not in self.datasets: continue
             label = lbl_item.text() if lbl_item and lbl_item.text() else yc
             result.append((self.datasets[xc], self.datasets[yc], label, xc, yc))
@@ -3654,7 +3737,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # Plot assignment filter (1-based; all go to 0 when n==1)
             row_plot = (plot_spin.value() - 1) if (plot_spin and n > 1) else 0
             if row_plot != subplot_idx: continue
-            xc = xcb.currentText(); yc = ycb.currentText()
+            xc = xcb.currentText()
+            yc = ycb.currentText()
             if xc not in self.datasets or yc not in self.datasets: continue
             label = lbl_item.text() if lbl_item and lbl_item.text() else yc
             # Per-series chart type — use subplot's chart type if it's a whole-chart type
@@ -3683,7 +3767,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 continue
             row_plot = (plot_spin.value() - 1) if (plot_spin and n > 1) else 0
             if row_plot == subplot_idx:
-                xc = xcb.currentText(); yc = ycb.currentText()
+                xc = xcb.currentText()
+                yc = ycb.currentText()
                 if xc in self.datasets and yc in self.datasets:
                     return row
         return 0
@@ -3701,7 +3786,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             if xcb is None or ycb is None: continue
             row_plot = (plot_spin.value() - 1) if (plot_spin and n > 1) else 0
             if row_plot != subplot_idx: continue
-            xc = xcb.currentText(); yc = ycb.currentText()
+            xc = xcb.currentText()
+            yc = ycb.currentText()
             if xc not in self.datasets or yc not in self.datasets: continue
             is_y2 = bool(y2_item and y2_item.checkState() == Qt.CheckState.Checked)
             if xc not in x_cols: x_cols.append(xc)
@@ -3818,7 +3904,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             (self.ann_sp_active,          '_ann_sp_row_widget'),
             (self.series_curve_sp_active, '_series_curve_sp_row_widget'),
         ]:
-            combo.blockSignals(True); combo.clear()
+            combo.blockSignals(True)
+            combo.clear()
             for i in range(n): combo.addItem(f'Subplot {i+1}')
             combo.setCurrentIndex(0)          # set index while signals still blocked
             combo.blockSignals(False)
@@ -4156,7 +4243,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     f'background-color:{col.name()};border:1px solid #888;border-radius:2px;')
             self._on_sp_legend_changed()
 
-    def _on_sp_title_changed(self):       self._save_axes_state(); self.update_preview()
+    def _on_sp_title_changed(self):
+        self._save_axes_state()
+        self.update_preview()
     def _on_sp_title_show_changed(self):  self._save_axes_state()
     def _on_sp_xlabel_changed(self):      self._save_axes_state()
     def _on_sp_xlabel_show_changed(self): self._save_axes_state()
@@ -4186,8 +4275,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             try:
                 ax = self.canvas.figure.axes[0]
                 lo, hi = ax.get_xlim()
-                self.x_min.blockSignals(True); self.x_min.setValue(lo); self.x_min.blockSignals(False)
-                self.x_max.blockSignals(True); self.x_max.setValue(hi); self.x_max.blockSignals(False)
+                self.x_min.blockSignals(True)
+                self.x_min.setValue(lo)
+                self.x_min.blockSignals(False)
+                self.x_max.blockSignals(True)
+                self.x_max.setValue(hi)
+                self.x_max.blockSignals(False)
             except Exception:
                 pass
         self.x_min.setEnabled(x_manual)
@@ -4199,8 +4292,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             try:
                 ax = self.canvas.figure.axes[0]
                 lo, hi = ax.get_ylim()
-                self.y_min.blockSignals(True); self.y_min.setValue(lo); self.y_min.blockSignals(False)
-                self.y_max.blockSignals(True); self.y_max.setValue(hi); self.y_max.blockSignals(False)
+                self.y_min.blockSignals(True)
+                self.y_min.setValue(lo)
+                self.y_min.blockSignals(False)
+                self.y_max.blockSignals(True)
+                self.y_max.setValue(hi)
+                self.y_max.blockSignals(False)
             except Exception:
                 pass
         self.y_min.setEnabled(y_manual)
@@ -4213,8 +4310,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 axes = self.canvas.figure.axes
                 ax2 = axes[1] if len(axes) > 1 else axes[0]
                 lo, hi = ax2.get_ylim()
-                self.y2_min.blockSignals(True); self.y2_min.setValue(lo); self.y2_min.blockSignals(False)
-                self.y2_max.blockSignals(True); self.y2_max.setValue(hi); self.y2_max.blockSignals(False)
+                self.y2_min.blockSignals(True)
+                self.y2_min.setValue(lo)
+                self.y2_min.blockSignals(False)
+                self.y2_max.blockSignals(True)
+                self.y2_max.setValue(hi)
+                self.y2_max.blockSignals(False)
             except Exception:
                 pass
         self.y2_min.setEnabled(y2_manual)
@@ -4355,7 +4456,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         dlg = QDialog(self)
         dlg.setWindowTitle('Subplot Layout')
-        dlg.setMinimumWidth(620); dlg.setMinimumHeight(520)
+        dlg.setMinimumWidth(620)
+        dlg.setMinimumHeight(520)
         dlg_lay = QVBoxLayout(dlg)
 
         inner_tabs = QTabWidget()
@@ -4364,18 +4466,23 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ══════════════════════════════════════════════════════════════════════
         # TAB 1 — Presets gallery
         # ══════════════════════════════════════════════════════════════════════
-        presets_w = QWidget(); presets_lay = QVBoxLayout(presets_w)
+        presets_w = QWidget()
+        presets_lay = QVBoxLayout(presets_w)
 
         def _make_preview(rows, cols, mosaic, size=(88,60)):
-            w = QWidget(); w.setFixedSize(*size)
-            g = QGridLayout(w); g.setSpacing(2); g.setContentsMargins(3,3,3,3)
+            w = QWidget()
+            w.setFixedSize(*size)
+            g = QGridLayout(w)
+            g.setSpacing(2)
+            g.setContentsMargins(3,3,3,3)
             style = 'background:#cce;border:1px solid #77a;font-size:8px;border-radius:2px;'
             if mosaic is None:
                 for r in range(rows):
                     for c in range(cols):
                         lbl = QLabel(str(r*cols+c+1))
                         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                        lbl.setStyleSheet(style); g.addWidget(lbl, r, c)
+                        lbl.setStyleSheet(style)
+                        g.addWidget(lbl, r, c)
             else:
                 seen = {}
                 for ri, row in enumerate(mosaic):
@@ -4395,7 +4502,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         card_group = []   # list of (preview_btn, label_btn) pairs
 
         per_row = 5
-        grid_w = QWidget(); grid = QGridLayout(grid_w); grid.setSpacing(10)
+        grid_w = QWidget()
+        grid = QGridLayout(grid_w)
+        grid.setSpacing(10)
 
         SELECTED_BORDER = '2px solid #3378ff'
         NORMAL_BORDER   = '1px solid #aaa'
@@ -4418,7 +4527,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         for i, (name, rows, cols, mosaic) in enumerate(LAYOUTS):
             cell = QWidget()
-            cly = QVBoxLayout(cell); cly.setSpacing(2); cly.setContentsMargins(0,0,0,0)
+            cly = QVBoxLayout(cell)
+            cly.setSpacing(2)
+            cly.setContentsMargins(0,0,0,0)
             cly.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
             # Clickable preview container
@@ -4426,7 +4537,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             prev_btn = QPushButton()
             prev_btn.setFixedSize(96, 68)
             prev_btn.setFlat(True)
-            inner = QVBoxLayout(prev_btn); inner.setContentsMargins(4,4,4,4)
+            inner = QVBoxLayout(prev_btn)
+            inner.setContentsMargins(4,4,4,4)
             inner.addWidget(prev_widget)
             prev_btn.clicked.connect(lambda _, idx=i: _select_preset(idx))
 
@@ -4441,7 +4553,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             grid.addWidget(cell, i // per_row, i % per_row)
 
         _select_preset(0)
-        scroll_presets = QScrollArea(); scroll_presets.setWidgetResizable(True)
+        scroll_presets = QScrollArea()
+        scroll_presets.setWidgetResizable(True)
         scroll_presets.setWidget(grid_w)
         presets_lay.addWidget(scroll_presets)
         inner_tabs.addTab(presets_w, '🗂 Presets')
@@ -4449,19 +4562,29 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ══════════════════════════════════════════════════════════════════════
         # TAB 2 — Custom mosaic editor
         # ══════════════════════════════════════════════════════════════════════
-        custom_w = QWidget(); custom_lay = QVBoxLayout(custom_w)
+        custom_w = QWidget()
+        custom_lay = QVBoxLayout(custom_w)
 
         # Grid size controls
-        size_row = QHBoxLayout(); size_row.setSpacing(8)
+        size_row = QHBoxLayout()
+        size_row.setSpacing(8)
         size_row.addWidget(QLabel('Rows:'))
-        custom_rows = QSpinBox(); custom_rows.setRange(1, 8); custom_rows.setValue(2); custom_rows.setFixedWidth(52)
+        custom_rows = QSpinBox()
+        custom_rows.setRange(1, 8)
+        custom_rows.setValue(2)
+        custom_rows.setFixedWidth(52)
         size_row.addWidget(custom_rows)
         size_row.addWidget(QLabel('Cols:'))
-        custom_cols = QSpinBox(); custom_cols.setRange(1, 8); custom_cols.setValue(2); custom_cols.setFixedWidth(52)
+        custom_cols = QSpinBox()
+        custom_cols.setRange(1, 8)
+        custom_cols.setValue(2)
+        custom_cols.setFixedWidth(52)
         size_row.addWidget(custom_cols)
-        btn_rebuild = QPushButton('↺ Rebuild grid'); btn_rebuild.setFixedWidth(110)
+        btn_rebuild = QPushButton('↺ Rebuild grid')
+        btn_rebuild.setFixedWidth(110)
         size_row.addWidget(btn_rebuild)
-        size_row.addStretch(); custom_lay.addLayout(size_row)
+        size_row.addStretch()
+        custom_lay.addLayout(size_row)
 
         custom_lay.addWidget(QLabel(
             'Click cells to assign them to a subplot panel (drag to paint). '
@@ -4479,7 +4602,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ALL_LETTERS = [chr(ord('A')+i) for i in range(26)]
 
         # Panel palette selector
-        palette_row = QHBoxLayout(); palette_row.setSpacing(4)
+        palette_row = QHBoxLayout()
+        palette_row.setSpacing(4)
         palette_row.addWidget(QLabel('Active panel:'))
         palette_btns = {}
 
@@ -4488,7 +4612,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             return CELL_COLOURS[idx % len(CELL_COLOURS)]
 
         for letter in ALL_LETTERS[:8]:
-            pb = QPushButton(letter); pb.setFixedSize(30, 28); pb.setCheckable(True)
+            pb = QPushButton(letter)
+            pb.setFixedSize(30, 28)
+            pb.setCheckable(True)
             pb.setStyleSheet(f'background:{_letter_colour(letter)};border-radius:4px;font-weight:bold;')
             palette_btns[letter] = pb
             def _sel_letter(checked, l=letter):
@@ -4498,13 +4624,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             pb.clicked.connect(_sel_letter)
             palette_row.addWidget(pb)
         palette_btns['A'].setChecked(True)
-        palette_row.addStretch(); custom_lay.addLayout(palette_row)
+        palette_row.addStretch()
+        custom_lay.addLayout(palette_row)
 
         # The cell grid container
         grid_frame = QFrame()
         grid_frame.setFrameShape(QFrame.Shape.StyledPanel)
         grid_frame_lay = QGridLayout(grid_frame)
-        grid_frame_lay.setSpacing(3); grid_frame_lay.setContentsMargins(6,6,6,6)
+        grid_frame_lay.setSpacing(3)
+        grid_frame_lay.setContentsMargins(6,6,6,6)
         custom_lay.addWidget(grid_frame)
 
         cell_btns = {}   # (r,c) → QPushButton
@@ -4513,15 +4641,18 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         preview_container = QWidget()
         preview_container.setFixedSize(180, 120)
         preview_grid_lay = QGridLayout(preview_container)
-        preview_grid_lay.setSpacing(3); preview_grid_lay.setContentsMargins(4,4,4,4)
+        preview_grid_lay.setSpacing(3)
+        preview_grid_lay.setContentsMargins(4,4,4,4)
         preview_cells = {}  # (r,c) → QLabel
 
         def _update_preview_widget():
             """Rebuild the small preview to mirror current grid state."""
             for lbl in preview_cells.values():
-                preview_grid_lay.removeWidget(lbl); lbl.deleteLater()
+                preview_grid_lay.removeWidget(lbl)
+                lbl.deleteLater()
             preview_cells.clear()
-            rows = custom_state['rows']; cols = custom_state['cols']
+            rows = custom_state['rows']
+            cols = custom_state['cols']
             grid = custom_state['grid']
             # Compute spans by finding each letter's bounding box
             spans = {}
@@ -4547,9 +4678,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         def _refresh_grid_ui():
             # Clear existing paint buttons
             for btn in cell_btns.values():
-                grid_frame_lay.removeWidget(btn); btn.deleteLater()
+                grid_frame_lay.removeWidget(btn)
+                btn.deleteLater()
             cell_btns.clear()
-            rows = custom_state['rows']; cols = custom_state['cols']
+            rows = custom_state['rows']
+            cols = custom_state['cols']
             grid = custom_state['grid']
             for r in range(rows):
                 for c in range(cols):
@@ -4568,7 +4701,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             _update_preview_widget()
 
         def _rebuild_grid():
-            rows = custom_rows.value(); cols = custom_cols.value()
+            rows = custom_rows.value()
+            cols = custom_cols.value()
             old = custom_state['grid']
             new_grid = []
             for r in range(rows):
@@ -4580,11 +4714,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                         used = {cell for row in new_grid for cell in row}
                         for l in ALL_LETTERS:
                             if l not in used:
-                                row_data.append(l); break
+                                row_data.append(l)
+                                break
                         else:
                             row_data.append('A')
                 new_grid.append(row_data)
-            custom_state['rows'] = rows; custom_state['cols'] = cols
+            custom_state['rows'] = rows
+            custom_state['cols'] = cols
             custom_state['grid'] = new_grid
             _refresh_grid_ui()
 
@@ -4603,9 +4739,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── Shared options ────────────────────────────────────────────────────
         share_row = QHBoxLayout()
-        share_x = QCheckBox('Share X axis'); share_x.setChecked(self.sp_sharex.isChecked())
-        share_y = QCheckBox('Share Y axis'); share_y.setChecked(self.sp_sharey.isChecked())
-        share_row.addWidget(share_x); share_row.addWidget(share_y); share_row.addStretch()
+        share_x = QCheckBox('Share X axis')
+        share_x.setChecked(self.sp_sharex.isChecked())
+        share_y = QCheckBox('Share Y axis')
+        share_y.setChecked(self.sp_sharey.isChecked())
+        share_row.addWidget(share_x)
+        share_row.addWidget(share_y)
+        share_row.addStretch()
         dlg_lay.addLayout(share_row)
 
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
@@ -4626,7 +4766,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             _, rows, cols, mosaic = LAYOUTS[selected_preset[0]]
         else:
             # Custom mosaic
-            rows = custom_state['rows']; cols = custom_state['cols']
+            rows = custom_state['rows']
+            cols = custom_state['cols']
             raw_grid = custom_state['grid']
             # Validate: every cell must have same letter = forms a contiguous block
             # (matplotlib mosaic just needs the list-of-lists, contiguity checked at render)
@@ -4636,10 +4777,14 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # Block signals on both spinboxes so we control exactly when
         # on_subplot_layout_changed fires (once, with both values correct).
-        self.sp_rows.blockSignals(True); self.sp_cols.blockSignals(True)
-        self.sp_rows.setValue(rows); self.sp_cols.setValue(cols)
-        self.sp_rows.blockSignals(False); self.sp_cols.blockSignals(False)
-        self.subplot_rows = rows; self.subplot_cols = cols
+        self.sp_rows.blockSignals(True)
+        self.sp_cols.blockSignals(True)
+        self.sp_rows.setValue(rows)
+        self.sp_cols.setValue(cols)
+        self.sp_rows.blockSignals(False)
+        self.sp_cols.blockSignals(False)
+        self.subplot_rows = rows
+        self.subplot_cols = cols
 
         if mosaic is None:
             self.on_subplot_layout_changed()
@@ -4660,7 +4805,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # PRESET / FIT
     # ═══════════════════════════════════════════════════════════════════════════
     def apply_preset(self, name):
-        ChartPresets.apply(name); self.update_preview()
+        ChartPresets.apply(name)
+        self.update_preview()
 
     def _rename_table_col(self, col_idx):
         from PyQt6.QtWidgets import QInputDialog
@@ -4680,9 +4826,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             yname = self.gen_y_name.text().strip() or 'y'
             spacing = self.gen_x_spacing.currentText() if hasattr(self, 'gen_x_spacing') else 'linspace'
             if spacing != 'logspace' and x_min >= x_max:
-                self.gen_status.setText('❌  x_min must be less than x_max'); return
+                self.gen_status.setText('❌  x_min must be less than x_max')
+                return
             if spacing == 'logspace' and x_min >= x_max:
-                self.gen_status.setText('❌  exponent start must be less than stop'); return
+                self.gen_status.setText('❌  exponent start must be less than stop')
+                return
 
             if spacing == 'linspace':
                 xarr = np.linspace(x_min, x_max, n)
@@ -4690,7 +4838,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 xarr = np.logspace(x_min, x_max, n)
             elif spacing == 'geomspace':
                 if x_min <= 0 or x_max <= 0:
-                    self.gen_status.setText('❌  geomspace requires start and stop > 0'); return
+                    self.gen_status.setText('❌  geomspace requires start and stop > 0')
+                    return
                 xarr = np.geomspace(x_min, x_max, n)
             elif spacing == 'random':
                 mid   = (x_min + x_max) / 2
@@ -4712,7 +4861,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             stored_x, stored_y = xname, yname
             for attr, nm, arr in (('stored_x', xname, xarr), ('stored_y', yname, yarr)):
                 base, cnt = nm, 1
-                while base in self.datasets: base = f'{nm}_{cnt}'; cnt += 1
+                while base in self.datasets:
+                    base = f'{nm}_{cnt}'
+                    cnt += 1
                 self.datasets[base] = arr
                 if attr == 'stored_x': stored_x = base
                 else: stored_y = base
@@ -4721,7 +4872,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # Show editable popup before inserting series
             popup = self._show_new_series_info(stored_y, n, source='f(x)', x_col=stored_x, y_col=stored_y)
             if popup is None:
-                self.gen_status.setText(f'✓  Datasets created — series not added'); return
+                self.gen_status.setText(f'✓  Datasets created — series not added')
+                return
             series_label, subplot_num, chart_type = popup
 
             self.series_table.blockSignals(True)
@@ -4729,7 +4881,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.series_table.insertRow(row)
             cols_sorted = sorted(self.datasets)
             for col_idx, col_name in ((0, stored_x), (1, stored_y)):
-                cb = QComboBox(); cb.addItems(cols_sorted)
+                cb = QComboBox()
+                cb.addItems(cols_sorted)
                 idx2 = cb.findText(col_name)
                 if idx2 >= 0: cb.setCurrentIndex(idx2)
                 handler = self._on_x_col_changed if col_idx == 0 else self.update_preview
@@ -4738,13 +4891,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.series_table.setItem(row, 2, QTableWidgetItem(series_label))
             _mode = self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard'
             _allowed = list(PLOT_MODE_GROUPS.get(_mode, PER_SERIES_TYPES))
-            type_cb = QComboBox(); type_cb.addItems(_allowed)
+            type_cb = QComboBox()
+            type_cb.addItems(_allowed)
             i_type = type_cb.findText(chart_type) if chart_type in _allowed else 0
             type_cb.setCurrentIndex(max(i_type, 0))
             type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
             self.series_table.setCellWidget(row, 3, type_cb)
-            plot_spin = QSpinBox(); plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
-            plot_spin.setValue(subplot_num); plot_spin.valueChanged.connect(self.update_preview)
+            plot_spin = QSpinBox()
+            plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
+            plot_spin.setValue(subplot_num)
+            plot_spin.valueChanged.connect(self.update_preview)
             self.series_table.setCellWidget(row, 4, plot_spin)
             y2_item = QTableWidgetItem()
             y2_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
@@ -4764,7 +4920,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             expr   = self.fxy_expr.text().strip()           if hasattr(self, 'fxy_expr')   else ''
             z_name = self.fxy_z_name.text().strip() or 'z' if hasattr(self, 'fxy_z_name') else 'z'
             if not expr:
-                self.fxy_status.setText('❌  Expression is empty'); return
+                self.fxy_status.setText('❌  Expression is empty')
+                return
             meshgrid = getattr(self, 'fxy_meshgrid', None) and self.fxy_meshgrid.isChecked()
 
             def _make_spacing(arr_min, arr_max, n, spacing):
@@ -4780,7 +4937,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                         raise ValueError('geomspace: start and stop must be > 0')
                     return np.geomspace(arr_min, arr_max, n)
                 elif spacing == 'random':
-                    mid = (arr_min + arr_max) / 2; sigma = (arr_max - arr_min) / 6
+                    mid = (arr_min + arr_max) / 2
+                    sigma = (arr_max - arr_min) / 6
                     return np.sort(np.random.normal(mid, sigma, n))
                 elif spacing == 'uniform':
                     return np.sort(np.random.uniform(arr_min, arr_max, n))
@@ -4789,9 +4947,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # ── Resolve x array ────────────────────────────────────────────────
             x_use_range = getattr(self, 'fxy_x_mode_range', None) and self.fxy_x_mode_range.isChecked()
             if x_use_range:
-                x_min = self.fxy_x_min.value(); x_max = self.fxy_x_max.value()
+                x_min = self.fxy_x_min.value()
+                x_max = self.fxy_x_max.value()
                 if x_min >= x_max and getattr(self, 'fxy_x_spacing', None) and self.fxy_x_spacing.currentText() not in ('logspace',):
-                    self.fxy_status.setText('❌  x: min must be < max'); return
+                    self.fxy_status.setText('❌  x: min must be < max')
+                    return
                 x_arr = _make_spacing(x_min, x_max, self.fxy_x_n.value(),
                                       self.fxy_x_spacing.currentText() if hasattr(self, 'fxy_x_spacing') else 'linspace')
                 x_var = self.fxy_x_col_name.text().strip() or 'x' if hasattr(self, 'fxy_x_col_name') else 'x'
@@ -4799,7 +4959,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             else:
                 x_col = self.fxy_x_combo.currentText() if hasattr(self, 'fxy_x_combo') else ''
                 if x_col not in self.datasets:
-                    self.fxy_status.setText('❌  x column not found'); return
+                    self.fxy_status.setText('❌  x column not found')
+                    return
                 x_arr = self.datasets[x_col].astype(float)
                 x_var = self.fxy_x_var.text().strip() or 'x' if hasattr(self, 'fxy_x_var') else 'x'
                 x_col_out = x_col
@@ -4807,9 +4968,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # ── Resolve y array ────────────────────────────────────────────────
             y_use_range = getattr(self, 'fxy_y_mode_range', None) and self.fxy_y_mode_range.isChecked()
             if y_use_range:
-                y_min = self.fxy_y_min.value(); y_max = self.fxy_y_max.value()
+                y_min = self.fxy_y_min.value()
+                y_max = self.fxy_y_max.value()
                 if y_min >= y_max and getattr(self, 'fxy_y_spacing', None) and self.fxy_y_spacing.currentText() not in ('logspace',):
-                    self.fxy_status.setText('❌  y: min must be < max'); return
+                    self.fxy_status.setText('❌  y: min must be < max')
+                    return
                 y_arr = _make_spacing(y_min, y_max, self.fxy_y_n.value(),
                                       self.fxy_y_spacing.currentText() if hasattr(self, 'fxy_y_spacing') else 'linspace')
                 y_var = self.fxy_y_col_name.text().strip() or 'y' if hasattr(self, 'fxy_y_col_name') else 'y'
@@ -4817,7 +4980,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             else:
                 y_col = self.fxy_y_combo.currentText() if hasattr(self, 'fxy_y_combo') else ''
                 if y_col not in self.datasets:
-                    self.fxy_status.setText('❌  y column not found'); return
+                    self.fxy_status.setText('❌  y column not found')
+                    return
                 y_arr = self.datasets[y_col].astype(float)
                 y_var = self.fxy_y_var.text().strip() or 'y' if hasattr(self, 'fxy_y_var') else 'y'
                 y_col_out = y_col
@@ -4825,11 +4989,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # ── Meshgrid expansion ─────────────────────────────────────────────
             if meshgrid:
                 X, Y = np.meshgrid(x_arr, y_arr)
-                x_eval = X.ravel(); y_eval = Y.ravel()
+                x_eval = X.ravel()
+                y_eval = Y.ravel()
                 n = len(x_eval)
             else:
                 n = min(len(x_arr), len(y_arr))
-                x_eval = x_arr[:n]; y_eval = y_arr[:n]
+                x_eval = x_arr[:n]
+                y_eval = y_arr[:n]
 
             # ── Evaluate expression ────────────────────────────────────────────
             ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
@@ -4845,8 +5011,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # ── Store datasets ─────────────────────────────────────────────────
             def _store(name, arr):
                 base, cnt, nm = name, 1, name
-                while nm in self.datasets: nm = f'{base}_{cnt}'; cnt += 1
-                self.datasets[nm] = arr; return nm
+                while nm in self.datasets:
+                    nm = f'{base}_{cnt}'
+                    cnt += 1
+                self.datasets[nm] = arr
+                return nm
 
             stored_x = _store(x_col_out, x_eval) if x_use_range or meshgrid else x_col_out
             if x_use_range: self.datasets[stored_x] = x_eval
@@ -4868,9 +5037,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             u_name = self.fuv_u_name.text().strip() or 'u' if hasattr(self, 'fuv_u_name') else 'u'
             v_name = self.fuv_v_name.text().strip() or 'v' if hasattr(self, 'fuv_v_name') else 'v'
             if not u_expr:
-                self.fuv_status.setText('❌  u expression is empty'); return
+                self.fuv_status.setText('❌  u expression is empty')
+                return
             if not v_expr:
-                self.fuv_status.setText('❌  v expression is empty'); return
+                self.fuv_status.setText('❌  v expression is empty')
+                return
             meshgrid = getattr(self, 'fuv_meshgrid', None) and self.fuv_meshgrid.isChecked()
 
             def _make_spacing(arr_min, arr_max, n, spacing):
@@ -4885,7 +5056,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                         raise ValueError('geomspace: start and stop must be > 0')
                     return np.geomspace(arr_min, arr_max, n)
                 elif spacing == 'random':
-                    mid = (arr_min + arr_max) / 2; sigma = (arr_max - arr_min) / 6
+                    mid = (arr_min + arr_max) / 2
+                    sigma = (arr_max - arr_min) / 6
                     return np.sort(np.random.normal(mid, sigma, n))
                 elif spacing == 'uniform':
                     return np.sort(np.random.uniform(arr_min, arr_max, n))
@@ -4894,16 +5066,19 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # ── Resolve x array ────────────────────────────────────────────────
             x_use_range = getattr(self, 'fuv_x_mode_range', None) and self.fuv_x_mode_range.isChecked()
             if x_use_range:
-                x_min = self.fuv_x_min.value(); x_max = self.fuv_x_max.value()
+                x_min = self.fuv_x_min.value()
+                x_max = self.fuv_x_max.value()
                 if x_min >= x_max and self.fuv_x_spacing.currentText() not in ('logspace',):
-                    self.fuv_status.setText('❌  x: min must be < max'); return
+                    self.fuv_status.setText('❌  x: min must be < max')
+                    return
                 x_arr = _make_spacing(x_min, x_max, self.fuv_x_n.value(), self.fuv_x_spacing.currentText())
                 x_var = self.fuv_x_col_name.text().strip() or 'x'
                 x_col_out = x_var
             else:
                 x_col = self.fuv_x_combo.currentText() if hasattr(self, 'fuv_x_combo') else ''
                 if x_col not in self.datasets:
-                    self.fuv_status.setText('❌  x column not found'); return
+                    self.fuv_status.setText('❌  x column not found')
+                    return
                 x_arr = self.datasets[x_col].astype(float)
                 x_var = self.fuv_x_var.text().strip() or 'x' if hasattr(self, 'fuv_x_var') else 'x'
                 x_col_out = x_col
@@ -4911,16 +5086,19 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # ── Resolve y array ────────────────────────────────────────────────
             y_use_range = getattr(self, 'fuv_y_mode_range', None) and self.fuv_y_mode_range.isChecked()
             if y_use_range:
-                y_min = self.fuv_y_min.value(); y_max = self.fuv_y_max.value()
+                y_min = self.fuv_y_min.value()
+                y_max = self.fuv_y_max.value()
                 if y_min >= y_max and self.fuv_y_spacing.currentText() not in ('logspace',):
-                    self.fuv_status.setText('❌  y: min must be < max'); return
+                    self.fuv_status.setText('❌  y: min must be < max')
+                    return
                 y_arr = _make_spacing(y_min, y_max, self.fuv_y_n.value(), self.fuv_y_spacing.currentText())
                 y_var = self.fuv_y_col_name.text().strip() or 'y'
                 y_col_out = y_var
             else:
                 y_col = self.fuv_y_combo.currentText() if hasattr(self, 'fuv_y_combo') else ''
                 if y_col not in self.datasets:
-                    self.fuv_status.setText('❌  y column not found'); return
+                    self.fuv_status.setText('❌  y column not found')
+                    return
                 y_arr = self.datasets[y_col].astype(float)
                 y_var = self.fuv_y_var.text().strip() or 'y' if hasattr(self, 'fuv_y_var') else 'y'
                 y_col_out = y_col
@@ -4928,11 +5106,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # ── Meshgrid expansion ─────────────────────────────────────────────
             if meshgrid:
                 X, Y = np.meshgrid(x_arr, y_arr)
-                x_eval = X.ravel(); y_eval = Y.ravel()
+                x_eval = X.ravel()
+                y_eval = Y.ravel()
                 n = len(x_eval)
             else:
                 n = min(len(x_arr), len(y_arr))
-                x_eval = x_arr[:n]; y_eval = y_arr[:n]
+                x_eval = x_arr[:n]
+                y_eval = y_arr[:n]
 
             # ── Evaluate expressions ───────────────────────────────────────────
             ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
@@ -4949,8 +5129,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # ── Store datasets ─────────────────────────────────────────────────
             def _store(name, arr):
                 base, cnt, nm = name, 1, name
-                while nm in self.datasets: nm = f'{base}_{cnt}'; cnt += 1
-                self.datasets[nm] = arr; return nm
+                while nm in self.datasets:
+                    nm = f'{base}_{cnt}'
+                    cnt += 1
+                self.datasets[nm] = arr
+                return nm
 
             stored_x = _store(x_col_out, x_eval) if x_use_range or meshgrid else x_col_out
             if x_use_range: self.datasets[stored_x] = x_eval
@@ -4974,7 +5157,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             expr    = self.fn_expr.text().strip()
             out_nm  = self.fn_out_name.text().strip() or 'result'
             if src_col not in self.datasets:
-                self.fn_status.setText('❌  No source column selected'); return
+                self.fn_status.setText('❌  No source column selected')
+                return
             src_arr = self.datasets[src_col]
             ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
             ns.update({var: src_arr, 'pi': np.pi, 'e': np.e,
@@ -4986,7 +5170,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             if result.shape == (): result = np.full(len(src_arr), float(result))
             base, cnt = out_nm, 1
             stored_nm = base
-            while stored_nm in self.datasets: stored_nm = f'{base}_{cnt}'; cnt += 1
+            while stored_nm in self.datasets:
+                stored_nm = f'{base}_{cnt}'
+                cnt += 1
             self.datasets[stored_nm] = result
             self.update_lists()
 
@@ -4994,7 +5180,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             n2 = len(result)
             popup = self._show_new_series_info(stored_nm, n2, source='f(col)', x_col=src_col, y_col=stored_nm)
             if popup is None:
-                self.fn_status.setText(f'✓  Column "{stored_nm}" created — series not added'); return
+                self.fn_status.setText(f'✓  Column "{stored_nm}" created — series not added')
+                return
             series_label, subplot_num, chart_type = popup
 
             self._add_series_row()
@@ -5041,7 +5228,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         info.setStyleSheet('font-size:12px; padding:3px 0;')
         vlay.addWidget(info)
 
-        form = QFormLayout(); form.setSpacing(7)
+        form = QFormLayout()
+        form.setSpacing(7)
         form.addRow('X column:', QLabel(f'<tt>{x_col}</tt>'))
         form.addRow('Y column:', QLabel(f'<tt>{y_col}</tt>'))
 
@@ -5207,16 +5395,20 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         """Paste clipboard CSV/TSV text into the table, expanding it as needed."""
         text = QApplication.clipboard().text().strip()
         if not text:
-            self.table_status.setText('❌  Clipboard is empty'); return
+            self.table_status.setText('❌  Clipboard is empty')
+            return
         # Detect delimiter
         delim = '\t' if '\t' in text.split('\n')[0] else ','
         reader = list(csv.reader(io.StringIO(text), delimiter=delim))
         if not reader:
-            self.table_status.setText('❌  No data found'); return
+            self.table_status.setText('❌  No data found')
+            return
         # Check if first row looks like a header
         first = reader[0]
         def _is_num(v):
-            try: float(v); return True
+            try:
+                float(v)
+                return True
             except ValueError: return False
         has_header = any(v.strip() and not _is_num(v) for v in first)
         data_rows = reader[1:] if has_header else reader
@@ -5269,7 +5461,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 except ValueError:
                     arr = np.array(raw, dtype=object)
                 base, cnt = col_name, 1
-                while base in self.datasets: base = f'{col_name}_{cnt}'; cnt += 1
+                while base in self.datasets:
+                    base = f'{col_name}_{cnt}'
+                    cnt += 1
                 self.datasets[base] = arr
                 loaded.append(base)
             self.update_lists()
@@ -5295,7 +5489,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             if model == 'None': return
             series = self._get_series_full()
             if not series:
-                QMessageBox.warning(self, 'Warning', 'Add at least one series in the Data tab first.'); return
+                QMessageBox.warning(self, 'Warning', 'Add at least one series in the Data tab first.')
+                return
 
             # Find the series the user selected in the per-curve selector
             target_label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
@@ -5315,7 +5510,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     break
             popt, pcov, func, eq_str, r2 = CurveFitter.fit(xd, yd, model)
             if popt is None:
-                QMessageBox.warning(self, 'Fit Failed', f'Could not fit {model} to the data.'); return
+                QMessageBox.warning(self, 'Fit Failed', f'Could not fit {model} to the data.')
+                return
 
             # Full statistics
             stats = CurveFitter.full_stats(xd, yd, popt, pcov, func, model)
@@ -5365,7 +5561,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 row = self.series_table.rowCount()
                 self.series_table.insertRow(row)
                 for col_idx, col_name in ((0, xc), (1, nm)):
-                    cb = QComboBox(); cb.addItems(sorted(self.datasets))
+                    cb = QComboBox()
+                    cb.addItems(sorted(self.datasets))
                     idx = cb.findText(col_name)
                     if idx >= 0: cb.setCurrentIndex(idx)
                     handler = self._on_x_col_changed if col_idx == 0 else self.update_preview
@@ -5374,11 +5571,14 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 self.series_table.setItem(row, 2, QTableWidgetItem(nm))
                 _mode = self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard'
                 _allowed = list(PLOT_MODE_GROUPS.get(_mode, PER_SERIES_TYPES))
-                type_cb = QComboBox(); type_cb.addItems(_allowed)
+                type_cb = QComboBox()
+                type_cb.addItems(_allowed)
                 type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
                 self.series_table.setCellWidget(row, 3, type_cb)
-                plot_spin = QSpinBox(); plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
-                plot_spin.setValue(source_plot_num); plot_spin.valueChanged.connect(self.update_preview)
+                plot_spin = QSpinBox()
+                plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
+                plot_spin.setValue(source_plot_num)
+                plot_spin.valueChanged.connect(self.update_preview)
                 self.series_table.setCellWidget(row, 4, plot_spin)
                 y2_item = QTableWidgetItem()
                 y2_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
@@ -5455,7 +5655,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         cilo   = st['param_ci_lo']
         cihi   = st['param_ci_hi']
         for i in range(st['p']):
-            pv = pvals[i]; tv = tstats[i]
+            pv = pvals[i]
+            tv = tstats[i]
             pv_str = f'{pv:.4g}' if not math.isnan(pv) else '—'
             tv_str = f'{tv:.4g}' if not math.isnan(tv) else '—'
             lo_str = f'{cilo[i]:.4g}' if not math.isnan(cilo[i]) else '—'
@@ -5688,7 +5889,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             cilo   = st['param_ci_lo']
             cihi   = st['param_ci_hi']
             for i in range(st['p']):
-                pv = pvals[i]; tv = tstats[i]
+                pv = pvals[i]
+                tv = tstats[i]
                 pv_str = f'{pv:.4g}' if not math.isnan(pv) else '—'
                 tv_str = f'{tv:.4g}' if not math.isnan(tv) else '—'
                 lo_str = f'{cilo[i]:.4g}' if not math.isnan(cilo[i]) else '—'

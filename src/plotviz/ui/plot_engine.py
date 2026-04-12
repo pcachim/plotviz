@@ -144,7 +144,8 @@ class PlotEngineMixin:
                         medianprops=dict(color='black', linewidth=2) if _o('box_show_medians', True) else dict(linewidth=0),
                     )
                     for patch, c in zip(bp['boxes'], C):
-                        patch.set_facecolor(c); patch.set_alpha(_o('box_alpha', 0.7))
+                        patch.set_facecolor(c)
+                        patch.set_alpha(_o('box_alpha', 0.7))
 
             elif ct == 'Violin':
                 num_series = [(k, v) for k, v in yd_dict.items() if not self._is_categorical(v)]
@@ -158,7 +159,9 @@ class PlotEngineMixin:
                         points=int(_o('violin_points', '100')),
                         vert=_o('violin_vert', True),
                     )
-                    for pc, c in zip(parts['bodies'], C): pc.set_facecolor(c); pc.set_alpha(0.7)
+                    for pc, c in zip(parts['bodies'], C):
+                        pc.set_facecolor(c)
+                        pc.set_alpha(0.7)
                     if _o('violin_vert', True):
                         ax.set_xticks(range(1, len(num_series)+1))
                         ax.set_xticklabels([k for k, _ in num_series])
@@ -208,8 +211,11 @@ class PlotEngineMixin:
                         # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
                         from scipy.interpolate import griddata as _griddata
                         xd, yd, lbl, _ = series[0]
-                        xf = xd.astype(float); yf = yd.astype(float); zf = np.array(z, dtype=float)
-                        _mn = min(len(xf), len(yf), len(zf)); xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                        xf = xd.astype(float)
+                        yf = yd.astype(float)
+                        zf = np.array(z, dtype=float)
+                        _mn = min(len(xf), len(yf), len(zf))
+                        xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
                         n = max(2, int(np.ceil(np.sqrt(_mn))))
                         xi = np.linspace(np.min(xf), np.max(xf), n)
                         yi = np.linspace(np.min(yf), np.max(yf), n)
@@ -234,16 +240,22 @@ class PlotEngineMixin:
                                        alpha=_o('heat_alpha', 1.0),
                                        interpolation=_o('heat_interpolation', 'nearest'),
                                        **extent_kw, **_vm_kw)
-                        if _o('heat_colorbar', True): self.canvas.figure.colorbar(im, ax=ax)
+                        if _o('heat_colorbar', True):
+                            self.canvas.figure.colorbar(im, ax=ax,
+                                shrink=_o('heat_colorbar_shrink', 1.0))
             elif ct == 'Contour':
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
-                    xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
+                    xd, yd, lbl, _ = series[0]
+                    z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
                         # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
                         from scipy.interpolate import griddata as _griddata
-                        xf = xd.astype(float); yf = yd.astype(float); zf = np.array(z, dtype=float)
-                        _mn = min(len(xf), len(yf), len(zf)); xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                        xf = xd.astype(float)
+                        yf = yd.astype(float)
+                        zf = np.array(z, dtype=float)
+                        _mn = min(len(xf), len(yf), len(zf))
+                        xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
                         n = max(2, int(np.ceil(np.sqrt(_mn))))
                         xi = np.linspace(np.min(xf), np.max(xf), n)
                         yi = np.linspace(np.min(yf), np.max(yf), n)
@@ -280,13 +292,16 @@ class PlotEngineMixin:
                                 cs = ax.contour(X, Y, Z, levels=lvl, colors=_lc, linewidths=_lw, alpha=0.5)
                                 if _last_contour_m is None: _last_contour_m = cs
                             if _last_contour_m is not None and _o('heat_colorbar', True):
-                                self.canvas.figure.colorbar(_last_contour_m, ax=ax)
+                                self.canvas.figure.colorbar(_last_contour_m, ax=ax,
+                                    shrink=_o('heat_colorbar_shrink', 1.0))
             elif ct == 'Tricontour':
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
-                    xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
+                    xd, yd, lbl, _ = series[0]
+                    z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        x = xd.astype(float); y = yd.astype(float)
+                        x = xd.astype(float)
+                        y = yd.astype(float)
                         z = np.array(z, dtype=float)
                         n = min(len(x), len(y), len(z))
                         x, y, z = x[:n], y[:n], z[:n]
@@ -312,19 +327,24 @@ class PlotEngineMixin:
                         if _o('tri_triplot', False):
                             ax.triplot(x, y, color='k', linewidth=0.4, alpha=0.5)
                         if last_mappable is not None and _o('tri_colorbar', True):
-                            self.canvas.figure.colorbar(last_mappable, ax=ax)
+                            self.canvas.figure.colorbar(last_mappable, ax=ax,
+                                shrink=_o('tri_colorbar_shrink', 1.0))
 
             elif ct == '3D Surface':
                 # Bug 1: this block was previously stranded inside the Tricontour elif,
                 # causing 3D Surface to never render and Tricontour to crash on 2D axes.
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
-                    xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
+                    xd, yd, lbl, _ = series[0]
+                    z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
                         # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
                         from scipy.interpolate import griddata as _griddata
-                        xf = xd.astype(float); yf = yd.astype(float); zf = np.array(z, dtype=float)
-                        _mn = min(len(xf), len(yf), len(zf)); xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                        xf = xd.astype(float)
+                        yf = yd.astype(float)
+                        zf = np.array(z, dtype=float)
+                        _mn = min(len(xf), len(yf), len(zf))
+                        xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
                         n = max(2, int(np.ceil(np.sqrt(_mn))))
                         xi = np.linspace(np.min(xf), np.max(xf), n)
                         yi = np.linspace(np.min(yf), np.max(yf), n)
@@ -332,7 +352,8 @@ class PlotEngineMixin:
                         Z = _griddata((xf, yf), zf, (X, Y), method='linear')
                         Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
                         if n >= 2:  # Bug 19: guard against empty Z
-                            st = _o('surf_stride', 1); alp = _o('heat_alpha', 1.0)
+                            st = _o('surf_stride', 1)
+                            alp = _o('heat_alpha', 1.0)
                             if _o('surf_wireframe', False):
                                 ax.plot_wireframe(X, Y, Z, rstride=st, cstride=st, alpha=alp)
                             else:
@@ -340,7 +361,8 @@ class PlotEngineMixin:
                                                        alpha=alp, rstride=st, cstride=st)
                                 # Fix 7: honour heat_colorbar for 3D Surface
                                 if _o('heat_colorbar', True):
-                                    self.canvas.figure.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
+                                    self.canvas.figure.colorbar(surf, ax=ax,
+                                        shrink=_o('heat_colorbar_shrink', 1.0))
 
 
             elif ct == 'Hist2D':
@@ -373,8 +395,10 @@ class PlotEngineMixin:
                     o = s.get('opts', {})
                     color = s.get('color', C[i])
                     ls = s.get('linestyle', '-') or '-'
-                    mk = s.get('marker', 'None'); mk = None if mk in ('None', 'none', '') else mk
-                    theta = xd.astype(float); r = yd.astype(float)
+                    mk = s.get('marker', 'None')
+                    mk = None if mk in ('None', 'none', '') else mk
+                    theta = xd.astype(float)
+                    r = yd.astype(float)
                     if ls != 'none':
                         ax.plot(theta, r, linestyle=ls, color=color,
                                 linewidth=s.get('linewidth', 1.5), marker=mk, label=lbl)
@@ -388,8 +412,10 @@ class PlotEngineMixin:
                     if n_cat >= 3:
                         angles = np.linspace(0, 2*np.pi, n_cat, endpoint=False).tolist() + [0]
                         labels = list(xd) if self._is_categorical(xd) else [str(round(v,3)) for v in xd]
-                        ax.set_theta_offset(np.pi/2); ax.set_theta_direction(-1)
-                        ax.set_xticks(angles[:-1]); ax.set_xticklabels(labels, size=8)
+                        ax.set_theta_offset(np.pi/2)
+                        ax.set_theta_direction(-1)
+                        ax.set_xticks(angles[:-1])
+                        ax.set_xticklabels(labels, size=8)
                         all_vals = np.concatenate([s[1].astype(float) for s in series])
                         vmax = np.nanmax(np.abs(all_vals)) if len(all_vals) else 1
                         ax.set_ylim(0, vmax*1.1)
@@ -418,7 +444,8 @@ class PlotEngineMixin:
                             label=lbl, where='post')
                     if o.get('ecdf_markers', _o('ecdf_markers', False)):
                         ax.scatter(sorted_d, ecdf, color=color, s=12, zorder=4)
-                ax.set_ylim(-0.02, 1.02); ax.set_ylabel('F(x)')
+                ax.set_ylim(-0.02, 1.02)
+                ax.set_ylabel('F(x)')
 
             elif ct == 'Quiver':
                 if series:
@@ -476,8 +503,10 @@ class PlotEngineMixin:
                             _xf = xd.astype(float)
                             _yf = yd.astype(float)
                             n = min(len(_xf), len(_yf), len(U_flat), len(V_flat))
-                            _xf = _xf[:n]; _yf = _yf[:n]
-                            U_flat = U_flat[:n]; V_flat = V_flat[:n]
+                            _xf = _xf[:n]
+                            _yf = _yf[:n]
+                            U_flat = U_flat[:n]
+                            V_flat = V_flat[:n]
                             # Build a regular 2-D grid from the flat point columns.
                             xs_u = np.unique(_xf)
                             ys_u = np.unique(_yf)
@@ -579,11 +608,13 @@ class PlotEngineMixin:
                     plot_kw['markeredgecolor'] = mk_color
                 _lines = ax.plot(xplot, yd, **plot_kw)
                 for _l in _lines: _l.set_pickradius(6)
-                upper_key = lbl + ' CI upper'; lower_key = lbl + ' CI lower'
+                upper_key = lbl + ' CI upper'
+                lower_key = lbl + ' CI lower'
                 if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
                                     alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-                pi_upper_key = lbl + ' PI upper'; pi_lower_key = lbl + ' PI lower'
+                pi_upper_key = lbl + ' PI upper'
+                pi_lower_key = lbl + ' PI lower'
                 if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
                                     alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
@@ -591,7 +622,8 @@ class PlotEngineMixin:
 
             elif sct == 'Scatter':
                 xplot = _cat_xplot(xd) if is_cat else xd
-                mk = s.get('marker', 'o'); mk = 'o' if mk in ('None', 'none', '') else mk
+                mk = s.get('marker', 'o')
+                mk = 'o' if mk in ('None', 'none', '') else mk
                 mk_color = s.get('marker_color', color)
                 sc_ec = o.get('sc_edgecolor', self.scatter_edgecolor.currentText())
                 if sc_ec == 'auto': sc_ec = mk_color
@@ -603,7 +635,8 @@ class PlotEngineMixin:
                         z = self.datasets[zc]
                         n = min(len(xplot), len(yd), len(z))
                         c_arg = z[:n]
-                        xplot = xplot[:n]; yd = yd[:n]
+                        xplot = xplot[:n]
+                        yd = yd[:n]
                 _sc = ax.scatter(xplot, yd, label=lbl,
                            s=o.get('sc_size', self.scatter_size.value()),
                            alpha=o.get('sc_alpha', self.scatter_alpha.value()),
@@ -613,18 +646,21 @@ class PlotEngineMixin:
                            edgecolors=sc_ec,
                            linewidths=o.get('sc_lw', self.scatter_lw.value()))
                 _sc.set_picker(True)
-                upper_key = lbl + ' CI upper'; lower_key = lbl + ' CI lower'
+                upper_key = lbl + ' CI upper'
+                lower_key = lbl + ' CI lower'
                 if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
                                     alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-                pi_upper_key = lbl + ' PI upper'; pi_lower_key = lbl + ' PI lower'
+                pi_upper_key = lbl + ' PI upper'
+                pi_lower_key = lbl + ' PI lower'
                 if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
                     ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
                                     alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
                                     label=f'{lbl} PI')
 
             elif sct == 'Bar':
-                bi = bar_idx_counter; bar_idx_counter += 1
+                bi = bar_idx_counter
+                bar_idx_counter += 1
                 b_w   = o.get('bar_width',    bar_w)
                 b_stk = o.get('bar_stacked',  bar_stk)
                 b_hor = o.get('bar_horizontal', bar_horiz)
@@ -664,7 +700,8 @@ class PlotEngineMixin:
                 else:
                     if is_cat or self._is_categorical(yd): continue
                     try:
-                        xd_f = np.asarray(xd, dtype=float); yd_f = np.asarray(yd, dtype=float)
+                        xd_f = np.asarray(xd, dtype=float)
+                        yd_f = np.asarray(yd, dtype=float)
                     except (ValueError, TypeError): continue
                     if bar_bottoms_num is None: bar_bottoms_num = np.zeros(len(xd_f))
                     if b_stk:
@@ -726,7 +763,8 @@ class PlotEngineMixin:
                 err  = self.datasets.get(ec)  if ec      != '(none)' else None
                 xerr = self.datasets.get(xerr_c) if xerr_c != '(none)' else None
                 xplot = _cat_xplot(xd) if is_cat else xd
-                mk = s.get('marker', 'o'); mk = 'o' if mk in ('None', 'none', '') else mk
+                mk = s.get('marker', 'o')
+                mk = 'o' if mk in ('None', 'none', '') else mk
                 ax.errorbar(xplot, yd, yerr=err, xerr=xerr, label=lbl,
                             capsize=o.get('err_capsize',   self.err_capsize.value()),
                             capthick=o.get('err_capthick', self.err_capthick.value()),
@@ -777,7 +815,8 @@ class PlotEngineMixin:
                     n = min(len(xplot), len(yd))
                     sizes = b_scale / 4
                 mk_color = s.get('marker_color', color)
-                mk = s.get('marker', 'o'); mk = 'o' if mk in ('None', 'none', '') else mk
+                mk = s.get('marker', 'o')
+                mk = 'o' if mk in ('None', 'none', '') else mk
                 b_ec = o.get('bubble_edgecolor', self.bubble_edgecolor.currentText())
                 if b_ec == 'auto': b_ec = mk_color
                 ax.scatter(xplot[:n], yd[:n], s=sizes, alpha=o.get('bubble_alpha', self.bubble_alpha.value()),
@@ -808,7 +847,8 @@ class PlotEngineMixin:
                 al  = _o('waterfall_alpha', 1.0)
                 pos_c = _o('waterfall_pos_color', None) or '#2ecc71'
                 neg_c = _o('waterfall_neg_color', None) or '#e74c3c'
-                running = 0.0; prev_top = None
+                running = 0.0
+                prev_top = None
                 for k in range(n):
                     val = float(yd_f[k])
                     fc = pos_c if val >= 0 else neg_c
@@ -819,7 +859,8 @@ class PlotEngineMixin:
                     if _o('waterfall_connector', True) and prev_top is not None:
                         ax.plot([xd_f[k-1]+w/2, xd_f[k]-w/2], [prev_top, prev_top],
                                 color='#555', linewidth=0.8, linestyle='--')
-                    prev_top = top; running = top
+                    prev_top = top
+                    running = top
                 # Apply string tick labels for categorical x after all bars are drawn
                 if x_labels is not None:
                     ax.set_xticks(xd_f)
@@ -1085,7 +1126,8 @@ class PlotEngineMixin:
                     ycb = self.series_table.cellWidget(row, 1)
                     lbl_item = self.series_table.item(row, 2)
                     if xcb is None or ycb is None: continue
-                    xc_row = xcb.currentText(); yc_row = ycb.currentText()
+                    xc_row = xcb.currentText()
+                    yc_row = ycb.currentText()
                     if xc_row not in self.datasets or yc_row not in self.datasets: continue
                     label = lbl_item.text() if lbl_item and lbl_item.text() else yc_row
                     sct = self._get_series_type(row)
@@ -1521,17 +1563,145 @@ class PlotEngineMixin:
     # ═══════════════════════════════════════════════════════════════════════════
     # EXPORT
     # ═══════════════════════════════════════════════════════════════════════════
-    def export_chart(self, fmt):
+    def export_chart(self, fmt=None):
         try:
-            ext     = 'jpg'   if fmt == 'jpeg' else fmt
-            mpl_fmt = 'jpeg'  if fmt == 'jpeg' else fmt
+            import os
+            from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout,
+                                         QLabel, QComboBox, QSpinBox,
+                                         QDialogButtonBox)
+            from PyQt6.QtCore import Qt
+
+            # ── Default filename from saved project file stem ──────────────
+            fp_project = getattr(self, '_current_filepath', None)
+            default_stem = (os.path.splitext(os.path.basename(fp_project))[0]
+                            if fp_project else 'chart')
+
+            wi, hi      = self._fig_size_in_inches()
+            current_fmt = (fmt or self._export_fmt_combo.currentText()).upper()
+            current_dpi = self.dpi_spin.value()
+
+            # ── Compact pre-dialog: format + DPI only ──────────────────────
+            _FORMATS     = ['PNG', 'SVG', 'PDF', 'JPEG', 'TIFF', 'EPS']
+            _VECTOR_FMTS = {'SVG', 'EPS', 'PDF'}
+            _DPI_PRESETS = [('96 dpi — screen', 96), ('150 dpi — low print', 150),
+                            ('300 dpi — print',  300), ('600 dpi — hi-res',   600)]
+
+            pre = QDialog(self)
+            pre.setWindowTitle('Export Image')
+            pre.setFixedWidth(320)
+            vbox = QVBoxLayout(pre)
+            vbox.setSpacing(10)
+            vbox.setContentsMargins(16, 14, 16, 14)
+
+            grid = QGridLayout()
+            grid.setSpacing(8)
+            grid.setColumnMinimumWidth(0, 64)
+
+            fmt_combo = QComboBox()
+            fmt_combo.addItems(_FORMATS)
+            fidx = fmt_combo.findText(current_fmt)
+            if fidx >= 0:
+                fmt_combo.setCurrentIndex(fidx)
+            grid.addWidget(QLabel('Format:'), 0, 0, Qt.AlignmentFlag.AlignRight)
+            grid.addWidget(fmt_combo, 0, 1)
+
+            dpi_combo = QComboBox()
+            for lbl, val in _DPI_PRESETS:
+                dpi_combo.addItem(lbl, val)
+            dpi_spin = QSpinBox()
+            dpi_spin.setRange(36, 1200)
+            dpi_spin.setValue(current_dpi)
+            dpi_spin.setSuffix(' dpi')
+            dpi_spin.setFixedWidth(80)
+
+            from PyQt6.QtWidgets import QHBoxLayout
+            dpi_row = QHBoxLayout()
+            dpi_row.setSpacing(6)
+            dpi_row.addWidget(dpi_combo, 1)
+            dpi_row.addWidget(dpi_spin)
+            grid.addWidget(QLabel('Resolution:'), 1, 0, Qt.AlignmentFlag.AlignRight)
+            grid.addLayout(dpi_row, 1, 1)
+
+            px_label = QLabel()
+            px_label.setStyleSheet('color: palette(mid); font-size: 10px;')
+            grid.addWidget(px_label, 2, 1)
+
+            vbox.addLayout(grid)
+
+            btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                    QDialogButtonBox.StandardButton.Cancel)
+            btns.button(QDialogButtonBox.StandardButton.Ok).setText('Save…')
+            btns.accepted.connect(pre.accept)
+            btns.rejected.connect(pre.reject)
+            vbox.addWidget(btns)
+
+            def _update_px():
+                f   = fmt_combo.currentText()
+                vec = f in _VECTOR_FMTS
+                dpi_combo.setEnabled(not vec)
+                dpi_spin.setEnabled(not vec)
+                px_label.setText(
+                    'Vector format — DPI not applied' if vec
+                    else f'{round(wi * dpi_spin.value())} × {round(hi * dpi_spin.value())} px')
+
+            def _preset_picked(i):
+                dpi_spin.blockSignals(True)
+                dpi_spin.setValue(dpi_combo.itemData(i))
+                dpi_spin.blockSignals(False)
+                _update_px()
+
+            def _spin_edited():
+                v = dpi_spin.value()
+                match = next((i for i in range(dpi_combo.count())
+                              if dpi_combo.itemData(i) == v), -1)
+                dpi_combo.blockSignals(True)
+                dpi_combo.setCurrentIndex(match)   # -1 → no selection = custom
+                dpi_combo.blockSignals(False)
+                _update_px()
+
+            dpi_combo.currentIndexChanged.connect(_preset_picked)
+            dpi_spin.valueChanged.connect(_spin_edited)
+            fmt_combo.currentTextChanged.connect(lambda _: _update_px())
+
+            # Seed preset selection
+            for i in range(dpi_combo.count()):
+                if dpi_combo.itemData(i) == current_dpi:
+                    dpi_combo.blockSignals(True)
+                    dpi_combo.setCurrentIndex(i)
+                    dpi_combo.blockSignals(False)
+                    break
+
+            _update_px()
+
+            if pre.exec() != QDialog.DialogCode.Accepted:
+                return
+
+            fmt     = fmt_combo.currentText().lower()
+            dpi     = dpi_spin.value()
+            ext     = 'jpg' if fmt == 'jpeg' else fmt
+            mpl_fmt = 'jpeg' if fmt == 'jpeg' else fmt
+
+            # ── Native file dialog with pre-filled name ────────────────────
+            suggested = os.path.join(_get_dir(), f'{default_stem}.{ext}')
             fp, _ = QFileDialog.getSaveFileName(
-                self, f'Export {fmt.upper()}', _get_dir(), f'{fmt.upper()} (*.{ext})')
+                self, 'Export Image', suggested,
+                f'{fmt.upper()} (*.{ext})'
+            )
             if not fp:
                 return
 
-            dpi = self.dpi_spin.value()
-            wi, hi = self._fig_size_in_inches()
+            if not fp.lower().endswith(f'.{ext}'):
+                fp = os.path.splitext(fp)[0] + f'.{ext}'
+
+            # Sync hidden sidebar widgets so settings persistence works
+            self.dpi_spin.blockSignals(True)
+            self.dpi_spin.setValue(dpi)
+            self.dpi_spin.blockSignals(False)
+            _fi = self._export_fmt_combo.findText(fmt.upper())
+            if _fi >= 0:
+                self._export_fmt_combo.blockSignals(True)
+                self._export_fmt_combo.setCurrentIndex(_fi)
+                self._export_fmt_combo.blockSignals(False)
 
             # Build a fresh Figure at the exact export size — never touches the screen figure
             exp_fig = MplFigure(figsize=(wi, hi), dpi=dpi)
@@ -1744,10 +1914,14 @@ class PlotEngineMixin:
             # Apply margins (user values map directly to the export figure)
             exp_top = self.fig_top.value()
             _n_sp_exp = self.subplot_rows * self.subplot_cols
-            _exp_title_text = _latex_safe(self.title_input.text().strip()) if _n_sp_exp > 1 else ''
+            _exp_title_raw = self.title_input.text().strip()
+            # For a single subplot, fall back to the placeholder just like the preview does.
+            if not _exp_title_raw and _n_sp_exp == 1:
+                _exp_title_raw = self.title_input.placeholderText()
+            _exp_title_text = _latex_safe(_exp_title_raw)
             _ty_widget = getattr(self, 'title_y', getattr(self, 'title_y_offset', None))
             _exp_ty = _ty_widget.value() if _ty_widget else 0.97
-            if _n_sp_exp > 1 and self.title_check.isChecked() and _exp_title_text:
+            if self.title_check.isChecked() and _exp_title_text:
                 suptitle_pt = self.title_size.value()
                 # title_y positions the suptitle text; do not clamp exp_top by it.
                 exp_fig.suptitle(_exp_title_text,

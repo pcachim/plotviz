@@ -134,9 +134,12 @@ class CanvasPlotter(FigureCanvas):
                 except Exception:
                     pass
             elif ann['type'] == 'arrow':
-                dx = nx - ann['x0']; dy = ny - ann['y0']
-                ann['x0'] += dx; ann['y0'] += dy
-                ann['x1'] += dx; ann['y1'] += dy
+                dx = nx - ann['x0']
+                dy = ny - ann['y0']
+                ann['x0'] += dx
+                ann['y0'] += dy
+                ann['x1'] += dx
+                ann['y1'] += dy
                 try:
                     ann['artist'].set_position((ann['x0'], ann['y0']))
                     ann['artist'].xy = (ann['x1'], ann['y1'])
@@ -315,7 +318,8 @@ class CanvasPlotter(FigureCanvas):
 
     def _find_annotation_at(self, ax, x, y, tol_frac=0.05):
         """Find the closest annotation within tol_frac of axis range."""
-        xlim = ax.get_xlim(); ylim = ax.get_ylim()
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
         tx = abs(xlim[1] - xlim[0]) * tol_frac
         ty = abs(ylim[1] - ylim[0]) * tol_frac
         best, best_d = None, float('inf')
@@ -445,7 +449,8 @@ class CanvasPlotter(FigureCanvas):
                              bbox=bp, zorder=50, annotation_clip=False)
         self.annotations.append({'type':'text','axes_index':ax_idx,
                                   'x':x,'y':y,'label':label,'style':dict(s),'artist':artist})
-        self.draw_idle(); self._notify()
+        self.draw_idle()
+        self._notify()
 
     def _place_arrow_annotation(self, ax, ax_idx, x0, y0, x1, y1, label=''):
         s = self.ann_style
@@ -458,12 +463,14 @@ class CanvasPlotter(FigureCanvas):
         self.annotations.append({'type':'arrow','axes_index':ax_idx,
                                   'x0':x0,'y0':y0,'x1':x1,'y1':y1,
                                   'label':label,'style':dict(s),'artist':artist})
-        self.draw_idle(); self._notify()
+        self.draw_idle()
+        self._notify()
 
     def _place_image_annotation(self, ax, ax_idx, x, y, filepath, zoom=0.15):
         try:
             img = mpimg.imread(filepath)
-            ib = OffsetImage(img, zoom=zoom); ib.image.axes = ax
+            ib = OffsetImage(img, zoom=zoom)
+            ib.image.axes = ax
             ab = AnnotationBbox(ib, (x, y), frameon=True,
                                 bboxprops=dict(edgecolor='#aaaaaa', linewidth=1.0),
                                 zorder=50, annotation_clip=False)
@@ -471,7 +478,8 @@ class CanvasPlotter(FigureCanvas):
             self.annotations.append({'type':'image','axes_index':ax_idx,
                                       'x':x,'y':y,'filepath':filepath,
                                       'zoom':zoom,'artist':ab})
-            self.draw_idle(); self._notify()
+            self.draw_idle()
+            self._notify()
         except Exception as e:
             print(f'Image annotation error: {e}')
 
@@ -480,21 +488,24 @@ class CanvasPlotter(FigureCanvas):
         if self.annotations:
             try: self.annotations.pop()['artist'].remove()
             except Exception: pass
-            self.draw_idle(); self._notify()
+            self.draw_idle()
+            self._notify()
 
     def remove_annotation_at(self, idx):
         if 0 <= idx < len(self.annotations):
             try: self.annotations[idx]['artist'].remove()
             except Exception: pass
             self.annotations.pop(idx)
-            self.draw_idle(); self._notify()
+            self.draw_idle()
+            self._notify()
 
     def clear_annotations(self):
         for ann in self.annotations:
             try: ann['artist'].remove()
             except Exception: pass
         self.annotations.clear()
-        self.draw_idle(); self._notify()
+        self.draw_idle()
+        self._notify()
 
     def _notify(self):
         if self.main_window:

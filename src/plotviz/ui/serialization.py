@@ -189,6 +189,7 @@ class SerializationMixin:
         s['heat_alpha']          = self.heat_alpha.value()
         s['heat_interpolation']  = self.heat_interpolation.currentText()
         s['heat_colorbar']       = self.heat_colorbar.isChecked()
+        s['heat_colorbar_shrink'] = self.heat_colorbar_shrink.value() if hasattr(self, 'heat_colorbar_shrink') else 1.0
         s['heat_filled_contour'] = self.heat_filled_contour.isChecked()
         s['heat_contour_lines']  = self.heat_contour_lines.isChecked()
         s['surf_stride']         = self.surf_stride.value()
@@ -208,6 +209,7 @@ class SerializationMixin:
         s['tri_lines']       = self.tri_lines.isChecked()
         s['tri_triplot']     = self.tri_triplot.isChecked()
         s['tri_colorbar']    = self.tri_colorbar.isChecked()
+        s['tri_colorbar_shrink'] = self.tri_colorbar_shrink.value() if hasattr(self, 'tri_colorbar_shrink') else 1.0
         # Pie
         s['pie_autopct']         = self.pie_autopct.isChecked()
         s['pie_shadow']          = self.pie_shadow.isChecked()
@@ -331,9 +333,11 @@ class SerializationMixin:
         def _set_rb(group, value):
             for btn in group.buttons():
                 if btn.property('scale_value') == value:
-                    btn.setChecked(True); return
+                    btn.setChecked(True)
+                    return
 
-        self.combo_x.blockSignals(True); self.y_list.blockSignals(True)
+        self.combo_x.blockSignals(True)
+        self.y_list.blockSignals(True)
 
         i = self.chart_type_combo.findText(s.get('chart_type', 'Line'))
         if i >= 0: self.chart_type_combo.setCurrentIndex(i)
@@ -386,7 +390,26 @@ class SerializationMixin:
             self.curve_styles[lbl] = style
 
         i = self.fig_unit.findText(s.get('fig_unit','cm'))
-        if i >= 0: self.fig_unit.setCurrentIndex(i)
+        if i >= 0:
+            self.fig_unit.blockSignals(True)
+            self.fig_unit.setCurrentIndex(i)
+            self.fig_unit.blockSignals(False)
+            # Sync the unit-change helper's "previous unit" tracker and fix ranges
+            # so the first interactive switch after load converts from the right unit.
+            restored_unit = self.fig_unit.currentText()
+            self._prev_fig_unit = restored_unit
+            if restored_unit == 'cm':
+                self.fig_width.setRange(2, 500); self.fig_height.setRange(2, 500)
+                self.fig_width.setDecimals(1);   self.fig_height.setDecimals(1)
+                self.fig_width.setSingleStep(0.5); self.fig_height.setSingleStep(0.5)
+            elif restored_unit == 'inches':
+                self.fig_width.setRange(1, 200); self.fig_height.setRange(1, 200)
+                self.fig_width.setDecimals(2);   self.fig_height.setDecimals(2)
+                self.fig_width.setSingleStep(0.25); self.fig_height.setSingleStep(0.25)
+            elif restored_unit == 'pixels':
+                self.fig_width.setRange(50, 20000); self.fig_height.setRange(50, 20000)
+                self.fig_width.setDecimals(0);      self.fig_height.setDecimals(0)
+                self.fig_width.setSingleStep(10);   self.fig_height.setSingleStep(10)
         self.fig_width.setValue(s.get('fig_width', 20.0))
         self.fig_height.setValue(s.get('fig_height', 15.0))
         i = self.fig_preset_combo.findText(s.get('fig_preset', '20 × 15 cm'))
@@ -424,8 +447,8 @@ class SerializationMixin:
         self.title_size.setValue(s.get('title_size', 14))
         tc = s.get('title_color', '#000000')
         self.title_color = tc
-        if hasattr(self, 'title_color_label'):
-            self.title_color_label.setStyleSheet(_SW_CSS.format(tc))
+        if hasattr(self, 'title_color_swatch'):
+            self.title_color_swatch.setStyleSheet(_SW_CSS.format(tc))
         i = self.xlabel_font.findText(s.get('xlabel_font','sans-serif'))
         if i >= 0: self.xlabel_font.setCurrentIndex(i)
         self.xlabel_size.setValue(s.get('xlabel_size', 11))
@@ -445,10 +468,12 @@ class SerializationMixin:
         # Subplots (layout + appearance only — column assignments come from series.json)
         mosaic = s.get('subplot_mosaic', None)
         self._subplot_mosaic = mosaic
-        self.sp_rows.blockSignals(True); self.sp_cols.blockSignals(True)
+        self.sp_rows.blockSignals(True)
+        self.sp_cols.blockSignals(True)
         self.sp_rows.setValue(s.get('subplot_rows', 1))
         self.sp_cols.setValue(s.get('subplot_cols', 1))
-        self.sp_rows.blockSignals(False); self.sp_cols.blockSignals(False)
+        self.sp_rows.blockSignals(False)
+        self.sp_cols.blockSignals(False)
         self.subplot_rows = s.get('subplot_rows', 1)
         self.subplot_cols = s.get('subplot_cols', 1)
         if mosaic is not None:
@@ -466,8 +491,14 @@ class SerializationMixin:
         self.subplot_title_color   = _di('subplot_title_color', {'0': '#000000'})
         if hasattr(self, 'title_x'): self.title_x.setValue(s.get('title_x', 0.5))
         if hasattr(self, 'title_y'):
-            _ty = s['title_y'] if 'title_y' in s else s.get('title_y_offset', 0.97)
-            self.title_y.setValue(min(max(float(_ty), 0.50), 1.00))
+            _raw_ty = float(s['title_y'] if 'title_y' in s else s.get('title_y_offset', 0.97))
+            _clamped_ty = min(max(_raw_ty, 0.50), 1.00)
+            if _clamped_ty != _raw_ty:
+                import logging
+                logging.getLogger('plotviz').warning(
+                    'title_y value %.3f from saved file is outside the supported range '
+                    '[0.50, 1.00] and has been clamped to %.3f.', _raw_ty, _clamped_ty)
+            self.title_y.setValue(_clamped_ty)
         if hasattr(self, 'sp_hspace'): self.sp_hspace.setValue(s.get('sp_hspace', 0.35))
         if hasattr(self, 'sp_wspace'): self.sp_wspace.setValue(s.get('sp_wspace', 0.35))
         self.subplot_xlabels       = _di('subplot_xlabels', {'0': ''})
@@ -516,7 +547,8 @@ class SerializationMixin:
         # Restore per-series fits
         import numpy as _np
         from data.scientific import CurveFitter as _CF
-        self._fits = {}; self._last_fit = None
+        self._fits = {}
+        self._last_fit = None
         _fits_saved = s.get('fits') or {}
         _legacy_fr  = s.get('fit_result')
         if _legacy_fr and _legacy_fr.get('model') and _legacy_fr.get('popt'):
@@ -526,7 +558,8 @@ class SerializationMixin:
         for _nm, fr in _fits_saved.items():
             if not (fr.get('model') and fr.get('popt')): continue
             try:
-                model = fr['model']; func = _CF.MODELS.get(model)
+                model = fr['model']
+                func = _CF.MODELS.get(model)
                 popt  = _np.array(fr['popt'])
                 pcov  = _np.array(fr['pcov']) if fr.get('pcov') else _np.zeros((len(popt), len(popt)))
                 xd    = _np.array(fr['xd'])
@@ -544,9 +577,11 @@ class SerializationMixin:
             if hasattr(self, '_refresh_fit_results_panel'):
                 self._refresh_fit_results_panel()
         # CI/PI combo display state
-        self.fit_ci_combo.blockSignals(True); self.fit_pi_combo.blockSignals(True)
+        self.fit_ci_combo.blockSignals(True)
+        self.fit_pi_combo.blockSignals(True)
         self.fit_ci_alpha_spin.setValue(s.get('fit_ci_alpha', 0.25))
-        self.fit_ci_combo.blockSignals(False); self.fit_pi_combo.blockSignals(False)
+        self.fit_ci_combo.blockSignals(False)
+        self.fit_pi_combo.blockSignals(False)
 
         # ── Chart-mode params ────────────────────────────────────────────────────
         def _cb(w, key, default): w.setChecked(s.get(key, default))
@@ -573,6 +608,12 @@ class SerializationMixin:
         _sp(self.heat_alpha,          'heat_alpha',       1.0)
         _co(self.heat_interpolation,  'heat_interpolation','nearest')
         _cb(self.heat_colorbar,       'heat_colorbar',     True)
+        if hasattr(self, 'heat_colorbar_shrink'):
+            self.heat_colorbar_shrink.blockSignals(True)
+            self.heat_colorbar_shrink.setValue(float(s.get('heat_colorbar_shrink', 1.0)))
+            self.heat_colorbar_shrink.blockSignals(False)
+        if hasattr(self, '_heat_colorbar_size_row'):
+            self._heat_colorbar_size_row.setVisible(self.heat_colorbar.isChecked())
         _cb(self.heat_filled_contour, 'heat_filled_contour', True)
         _cb(self.heat_contour_lines,  'heat_contour_lines',  True)
         _sp(self.surf_stride,         'surf_stride',      1)
@@ -585,16 +626,22 @@ class SerializationMixin:
             self.heat_vmin.setEnabled(self.heat_vminmax_enable.isChecked())
             self.heat_vmax.setEnabled(self.heat_vminmax_enable.isChecked())
         if hasattr(self, 'heat_vmin'):
-            self.heat_vmin.blockSignals(True); self.heat_vmin.setValue(float(s.get('heat_vmin', 0.0))); self.heat_vmin.blockSignals(False)
+            self.heat_vmin.blockSignals(True)
+            self.heat_vmin.setValue(float(s.get('heat_vmin', 0.0)))
+            self.heat_vmin.blockSignals(False)
         if hasattr(self, 'heat_vmax'):
-            self.heat_vmax.blockSignals(True); self.heat_vmax.setValue(float(s.get('heat_vmax', 1.0))); self.heat_vmax.blockSignals(False)
+            self.heat_vmax.blockSignals(True)
+            self.heat_vmax.setValue(float(s.get('heat_vmax', 1.0)))
+            self.heat_vmax.blockSignals(False)
         if hasattr(self, 'contour_line_color'):
             _clc = s.get('contour_line_color', '#000000')
             self.contour_line_color = _clc
             sw = getattr(self, 'contour_line_color_sw', None)
             if sw: sw.setStyleSheet(self._SW_CSS.format(_clc))
         if hasattr(self, 'contour_line_width'):
-            self.contour_line_width.blockSignals(True); self.contour_line_width.setValue(float(s.get('contour_line_width', 0.5))); self.contour_line_width.blockSignals(False)
+            self.contour_line_width.blockSignals(True)
+            self.contour_line_width.setValue(float(s.get('contour_line_width', 0.5)))
+            self.contour_line_width.blockSignals(False)
         if hasattr(self, 'contour_levels_explicit'):
             self.contour_levels_explicit.blockSignals(True)
             self.contour_levels_explicit.setText(s.get('contour_levels_explicit', ''))
@@ -615,6 +662,12 @@ class SerializationMixin:
         _cb(self.tri_lines,      'tri_lines',    True)
         _cb(self.tri_triplot,    'tri_triplot',  False)
         _cb(self.tri_colorbar,   'tri_colorbar', True)
+        if hasattr(self, 'tri_colorbar_shrink'):
+            self.tri_colorbar_shrink.blockSignals(True)
+            self.tri_colorbar_shrink.setValue(float(s.get('tri_colorbar_shrink', 1.0)))
+            self.tri_colorbar_shrink.blockSignals(False)
+        if hasattr(self, '_tri_colorbar_size_row'):
+            self._tri_colorbar_size_row.setVisible(self.tri_colorbar.isChecked())
         # Pie
         _cb(self.pie_autopct,       'pie_autopct',      True)
         _cb(self.pie_shadow,        'pie_shadow',       False)
@@ -653,7 +706,8 @@ class SerializationMixin:
             ('waterfall_pos_color', 'waterfall_pos_color', '#2ecc71'),
             ('waterfall_neg_color', 'waterfall_neg_color', '#e74c3c'),
         ]:
-            _v = s.get(_key, _def); setattr(self, _attr, _v)
+            _v = s.get(_key, _def)
+            setattr(self, _attr, _v)
             _sw = getattr(self, _attr + '_sw', None)
             if _sw: _sw.setStyleSheet(
                 f'background-color:{_v};border:1px solid #888;border-radius:2px;')
@@ -716,7 +770,8 @@ class SerializationMixin:
         self.ann_bg_alpha.setValue(s.get('ann_bg_alpha', 0.9))
         self.ann_bg_alpha.blockSignals(False)
 
-        self.combo_x.blockSignals(False); self.y_list.blockSignals(False)
+        self.combo_x.blockSignals(False)
+        self.y_list.blockSignals(False)
 
         # ── Post-load UI sync ────────────────────────────────────────────────
         # Refresh curve selector and load the first curve's style into the swatch
@@ -752,7 +807,8 @@ class SerializationMixin:
             self.series_table.insertRow(row)
 
             # X combo — signals blocked during construction
-            cb_x = QComboBox(); cb_x.blockSignals(True)
+            cb_x = QComboBox()
+            cb_x.blockSignals(True)
             cb_x.addItems(cols)
             i = cb_x.findText(sd.get('x_col', ''))
             if i >= 0: cb_x.setCurrentIndex(i)
@@ -761,7 +817,8 @@ class SerializationMixin:
             self.series_table.setCellWidget(row, 0, cb_x)
 
             # Y combo — signals blocked during construction
-            cb_y = QComboBox(); cb_y.blockSignals(True)
+            cb_y = QComboBox()
+            cb_y.blockSignals(True)
             cb_y.addItems(cols)
             i = cb_y.findText(sd.get('y_col', ''))
             if i >= 0: cb_y.setCurrentIndex(i)
@@ -936,7 +993,8 @@ class SerializationMixin:
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 if 'palette.json' not in zf.namelist():
-                    QMessageBox.warning(self, 'Invalid', 'No palette.json in file.'); return
+                    QMessageBox.warning(self, 'Invalid', 'No palette.json in file.')
+                    return
                 self._load_custom_palettes_json(zf.read('palette.json').decode())
             QMessageBox.information(self, 'Imported', 'Palette bundle imported.')
         except Exception as e:
@@ -1140,7 +1198,8 @@ class SerializationMixin:
             with zipfile.ZipFile(fp, 'r') as zf:
                 names = zf.namelist()
                 if 'settings.json' not in names:
-                    QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.'); return
+                    QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.')
+                    return
                 settings = json.loads(zf.read('settings.json'))
             self._applying_settings = True
             try:
@@ -1196,7 +1255,8 @@ class SerializationMixin:
             with zipfile.ZipFile(fp, 'r') as zf:
                 names = zf.namelist()
                 if 'settings.json' not in names:
-                    QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.'); return
+                    QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.')
+                    return
                 settings    = json.loads(zf.read('settings.json'))
                 series_meta = json.loads(zf.read('series.json')) if 'series.json' in names else None
                 # Load custom palettes if present

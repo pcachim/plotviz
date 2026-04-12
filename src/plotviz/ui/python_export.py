@@ -243,7 +243,8 @@ def _gen_pie(settings, series, datasets, palette, ax_var):
 def _gen_polar(settings, series, datasets, palette, ax_var):
     lines = [f"# Note: polar axes require projection='polar' — see fig.add_subplot below"]
     for i, s in enumerate(series):
-        xc = s.get('x_col', ''); yc = s.get('y_col', '')
+        xc = s.get('x_col', '')
+        yc = s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
         st  = _series_style(settings, s, i, palette)
         col = f"'{st['color']}'"
@@ -273,7 +274,9 @@ def _gen_heatmap(settings, series, datasets, palette, ax_var):
         f"import numpy as np",
     ]
     if series:
-        s0 = series[0]; xc = s0.get('x_col', ''); yc = s0.get('y_col', '')
+        s0 = series[0]
+        xc = s0.get('x_col', '')
+        yc = s0.get('y_col', '')
         if xc and yc:
             lines += [
                 f"_hx = np.array({_col_ref(xc)}, dtype=float)",
@@ -771,7 +774,8 @@ def generate_plot_script(settings: dict, series_meta: dict,
 
     # ── Collect dataset filenames ──────────────────────────────────────────────
     used_cols = {s.get('x_col') for s in series_list} | {s.get('y_col') for s in series_list}
-    used_cols.discard(''); used_cols.discard(None)
+    used_cols.discard('')
+    used_cols.discard(None)
     ds_names  = sorted(datasets.keys())
     # All datasets go into data/ as CSVs; build a combined CSV if they share length
     lengths = {len(v) for v in datasets.values() if v is not None}

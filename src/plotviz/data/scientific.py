@@ -158,8 +158,10 @@ class CurveFitter:
         J = np.zeros((len(x), len(popt)))
         for i, p in enumerate(popt):
             dp = eps * abs(p) if abs(p) > eps else eps
-            pp = popt.copy(); pp[i] += dp
-            pm = popt.copy(); pm[i] -= dp
+            pp = popt.copy()
+            pp[i] += dp
+            pm = popt.copy()
+            pm[i] -= dp
             J[:, i] = (func(x, *pp) - func(x, *pm)) / (2 * dp)
         return J
 
