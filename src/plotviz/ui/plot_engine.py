@@ -204,49 +204,83 @@ class PlotEngineMixin:
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets:
                     z = self.datasets[zc]
-                    n = int(np.ceil(np.sqrt(len(z))))
-                    if n >= 2:  # Bug 19: guard against empty / single-point Z column
+                    if series and len(series) > 0:
+                        # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
+                        from scipy.interpolate import griddata as _griddata
+                        xd, yd, lbl, _ = series[0]
+                        xf = xd.astype(float); yf = yd.astype(float); zf = np.array(z, dtype=float)
+                        _mn = min(len(xf), len(yf), len(zf)); xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                        n = max(2, int(np.ceil(np.sqrt(_mn))))
+                        xi = np.linspace(np.min(xf), np.max(xf), n)
+                        yi = np.linspace(np.min(yf), np.max(yf), n)
+                        XI, YI = np.meshgrid(xi, yi)
+                        Z = _griddata((xf, yf), zf, (XI, YI), method='linear')
+                        Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
+                        # Bug 18: pass extent so axis ticks show data values, not pixel indices
+                        extent_kw = {'extent': [float(np.min(xf)), float(np.max(xf)),
+                                                float(np.min(yf)), float(np.max(yf))]}
+                    else:
+                        n = int(np.ceil(np.sqrt(len(z))))
+                        if n < 2: n = 2
                         Z = np.full((n, n), np.nan)
                         for k in range(len(z)): Z[k//n, k%n] = z[k]
-                        # Bug 18: pass extent so axis ticks show data values, not pixel indices
                         extent_kw = {}
-                        if series:
-                            xd, yd, lbl, _ = series[0]
-                            extent_kw = {'extent': [float(np.min(xd)), float(np.max(xd)),
-                                                    float(np.min(yd)), float(np.max(yd))]}
+                    if n >= 2:
+                        # Fix 4: optional vmin/vmax
+                        _vm_kw = {}
+                        if hasattr(self, 'heat_vminmax_enable') and self.heat_vminmax_enable.isChecked():
+                            _vm_kw = {'vmin': self.heat_vmin.value(), 'vmax': self.heat_vmax.value()}
                         im = ax.imshow(Z, aspect='auto', cmap=_cmap('cmap_combo', 'cmap'), origin='lower',
                                        alpha=_o('heat_alpha', 1.0),
                                        interpolation=_o('heat_interpolation', 'nearest'),
-                                       **extent_kw)
+                                       **extent_kw, **_vm_kw)
                         if _o('heat_colorbar', True): self.canvas.figure.colorbar(im, ax=ax)
-
             elif ct == 'Contour':
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
                     xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        n = int(np.ceil(np.sqrt(len(z))))
-                        if n >= 2:  # Bug 19: guard against empty / single-point Z column
-                            Z = np.full((n, n), np.nan)
-                            for k in range(len(z)): Z[k//n, k%n] = z[k]
-                            Z = np.where(np.isnan(Z), np.nanmean(Z), Z)
-                            xi = np.linspace(np.min(xd), np.max(xd), n)
-                            yi = np.linspace(np.min(yd), np.max(yd), n)
-                            X, Y = np.meshgrid(xi, yi)
-                            lvl = _o('contour_levels', 10)
+                        # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
+                        from scipy.interpolate import griddata as _griddata
+                        xf = xd.astype(float); yf = yd.astype(float); zf = np.array(z, dtype=float)
+                        _mn = min(len(xf), len(yf), len(zf)); xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                        n = max(2, int(np.ceil(np.sqrt(_mn))))
+                        xi = np.linspace(np.min(xf), np.max(xf), n)
+                        yi = np.linspace(np.min(yf), np.max(yf), n)
+                        X, Y = np.meshgrid(xi, yi)
+                        Z = _griddata((xf, yf), zf, (X, Y), method='linear')
+                        Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
+                        if n >= 2:
+                            # Fix 6: explicit levels list overrides integer count
+                            _lvl_raw = ''
+                            if hasattr(self, 'contour_levels_explicit'):
+                                _lvl_raw = self.contour_levels_explicit.text().strip()
+                            if _lvl_raw:
+                                try:
+                                    lvl = [float(v) for v in _lvl_raw.split(',') if v.strip()]
+                                except ValueError:
+                                    lvl = _o('contour_levels', 10)
+                            else:
+                                lvl = _o('contour_levels', 10)
                             alp = _o('heat_alpha', 1.0)
+                            # Fix 4: optional vmin/vmax
+                            _vm_kw = {}
+                            if hasattr(self, 'heat_vminmax_enable') and self.heat_vminmax_enable.isChecked():
+                                _vm_kw = {'vmin': self.heat_vmin.value(), 'vmax': self.heat_vmax.value()}
+                            # Fix 5: contour line colour/width from settings
+                            _lc = _o('contour_line_color', '#000000')
+                            _lw = _o('contour_line_width', 0.5)
                             # Bug 3: track last mappable so colorbar is drawn regardless of
                             # which combination of filled/line contour is active.
                             _last_contour_m = None
                             if _o('heat_filled_contour', True):
-                                cf = ax.contourf(X, Y, Z, levels=lvl, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp)
+                                cf = ax.contourf(X, Y, Z, levels=lvl, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp, **_vm_kw)
                                 _last_contour_m = cf
                             if _o('heat_contour_lines', True):
-                                cs = ax.contour(X, Y, Z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
+                                cs = ax.contour(X, Y, Z, levels=lvl, colors=_lc, linewidths=_lw, alpha=0.5)
                                 if _last_contour_m is None: _last_contour_m = cs
                             if _last_contour_m is not None and _o('heat_colorbar', True):
                                 self.canvas.figure.colorbar(_last_contour_m, ax=ax)
-
             elif ct == 'Tricontour':
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
@@ -260,15 +294,19 @@ class PlotEngineMixin:
                         alp  = _o('tri_alpha', 1.0)
                         cmap = _cmap('tri_cmap_combo', 'tri_cmap')
                         last_mappable = None
-                        if _o('tri_tripcolor', False):
+                        _fill_mode = _o('tri_fill_mode', 'Filled contour')
+                        # Backward compat: old saves may have boolean tri_filled/tri_tripcolor
+                        if _fill_mode not in ('Filled contour', 'Face colours', 'None'):
+                            _fill_mode = 'Filled contour'
+                        if _fill_mode == 'Face colours':
                             tc = ax.tripcolor(x, y, z, cmap=cmap, alpha=alp)
                             last_mappable = tc
-                        if _o('tri_filled', True):
+                        elif _fill_mode == 'Filled contour':
                             cf = ax.tricontourf(x, y, z, levels=lvl, cmap=cmap, alpha=alp)
                             last_mappable = cf
                         if _o('tri_lines', True):
                             # Bug 4: assign to last_mappable so colorbar works when
-                            # tri_filled is OFF and only contour lines are drawn.
+                            # fill style is None and only contour lines are drawn.
                             tl = ax.tricontour(x, y, z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
                             if last_mappable is None: last_mappable = tl
                         if _o('tri_triplot', False):
@@ -283,18 +321,27 @@ class PlotEngineMixin:
                 if zc != '(none)' and zc in self.datasets and series:
                     xd, yd, lbl, _ = series[0]; z = self.datasets[zc]
                     if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        n = int(np.ceil(np.sqrt(min(len(xd), len(yd), len(z)))))
+                        # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
+                        from scipy.interpolate import griddata as _griddata
+                        xf = xd.astype(float); yf = yd.astype(float); zf = np.array(z, dtype=float)
+                        _mn = min(len(xf), len(yf), len(zf)); xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                        n = max(2, int(np.ceil(np.sqrt(_mn))))
+                        xi = np.linspace(np.min(xf), np.max(xf), n)
+                        yi = np.linspace(np.min(yf), np.max(yf), n)
+                        X, Y = np.meshgrid(xi, yi)
+                        Z = _griddata((xf, yf), zf, (X, Y), method='linear')
+                        Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
                         if n >= 2:  # Bug 19: guard against empty Z
-                            Z = np.full((n, n), np.nanmean(z))
-                            for k in range(min(len(z), n*n)): Z[k//n, k%n] = z[k]
-                            xi = np.linspace(np.min(xd), np.max(xd), n)
-                            yi = np.linspace(np.min(yd), np.max(yd), n)
-                            X, Y = np.meshgrid(xi, yi)
                             st = _o('surf_stride', 1); alp = _o('heat_alpha', 1.0)
                             if _o('surf_wireframe', False):
                                 ax.plot_wireframe(X, Y, Z, rstride=st, cstride=st, alpha=alp)
                             else:
-                                ax.plot_surface(X, Y, Z, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp, rstride=st, cstride=st)
+                                surf = ax.plot_surface(X, Y, Z, cmap=_cmap('cmap_combo', 'cmap'),
+                                                       alpha=alp, rstride=st, cstride=st)
+                                # Fix 7: honour heat_colorbar for 3D Surface
+                                if _o('heat_colorbar', True):
+                                    self.canvas.figure.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
+
 
             elif ct == 'Hist2D':
                 if series:
@@ -976,8 +1023,7 @@ class PlotEngineMixin:
             kw['loc'] = 'best'
         else:
             # For every named location, X/Y fine-tune the anchor point via bbox_to_anchor.
-            # 'manual' means the dropdown is just a helper label; treat as upper left.
-            kw['loc'] = 'upper left' if loc == 'manual' else loc
+            kw['loc'] = loc
             kw['bbox_to_anchor'] = (lx, ly)
         return kw
 
@@ -992,15 +1038,10 @@ class PlotEngineMixin:
         # n>1: per-subplot title from Axes tab (sp_titles[idx])
         _n_subplots = self.subplot_rows * self.subplot_cols
         if _n_subplots == 1:
-            # Bug 11: per-axis title was commented out and replaced with ax.set_title('').
-            # Restore it so title_input / title_size / title_color / title_font are honoured
-            # for single-subplot charts.  Suptitle is kept for n>1 layouts only.
-            show_title = self.title_check.isChecked()
-            title_txt = (self.title_input.text().strip() or self.title_input.placeholderText()) if show_title else ''
-            ax.set_title(_latex_safe(title_txt),
-                         fontsize=self.title_size.value(),
-                         color=self.title_color,
-                         fontfamily=self.title_font.currentText())
+            # Title for single-subplot charts is rendered via suptitle() in the
+            # render loop so that title_x/title_y controls work and the title
+            # does not move when subplot margins are adjusted.
+            ax.set_title('')
         else:
             show_title = self.subplot_title_show.get(subplot_idx, True)
             title_txt = (self.sp_titles.get(subplot_idx, '') or f'Subplot {subplot_idx+1}') if show_title else ''
@@ -1072,26 +1113,34 @@ class PlotEngineMixin:
         _series = self._get_series(primary_only=True)
         _x_is_cat = bool(_series) and self._is_categorical(_series[0][0])
         if not is3d:
-            if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
-                _horiz = ct == 'Bar' and self._sp_opt(subplot_idx, 'bar_horizontal', False)
-                _protect_y = _x_is_cat and _horiz
-                xs = self.subplot_xscales.get(subplot_idx, 'linear')
-                ys = self.subplot_yscales.get(subplot_idx, 'linear')
+            # Types where the axes are not in standard data-coordinates:
+            # Heatmap uses imshow pixel-space, Pie/Polar/Radar use non-Cartesian projections.
+            # Contour, Tricontour, Hist2D, Hexbin all use data coordinates and CAN receive
+            # set_xscale / set_xlim / set_ylim normally.
+            _NO_SCALE_TYPES  = {'Pie', 'Heatmap', 'Polar', 'Radar', '3D Surface'}
+            _NO_LIMITS_TYPES = _NO_X_TYPES | {'Pie', 'Heatmap'}
+            _horiz    = ct == 'Bar' and self._sp_opt(subplot_idx, 'bar_horizontal', False)
+            _protect_y = _x_is_cat and _horiz
+            xs = self.subplot_xscales.get(subplot_idx, 'linear')
+            ys = self.subplot_yscales.get(subplot_idx, 'linear')
+            if ct not in _NO_SCALE_TYPES:
                 if not _x_is_cat:  # never call set_xscale on categorical axes
                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
                     except Exception: ax.set_xscale('linear')
-                    if xs == 'inverted': ax.invert_xaxis()
                 if not _protect_y:
                     try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
                     except Exception: ax.set_yscale('linear')
-                    if ys == 'inverted': ax.invert_yaxis()
             xlim = self.subplot_xlims.get(subplot_idx)
-            _NO_LIMITS_TYPES = _NO_X_TYPES | {'Pie', 'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
             if xlim and ct not in _NO_LIMITS_TYPES and not _x_is_cat:
                 ax.set_xlim(xlim[0], xlim[1])
             ylim = self.subplot_ylims.get(subplot_idx)
             if ylim and ct not in _NO_LIMITS_TYPES:
                 ax.set_ylim(ylim[0], ylim[1])
+            # Bug 3 fix: apply axis inversion AFTER set_xlim/set_ylim so the
+            # inversion is not silently undone by a subsequent set_xlim call.
+            if ct not in _NO_SCALE_TYPES:
+                if not _x_is_cat and xs == 'inverted': ax.invert_xaxis()
+                if not _protect_y and ys == 'inverted': ax.invert_yaxis()
             if self.subplot_equal_aspect.get(subplot_idx, False) and ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                 except Exception: pass
@@ -1227,20 +1276,26 @@ class PlotEngineMixin:
                             ys = self.subplot_yscales.get(idx, 'linear')
                             # Bugs 15/16: guard scale and limits against heatmap-group types,
                             # mirroring the existing guard in the regular-grid path.
-                            _mosaic_no_scale = {'Pie', 'Heatmap', 'Contour', 'Tricontour',
-                                                'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface'}
+                            # Only Heatmap (imshow pixel-space) and non-Cartesian types
+                            # need scale/inversion suppressed.  Contour, Tricontour,
+                            # Hist2D, and Hexbin all use data coordinates and work fine.
+                            _mosaic_no_scale  = {'Pie', 'Heatmap', 'Polar', 'Radar', '3D Surface'}
+                            _mosaic_no_limits = {'Pie', 'Heatmap'}
                             if sub_ct not in _mosaic_no_scale:
                                 if cat_info is None:  # don't set_xscale for categorical axes
                                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
                                     except Exception: ax.set_xscale('linear')
-                                    if xs == 'inverted': ax.invert_xaxis()
                                 try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
                                 except Exception: ax.set_yscale('linear')
-                                if ys == 'inverted': ax.invert_yaxis()
-                                xlim = self.subplot_xlims.get(idx)
+                            xlim = self.subplot_xlims.get(idx)
+                            ylim = self.subplot_ylims.get(idx)
+                            if sub_ct not in _mosaic_no_limits:
                                 if xlim: ax.set_xlim(xlim[0], xlim[1])
-                                ylim = self.subplot_ylims.get(idx)
                                 if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
+                            if sub_ct not in _mosaic_no_scale:
+                                if cat_info is None and xs == 'inverted': ax.invert_xaxis()
+                                if ys == 'inverted': ax.invert_yaxis()
                             if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass
@@ -1332,21 +1387,23 @@ class PlotEngineMixin:
                                 if cat_info is None:  # skip set_xscale for categorical
                                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
                                     except Exception: ax.set_xscale('linear')
-                                    if xs == 'inverted': ax.invert_xaxis()
                                 _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
                                 _sub_x_is_cat = cat_info is not None
                                 _protect_y = _sub_x_is_cat and _sub_horiz
                                 if not _protect_y:
                                     try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
                                     except Exception: ax.set_yscale('linear')
-                                    if ys == 'inverted': ax.invert_yaxis()
-                            # Bug 13: exclude heatmap-group types from xlim/ylim — their
-                            # axes are managed internally by imshow/contourf/meshgrid.
-                            _grid_no_limits = {'Pie', 'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
+                            # Bug 13: only Heatmap (imshow pixel-space) needs this guard;
+                            # Contour, Tricontour, Hist2D, Hexbin all use data coordinates.
+                            _grid_no_limits = {'Pie', 'Heatmap'}
                             xlim = self.subplot_xlims.get(idx, None)
                             if xlim and sub_ct not in _grid_no_limits: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx, None)
                             if ylim and sub_ct not in _grid_no_limits: ax.set_ylim(ylim[0], ylim[1])
+                            # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
+                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
+                                if cat_info is None and xs == 'inverted': ax.invert_xaxis()
+                                if not _protect_y and ys == 'inverted': ax.invert_yaxis()
                             if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass
@@ -1407,17 +1464,20 @@ class PlotEngineMixin:
 
                 _n_sp = self.subplot_rows * self.subplot_cols
 
-                # ── Suptitle (n>1 only; single-subplot title lives inside the axes) ──
+                # ── Suptitle (all layouts, including single-subplot) ─────────────────
+                # Using suptitle for n==1 too ensures title_x/title_y controls work
+                # and the title stays fixed when subplot margins are adjusted.
                 _show_sup = self.title_check.isChecked()
-                _sup_text = _latex_safe(self.title_input.text().strip()) if _show_sup else ''
+                # For a single subplot, fall back to the placeholder text so the
+                # title field always shows something when the input is empty.
+                _sup_raw = self.title_input.text().strip()
+                if not _sup_raw and _n_sp == 1:
+                    _sup_raw = self.title_input.placeholderText()
+                _sup_text = _latex_safe(_sup_raw) if _show_sup else ''
                 _title_y_fig = getattr(self, 'title_y', self.title_y_offset if hasattr(self, 'title_y_offset') else None)
                 _ty = _title_y_fig.value() if _title_y_fig else 0.97
 
-                # made by me
-                # if _show_sup and _sup_text and _n_sp > 1:
-                # Bug 11: suptitle is now n>1 only; the single-subplot title is rendered
-                # via ax.set_title inside _decorate to preserve per-axis styling controls.
-                if _show_sup and _sup_text and _n_sp > 1:
+                if _show_sup and _sup_text:
                     # Place suptitle at the user-set position (in canvas-box coords).
                     # Do NOT clamp adj_top here — title_y only controls where the text
                     # sits; subplot margins are controlled independently by fig_top.
@@ -1429,6 +1489,8 @@ class PlotEngineMixin:
                         x=self.title_x.value() if hasattr(self, 'title_x') else 0.5,
                         y=title_y_canvas,
                         ha='center', va='top', transform=self.canvas.figure.transFigure)
+                else:
+                    self.canvas.figure.suptitle('')
 
                 _hspace = self.sp_hspace.value() if hasattr(self, 'sp_hspace') else 0.35
                 _wspace = self.sp_wspace.value() if hasattr(self, 'sp_wspace') else 0.35
@@ -1543,14 +1605,15 @@ class PlotEngineMixin:
                             if cat_info is None:
                                 try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
                                 except Exception: ax.set_xscale('linear')
-                                if xs == 'inverted': ax.invert_xaxis()
                             try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
                             except Exception: ax.set_yscale('linear')
-                            if ys == 'inverted': ax.invert_yaxis()
                             xlim = self.subplot_xlims.get(idx)
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
+                            if cat_info is None and xs == 'inverted': ax.invert_xaxis()
+                            if ys == 'inverted': ax.invert_yaxis()
                             if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass
@@ -1637,17 +1700,19 @@ class PlotEngineMixin:
                                 if cat_info is None:
                                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
                                     except Exception: ax.set_xscale('linear')
-                                    if xs == 'inverted': ax.invert_xaxis()
                                 _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
                                 _protect_y = (cat_info is not None) and _sub_horiz
                                 if not _protect_y:
                                     try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
                                     except Exception: ax.set_yscale('linear')
-                                    if ys == 'inverted': ax.invert_yaxis()
                             xlim = self.subplot_xlims.get(idx)
                             if xlim: ax.set_xlim(xlim[0], xlim[1])
                             ylim = self.subplot_ylims.get(idx)
                             if ylim: ax.set_ylim(ylim[0], ylim[1])
+                            # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
+                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
+                                if cat_info is None and xs == 'inverted': ax.invert_xaxis()
+                                if not _protect_y and ys == 'inverted': ax.invert_yaxis()
                             if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass

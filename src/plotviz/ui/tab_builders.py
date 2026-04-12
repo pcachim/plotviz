@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QFrame, QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView,
     QTabWidget, QSizePolicy, QPlainTextEdit,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QObject, QEvent
 from PyQt6.QtGui import QFont
 from data.scientific import CurveFitter
 
@@ -138,6 +138,19 @@ def add_custom_palette(name: str, colors: list):
     _CUSTOM_PALETTES[name] = colors[:16]
 
 _FONTS = ['sans-serif', 'serif', 'monospace']
+
+
+class _ClampWidth(QObject):
+    """Event-filter that keeps a widget's width <= the watched object's width.
+    Used to prevent content widgets inside QScrollArea from growing horizontally
+    beyond the viewport, which would trigger unwanted horizontal scrolling."""
+    def __init__(self, target, parent=None):
+        super().__init__(parent)
+        self._target = target
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.Resize:
+            self._target.setMaximumWidth(obj.width())
+        return False
 
 
 class TabBuildersMixin:
@@ -345,6 +358,7 @@ class TabBuildersMixin:
     def create_data_tab(self):
         widget = QWidget()
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget()
         layout = QVBoxLayout(content)
 
@@ -376,8 +390,11 @@ class TabBuildersMixin:
         self.series_table.setHorizontalHeaderLabels(['X column', 'Y column', 'Label', 'Type', 'Plot', 'Y2'])
         hh = self.series_table.horizontalHeader()
         hh.setStretchLastSection(False)
-        hh.resizeSection(0, 90); hh.resizeSection(1, 90); hh.resizeSection(2, 80)
-        hh.resizeSection(3, 75); hh.resizeSection(4, 36); hh.resizeSection(5, 30)
+        # Stretch X, Y, Label, Type proportionally; keep Plot and Y2 fixed-width
+        for _ci in (0, 1, 2, 3):
+            hh.setSectionResizeMode(_ci, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed); hh.resizeSection(4, 38)
+        hh.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed); hh.resizeSection(5, 32)
         self.series_table.setMinimumHeight(140)
         self.series_table.setSizePolicy(
             __import__('PyQt6.QtWidgets', fromlist=['QSizePolicy']).QSizePolicy.Policy.Expanding,
@@ -454,7 +471,9 @@ class TabBuildersMixin:
 
         layout.addStretch()
         scroll.setWidget(content)
-        mlay = QVBoxLayout(widget); mlay.addWidget(scroll)
+        _cw = _ClampWidth(content, scroll)
+        scroll.viewport().installEventFilter(_cw)
+        mlay = QVBoxLayout(widget); mlay.setContentsMargins(0,0,0,0); mlay.addWidget(scroll)
         self.plots_inner_tabs.addTab(widget, 'Data')
         self._on_plot_mode_changed('Standard')
 
@@ -495,9 +514,39 @@ class TabBuildersMixin:
         # - Interpolation:  relevant for Heatmap only (imshow uses it; the others don't)
         self._heat_contour_levels_row = QWidget()
         _cl_h = QHBoxLayout(self._heat_contour_levels_row); _cl_h.setContentsMargins(0, 0, 0, 0)
-        _cl_h.addWidget(QLabel('Contour levels:')); _cl_h.addWidget(self._make_spin('contour_levels', 3, 100, 10))
+        _cl_h.addWidget(QLabel('Contour levels:'))
+        _cl_h.addWidget(self._make_spin('contour_levels', 3, 100, 10))
+        # Fix 6: explicit level values as comma-separated list; if non-empty, overrides the spin
+        self.contour_levels_explicit = QLineEdit()
+        self.contour_levels_explicit.setPlaceholderText('0.1,0.5,1.0…')
+        self.contour_levels_explicit.setToolTip('Explicit level values (comma-separated). Leave blank to use the count above.')
+        self.contour_levels_explicit.setMinimumWidth(0)
+        self.contour_levels_explicit.editingFinished.connect(self.update_preview)
+        _cl_h.addWidget(self.contour_levels_explicit)
         hgb.addWidget(self._heat_contour_levels_row)
         hgb.addLayout(_row(QLabel('Alpha:'), self._make_dbl_spin('heat_alpha', 0.05, 1.0, 1.0, 0.05)))
+        # Fix 4: vmin / vmax for colormap range pinning (Heatmap + Contour)
+        self._heat_vminmax_row = QWidget()
+        _vm_h = QHBoxLayout(self._heat_vminmax_row); _vm_h.setContentsMargins(0, 0, 0, 0)
+        _vm_h.addWidget(QLabel('vmin:'))
+        self.heat_vmin = QDoubleSpinBox(); self.heat_vmin.setRange(-1e9, 1e9); self.heat_vmin.setValue(0.0)
+        self.heat_vmin.setSpecialValueText('auto'); self.heat_vmin.setSingleStep(0.1)
+        self.heat_vmin.setDecimals(4); self.heat_vmin.setEnabled(False)
+        _vm_h.addWidget(self.heat_vmin)
+        _vm_h.addWidget(QLabel('vmax:'))
+        self.heat_vmax = QDoubleSpinBox(); self.heat_vmax.setRange(-1e9, 1e9); self.heat_vmax.setValue(1.0)
+        self.heat_vmax.setSpecialValueText('auto'); self.heat_vmax.setSingleStep(0.1)
+        self.heat_vmax.setDecimals(4); self.heat_vmax.setEnabled(False)
+        _vm_h.addWidget(self.heat_vmax)
+        self.heat_vminmax_enable = QCheckBox('Pin range')
+        self.heat_vminmax_enable.stateChanged.connect(lambda s: (
+            self.heat_vmin.setEnabled(bool(s)),
+            self.heat_vmax.setEnabled(bool(s)),
+            self.update_preview()))
+        self.heat_vmin.valueChanged.connect(self.update_preview)
+        self.heat_vmax.valueChanged.connect(self.update_preview)
+        _vm_h.addWidget(self.heat_vminmax_enable)
+        hgb.addWidget(self._heat_vminmax_row)
         self._heat_interpolation_row = QWidget()
         _hi_h = QHBoxLayout(self._heat_interpolation_row); _hi_h.setContentsMargins(0, 0, 0, 0)
         _hi_h.addWidget(QLabel('Interpolation:'))
@@ -505,10 +554,31 @@ class TabBuildersMixin:
             ['nearest','bilinear','bicubic','lanczos','spline16','gaussian']))
         hgb.addWidget(self._heat_interpolation_row)
         self.heat_colorbar     = QCheckBox('Show colorbar');         self.heat_colorbar.setChecked(True);     self.heat_colorbar.stateChanged.connect(self.update_preview);     hgb.addWidget(self.heat_colorbar)
-        self.heat_filled_contour = QCheckBox('Filled contour');      self.heat_filled_contour.setChecked(True); self.heat_filled_contour.stateChanged.connect(self.update_preview); hgb.addWidget(self.heat_filled_contour)
-        self.heat_contour_lines  = QCheckBox('Contour line overlay'); self.heat_contour_lines.setChecked(True);  self.heat_contour_lines.stateChanged.connect(self.update_preview);  hgb.addWidget(self.heat_contour_lines)
-        hgb.addLayout(_row(QLabel('3D stride:'), self._make_spin('surf_stride', 1, 10, 1)))
-        self.surf_wireframe = QCheckBox('Wireframe (3D)'); self.surf_wireframe.stateChanged.connect(self.update_preview); hgb.addWidget(self.surf_wireframe)
+        # Fix 2: wrap Filled contour / Contour line overlay in a container — only shown for Contour
+        self._heat_contour_style_row = QWidget()
+        _cs_h = QHBoxLayout(self._heat_contour_style_row); _cs_h.setContentsMargins(0, 0, 0, 0)
+        self.heat_filled_contour = QCheckBox('Filled contour')
+        self.heat_filled_contour.setChecked(True); self.heat_filled_contour.stateChanged.connect(self.update_preview)
+        self.heat_contour_lines  = QCheckBox('Contour line overlay')
+        self.heat_contour_lines.setChecked(True);  self.heat_contour_lines.stateChanged.connect(self.update_preview)
+        _cs_h.addWidget(self.heat_filled_contour); _cs_h.addWidget(self.heat_contour_lines)
+        hgb.addWidget(self._heat_contour_style_row)
+        # Fix 5: contour line colour and width controls (Contour only)
+        self._heat_contour_line_style_row = QWidget()
+        _cls_h = QHBoxLayout(self._heat_contour_line_style_row); _cls_h.setContentsMargins(0, 0, 0, 0)
+        _cls_h.addWidget(QLabel('Line colour:'))
+        _cls_h.addWidget(self._make_color_btn('contour_line_color', '#000000'))
+        _cls_h.addWidget(QLabel('  Width:'))
+        _cls_h.addWidget(self._make_dbl_spin('contour_line_width', 0.1, 10.0, 0.5, 0.1))
+        hgb.addWidget(self._heat_contour_line_style_row)
+        # Fix 2: wrap 3D-specific controls in a container — only shown for 3D Surface
+        self._heat_3d_row = QWidget()
+        _3d_h = QHBoxLayout(self._heat_3d_row); _3d_h.setContentsMargins(0, 0, 0, 0)
+        _3d_h.addWidget(QLabel('3D stride:'))
+        _3d_h.addWidget(self._make_spin('surf_stride', 1, 10, 1))
+        self.surf_wireframe = QCheckBox('Wireframe (3D)'); self.surf_wireframe.stateChanged.connect(self.update_preview)
+        _3d_h.addWidget(self.surf_wireframe)
+        hgb.addWidget(self._heat_3d_row)
         layout.addWidget(self.heat_group)
 
         # ── Tricontour ────────────────────────────────────────────────────────
@@ -517,10 +587,10 @@ class TabBuildersMixin:
         tg.addLayout(_row(QLabel('Colormap:'),      self._make_combo('tri_cmap_combo', _CMAP_LIST, default='rainbow')))
         tg.addLayout(_row(QLabel('Levels:'),         self._make_spin('tri_levels', 3, 100, 10)))
         tg.addLayout(_row(QLabel('Alpha:'),          self._make_dbl_spin('tri_alpha', 0.05, 1.0, 1.0, 0.05)))
-        self.tri_filled    = QCheckBox('tricontourf  (filled contour)'); self.tri_filled.setChecked(True);   self.tri_filled.stateChanged.connect(self.update_preview);   tg.addWidget(self.tri_filled)
-        self.tri_lines     = QCheckBox('tricontour   (contour lines)');  self.tri_lines.setChecked(True);    self.tri_lines.stateChanged.connect(self.update_preview);    tg.addWidget(self.tri_lines)
-        self.tri_triplot   = QCheckBox('triplot       (mesh edges)');     self.tri_triplot.setChecked(False); self.tri_triplot.stateChanged.connect(self.update_preview);  tg.addWidget(self.tri_triplot)
-        self.tri_tripcolor = QCheckBox('tripcolor     (face colours)');   self.tri_tripcolor.setChecked(False); self.tri_tripcolor.stateChanged.connect(self.update_preview); tg.addWidget(self.tri_tripcolor)
+        tg.addLayout(_row(QLabel('Fill style:'), self._make_combo('tri_fill_mode',
+            ['Filled contour', 'Face colours', 'None'], default='Filled contour')))
+        self.tri_lines   = QCheckBox('Contour lines'); self.tri_lines.setChecked(True);   self.tri_lines.stateChanged.connect(self.update_preview);  tg.addWidget(self.tri_lines)
+        self.tri_triplot = QCheckBox('Mesh edges');    self.tri_triplot.setChecked(False); self.tri_triplot.stateChanged.connect(self.update_preview); tg.addWidget(self.tri_triplot)
         self.tri_colorbar  = QCheckBox('Show colorbar');                   self.tri_colorbar.setChecked(True);   self.tri_colorbar.stateChanged.connect(self.update_preview);  tg.addWidget(self.tri_colorbar)
         layout.addWidget(self.tri_group)
         self.pie_group = QGroupBox('Pie Options')
@@ -816,12 +886,14 @@ class TabBuildersMixin:
         xlim_row.addWidget(QLabel('X min:'))
         self.x_min = QDoubleSpinBox(); self.x_min.setRange(-1e10, 1e10); self.x_min.setSingleStep(0.1)
         self.x_min.setFixedWidth(_LW)
-        self.x_min.editingFinished.connect(self._on_sp_lim_changed)
+        self.x_min.setEnabled(False)  # disabled while Auto is checked
+        self.x_min.valueChanged.connect(self._on_sp_lim_changed)
         xlim_row.addWidget(self.x_min)
         xlim_row.addWidget(QLabel('max:'))
         self.x_max = QDoubleSpinBox(); self.x_max.setRange(-1e10, 1e10); self.x_max.setValue(1); self.x_max.setSingleStep(0.1)
         self.x_max.setFixedWidth(_LW)
-        self.x_max.editingFinished.connect(self._on_sp_lim_changed)
+        self.x_max.setEnabled(False)  # disabled while Auto is checked
+        self.x_max.valueChanged.connect(self._on_sp_lim_changed)
         xlim_row.addWidget(self.x_max)
         xlim_row.addStretch()
         layout.addLayout(xlim_row)
@@ -943,12 +1015,14 @@ class TabBuildersMixin:
         ylim_row.addWidget(QLabel('Y min:'))
         self.y_min = QDoubleSpinBox(); self.y_min.setRange(-1e10, 1e10); self.y_min.setSingleStep(0.1)
         self.y_min.setFixedWidth(_LW)
-        self.y_min.editingFinished.connect(self._on_sp_lim_changed)
+        self.y_min.setEnabled(False)  # disabled while Auto is checked
+        self.y_min.valueChanged.connect(self._on_sp_lim_changed)
         ylim_row.addWidget(self.y_min)
         ylim_row.addWidget(QLabel('max:'))
         self.y_max = QDoubleSpinBox(); self.y_max.setRange(-1e10, 1e10); self.y_max.setValue(1); self.y_max.setSingleStep(0.1)
         self.y_max.setFixedWidth(_LW)
-        self.y_max.editingFinished.connect(self._on_sp_lim_changed)
+        self.y_max.setEnabled(False)  # disabled while Auto is checked
+        self.y_max.valueChanged.connect(self._on_sp_lim_changed)
         ylim_row.addWidget(self.y_max)
         ylim_row.addStretch()
         layout.addLayout(ylim_row)
@@ -1076,12 +1150,14 @@ class TabBuildersMixin:
         y2lim_row.addWidget(QLabel('Y2 min:'))
         self.y2_min = QDoubleSpinBox(); self.y2_min.setRange(-1e10, 1e10); self.y2_min.setSingleStep(0.1)
         self.y2_min.setFixedWidth(_LW)
-        self.y2_min.editingFinished.connect(self._on_sp_lim_changed)
+        self.y2_min.setEnabled(False)  # disabled while Auto is checked
+        self.y2_min.valueChanged.connect(self._on_sp_lim_changed)
         y2lim_row.addWidget(self.y2_min)
         y2lim_row.addWidget(QLabel('max:'))
         self.y2_max = QDoubleSpinBox(); self.y2_max.setRange(-1e10, 1e10); self.y2_max.setValue(1); self.y2_max.setSingleStep(0.1)
         self.y2_max.setFixedWidth(_LW)
-        self.y2_max.editingFinished.connect(self._on_sp_lim_changed)
+        self.y2_max.setEnabled(False)  # disabled while Auto is checked
+        self.y2_max.valueChanged.connect(self._on_sp_lim_changed)
         y2lim_row.addWidget(self.y2_max)
         y2lim_row.addStretch()
         layout.addLayout(y2lim_row)
@@ -1710,33 +1786,44 @@ class TabBuildersMixin:
         leg_check_row = QHBoxLayout(); leg_check_row.setSpacing(6)
         self.legend_show_check = QCheckBox('Show legend'); self.legend_show_check.setChecked(True)
         self.legend_show_check.stateChanged.connect(self._on_sp_legend_changed)
-        leg_check_row.addWidget(self.legend_show_check); leg_check_row.addStretch()
+        leg_check_row.addWidget(self.legend_show_check)
+        leg_check_row.addSpacing(12)
+        self.legend_auto_pos = QCheckBox('Auto position'); self.legend_auto_pos.setChecked(True)
+        self.legend_auto_pos.setToolTip('Let matplotlib pick the best legend position automatically')
+        self.legend_auto_pos.stateChanged.connect(self._on_sp_legend_changed)
+        self.legend_auto_pos.stateChanged.connect(self._update_legend_pos_enabled)
+        leg_check_row.addWidget(self.legend_auto_pos)
+        leg_check_row.addStretch()
         layout.addLayout(leg_check_row)
 
         # Location dropdown + fine X/Y position
         leg_loc_row = QHBoxLayout(); leg_loc_row.setSpacing(4)
         leg_loc_row.addWidget(QLabel('Position:'))
         self.legend_pos = QComboBox()
-        self.legend_pos.addItems(['best', 'upper right', 'upper left', 'upper center',
-                                  'lower right', 'lower left', 'lower center',
-                                  'center right', 'center left', 'center', 'manual'])
+        self.legend_pos.addItems(['upper left', 'upper center', 'upper right',
+                                  'center left', 'center', 'center right',
+                                  'lower left', 'lower center', 'lower right'])
         self.legend_pos.currentTextChanged.connect(self._on_sp_legend_changed)
         leg_loc_row.addWidget(self.legend_pos)
-        leg_loc_row.addWidget(QLabel('X:'))
+        self._legend_x_label = QLabel('X:')
+        leg_loc_row.addWidget(self._legend_x_label)
         self.legend_x = QDoubleSpinBox(); self.legend_x.setRange(0.0, 1.5)
         self.legend_x.setSingleStep(0.01); self.legend_x.setDecimals(2)
         self.legend_x.setValue(0.01); self.legend_x.setFixedWidth(60)
-        self.legend_x.setToolTip('Fine X position (figure fraction); active for all positions except "best"')
+        self.legend_x.setToolTip('Fine X position (figure fraction); used when Auto position is off')
         self.legend_x.valueChanged.connect(self._on_sp_legend_changed)
         leg_loc_row.addWidget(self.legend_x)
-        leg_loc_row.addWidget(QLabel('Y:'))
+        self._legend_y_label = QLabel('Y:')
+        leg_loc_row.addWidget(self._legend_y_label)
         self.legend_y = QDoubleSpinBox(); self.legend_y.setRange(0.0, 1.5)
         self.legend_y.setSingleStep(0.01); self.legend_y.setDecimals(2)
         self.legend_y.setValue(0.99); self.legend_y.setFixedWidth(60)
-        self.legend_y.setToolTip('Fine Y position (figure fraction); active for all positions except "best"')
+        self.legend_y.setToolTip('Fine Y position (figure fraction); used when Auto position is off')
         self.legend_y.valueChanged.connect(self._on_sp_legend_changed)
         leg_loc_row.addWidget(self.legend_y)
         leg_loc_row.addStretch(); layout.addLayout(leg_loc_row)
+        # Reflect the initial auto-on state (combo + X/Y start disabled)
+        self._update_legend_pos_enabled()
 
         # Font size + columns
         leg_style_row = QHBoxLayout(); leg_style_row.setSpacing(4)
@@ -2092,7 +2179,105 @@ class TabBuildersMixin:
         self.fxy_y_mode_range.toggled.connect(_fxy_ytog)
         inner_tabs.addTab(fxy_content, 'z=f(x,y)')
 
-        # ── Inner tab 3 — Manual Data Table ───────────────────────────────────
+        # ── Inner tab 3 — (u, v) = f(x, y) vector-field generator ────────────
+        fuv_content = QWidget()
+        fuv_lay = QVBoxLayout(fuv_content); fuv_lay.setSpacing(4); fuv_lay.setContentsMargins(8,8,8,8)
+        fuv_lay.addWidget(self._sec_label('(u, v) = f(x, y)  Generator'))
+        _fuv_sp_tip = ('linspace  — evenly spaced in linear scale\n'
+                       'logspace  — evenly spaced in log₁₀ scale (start/stop are exponents)\n'
+                       'geomspace — evenly spaced in log scale (start/stop must be > 0)\n'
+                       'random    — Normal(μ=mid, σ=(max−min)/6), sorted ascending\n'
+                       'uniform   — Uniform(start, stop), sorted ascending')
+        # ─ X series ─
+        fuv_lay.addWidget(self._sec_label('x series'))
+        _fuvxm = QHBoxLayout(); _fuvxm.setSpacing(4); _fuvxm.addWidget(QLabel('Input:'))
+        self.fuv_x_mode_range = QRadioButton('range'); self.fuv_x_mode_range.setChecked(True)
+        self.fuv_x_mode_col   = QRadioButton('column')
+        _fuvxm.addWidget(self.fuv_x_mode_range); _fuvxm.addWidget(self.fuv_x_mode_col); _fuvxm.addStretch(); fuv_lay.addLayout(_fuvxm)
+        self._fuv_x_range_widget = QWidget()
+        _fuvxrw = QVBoxLayout(self._fuv_x_range_widget); _fuvxrw.setContentsMargins(0,0,0,0); _fuvxrw.setSpacing(2)
+        _fuvxr = QHBoxLayout(); _fuvxr.setSpacing(4); _fuvxr.addWidget(QLabel('x:'))
+        self.fuv_x_min = QDoubleSpinBox(); self.fuv_x_min.setRange(-1e9,1e9); self.fuv_x_min.setValue(0); self.fuv_x_min.setDecimals(3); self.fuv_x_min.setFixedWidth(68)
+        _fuvxr.addWidget(self.fuv_x_min); _fuvxr.addWidget(QLabel('→'))
+        self.fuv_x_max = QDoubleSpinBox(); self.fuv_x_max.setRange(-1e9,1e9); self.fuv_x_max.setValue(10); self.fuv_x_max.setDecimals(3); self.fuv_x_max.setFixedWidth(68)
+        _fuvxr.addWidget(self.fuv_x_max); _fuvxr.addWidget(QLabel('n:'))
+        self.fuv_x_n = QSpinBox(); self.fuv_x_n.setRange(2,100000); self.fuv_x_n.setValue(20); self.fuv_x_n.setFixedWidth(56)
+        _fuvxr.addWidget(self.fuv_x_n); _fuvxr.addStretch(); _fuvxrw.addLayout(_fuvxr)
+        _fuvxsp = QHBoxLayout(); _fuvxsp.setSpacing(4); _fuvxsp.addWidget(QLabel('spacing:'))
+        self.fuv_x_spacing = QComboBox(); self.fuv_x_spacing.addItems(['linspace','logspace','geomspace','random','uniform'])
+        self.fuv_x_spacing.setToolTip(_fuv_sp_tip); self.fuv_x_spacing.setFixedWidth(96)
+        _fuvxsp.addWidget(self.fuv_x_spacing); _fuvxsp.addStretch(); _fuvxrw.addLayout(_fuvxsp)
+        _fuvxcn = QHBoxLayout(); _fuvxcn.setSpacing(4); _fuvxcn.addWidget(QLabel('x col:'))
+        self.fuv_x_col_name = QLineEdit('x'); self.fuv_x_col_name.setFixedWidth(60)
+        _fuvxcn.addWidget(self.fuv_x_col_name); _fuvxcn.addStretch(); _fuvxrw.addLayout(_fuvxcn)
+        fuv_lay.addWidget(self._fuv_x_range_widget)
+        self._fuv_x_col_widget = QWidget()
+        _fuvxcw = QHBoxLayout(self._fuv_x_col_widget); _fuvxcw.setContentsMargins(0,0,0,0); _fuvxcw.setSpacing(4)
+        _fuvxcw.addWidget(QLabel('x col:')); self.fuv_x_combo = QComboBox(); self.fuv_x_combo.setMinimumWidth(90)
+        _fuvxcw.addWidget(self.fuv_x_combo); _fuvxcw.addWidget(QLabel('as:'))
+        self.fuv_x_var = QLineEdit('x'); self.fuv_x_var.setFixedWidth(36)
+        _fuvxcw.addWidget(self.fuv_x_var); _fuvxcw.addStretch()
+        fuv_lay.addWidget(self._fuv_x_col_widget); self._fuv_x_col_widget.setVisible(False)
+        # ─ Y series ─
+        fuv_lay.addWidget(self._sec_label('y series'))
+        _fuvym = QHBoxLayout(); _fuvym.setSpacing(4); _fuvym.addWidget(QLabel('Input:'))
+        self.fuv_y_mode_range = QRadioButton('range'); self.fuv_y_mode_range.setChecked(True)
+        self.fuv_y_mode_col   = QRadioButton('column')
+        _fuvym.addWidget(self.fuv_y_mode_range); _fuvym.addWidget(self.fuv_y_mode_col); _fuvym.addStretch(); fuv_lay.addLayout(_fuvym)
+        self._fuv_y_range_widget = QWidget()
+        _fuvyrw = QVBoxLayout(self._fuv_y_range_widget); _fuvyrw.setContentsMargins(0,0,0,0); _fuvyrw.setSpacing(2)
+        _fuvyr = QHBoxLayout(); _fuvyr.setSpacing(4); _fuvyr.addWidget(QLabel('y:'))
+        self.fuv_y_min = QDoubleSpinBox(); self.fuv_y_min.setRange(-1e9,1e9); self.fuv_y_min.setValue(0); self.fuv_y_min.setDecimals(3); self.fuv_y_min.setFixedWidth(68)
+        _fuvyr.addWidget(self.fuv_y_min); _fuvyr.addWidget(QLabel('→'))
+        self.fuv_y_max = QDoubleSpinBox(); self.fuv_y_max.setRange(-1e9,1e9); self.fuv_y_max.setValue(10); self.fuv_y_max.setDecimals(3); self.fuv_y_max.setFixedWidth(68)
+        _fuvyr.addWidget(self.fuv_y_max); _fuvyr.addWidget(QLabel('n:'))
+        self.fuv_y_n = QSpinBox(); self.fuv_y_n.setRange(2,100000); self.fuv_y_n.setValue(20); self.fuv_y_n.setFixedWidth(56)
+        _fuvyr.addWidget(self.fuv_y_n); _fuvyr.addStretch(); _fuvyrw.addLayout(_fuvyr)
+        _fuvysp = QHBoxLayout(); _fuvysp.setSpacing(4); _fuvysp.addWidget(QLabel('spacing:'))
+        self.fuv_y_spacing = QComboBox(); self.fuv_y_spacing.addItems(['linspace','logspace','geomspace','random','uniform'])
+        self.fuv_y_spacing.setToolTip(_fuv_sp_tip); self.fuv_y_spacing.setFixedWidth(96)
+        _fuvysp.addWidget(self.fuv_y_spacing); _fuvysp.addStretch(); _fuvyrw.addLayout(_fuvysp)
+        _fuvycn = QHBoxLayout(); _fuvycn.setSpacing(4); _fuvycn.addWidget(QLabel('y col:'))
+        self.fuv_y_col_name = QLineEdit('y'); self.fuv_y_col_name.setFixedWidth(60)
+        _fuvycn.addWidget(self.fuv_y_col_name); _fuvycn.addStretch(); _fuvyrw.addLayout(_fuvycn)
+        fuv_lay.addWidget(self._fuv_y_range_widget)
+        self._fuv_y_col_widget = QWidget()
+        _fuvycw = QHBoxLayout(self._fuv_y_col_widget); _fuvycw.setContentsMargins(0,0,0,0); _fuvycw.setSpacing(4)
+        _fuvycw.addWidget(QLabel('y col:')); self.fuv_y_combo = QComboBox(); self.fuv_y_combo.setMinimumWidth(90)
+        _fuvycw.addWidget(self.fuv_y_combo); _fuvycw.addWidget(QLabel('as:'))
+        self.fuv_y_var = QLineEdit('y'); self.fuv_y_var.setFixedWidth(36)
+        _fuvycw.addWidget(self.fuv_y_var); _fuvycw.addStretch()
+        fuv_lay.addWidget(self._fuv_y_col_widget); self._fuv_y_col_widget.setVisible(False)
+        # ─ Meshgrid ─
+        self.fuv_meshgrid = QCheckBox('Meshgrid  (expand x × y → n² points)')
+        self.fuv_meshgrid.setChecked(True)
+        self.fuv_meshgrid.setToolTip(
+            'When checked, a full meshgrid is created (every x_i × y_j combination).\n'
+            'x, y, u, and v columns are all flattened to length nx * ny.\n'
+            'Ideal for Quiver, Barbs, or Streamplot.')
+        fuv_lay.addWidget(self.fuv_meshgrid)
+        # ─ Expressions & output ─
+        fuv_lay.addWidget(QLabel('u = expr (np, sin, cos, exp, log, pi …):'))
+        self.fuv_u_expr = QLineEdit('cos(y)'); fuv_lay.addWidget(self.fuv_u_expr)
+        _fuvun = QHBoxLayout(); _fuvun.setSpacing(4); _fuvun.addWidget(QLabel('u col:'))
+        self.fuv_u_name = QLineEdit('u'); self.fuv_u_name.setFixedWidth(60)
+        _fuvun.addWidget(self.fuv_u_name); _fuvun.addStretch(); fuv_lay.addLayout(_fuvun)
+        fuv_lay.addWidget(QLabel('v = expr (np, sin, cos, exp, log, pi …):'))
+        self.fuv_v_expr = QLineEdit('sin(x)'); fuv_lay.addWidget(self.fuv_v_expr)
+        _fuvvn = QHBoxLayout(); _fuvvn.setSpacing(4); _fuvvn.addWidget(QLabel('v col:'))
+        self.fuv_v_name = QLineEdit('v'); self.fuv_v_name.setFixedWidth(60)
+        _fuvvn.addWidget(self.fuv_v_name); _fuvvn.addStretch(); fuv_lay.addLayout(_fuvvn)
+        btn_fuv = QPushButton('▶  Generate u, v')
+        btn_fuv.clicked.connect(self._generate_fuv); fuv_lay.addWidget(btn_fuv)
+        self.fuv_status = QLabel(''); self.fuv_status.setStyleSheet('color:#555;font-size:11px;')
+        fuv_lay.addWidget(self.fuv_status); fuv_lay.addStretch()
+        def _fuv_xtog(): r = self.fuv_x_mode_range.isChecked(); self._fuv_x_range_widget.setVisible(r); self._fuv_x_col_widget.setVisible(not r)
+        def _fuv_ytog(): r = self.fuv_y_mode_range.isChecked(); self._fuv_y_range_widget.setVisible(r); self._fuv_y_col_widget.setVisible(not r)
+        self.fuv_x_mode_range.toggled.connect(_fuv_xtog)
+        self.fuv_y_mode_range.toggled.connect(_fuv_ytog)
+        inner_tabs.addTab(fuv_content, '(u,v)=f(x,y)')
+
+        # ── Inner tab 4 — Manual Data Table ───────────────────────────────────
         dt_widget = QWidget()
         dt_lay = QVBoxLayout(dt_widget); dt_lay.setSpacing(5); dt_lay.setContentsMargins(8,8,8,8)
 

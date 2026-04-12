@@ -24,7 +24,13 @@ def _esc(s):
     return str(s).replace('\\', '\\\\').replace("'", "\\'")
 
 
-def _col_ref(col, use_combined=True, datasets=None):
+# Context flag set by generate_plot_script before invoking any generator so that
+# module-level generator functions emit the correct column reference style even
+# when datasets have different lengths (multi-CSV mode).
+_USE_COMBINED: bool = True
+
+
+def _col_ref(col, use_combined=None, datasets=None):
     """Return a Python expression to reference a dataset column.
 
     When all columns share the same length (use_combined=True) they are read
@@ -32,7 +38,8 @@ def _col_ref(col, use_combined=True, datasets=None):
     When columns differ in length each is in its own ``_df_<safe>`` frame and
     we emit ``_df_<safe>['col']`` to avoid NaN-padding from pd.concat.
     """
-    if use_combined or datasets is None:
+    uc = _USE_COMBINED if use_combined is None else use_combined
+    if uc or datasets is None:
         return f"df['{_esc(col)}']"
     safe = col.replace(' ', '_').replace('-', '_')
     return f"_df_{safe}['{_esc(col)}']"
@@ -147,13 +154,22 @@ def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palett
 
 def _gen_histogram(settings, series, datasets, palette, ax_var):
     lines = []
+    bins      = settings.get('hist_bins', 20)
+    histtype  = settings.get('hist_histtype', 'bar')
+    orient    = settings.get('hist_orientation', 'vertical')
+    alpha     = settings.get('heat_alpha', 0.7)
+    edgecolor = settings.get('hist_edgecolor', 'white')
     for i, s in enumerate(series):
         yc  = s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
         st  = _series_style(settings, s, i, palette)
         col = f"'{st['color']}'"
         if yc:
-            lines.append(f"{ax_var}.hist({_col_ref(yc)}.dropna(), bins=25, label='{lbl}', color={col}, alpha=0.7)")
+            lines.append(
+                f"{ax_var}.hist({_col_ref(yc)}.dropna(), bins={bins}, label='{lbl}', "
+                f"color={col}, alpha={alpha}, histtype='{_esc(histtype)}', "
+                f"orientation='{_esc(orient)}', edgecolor='{_esc(edgecolor)}')"
+            )
     return lines
 
 
@@ -240,51 +256,62 @@ def _gen_polar(settings, series, datasets, palette, ax_var):
 
 def _gen_heatmap(settings, series, datasets, palette, ax_var):
     # Bug 6: the old implementation generated a df.corr() correlation heatmap, which is
-    # completely different from what plot_engine renders (Z column reshaped into an n×n grid
-    # displayed with imshow). Rewritten to match the live renderer exactly.
+    # completely different from what plot_engine renders (Z column on a regular grid via imshow).
+    # Fix 1: use scipy.interpolate.griddata for correct scatter-point reconstruction.
     zc = settings.get('_z_col', '')
     if not zc:
         return [f"# Heatmap: assign a Z column in plotviz to render."]
-    cmap   = settings.get('cmap', 'rainbow')
-    alpha  = settings.get('heat_alpha', 1.0)
-    interp = settings.get('heat_interpolation', 'nearest')
+    cmap    = settings.get('cmap', 'rainbow')
+    alpha   = settings.get('heat_alpha', 1.0)
+    interp  = settings.get('heat_interpolation', 'nearest')
     show_cb = settings.get('heat_colorbar', True)
+    pin_range = settings.get('heat_vminmax_enable', False)
+    vmin_v  = settings.get('heat_vmin', 0.0)
+    vmax_v  = settings.get('heat_vmax', 1.0)
     lines = [
+        f"from scipy.interpolate import griddata as _griddata",
         f"import numpy as np",
-        f"_hz = np.array({_col_ref(zc)}, dtype=float)",
-        f"_hn = int(np.ceil(np.sqrt(len(_hz))))",
-        f"_hZ = np.full((_hn, _hn), np.nan)",
-        f"for _hk in range(len(_hz)): _hZ[_hk // _hn, _hk % _hn] = _hz[_hk]",
     ]
-    # Add extent if X/Y columns are available
     if series:
-        s = series[0]; xc = s.get('x_col', ''); yc = s.get('y_col', '')
+        s0 = series[0]; xc = s0.get('x_col', ''); yc = s0.get('y_col', '')
         if xc and yc:
-            lines.append(
-                f"_hext = [{_col_ref(xc)}.min(), {_col_ref(xc)}.max(), "
-                f"{_col_ref(yc)}.min(), {_col_ref(yc)}.max()]"
-            )
+            lines += [
+                f"_hx = np.array({_col_ref(xc)}, dtype=float)",
+                f"_hy = np.array({_col_ref(yc)}, dtype=float)",
+                f"_hz = np.array({_col_ref(zc)}, dtype=float)",
+                f"_hmn = min(len(_hx), len(_hy), len(_hz)); _hx, _hy, _hz = _hx[:_hmn], _hy[:_hmn], _hz[:_hmn]",
+                f"_hn = max(2, int(np.ceil(np.sqrt(_hmn))))",
+                f"_hxi = np.linspace(_hx.min(), _hx.max(), _hn)",
+                f"_hyi = np.linspace(_hy.min(), _hy.max(), _hn)",
+                f"_hXI, _hYI = np.meshgrid(_hxi, _hyi)",
+                f"_hZ = _griddata((_hx, _hy), _hz, (_hXI, _hYI), method='linear')",
+                f"_hZ = np.where(np.isnan(_hZ), np.nanmean(_hz), _hZ)",
+                f"_hext = [float(_hx.min()), float(_hx.max()), float(_hy.min()), float(_hy.max())]",
+            ]
+            vm_str = f", vmin={vmin_v}, vmax={vmax_v}" if pin_range else ""
             lines.append(
                 f"_him = {ax_var}.imshow(_hZ, aspect='auto', cmap='{_esc(cmap)}', "
-                f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}', extent=_hext)"
+                f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}', extent=_hext{vm_str})"
             )
         else:
+            lines += [
+                f"_hz = np.array({_col_ref(zc)}, dtype=float)",
+                f"_hn = max(2, int(np.ceil(np.sqrt(len(_hz)))))",
+                f"_hZ = np.full((_hn, _hn), np.nan)",
+                f"for _hk in range(len(_hz)): _hZ[_hk // _hn, _hk % _hn] = _hz[_hk]",
+            ]
+            vm_str = f", vmin={vmin_v}, vmax={vmax_v}" if pin_range else ""
             lines.append(
                 f"_him = {ax_var}.imshow(_hZ, aspect='auto', cmap='{_esc(cmap)}', "
-                f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}')"
+                f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}'{vm_str})"
             )
-    else:
-        lines.append(
-            f"_him = {ax_var}.imshow(_hZ, aspect='auto', cmap='{_esc(cmap)}', "
-            f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}')"
-        )
     if show_cb:
         lines.append(f"plt.colorbar(_him, ax={ax_var})")
     return lines
-
-
 def _gen_contour(settings, series, datasets, palette, ax_var):
     # Bug 7: was hardcoding levels=15, cmap='coolwarm' and ignoring all user settings.
+    # Fix 1: use griddata for correct scatter reconstruction (dead import removed).
+    # Fix 4: vmin/vmax support. Fix 5: line colour/width. Fix 6: explicit levels list.
     lines = []
     if series:
         s = series[0]
@@ -292,34 +319,53 @@ def _gen_contour(settings, series, datasets, palette, ax_var):
         yc = s.get('y_col', '')
         zc = settings.get('_z_col', '')   # top-level z from series_meta
         if xc and yc and zc:
-            lvl     = settings.get('contour_levels', 10)
+            # Fix 6: explicit levels list overrides integer count
+            lvl_explicit = settings.get('contour_levels_explicit', '').strip()
+            if lvl_explicit:
+                try:
+                    lvl = [float(v) for v in lvl_explicit.split(',') if v.strip()]
+                except ValueError:
+                    lvl = settings.get('contour_levels', 10)
+            else:
+                lvl = settings.get('contour_levels', 10)
             cmap    = settings.get('cmap', 'rainbow')
             alpha   = settings.get('heat_alpha', 1.0)
             filled  = settings.get('heat_filled_contour', True)
             lines_  = settings.get('heat_contour_lines', True)
             show_cb = settings.get('heat_colorbar', True)
+            # Fix 5: contour line colour/width
+            line_color = settings.get('contour_line_color', '#000000')
+            line_width = settings.get('contour_line_width', 0.5)
+            # Fix 4: vmin/vmax
+            pin_range = settings.get('heat_vminmax_enable', False)
+            vmin_v  = settings.get('heat_vmin', 0.0)
+            vmax_v  = settings.get('heat_vmax', 1.0)
+            vm_str  = f", vmin={vmin_v}, vmax={vmax_v}" if pin_range else ""
             lines += [
-                f"from scipy.interpolate import griddata",
+                f"from scipy.interpolate import griddata as _griddata",
                 f"import numpy as np",
-                f"_cn = int(np.ceil(np.sqrt(len({_col_ref(zc)}))))",
-                f"_cZ = np.full((_cn, _cn), np.nan)",
-                f"for _ck in range(len({_col_ref(zc)})): _cZ[_ck // _cn, _ck % _cn] = {_col_ref(zc)}.iloc[_ck]",
-                f"_cZ = np.where(np.isnan(_cZ), np.nanmean(_cZ), _cZ)",
-                f"_cxi = np.linspace({_col_ref(xc)}.min(), {_col_ref(xc)}.max(), _cn)",
-                f"_cyi = np.linspace({_col_ref(yc)}.min(), {_col_ref(yc)}.max(), _cn)",
+                f"_cx = np.array({_col_ref(xc)}, dtype=float)",
+                f"_cy = np.array({_col_ref(yc)}, dtype=float)",
+                f"_cz = np.array({_col_ref(zc)}, dtype=float)",
+                f"_cmn = min(len(_cx), len(_cy), len(_cz)); _cx, _cy, _cz = _cx[:_cmn], _cy[:_cmn], _cz[:_cmn]",
+                f"_cn = max(2, int(np.ceil(np.sqrt(_cmn))))",
+                f"_cxi = np.linspace(_cx.min(), _cx.max(), _cn)",
+                f"_cyi = np.linspace(_cy.min(), _cy.max(), _cn)",
                 f"_cX, _cY = np.meshgrid(_cxi, _cyi)",
+                f"_cZ = _griddata((_cx, _cy), _cz, (_cX, _cY), method='linear')",
+                f"_cZ = np.where(np.isnan(_cZ), np.nanmean(_cz), _cZ)",
                 f"_last_cm = None",
             ]
             if filled:
                 lines.append(
                     f"_cf = {ax_var}.contourf(_cX, _cY, _cZ, levels={lvl}, "
-                    f"cmap='{_esc(cmap)}', alpha={alpha})"
+                    f"cmap='{_esc(cmap)}', alpha={alpha}{vm_str})"
                 )
                 lines.append(f"_last_cm = _cf")
             if lines_:
                 lines.append(
                     f"_cs = {ax_var}.contour(_cX, _cY, _cZ, levels={lvl}, "
-                    f"colors='k', linewidths=0.5, alpha=0.5)"
+                    f"colors='{_esc(line_color)}', linewidths={line_width}, alpha=0.5)"
                 )
                 lines.append(f"_last_cm = _last_cm if _last_cm is not None else _cs")
             if show_cb:
@@ -327,8 +373,6 @@ def _gen_contour(settings, series, datasets, palette, ax_var):
         else:
             lines.append(f"# Contour: assign X, Y and Z columns in plotviz to render.")
     return lines
-
-
 def _gen_tricontour(settings, series, datasets, palette, ax_var):
     # Bug 7: was hardcoding levels=10, cmap='rainbow' and ignoring all user settings.
     lines = []
@@ -341,10 +385,17 @@ def _gen_tricontour(settings, series, datasets, palette, ax_var):
             lvl       = settings.get('tri_levels', 10)
             cmap      = settings.get('tri_cmap', 'rainbow')
             alpha     = settings.get('tri_alpha', 1.0)
-            filled    = settings.get('tri_filled', True)
+            fill_mode = settings.get('tri_fill_mode', 'Filled contour')
+            # Backward compat: old saves used boolean tri_filled / tri_tripcolor
+            if fill_mode not in ('Filled contour', 'Face colours', 'None'):
+                if settings.get('tri_tripcolor', False):
+                    fill_mode = 'Face colours'
+                elif settings.get('tri_filled', True):
+                    fill_mode = 'Filled contour'
+                else:
+                    fill_mode = 'None'
             tri_lines = settings.get('tri_lines', True)
             triplot   = settings.get('tri_triplot', False)
-            tripcolor = settings.get('tri_tripcolor', False)
             show_cb   = settings.get('tri_colorbar', True)
             lines += [
                 f"import numpy as np",
@@ -354,12 +405,12 @@ def _gen_tricontour(settings, series, datasets, palette, ax_var):
                 f"_tn = min(len(_tx), len(_ty), len(_tz)); _tx, _ty, _tz = _tx[:_tn], _ty[:_tn], _tz[:_tn]",
                 f"_last_tm = None",
             ]
-            if tripcolor:
+            if fill_mode == 'Face colours':
                 lines.append(
                     f"_tc = {ax_var}.tripcolor(_tx, _ty, _tz, cmap='{_esc(cmap)}', alpha={alpha})"
                 )
                 lines.append(f"_last_tm = _tc")
-            if filled:
+            elif fill_mode == 'Filled contour':
                 lines.append(
                     f"_tcf = {ax_var}.tricontourf(_tx, _ty, _tz, levels={lvl}, "
                     f"cmap='{_esc(cmap)}', alpha={alpha})"
@@ -383,29 +434,51 @@ def _gen_tricontour(settings, series, datasets, palette, ax_var):
 
 
 def _gen_surface3d(settings, series, datasets, palette, ax_var):
+    # Fix 3: was hardcoding cmap='viridis', alpha=0.9 and ignoring surf_stride / surf_wireframe.
+    # Fix 1: now uses griddata (matching the live renderer) instead of a different approach.
+    # Fix 7: honours heat_colorbar.
     lines = [
         f"# Note: 3D Surface requires projection='3d' — see fig.add_subplot below",
-        f"from scipy.interpolate import griddata",
+        f"from scipy.interpolate import griddata as _griddata",
         f"import numpy as np",
     ]
     if series:
-        s = series[0]
-        xc = s.get('x_col', '')
-        yc = s.get('y_col', '')
+        s0 = series[0]
+        xc = s0.get('x_col', '')
+        yc = s0.get('y_col', '')
         zc = settings.get('_z_col', '')   # top-level z from series_meta
         if xc and yc and zc:
+            cmap      = settings.get('cmap', 'rainbow')
+            alpha     = settings.get('heat_alpha', 1.0)
+            stride    = settings.get('surf_stride', 1)
+            wireframe = settings.get('surf_wireframe', False)
+            show_cb   = settings.get('heat_colorbar', True)
             lines += [
-                f"_xi = np.linspace({_col_ref(xc)}.min(), {_col_ref(xc)}.max(), 50)",
-                f"_yi = np.linspace({_col_ref(yc)}.min(), {_col_ref(yc)}.max(), 50)",
-                f"_xi, _yi = np.meshgrid(_xi, _yi)",
-                f"_zi = griddata(({_col_ref(xc)}, {_col_ref(yc)}), {_col_ref(zc)}, (_xi, _yi), method='cubic')",
-                f"{ax_var}.plot_surface(_xi, _yi, _zi, cmap='viridis', alpha=0.9)",
+                f"_sx = np.array({_col_ref(xc)}, dtype=float)",
+                f"_sy = np.array({_col_ref(yc)}, dtype=float)",
+                f"_sz = np.array({_col_ref(zc)}, dtype=float)",
+                f"_smn = min(len(_sx), len(_sy), len(_sz)); _sx, _sy, _sz = _sx[:_smn], _sy[:_smn], _sz[:_smn]",
+                f"_sn = max(2, int(np.ceil(np.sqrt(_smn))))",
+                f"_sxi = np.linspace(_sx.min(), _sx.max(), _sn)",
+                f"_syi = np.linspace(_sy.min(), _sy.max(), _sn)",
+                f"_sX, _sY = np.meshgrid(_sxi, _syi)",
+                f"_sZ = _griddata((_sx, _sy), _sz, (_sX, _sY), method='linear')",
+                f"_sZ = np.where(np.isnan(_sZ), np.nanmean(_sz), _sZ)",
             ]
+            if wireframe:
+                lines.append(
+                    f"{ax_var}.plot_wireframe(_sX, _sY, _sZ, rstride={stride}, cstride={stride}, alpha={alpha})"
+                )
+            else:
+                lines.append(
+                    f"_ssurf = {ax_var}.plot_surface(_sX, _sY, _sZ, cmap='{_esc(cmap)}', "
+                    f"alpha={alpha}, rstride={stride}, cstride={stride})"
+                )
+                if show_cb:
+                    lines.append(f"plt.colorbar(_ssurf, ax={ax_var}, shrink=0.5, aspect=10)")
         else:
             lines.append(f"# 3D Surface: assign X, Y and Z columns in plotviz to render.")
     return lines
-
-
 def _gen_ecdf(settings, series, datasets, palette, ax_var):
     lines = []
     for i, s in enumerate(series):
@@ -435,7 +508,7 @@ def _gen_hist2d_hexbin(settings, series, datasets, palette, ax_var):
                 gridsize = settings.get('hexbin_gridsize', 20)
                 cmap     = settings.get('hexbin_cmap', 'viridis')
                 alpha    = settings.get('hexbin_alpha', 1.0)
-                show_cb  = settings.get('hist2d_colorbar', True)   # shared checkbox key
+                show_cb  = settings.get('hexbin_colorbar', True)
                 lines.append(
                     f"_hb = {ax_var}.hexbin({_col_ref(xc)}, {_col_ref(yc)}, "
                     f"gridsize={gridsize}, cmap='{_esc(cmap)}', alpha={alpha})"
@@ -470,10 +543,23 @@ def _gen_quiver(settings, series, datasets, palette, ax_var):
         if xc and yc and uc != '(none)' and vc != '(none)':
             sc    = settings.get('quiver_scale', 1.0)
             width = settings.get('quiver_width', 0.005)
+            color_by_mag = settings.get('quiver_color_by_mag', False)
+            cmap  = settings.get('quiver_cmap', 'viridis')
+            # Truncate all four arrays to their common minimum length,
+            # mirroring the plot engine's n = min(len(xd), len(yd), len(U), len(V)).
+            lines.append(f"_qx = {_col_ref(xc)}.values.astype(float)")
+            lines.append(f"_qy = {_col_ref(yc)}.values.astype(float)")
+            lines.append(f"_qU = {_col_ref(uc)}.values.astype(float)")
+            lines.append(f"_qV = {_col_ref(vc)}.values.astype(float)")
+            lines.append(f"_qn = min(len(_qx), len(_qy), len(_qU), len(_qV))")
+            lines.append(f"_qx, _qy, _qU, _qV = _qx[:_qn], _qy[:_qn], _qU[:_qn], _qV[:_qn]")
             scale_kw = f', scale={sc}, scale_units="xy"' if sc != 1.0 else ''
-            lines.append(f"{ax_var}.quiver({_col_ref(xc)}, {_col_ref(yc)}, "
-                         f"{_col_ref(uc)}, {_col_ref(vc)}"
-                         f", width={width}{scale_kw})")
+            if color_by_mag:
+                lines.append(f"{ax_var}.quiver(_qx, _qy, _qU, _qV, np.hypot(_qU, _qV)"
+                             f", cmap='{_esc(cmap)}', width={width}, alpha=0.85{scale_kw})")
+            else:
+                lines.append(f"{ax_var}.quiver(_qx, _qy, _qU, _qV"
+                             f", width={width}, alpha=0.85{scale_kw})")
         elif xc and yc:
             lines.append(f"# Quiver: set U/V columns in app; shown as placeholder")
             lines.append(f"# {ax_var}.quiver({_col_ref(xc)}, {_col_ref(yc)}, U, V)")
@@ -491,9 +577,22 @@ def _gen_barbs(settings, series, datasets, palette, ax_var):
             length = settings.get('barbs_length', 7.0)
             pivot  = settings.get('barbs_pivot',  'tip')
             alpha  = settings.get('barbs_alpha',  0.85)
-            lines.append(f"{ax_var}.barbs({_col_ref(xc)}, {_col_ref(yc)}, "
-                         f"{_col_ref(uc)}, {_col_ref(vc)}"
-                         f", length={length}, pivot='{pivot}', alpha={alpha})")
+            color_by_mag = settings.get('barbs_color_by_mag', False)
+            cmap   = settings.get('barbs_cmap', 'viridis')
+            # Truncate to common minimum length
+            lines.append(f"_bx = {_col_ref(xc)}.values.astype(float)")
+            lines.append(f"_by = {_col_ref(yc)}.values.astype(float)")
+            lines.append(f"_bU = {_col_ref(uc)}.values.astype(float)")
+            lines.append(f"_bV = {_col_ref(vc)}.values.astype(float)")
+            lines.append(f"_bn = min(len(_bx), len(_by), len(_bU), len(_bV))")
+            lines.append(f"_bx, _by, _bU, _bV = _bx[:_bn], _by[:_bn], _bU[:_bn], _bV[:_bn]")
+            if color_by_mag:
+                lines.append(f"_bmag = np.hypot(_bU, _bV)")
+                lines.append(f"{ax_var}.barbs(_bx, _by, _bU, _bV, _bmag"
+                             f", cmap='{_esc(cmap)}', length={length}, pivot='{pivot}', alpha={alpha})")
+            else:
+                lines.append(f"{ax_var}.barbs(_bx, _by, _bU, _bV"
+                             f", length={length}, pivot='{pivot}', alpha={alpha})")
         elif xc and yc:
             lines.append(f"# Barbs: set U/V columns in app")
             lines.append(f"# {ax_var}.barbs({_col_ref(xc)}, {_col_ref(yc)}, U, V)")
@@ -508,23 +607,38 @@ def _gen_streamplot(settings, series, datasets, palette, ax_var):
         uc = settings.get('stream_u_col', '(none)')
         vc = settings.get('stream_v_col', '(none)')
         if xc and yc and uc != '(none)' and vc != '(none)':
-            density   = settings.get('stream_density',   1.0)
-            arrowsize = settings.get('stream_arrowsize', 1.0)
-            linewidth = settings.get('stream_linewidth', 1.5)
-            lines.append(f"import numpy as _np")
-            lines.append(f"# Streamplot: re-grid flat columns onto a 2-D mesh")
-            lines.append(f"_xf = df[{_col_ref(xc)!r}].values.astype(float)")
-            lines.append(f"_yf = df[{_col_ref(yc)!r}].values.astype(float)")
-            lines.append(f"_U  = df[{_col_ref(uc)!r}].values.astype(float)")
-            lines.append(f"_V  = df[{_col_ref(vc)!r}].values.astype(float)")
-            lines.append(f"_xs, _ys = _np.unique(_xf), _np.unique(_yf)")
-            lines.append(f"_UG = _np.zeros((len(_ys), len(_xs)))")
-            lines.append(f"_VG = _np.zeros((len(_ys), len(_xs)))")
-            lines.append(f"for _k in range(len(_xf)):")
-            lines.append(f"    _i=_np.searchsorted(_xs,_xf[_k]); _j=_np.searchsorted(_ys,_yf[_k])")
-            lines.append(f"    if _i<len(_xs) and _j<len(_ys): _UG[_j,_i]=_U[_k]; _VG[_j,_i]=_V[_k]")
-            lines.append(f"{ax_var}.streamplot(_xs, _ys, _UG, _VG"
-                         f", density={density}, arrowsize={arrowsize}, linewidth={linewidth})")
+            density      = settings.get('stream_density',   1.0)
+            arrowsize    = settings.get('stream_arrowsize', 1.0)
+            linewidth    = settings.get('stream_linewidth', 1.5)
+            color_by_mag = settings.get('stream_color_by_mag', False)
+            cmap         = settings.get('stream_cmap', 'viridis')
+            # Truncate to common minimum length then re-grid onto a 2-D mesh.
+            # streamplot() requires 1-D xs/ys axes and (ny, nx) U/V grids.
+            lines.append(f"_sf = {_col_ref(xc)}.values.astype(float)")
+            lines.append(f"_sg = {_col_ref(yc)}.values.astype(float)")
+            lines.append(f"_sU = {_col_ref(uc)}.values.astype(float)")
+            lines.append(f"_sV = {_col_ref(vc)}.values.astype(float)")
+            lines.append(f"_sn = min(len(_sf), len(_sg), len(_sU), len(_sV))")
+            lines.append(f"_sf, _sg, _sU, _sV = _sf[:_sn], _sg[:_sn], _sU[:_sn], _sV[:_sn]")
+            lines.append(f"_xs, _ys = np.unique(_sf), np.unique(_sg)")
+            lines.append(f"_UG = np.zeros((len(_ys), len(_xs)))")
+            lines.append(f"_VG = np.zeros((len(_ys), len(_xs)))")
+            lines.append(f"_xi = np.searchsorted(_xs, _sf)")
+            lines.append(f"_yi = np.searchsorted(_ys, _sg)")
+            lines.append(f"for _k in range(_sn):")
+            lines.append(f"    if _xi[_k] < len(_xs) and _yi[_k] < len(_ys):")
+            lines.append(f"        _UG[_yi[_k], _xi[_k]] = _sU[_k]")
+            lines.append(f"        _VG[_yi[_k], _xi[_k]] = _sV[_k]")
+            if color_by_mag:
+                # When coloring by magnitude, matplotlib requires color= to be a
+                # 2-D array and must not receive linewidth at the same time.
+                lines.append(f"_speed = np.sqrt(_UG**2 + _VG**2)")
+                lines.append(f"{ax_var}.streamplot(_xs, _ys, _UG, _VG"
+                             f", color=_speed, cmap='{_esc(cmap)}'"
+                             f", density={density}, arrowsize={arrowsize})")
+            else:
+                lines.append(f"{ax_var}.streamplot(_xs, _ys, _UG, _VG"
+                             f", density={density}, arrowsize={arrowsize}, linewidth={linewidth})")
         elif xc and yc:
             lines.append(f"# Streamplot: set U/V columns and build 2-D grids")
     return lines
@@ -646,6 +760,14 @@ def generate_plot_script(settings: dict, series_meta: dict,
     # per-subplot z columns (if stored separately)
     if not settings.get('subplot_z_cols'):
         settings['subplot_z_cols'] = series_meta.get('subplot_z_cols', {})
+    # U/V column assignments for quiver, barbs, and streamplot live in series_meta
+    # (set from UI combos in _collect_series_meta, not _collect_settings).
+    # Merge them into settings so the generator functions can read them.
+    for _uv_key in ('quiver_u_col', 'quiver_v_col',
+                    'barbs_u_col',  'barbs_v_col',
+                    'stream_u_col', 'stream_v_col'):
+        if _uv_key in series_meta:
+            settings[_uv_key] = series_meta[_uv_key]
 
     # ── Collect dataset filenames ──────────────────────────────────────────────
     used_cols = {s.get('x_col') for s in series_list} | {s.get('y_col') for s in series_list}
@@ -655,12 +777,10 @@ def generate_plot_script(settings: dict, series_meta: dict,
     lengths = {len(v) for v in datasets.values() if v is not None}
     use_combined = len(lengths) == 1   # all same length → one CSV
 
-    # Rebind _col_ref so every generator in this script uses the right frame
-    def _col_ref(col, _uc=use_combined, _ds=datasets):  # noqa: F811
-        if _uc or _ds is None:
-            return f"df['{_esc(col)}']"
-        safe = col.replace(' ', '_').replace('-', '_')
-        return f"_df_{safe}['{_esc(col)}']"
+    # Propagate use_combined to the module-level _col_ref so every generator
+    # function (which closes over the module scope) emits the correct reference.
+    global _USE_COMBINED
+    _USE_COMBINED = use_combined
 
     # ── Imports ───────────────────────────────────────────────────────────────
     lines = [
@@ -707,20 +827,22 @@ def generate_plot_script(settings: dict, series_meta: dict,
     fig_unit = settings.get('fig_unit', 'cm')
     fig_w_raw = settings.get('fig_width',  20.0)
     fig_h_raw = settings.get('fig_height', 15.0)
+    _dpi = settings.get('dpi', 300)   # always read; only emitted for pixel-unit figures
     if fig_unit == 'cm':
         fig_w = fig_w_raw / 2.54
         fig_h = fig_h_raw / 2.54
     elif fig_unit == 'pixels':
-        _dpi = settings.get('dpi', 300)
         fig_w = fig_w_raw / _dpi
         fig_h = fig_h_raw / _dpi
     else:  # inches
         fig_w, fig_h = fig_w_raw, fig_h_raw
     fig_w = round(max(fig_w, 4.0), 2)
     fig_h = round(max(fig_h, 3.0), 2)
+    # For pixel-unit figures emit dpi= so the rendered pixel dimensions match the app.
+    _figsize_dpi = f', dpi={_dpi}' if fig_unit == 'pixels' else ''
     lines += [
         "# ── Figure ───────────────────────────────────────────────────────────",
-        f"fig = plt.figure(figsize=({fig_w:.1f}, {fig_h:.1f}))",
+        f"fig = plt.figure(figsize=({fig_w:.1f}, {fig_h:.1f}){_figsize_dpi})",
         f"fig.patch.set_facecolor('{_esc(bg_color)}')",
         "",
     ]
@@ -999,7 +1121,7 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
 
     elif chart_name == 'Strip':
         lines += [
-            f"df['_x'] = df['{_esc(xn)}'].astype(str)",
+            f"df['_x'] = df['{_esc(xn)}'].astype(str) if df['{_esc(xn)}'].dtype.kind not in 'biufc' else df['{_esc(xn)}'].copy()",
             'fig, ax = plt.subplots()',
             "sns.stripplot(data=df, x='_x', y='" + _esc(yn) + "', ax=ax,",
             f'    color={col},',
@@ -1012,7 +1134,7 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
 
     elif chart_name == 'Swarm':
         lines += [
-            f"df['_x'] = df['{_esc(xn)}'].astype(str)",
+            f"df['_x'] = df['{_esc(xn)}'].astype(str) if df['{_esc(xn)}'].dtype.kind not in 'biufc' else df['{_esc(xn)}'].copy()",
             'fig, ax = plt.subplots()',
             "sns.swarmplot(data=df, x='_x', y='" + _esc(yn) + "', ax=ax,",
             f'    color={col},',
@@ -1026,7 +1148,7 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
         fmt = explorer._heat_fmt.currentText()
         num_cols = list(datasets.keys())
         lines += [
-            f'_cols = {[_esc(c) for c in num_cols]!r}',
+            f'_cols = {repr(num_cols)}',
             'corr = df[_cols].corr()',
             'fig, ax = plt.subplots(figsize=(max(6, len(_cols)), max(5, len(_cols))))',
             'sns.heatmap(corr, ax=ax,',
@@ -1043,11 +1165,22 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
 
     elif chart_name == 'Pairplot':
         num_cols = list(datasets.keys())
-        lines += [
-            f'_cols = {[_esc(c) for c in num_cols]!r}',
-            'pg = sns.pairplot(df[_cols],',
+        _pair_hue_name = explorer._hue_combo.currentText()
+        _pair_hue = None if _pair_hue_name in ('', '(none)') else _pair_hue_name
+        _pair_pal_name = explorer._sns_palette_name()
+        _pair_pal = _pair_pal_name if _pair_pal_name else repr(explorer._sns_palette(len(num_cols)))
+        _pair_hue_lines = []
+        if _pair_hue and _pair_hue in datasets:
+            _pair_hue_lines = [
+                f"df[{repr(_pair_hue)}] = df[{repr(_pair_hue)}].astype(str)",
+            ]
+        lines += _pair_hue_lines + [
+            f'_cols = {repr(num_cols)}',
+            'pg = sns.pairplot(df[_cols' + (f' + [{repr(_pair_hue)}]' if _pair_hue else '') + '],',
+            f'    hue={repr(_pair_hue)},',
             f'    diag_kind={repr(explorer._pair_diag.currentText())},',
             f'    kind={repr(explorer._pair_kind.currentText())},',
+            f'    palette={repr(_pair_pal_name) if _pair_pal_name else _pair_pal},',
             f'    plot_kws={{"alpha": {explorer._pair_alpha.value()}}},',
             ')',
             'fig = pg.figure',
@@ -1073,15 +1206,21 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
         if ci_str in ('95', '99'):
             eb = f"('ci', {ci_str})"
         elif ci_str == 'sd':
-            eb = "('sd', None)"
+            eb = "'sd'"
         else:
             eb = 'None'
+        _cat_pal_name = explorer._sns_palette_name()
+        _cat_pal_line = (
+            f'    palette={repr(_cat_pal_name)},'
+            if _cat_pal_name else
+            f'    palette={repr(explorer._sns_palette(10))},'
+        )
         lines += [
             f"df['_x'] = df['{_esc(xn)}'].astype(str)",
             "fg = sns.catplot(",
             f"    data=df, x='_x', y='{_esc(yn)}',",
             f'    kind={repr(kind)},',
-            f'    color={col},',
+            _cat_pal_line,
             f'    alpha={explorer._cat_alpha.value()},',
             f'    saturation={explorer._cat_sat.value()},',
         ]
@@ -1165,13 +1304,17 @@ class PythonExportMixin:
                 txt = cb.currentText()
                 if txt and txt != '(none)' and txt in self.datasets:
                     used_cols.add(txt)
+        # U/V columns for quiver, barbs, and streamplot live in series_meta,
+        # not in the series rows — add them so they are written to the CSV.
+        for _uv_key in ('quiver_u_col', 'quiver_v_col',
+                        'barbs_u_col',  'barbs_v_col',
+                        'stream_u_col', 'stream_v_col'):
+            c = series_meta.get(_uv_key, '')
+            if c and c != '(none)' and c in self.datasets:
+                used_cols.add(c)
         # Fall back to all columns if nothing is explicitly assigned
         export_cols = used_cols if used_cols else set(self.datasets.keys())
         datasets_to_export = {k: self.datasets[k] for k in export_cols if k in self.datasets}
-
-        if not datasets_to_export:
-            QMessageBox.warning(self, 'No data', 'No datasets are loaded — nothing to export.')
-            return
 
         # ── Palette ────────────────────────────────────────────────────────────
         palette = [self._palette_color(i) for i in range(16)]
@@ -1243,3 +1386,107 @@ class PythonExportMixin:
         except Exception as e:
             import traceback as _tb
             QMessageBox.critical(self, 'Export error', f'{e}\n\n{_tb.format_exc()}')
+
+    def _export_to_code_runner(self):
+        """Build a .pvizx bundle from the current chart and open it directly in Code Runner.
+
+        Unlike _export_python_bundle(), this method skips the Save dialog and
+        writes the bundle to a temporary file, then hands it off to the Code
+        Runner so the user can inspect and tweak the generated script immediately.
+        """
+        import csv as _csv
+        import tempfile
+        import numpy as np
+
+        # ── Collect state ──────────────────────────────────────────────────────
+        settings    = self._collect_settings()
+        series_meta = self._collect_series_meta()
+        series_list = series_meta.get('series', [])
+
+        # Determine which columns are used (mirrors _export_python_bundle logic)
+        used_cols: set[str] = set()
+        for s in series_list:
+            for k in ('x_col', 'y_col'):
+                c = s.get(k, '')
+                if c and c in self.datasets:
+                    used_cols.add(c)
+        for attr in ('combo_z', 'combo_err'):
+            cb = getattr(self, attr, None)
+            if cb:
+                txt = cb.currentText()
+                if txt and txt != '(none)' and txt in self.datasets:
+                    used_cols.add(txt)
+        # U/V columns for quiver, barbs, and streamplot live in series_meta,
+        # not in the series rows — add them so they are written to the CSV.
+        for _uv_key in ('quiver_u_col', 'quiver_v_col',
+                        'barbs_u_col',  'barbs_v_col',
+                        'stream_u_col', 'stream_v_col'):
+            c = series_meta.get(_uv_key, '')
+            if c and c != '(none)' and c in self.datasets:
+                used_cols.add(c)
+        export_cols = used_cols if used_cols else set(self.datasets.keys())
+        datasets_to_export = {k: self.datasets[k] for k in export_cols if k in self.datasets}
+
+        if not datasets_to_export:
+            QMessageBox.warning(self, 'No data',
+                'No datasets are loaded — cannot open in Code Runner.')
+            return
+
+        # ── Palette & title ────────────────────────────────────────────────────
+        palette = [self._palette_color(i) for i in range(16)]
+        chart_title = (settings.get('title_text') or
+                       getattr(self, '_current_filepath', None) and
+                       os.path.splitext(os.path.basename(self._current_filepath))[0] or
+                       'chart')
+
+        try:
+            # ── Generate script ────────────────────────────────────────────────
+            n_subplots = settings.get('subplot_rows', 1) * settings.get('subplot_cols', 1)
+            script = generate_plot_script(
+                settings, series_meta, datasets_to_export, palette, chart_title)
+
+            # ── Build CSVs ─────────────────────────────────────────────────────
+            lengths      = {len(v) for v in datasets_to_export.values() if v is not None}
+            use_combined = len(lengths) == 1
+
+            # Write to a named temp file that persists until the Code Runner
+            # extracts and runs it (Code Runner manages its own cleanup via
+            # _pvizx_tmpdir, so we only need to ensure the zip itself survives
+            # long enough to be read by load_pvizx).
+            tmp_fd, tmp_fp = tempfile.mkstemp(suffix='.pvizx', prefix='plotviz_cr_')
+            os.close(tmp_fd)
+
+            with zipfile.ZipFile(tmp_fp, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr('plot.py', script)
+                zf.writestr('README.md', _build_readme(chart_title, datasets_to_export, n_subplots))
+                zf.writestr('pyproject.toml', _build_pyproject_toml(chart_title, script))
+
+                if use_combined:
+                    buf = io.StringIO()
+                    writer = _csv.writer(buf)
+                    col_names = list(datasets_to_export.keys())
+                    writer.writerow(col_names)
+                    n_rows = len(next(iter(datasets_to_export.values())))
+                    for row_idx in range(n_rows):
+                        writer.writerow([
+                            datasets_to_export[c][row_idx]
+                            if row_idx < len(datasets_to_export[c]) else ''
+                            for c in col_names
+                        ])
+                    zf.writestr('data/data.csv', buf.getvalue())
+                else:
+                    for col_name, arr in datasets_to_export.items():
+                        buf = io.StringIO()
+                        writer = _csv.writer(buf)
+                        writer.writerow([col_name])
+                        for v in arr:
+                            writer.writerow([v])
+                        safe = ''.join(c if c.isalnum() or c in '-_.' else '_' for c in col_name)
+                        zf.writestr(f'data/{safe}.csv', buf.getvalue())
+
+            # ── Hand off to Code Runner ────────────────────────────────────────
+            self._open_pvizx_in_code_runner(tmp_fp)
+
+        except Exception as e:
+            import traceback as _tb
+            QMessageBox.critical(self, 'Code Runner export error', f'{e}\n\n{_tb.format_exc()}')

@@ -193,14 +193,20 @@ class SerializationMixin:
         s['heat_contour_lines']  = self.heat_contour_lines.isChecked()
         s['surf_stride']         = self.surf_stride.value()
         s['surf_wireframe']      = self.surf_wireframe.isChecked()
+        # Fix 4/5/6: new heat/contour controls
+        s['heat_vminmax_enable'] = self.heat_vminmax_enable.isChecked() if hasattr(self, 'heat_vminmax_enable') else False
+        s['heat_vmin']           = self.heat_vmin.value()               if hasattr(self, 'heat_vmin')           else 0.0
+        s['heat_vmax']           = self.heat_vmax.value()               if hasattr(self, 'heat_vmax')           else 1.0
+        s['contour_line_color']  = getattr(self, 'contour_line_color',  '#000000')
+        s['contour_line_width']  = self.contour_line_width.value()      if hasattr(self, 'contour_line_width')  else 0.5
+        s['contour_levels_explicit'] = self.contour_levels_explicit.text() if hasattr(self, 'contour_levels_explicit') else ''
         # Tricontour
         s['tri_cmap']        = self.tri_cmap_combo.currentText()
         s['tri_levels']      = self.tri_levels.value()
         s['tri_alpha']       = self.tri_alpha.value()
-        s['tri_filled']      = self.tri_filled.isChecked()
+        s['tri_fill_mode']   = self.tri_fill_mode.currentText()
         s['tri_lines']       = self.tri_lines.isChecked()
         s['tri_triplot']     = self.tri_triplot.isChecked()
-        s['tri_tripcolor']   = self.tri_tripcolor.isChecked()
         s['tri_colorbar']    = self.tri_colorbar.isChecked()
         # Pie
         s['pie_autopct']         = self.pie_autopct.isChecked()
@@ -571,14 +577,43 @@ class SerializationMixin:
         _cb(self.heat_contour_lines,  'heat_contour_lines',  True)
         _sp(self.surf_stride,         'surf_stride',      1)
         _cb(self.surf_wireframe,      'surf_wireframe',   False)
+        # Fix 4/5/6: new heat/contour controls
+        if hasattr(self, 'heat_vminmax_enable'):
+            self.heat_vminmax_enable.blockSignals(True)
+            self.heat_vminmax_enable.setChecked(bool(s.get('heat_vminmax_enable', False)))
+            self.heat_vminmax_enable.blockSignals(False)
+            self.heat_vmin.setEnabled(self.heat_vminmax_enable.isChecked())
+            self.heat_vmax.setEnabled(self.heat_vminmax_enable.isChecked())
+        if hasattr(self, 'heat_vmin'):
+            self.heat_vmin.blockSignals(True); self.heat_vmin.setValue(float(s.get('heat_vmin', 0.0))); self.heat_vmin.blockSignals(False)
+        if hasattr(self, 'heat_vmax'):
+            self.heat_vmax.blockSignals(True); self.heat_vmax.setValue(float(s.get('heat_vmax', 1.0))); self.heat_vmax.blockSignals(False)
+        if hasattr(self, 'contour_line_color'):
+            _clc = s.get('contour_line_color', '#000000')
+            self.contour_line_color = _clc
+            sw = getattr(self, 'contour_line_color_sw', None)
+            if sw: sw.setStyleSheet(self._SW_CSS.format(_clc))
+        if hasattr(self, 'contour_line_width'):
+            self.contour_line_width.blockSignals(True); self.contour_line_width.setValue(float(s.get('contour_line_width', 0.5))); self.contour_line_width.blockSignals(False)
+        if hasattr(self, 'contour_levels_explicit'):
+            self.contour_levels_explicit.blockSignals(True)
+            self.contour_levels_explicit.setText(s.get('contour_levels_explicit', ''))
+            self.contour_levels_explicit.blockSignals(False)
         # Tricontour
         _co(self.tri_cmap_combo, 'tri_cmap',     'rainbow')
         _sp(self.tri_levels,     'tri_levels',   10)
         _sp(self.tri_alpha,      'tri_alpha',    1.0)
-        _cb(self.tri_filled,     'tri_filled',   True)
+        # Backward compat: old saves used tri_filled/tri_tripcolor booleans
+        if 'tri_fill_mode' in s:
+            _co(self.tri_fill_mode, 'tri_fill_mode', 'Filled contour')
+        elif s.get('tri_tripcolor', False):
+            self.tri_fill_mode.setCurrentText('Face colours')
+        elif s.get('tri_filled', True):
+            self.tri_fill_mode.setCurrentText('Filled contour')
+        else:
+            self.tri_fill_mode.setCurrentText('None')
         _cb(self.tri_lines,      'tri_lines',    True)
         _cb(self.tri_triplot,    'tri_triplot',  False)
-        _cb(self.tri_tripcolor,  'tri_tripcolor',False)
         _cb(self.tri_colorbar,   'tri_colorbar', True)
         # Pie
         _cb(self.pie_autopct,       'pie_autopct',      True)

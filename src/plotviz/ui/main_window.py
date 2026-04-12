@@ -1062,6 +1062,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         code_action.triggered.connect(self._open_code_runner)
         tools_menu.addAction(code_action)
 
+        cr_from_chart_action = QAction('Code Runner from chart', self)
+        cr_from_chart_action.setShortcut('Ctrl+Shift+R')
+        cr_from_chart_action.setStatusTip(
+            'Export the current chart as a .pvizx bundle and open it in the Code Runner')
+        cr_from_chart_action.triggered.connect(
+            lambda: (self._go_chart_tab() if hasattr(self, '_go_chart_tab') else None,
+                     self._export_to_code_runner()))
+        tools_menu.addAction(cr_from_chart_action)
+
         self._tools_menu = tools_menu
         self._sns_explorer  = None   # lazily created
         self._code_runner   = None   # lazily created
@@ -1262,13 +1271,24 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         for grp, show in data_vis.items():
             grp.setVisible(show)
 
-        # Bug 9: within heat_group, show only the controls relevant to each type.
+        # Bug 9 / Fix 2: within heat_group, show only the controls relevant to each type.
         # Interpolation is an imshow parameter — only Heatmap uses it.
-        # Contour levels only apply to Contour (Tricontour has its own tri_levels control).
+        # Contour levels / style / line-style only apply to Contour.
+        # 3D stride / wireframe only apply to 3D Surface.
+        # vmin/vmax and colorbar apply to all three.
         if hasattr(self, '_heat_interpolation_row'):
             self._heat_interpolation_row.setVisible(ct == 'Heatmap')
         if hasattr(self, '_heat_contour_levels_row'):
             self._heat_contour_levels_row.setVisible(ct == 'Contour')
+        if hasattr(self, '_heat_contour_style_row'):
+            self._heat_contour_style_row.setVisible(ct == 'Contour')
+        if hasattr(self, '_heat_contour_line_style_row'):
+            self._heat_contour_line_style_row.setVisible(ct == 'Contour')
+        if hasattr(self, '_heat_3d_row'):
+            self._heat_3d_row.setVisible(ct == '3D Surface')
+        # Fix 4: vmin/vmax shown for Heatmap and Contour
+        if hasattr(self, '_heat_vminmax_row'):
+            self._heat_vminmax_row.setVisible(ct in ('Heatmap', 'Contour'))
 
         # ── Series tab: per-series type groups ────────────────────────────────
         for attr, show in [
@@ -1387,15 +1407,20 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ('heat_contour_lines',  'heat_contour_lines',   True,      'check'),
         ('surf_stride',         'surf_stride',          1,         'spin'),
         ('surf_wireframe',      'surf_wireframe',       False,     'check'),
+        # Fix 4/5: new heat/contour controls
+        ('heat_vminmax_enable', 'heat_vminmax_enable',  False,     'check'),
+        ('heat_vmin',           'heat_vmin',            0.0,       'dbl'),
+        ('heat_vmax',           'heat_vmax',            1.0,       'dbl'),
+        ('contour_line_width',  'contour_line_width',   0.5,       'dbl'),
+        ('contour_line_color',  'contour_line_color',   '#000000', 'color'),
         # Tricontour
-        ('tri_cmap_combo',      'tri_cmap',             'rainbow', 'combo'),
-        ('tri_levels',          'tri_levels',           10,        'spin'),
-        ('tri_alpha',           'tri_alpha',            1.0,       'dbl'),
-        ('tri_filled',          'tri_filled',           True,      'check'),
-        ('tri_lines',           'tri_lines',            True,      'check'),
-        ('tri_triplot',         'tri_triplot',          False,     'check'),
-        ('tri_tripcolor',       'tri_tripcolor',        False,     'check'),
-        ('tri_colorbar',        'tri_colorbar',         True,      'check'),
+        ('tri_cmap_combo',      'tri_cmap',             'rainbow',          'combo'),
+        ('tri_levels',          'tri_levels',           10,                 'spin'),
+        ('tri_alpha',           'tri_alpha',            1.0,                'dbl'),
+        ('tri_fill_mode',       'tri_fill_mode',        'Filled contour',   'combo'),
+        ('tri_lines',           'tri_lines',            True,               'check'),
+        ('tri_triplot',         'tri_triplot',          False,              'check'),
+        ('tri_colorbar',        'tri_colorbar',         True,               'check'),
         # Pie
         ('pie_autopct',         'pie_autopct',          True,      'check'),
         ('pie_shadow',          'pie_shadow',           False,     'check'),
@@ -1489,6 +1514,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 opts[key] = w.currentText()
             elif kind == 'color':
                 opts[key] = getattr(self, attr, default)
+        # Fix 6: save explicit contour levels QLineEdit (not in CHART_OPT_FIELDS — no 'text' kind)
+        if hasattr(self, 'contour_levels_explicit'):
+            opts['contour_levels_explicit'] = self.contour_levels_explicit.text()
 
     def _load_chart_opts(self, idx):
         """Load subplot_chart_opts[idx] values into the chart option widgets."""
@@ -1515,6 +1543,14 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 setattr(self, attr, val)
                 btn = getattr(self, attr + '_btn', None)
                 if btn: btn.setStyleSheet(f'background-color:{val};border:1px solid #888;')
+                # Also update the swatch if it exists (for contour_line_color etc.)
+                sw = getattr(self, attr + '_sw', None)
+                if sw: sw.setStyleSheet(self._SW_CSS.format(val))
+        # Fix 6: load explicit contour levels QLineEdit
+        if hasattr(self, 'contour_levels_explicit'):
+            self.contour_levels_explicit.blockSignals(True)
+            self.contour_levels_explicit.setText(opts.get('contour_levels_explicit', ''))
+            self.contour_levels_explicit.blockSignals(False)
 
     # ── Per-series option fields ──────────────────────────────────────────────
     # Each entry: (widget_attr, storage_key, default_value, widget_kind)
@@ -2926,6 +2962,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'scatter_size':  20,   'scatter_alpha': 0.8,
             'err_capsize':   4,    'cmap':          'viridis',
             'contour_levels':10,   'heat_colorbar': True,
+            'contour_levels_explicit': '',
+            'contour_line_color': '#000000', 'contour_line_width': 0.5,
+            'heat_vminmax_enable': False, 'heat_vmin': 0.0, 'heat_vmax': 1.0,
             'pie_autopct':   True, 'pie_shadow':    False,
             'area_alpha':    0.4,  'area_stacked':  False,
             'violin_show_means':   True, 'violin_show_medians': True,
@@ -3100,6 +3139,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         for _fxy_attr, _fxy_prev in [
             ('fxy_x_combo', getattr(getattr(self, 'fxy_x_combo', None), 'currentText', lambda: '')()),
             ('fxy_y_combo', getattr(getattr(self, 'fxy_y_combo', None), 'currentText', lambda: '')()),
+            ('fuv_x_combo', getattr(getattr(self, 'fuv_x_combo', None), 'currentText', lambda: '')()),
+            ('fuv_y_combo', getattr(getattr(self, 'fuv_y_combo', None), 'currentText', lambda: '')()),
         ]:
             _cb = getattr(self, _fxy_attr, None)
             if _cb is None: continue
@@ -3910,6 +3951,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _load(self.x_auto,  xlim is None)
         _load(self.x_min,   xlim[0] if xlim else 0.0)
         _load(self.x_max,   xlim[1] if xlim else 1.0)
+        self.x_min.setEnabled(xlim is not None)   # Bug 4: restore enabled state
+        self.x_max.setEnabled(xlim is not None)
         self._set_scale_rb(self.xscale_group, self.subplot_xscales.get(idx, 'linear'))
         _load(self.xtick_size, self.subplot_xtick_sizes.get(idx, 9))
         _load(self.xtick_dir,      self.subplot_xtick_dir.get(idx, 'out'))
@@ -3925,6 +3968,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _load(self.y_auto,  ylim is None)
         _load(self.y_min,   ylim[0] if ylim else 0.0)
         _load(self.y_max,   ylim[1] if ylim else 1.0)
+        self.y_min.setEnabled(ylim is not None)   # Bug 4: restore enabled state
+        self.y_max.setEnabled(ylim is not None)
         self._set_scale_rb(self.yscale_group, self.subplot_yscales.get(idx, 'linear'))
         _load(self.ytick_size, self.subplot_ytick_sizes.get(idx, 9))
         _load(self.ytick_dir,      self.subplot_ytick_dir.get(idx, 'out'))
@@ -3941,13 +3986,21 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _load(self.y2_auto, y2lim is None)
         _load(self.y2_min,  y2lim[0] if y2lim else 0.0)
         _load(self.y2_max,  y2lim[1] if y2lim else 1.0)
+        self.y2_min.setEnabled(y2lim is not None)  # Bug 4: restore enabled state
+        self.y2_max.setEnabled(y2lim is not None)
         # Legend
         _load(self.legend_show_check, self.subplot_legends.get(idx, True))
         loc = self.subplot_legend_locs.get(idx, 'best')
-        i_loc = self.legend_pos.findText(loc)
+        is_auto = (loc == 'best')
+        self.legend_auto_pos.blockSignals(True)
+        self.legend_auto_pos.setChecked(is_auto)
+        self.legend_auto_pos.blockSignals(False)
         self.legend_pos.blockSignals(True)
-        self.legend_pos.setCurrentIndex(i_loc if i_loc >= 0 else 0)
+        if not is_auto:
+            i_loc = self.legend_pos.findText(loc)
+            self.legend_pos.setCurrentIndex(i_loc if i_loc >= 0 else 0)
         self.legend_pos.blockSignals(False)
+        self._update_legend_pos_enabled()
         _load(self.legend_x, self.subplot_legend_x.get(idx, 0.01))
         _load(self.legend_y, self.subplot_legend_y.get(idx, 0.99))
         _load(self.legend_fontsize, self.subplot_legend_fontsize.get(idx, 9))
@@ -4028,7 +4081,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_title_size[ann_idx]   = self.sp_title_size.value()
         self.subplot_title_color[ann_idx]  = self.sp_title_color
         self.subplot_legends[ann_idx]      = self.legend_show_check.isChecked()
-        self.subplot_legend_locs[ann_idx]  = self.legend_pos.currentText()
+        self.subplot_legend_locs[ann_idx]  = (
+            'best' if self.legend_auto_pos.isChecked() else self.legend_pos.currentText())
         self.subplot_legend_x[ann_idx]     = self.legend_x.value()
         self.subplot_legend_y[ann_idx]     = self.legend_y.value()
         self.subplot_legend_fontsize[ann_idx] = self.legend_fontsize.value()
@@ -4110,8 +4164,63 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _on_sp_ylabel_show_changed(self): self._save_axes_state()
     def _on_sp_y2label_changed(self):     self._save_axes_state()
     def _on_sp_y2label_show_changed(self):self._save_axes_state()
+    def _update_legend_pos_enabled(self, *_):
+        """Enable/disable position combo, X and Y based on the Auto position checkbox."""
+        auto = self.legend_auto_pos.isChecked()
+        for w in (self.legend_pos, self.legend_x, self.legend_y,
+                  self._legend_x_label, self._legend_y_label):
+            w.setEnabled(not auto)
+
     def _on_sp_legend_changed(self):      self._save_axes_state()
-    def _on_sp_lim_changed(self):         self._save_axes_state()
+    def _on_sp_lim_changed(self):
+        """Handle auto/manual limit checkbox toggles and spinbox edits.
+
+        When an auto checkbox is unchecked for the first time, read the current
+        matplotlib axis limits from the live canvas and pre-populate the spinboxes
+        so the user has a meaningful starting point rather than the 0/1 defaults.
+        """
+        # ── X limits ──────────────────────────────────────────────────────────
+        x_manual = not self.x_auto.isChecked()
+        if x_manual and not self.x_min.isEnabled():
+            # Switching auto → manual: seed spinboxes from the live plot
+            try:
+                ax = self.canvas.figure.axes[0]
+                lo, hi = ax.get_xlim()
+                self.x_min.blockSignals(True); self.x_min.setValue(lo); self.x_min.blockSignals(False)
+                self.x_max.blockSignals(True); self.x_max.setValue(hi); self.x_max.blockSignals(False)
+            except Exception:
+                pass
+        self.x_min.setEnabled(x_manual)
+        self.x_max.setEnabled(x_manual)
+
+        # ── Y limits ──────────────────────────────────────────────────────────
+        y_manual = not self.y_auto.isChecked()
+        if y_manual and not self.y_min.isEnabled():
+            try:
+                ax = self.canvas.figure.axes[0]
+                lo, hi = ax.get_ylim()
+                self.y_min.blockSignals(True); self.y_min.setValue(lo); self.y_min.blockSignals(False)
+                self.y_max.blockSignals(True); self.y_max.setValue(hi); self.y_max.blockSignals(False)
+            except Exception:
+                pass
+        self.y_min.setEnabled(y_manual)
+        self.y_max.setEnabled(y_manual)
+
+        # ── Y2 limits ─────────────────────────────────────────────────────────
+        y2_manual = not self.y2_auto.isChecked()
+        if y2_manual and not self.y2_min.isEnabled():
+            try:
+                axes = self.canvas.figure.axes
+                ax2 = axes[1] if len(axes) > 1 else axes[0]
+                lo, hi = ax2.get_ylim()
+                self.y2_min.blockSignals(True); self.y2_min.setValue(lo); self.y2_min.blockSignals(False)
+                self.y2_max.blockSignals(True); self.y2_max.setValue(hi); self.y2_max.blockSignals(False)
+            except Exception:
+                pass
+        self.y2_min.setEnabled(y2_manual)
+        self.y2_max.setEnabled(y2_manual)
+
+        self._save_axes_state()
 
     # ── Global subplot selector (above the tabs) ────────────────────────────
     def _on_global_sp_changed(self, idx):
@@ -4750,6 +4859,113 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         except Exception as e:
             if hasattr(self, 'fxy_status'):
                 self.fxy_status.setText(f'\u274c  {e}')
+
+    def _generate_fuv(self):
+        """Generate (u, v) = f(x, y) — vector-field components over a 2-D grid."""
+        try:
+            u_expr = self.fuv_u_expr.text().strip() if hasattr(self, 'fuv_u_expr') else ''
+            v_expr = self.fuv_v_expr.text().strip() if hasattr(self, 'fuv_v_expr') else ''
+            u_name = self.fuv_u_name.text().strip() or 'u' if hasattr(self, 'fuv_u_name') else 'u'
+            v_name = self.fuv_v_name.text().strip() or 'v' if hasattr(self, 'fuv_v_name') else 'v'
+            if not u_expr:
+                self.fuv_status.setText('❌  u expression is empty'); return
+            if not v_expr:
+                self.fuv_status.setText('❌  v expression is empty'); return
+            meshgrid = getattr(self, 'fuv_meshgrid', None) and self.fuv_meshgrid.isChecked()
+
+            def _make_spacing(arr_min, arr_max, n, spacing):
+                if spacing == 'linspace':
+                    return np.linspace(arr_min, arr_max, n)
+                elif spacing == 'logspace':
+                    if arr_min >= arr_max:
+                        raise ValueError('logspace: start exponent must be < stop')
+                    return np.logspace(arr_min, arr_max, n)
+                elif spacing == 'geomspace':
+                    if arr_min <= 0 or arr_max <= 0:
+                        raise ValueError('geomspace: start and stop must be > 0')
+                    return np.geomspace(arr_min, arr_max, n)
+                elif spacing == 'random':
+                    mid = (arr_min + arr_max) / 2; sigma = (arr_max - arr_min) / 6
+                    return np.sort(np.random.normal(mid, sigma, n))
+                elif spacing == 'uniform':
+                    return np.sort(np.random.uniform(arr_min, arr_max, n))
+                return np.linspace(arr_min, arr_max, n)
+
+            # ── Resolve x array ────────────────────────────────────────────────
+            x_use_range = getattr(self, 'fuv_x_mode_range', None) and self.fuv_x_mode_range.isChecked()
+            if x_use_range:
+                x_min = self.fuv_x_min.value(); x_max = self.fuv_x_max.value()
+                if x_min >= x_max and self.fuv_x_spacing.currentText() not in ('logspace',):
+                    self.fuv_status.setText('❌  x: min must be < max'); return
+                x_arr = _make_spacing(x_min, x_max, self.fuv_x_n.value(), self.fuv_x_spacing.currentText())
+                x_var = self.fuv_x_col_name.text().strip() or 'x'
+                x_col_out = x_var
+            else:
+                x_col = self.fuv_x_combo.currentText() if hasattr(self, 'fuv_x_combo') else ''
+                if x_col not in self.datasets:
+                    self.fuv_status.setText('❌  x column not found'); return
+                x_arr = self.datasets[x_col].astype(float)
+                x_var = self.fuv_x_var.text().strip() or 'x' if hasattr(self, 'fuv_x_var') else 'x'
+                x_col_out = x_col
+
+            # ── Resolve y array ────────────────────────────────────────────────
+            y_use_range = getattr(self, 'fuv_y_mode_range', None) and self.fuv_y_mode_range.isChecked()
+            if y_use_range:
+                y_min = self.fuv_y_min.value(); y_max = self.fuv_y_max.value()
+                if y_min >= y_max and self.fuv_y_spacing.currentText() not in ('logspace',):
+                    self.fuv_status.setText('❌  y: min must be < max'); return
+                y_arr = _make_spacing(y_min, y_max, self.fuv_y_n.value(), self.fuv_y_spacing.currentText())
+                y_var = self.fuv_y_col_name.text().strip() or 'y'
+                y_col_out = y_var
+            else:
+                y_col = self.fuv_y_combo.currentText() if hasattr(self, 'fuv_y_combo') else ''
+                if y_col not in self.datasets:
+                    self.fuv_status.setText('❌  y column not found'); return
+                y_arr = self.datasets[y_col].astype(float)
+                y_var = self.fuv_y_var.text().strip() or 'y' if hasattr(self, 'fuv_y_var') else 'y'
+                y_col_out = y_col
+
+            # ── Meshgrid expansion ─────────────────────────────────────────────
+            if meshgrid:
+                X, Y = np.meshgrid(x_arr, y_arr)
+                x_eval = X.ravel(); y_eval = Y.ravel()
+                n = len(x_eval)
+            else:
+                n = min(len(x_arr), len(y_arr))
+                x_eval = x_arr[:n]; y_eval = y_arr[:n]
+
+            # ── Evaluate expressions ───────────────────────────────────────────
+            ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
+            ns.update({x_var: x_eval, y_var: y_eval,
+                       'pi': np.pi, 'e': np.e,
+                       'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
+                       'exp': np.exp, 'log': np.log, 'log10': np.log10,
+                       'sqrt': np.sqrt, 'abs': np.abs})
+            u_arr = np.asarray(eval(u_expr, {'__builtins__': {}}, ns), dtype=float)
+            v_arr = np.asarray(eval(v_expr, {'__builtins__': {}}, ns), dtype=float)
+            if u_arr.shape == (): u_arr = np.full(n, float(u_arr))
+            if v_arr.shape == (): v_arr = np.full(n, float(v_arr))
+
+            # ── Store datasets ─────────────────────────────────────────────────
+            def _store(name, arr):
+                base, cnt, nm = name, 1, name
+                while nm in self.datasets: nm = f'{base}_{cnt}'; cnt += 1
+                self.datasets[nm] = arr; return nm
+
+            stored_x = _store(x_col_out, x_eval) if x_use_range or meshgrid else x_col_out
+            if x_use_range: self.datasets[stored_x] = x_eval
+            stored_y = _store(y_col_out, y_eval) if y_use_range or meshgrid else y_col_out
+            if y_use_range: self.datasets[stored_y] = y_eval
+            stored_u = _store(u_name, u_arr)
+            stored_v = _store(v_name, v_arr)
+            self.update_lists()
+            mode_str = 'meshgrid ' if meshgrid else ''
+            self.fuv_status.setText(
+                f'\u2713  {mode_str}Created x={stored_x}, y={stored_y}, '
+                f'u={stored_u}, v={stored_v}  ({n} pts)')
+        except Exception as e:
+            if hasattr(self, 'fuv_status'):
+                self.fuv_status.setText(f'\u274c  {e}')
 
     def _apply_col_function(self):
         try:

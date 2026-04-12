@@ -180,9 +180,18 @@ class SeabornExplorer(QDialog):
         self._btn_draw      = QPushButton('Redraw')
         self._btn_export    = QPushButton('Export...')
         self._btn_py_code   = QPushButton('🐍 Generate Python Code')
+        self._btn_to_runner = QPushButton('▶ Open in Code Runner')
         self._btn_close     = QPushButton('Close')
-        for b in (self._btn_draw, self._btn_export, self._btn_py_code, self._btn_close):
+        for b in (self._btn_draw, self._btn_export, self._btn_py_code,
+                  self._btn_to_runner, self._btn_close):
             b.setFixedHeight(28)
+        self._btn_to_runner.setToolTip(
+            'Export the current seaborn chart as a .pvizx bundle and open it in the Code Runner')
+        self._btn_to_runner.setStyleSheet(
+            'QPushButton { background: #2ecc71; color: white; font-weight: bold; border-radius: 3px; }'
+            'QPushButton:hover { background: #27ae60; }'
+            'QPushButton:pressed { background: #1e8449; }'
+        )
 
         _initial_dpi = 150
         _p = self.parent()
@@ -201,6 +210,7 @@ class SeabornExplorer(QDialog):
         btn_row.addWidget(self._dpi_spin)
         btn_row.addWidget(self._btn_export)
         btn_row.addWidget(self._btn_py_code)
+        btn_row.addWidget(self._btn_to_runner)
         btn_row.addStretch()
         btn_row.addWidget(self._btn_close)
         rl.addLayout(btn_row)
@@ -212,6 +222,7 @@ class SeabornExplorer(QDialog):
         self._btn_draw.clicked.connect(self._draw)
         self._btn_export.clicked.connect(self._export)
         self._btn_py_code.clicked.connect(self._generate_python_code)
+        self._btn_to_runner.clicked.connect(self._send_to_code_runner)
         self._btn_close.clicked.connect(self.close)
 
     def _section(self, title):
@@ -378,8 +389,6 @@ class SeabornExplorer(QDialog):
         self._pair_diag  = _combo(['auto', 'hist', 'kde'])
         self._pair_kind  = _combo(['scatter', 'kde', 'hist', 'reg'])
         self._pair_alpha = _Spin(0.05, 1.0, 0.7)
-        fl.addRow('Hue:', self._hue_combo)
-        fl.addRow('Size:', self._size_combo)
         fl.addRow('Diagonal:', self._pair_diag)
         fl.addRow('Off-diag:', self._pair_kind)
         fl.addRow('Alpha:',    self._pair_alpha)
@@ -534,19 +543,15 @@ class SeabornExplorer(QDialog):
 
     # ── Python Bundle Export (.pvizx) ─────────────────────────────────────────
 
-    def _generate_python_code(self):
-        """Export a .pvizx zip bundle: sns_plot.py + data CSVs + README."""
-        import csv as _csv
-        import io as _io
-        import zipfile as _zf
-        import textwrap as _tw
-        from PyQt6.QtWidgets import QFileDialog, QMessageBox
-        from .python_export import generate_sns_plot_script
+    def _collect_sns_export_data(self) -> tuple[str, dict] | None:
+        """Collect (chart_name, datasets_to_export) for the current chart state.
 
+        Returns None and shows a warning dialog if no data is available.
+        """
+        from PyQt6.QtWidgets import QMessageBox
         name = self._type_combo.currentText()
-
-        # ── Collect data columns referenced by the current chart ──────────────
         datasets_to_export: dict = {}
+
         def _add(combo):
             if combo is None:
                 return
@@ -556,8 +561,6 @@ class SeabornExplorer(QDialog):
 
         _add(self._x_combo)
         _add(self._y_combo)
-
-        # For multi-column types grab selected columns from the list widget
         if name in ('Heatmap', 'Pairplot'):
             for i in range(self._col_list.count()):
                 item = self._col_list.item(i)
@@ -565,26 +568,25 @@ class SeabornExplorer(QDialog):
                     col = item.text()
                     if col in self.datasets:
                         datasets_to_export[col] = self.datasets[col]
-
-        # Fall back to all datasets if nothing specific was selected
+        if name == 'Pairplot':
+            _add(self._hue_combo)
         if not datasets_to_export:
             datasets_to_export = dict(self.datasets)
-
         if not datasets_to_export:
             QMessageBox.warning(self, 'No data',
                 'No datasets are loaded — nothing to export.')
-            return
+            return None
+        return name, datasets_to_export
 
-        # ── Generate the seaborn script ───────────────────────────────────────
-        try:
-            script = generate_sns_plot_script(self, name, datasets_to_export)
-        except Exception as exc:
-            import traceback as _tb
-            QMessageBox.critical(self, 'Script generation error',
-                f'{exc}\n\n{_tb.format_exc()}')
-            return
+    def _build_sns_pvizx(self, name: str, datasets_to_export: dict) -> bytes:
+        """Build and return the raw bytes of a .pvizx zip for the current seaborn chart."""
+        import csv as _csv
+        import io as _io
+        import zipfile as _zf
+        import textwrap as _tw
+        from .python_export import generate_sns_plot_script
 
-        # ── README ────────────────────────────────────────────────────────────
+        script = generate_sns_plot_script(self, name, datasets_to_export)
         readme = _tw.dedent(f"""\
         # SNS {name} — Python Export
 
@@ -595,7 +597,7 @@ class SeabornExplorer(QDialog):
 
         | File | Description |
         |------|-------------|
-        | `sns_plot.py` | Standalone Python script |
+        | `plot.py` | Standalone Python script |
         | `data/` | CSV files with the chart datasets |
         | `README.md` | This file |
 
@@ -605,10 +607,10 @@ class SeabornExplorer(QDialog):
 
         ## Running
 
-            python sns_plot.py
+            python plot.py
 
         The script loads data from the `data/` folder relative to its own location,
-        so keep `sns_plot.py` and `data/` together.
+        so keep `plot.py` and `data/` together.
 
         ## Datasets ({len(datasets_to_export)} column(s))
 
@@ -617,7 +619,47 @@ class SeabornExplorer(QDialog):
         *Generated by plotviz Seaborn Explorer*
         """)
 
-        # ── File dialog ───────────────────────────────────────────────────────
+        lengths = {len(v) for v in datasets_to_export.values() if v is not None}
+        use_combined = len(lengths) == 1
+        buf_zip = _io.BytesIO()
+        with _zf.ZipFile(buf_zip, 'w', _zf.ZIP_DEFLATED) as zf:
+            zf.writestr('plot.py', script)
+            zf.writestr('README.md', readme)
+            if use_combined:
+                buf = _io.StringIO()
+                writer = _csv.writer(buf)
+                col_names = list(datasets_to_export.keys())
+                writer.writerow(col_names)
+                n_rows = len(next(iter(datasets_to_export.values())))
+                for row_idx in range(n_rows):
+                    writer.writerow([
+                        datasets_to_export[c][row_idx]
+                        if row_idx < len(datasets_to_export[c]) else ''
+                        for c in col_names
+                    ])
+                zf.writestr('data/data.csv', buf.getvalue())
+            else:
+                for col_name, arr in datasets_to_export.items():
+                    buf = _io.StringIO()
+                    writer = _csv.writer(buf)
+                    writer.writerow([col_name])
+                    for v in arr:
+                        writer.writerow([v])
+                    safe = ''.join(
+                        c if c.isalnum() or c in '-_.' else '_'
+                        for c in col_name)
+                    zf.writestr(f'data/{safe}.csv', buf.getvalue())
+        return buf_zip.getvalue()
+
+    def _generate_python_code(self):
+        """Export a .pvizx zip bundle: plot.py + data CSVs + README."""
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+
+        result = self._collect_sns_export_data()
+        if result is None:
+            return
+        name, datasets_to_export = result
+
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Export Seaborn Python Bundle',
             f'sns_{name.lower()}.pvizx',
@@ -627,47 +669,44 @@ class SeabornExplorer(QDialog):
         if not fp.endswith('.pvizx'):
             fp += '.pvizx'
 
-        # ── Build zip ─────────────────────────────────────────────────────────
         try:
-            lengths = {len(v) for v in datasets_to_export.values() if v is not None}
-            use_combined = len(lengths) == 1
-
-            with _zf.ZipFile(fp, 'w', _zf.ZIP_DEFLATED) as zf:
-                zf.writestr('sns_plot.py', script)
-                zf.writestr('README.md', readme)
-
-                if use_combined:
-                    buf = _io.StringIO()
-                    writer = _csv.writer(buf)
-                    col_names = list(datasets_to_export.keys())
-                    writer.writerow(col_names)
-                    n_rows = len(next(iter(datasets_to_export.values())))
-                    for row_idx in range(n_rows):
-                        writer.writerow([
-                            datasets_to_export[c][row_idx]
-                            if row_idx < len(datasets_to_export[c]) else ''
-                            for c in col_names
-                        ])
-                    zf.writestr('data/data.csv', buf.getvalue())
-                else:
-                    for col_name, arr in datasets_to_export.items():
-                        buf = _io.StringIO()
-                        writer = _csv.writer(buf)
-                        writer.writerow([col_name])
-                        for v in arr:
-                            writer.writerow([v])
-                        safe = ''.join(
-                            c if c.isalnum() or c in '-_.' else '_'
-                            for c in col_name)
-                        zf.writestr(f'data/{safe}.csv', buf.getvalue())
-
+            data = self._build_sns_pvizx(name, datasets_to_export)
+            with open(fp, 'wb') as fh:
+                fh.write(data)
             QMessageBox.information(self, 'Exported',
                 f'Seaborn bundle saved to:\n{fp}\n\n'
-                f'Extract the zip and run:  python sns_plot.py')
-
+                f'Extract the zip and run:  python plot.py')
         except Exception as exc:
             import traceback as _tb
             QMessageBox.critical(self, 'Export error',
+                f'{exc}\n\n{_tb.format_exc()}')
+
+    def _send_to_code_runner(self):
+        """Build a .pvizx bundle for the current seaborn chart and open it in Code Runner."""
+        import tempfile, os
+        from PyQt6.QtWidgets import QMessageBox
+
+        result = self._collect_sns_export_data()
+        if result is None:
+            return
+        name, datasets_to_export = result
+
+        main_win = self.parent()
+        if main_win is None or not hasattr(main_win, '_open_pvizx_in_code_runner'):
+            QMessageBox.warning(self, 'Code Runner unavailable',
+                'Cannot reach the main window Code Runner from here.')
+            return
+
+        try:
+            data = self._build_sns_pvizx(name, datasets_to_export)
+            tmp_fd, tmp_fp = tempfile.mkstemp(suffix='.pvizx', prefix='plotviz_sns_cr_')
+            os.close(tmp_fd)
+            with open(tmp_fp, 'wb') as fh:
+                fh.write(data)
+            main_win._open_pvizx_in_code_runner(tmp_fp)
+        except Exception as exc:
+            import traceback as _tb
+            QMessageBox.critical(self, 'Code Runner export error',
                 f'{exc}\n\n{_tb.format_exc()}')
 
 
@@ -842,16 +881,8 @@ class SeabornExplorer(QDialog):
             hue_val = hn
         else:
             hue_val = None
-        szd, szn = self._get_style()
-        if szd is not None:
-            df[szn] = szd[:].astype(str)
-            size_val = szn
-        else:
-            size_val = None
-
         pg = sns.pairplot(df,
                         hue=hue_val,
-                        size=size_val,
                         diag_kind=self._pair_diag.currentText(),
                         kind=self._pair_kind.currentText(),
                         palette=_pal,
@@ -904,18 +935,16 @@ class SeabornExplorer(QDialog):
         ci_str  = self._cat_ci.currentText()
         errorbar = ('ci', 95) if ci_str == '95' else \
                    ('ci', 99) if ci_str == '99' else \
-                   ('sd', None) if ci_str == 'sd' else None
-        _cat_pal = self._sns_palette_name() or self._sns_palette()[0]
+                   'sd' if ci_str == 'sd' else None
+        _pal_name = self._sns_palette_name()  # str if named palette, None if plotviz
         kw = dict(data=df, x='x', y='y', kind=kind,
-                  palette=_cat_pal if isinstance(_cat_pal, str) else None,
-                  color=_cat_pal if isinstance(_cat_pal, str) else self._sns_palette()[0],
                   alpha=self._cat_alpha.value(),
                   saturation=self._cat_sat.value())
         # palette and color are mutually exclusive in seaborn catplot
-        if 'palette' in kw and kw['palette'] is None:
-            del kw['palette']
-        elif 'palette' in kw and kw['palette'] is not None:
-            del kw['color']
+        if _pal_name is not None:
+            kw['palette'] = _pal_name
+        else:
+            kw['palette'] = self._sns_palette(10)
         if kind in ('bar', 'point') and errorbar is not None:
             kw['errorbar'] = errorbar
         fg = sns.catplot(**kw)
