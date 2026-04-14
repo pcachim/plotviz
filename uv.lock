@@ -1316,11 +1316,6 @@ dependencies = [
     { name = "statsmodels" },
 ]
 
-[package.optional-dependencies]
-stats = [
-    { name = "statsmodels" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "mike" },
@@ -1340,9 +1335,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.10" },
     { name = "seaborn", specifier = ">=0.13" },
     { name = "statsmodels", specifier = ">=0.14" },
-    { name = "statsmodels", marker = "extra == 'stats'", specifier = ">=0.14" },
 ]
-provides-extras = ["stats"]
 
 [package.metadata.requires-dev]
 dev = [

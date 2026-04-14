@@ -1017,6 +1017,26 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._open_code_runner()
         self._code_runner.load_pvizx(fp)
 
+    def _open_documentation(self):
+        """Open the plotviz online documentation in the default browser."""
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+        QDesktopServices.openUrl(QUrl('https://pcachim.github.io/plotviz/'))
+
+    def _open_plots_folder(self):
+        """Reveal the user plots folder in Finder / Explorer."""
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+        from config.settings import plots_dir
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(plots_dir())))
+
+    def _open_datasets_folder(self):
+        """Reveal the user datasets folder in Finder / Explorer."""
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+        from config.settings import datasets_dir
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(datasets_dir())))
+
     def closeEvent(self, event):
         """Persist window state and prefs before closing."""
         geo = self.geometry()
@@ -1228,6 +1248,28 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._tools_menu = tools_menu
         self._sns_explorer  = None   # lazily created
         self._code_runner   = None   # lazily created
+
+        # ── Help menu ─────────────────────────────────────────────────────────
+        help_menu = menubar.addMenu('Help')
+
+        docs_action = QAction('Documentation', self)
+        docs_action.setStatusTip('Open the plotviz online documentation')
+        docs_action.triggered.connect(self._open_documentation)
+        help_menu.addAction(docs_action)
+
+        help_menu.addSeparator()
+
+        sample_charts_action = QAction('Sample Charts', self)
+        sample_charts_action.setStatusTip('Open the folder containing sample chart files')
+        sample_charts_action.triggered.connect(self._open_plots_folder)
+        help_menu.addAction(sample_charts_action)
+
+        sample_datasets_action = QAction('Sample Datasets', self)
+        sample_datasets_action.setStatusTip('Open the folder containing sample dataset files')
+        sample_datasets_action.triggered.connect(self._open_datasets_folder)
+        help_menu.addAction(sample_datasets_action)
+
+        self._help_menu = help_menu
 
         # ── Configurations menu ───────────────────────────────────────────────
         config_menu = menubar.addMenu('Configurations')

@@ -1,9 +1,9 @@
 site_name: plotviz
 site_description: Publication-quality chart editor for scientists and analysts
 site_author: Paulo Cachim
-site_url: https://yourorg.github.io/plotviz/
-repo_url: https://github.com/yourorg/plotviz
-repo_name: yourorg/plotviz
+site_url: https://pcachim.github.io/plotviz/
+repo_url: https://github.com/pcachim/plotviz
+repo_name: pcachim/plotviz
 edit_uri: edit/main/docs/
 
 docs_dir: docs
@@ -90,4 +90,4 @@ extra:
     provider: mike
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/yourorg/plotviz
+      link: https://github.com/pcachim/plotviz

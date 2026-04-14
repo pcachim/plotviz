@@ -1885,6 +1885,13 @@ class TabBuildersMixin:
         self.preset_combo.setVisible(False)
         layout.addWidget(self.preset_combo)
 
+        layout.addWidget(self._hline())
+
+        # ── Colors ────────────────────────────────────────────────────────────
+        layout.addWidget(self._sec_label('Colors'))
+        color_row('BG color:',  'chart_bg_color', '#ffffff', 'chart_bg')
+        color_row('FG color:',  'chart_fg_color', '#000000', 'chart_fg')
+
         layout.addStretch()
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)
@@ -2653,8 +2660,6 @@ class TabBuildersMixin:
             r.addStretch()
             layout.addLayout(r)
 
-        _color_row('BG color:',  'chart_bg_color', '#ffffff', 'chart_bg')
-        _color_row('FG color:',  'chart_fg_color', '#000000', 'chart_fg')
         _color_row('Plot area:', 'plot_bg_color',  '#ffffff', 'plot_bg')
 
         br = QHBoxLayout()

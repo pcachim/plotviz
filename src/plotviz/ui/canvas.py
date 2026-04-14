@@ -155,9 +155,44 @@ class CanvasPlotter(FigureCanvas):
             self.draw_idle()
 
     # ── Tab-navigation constants ──────────────────────────────────────────────
-    _TAB_AXES   = 4   # Chart / Data / Style / Series / Axes / Annotations / Advanced
-    _TAB_STYLE  = 2
-    _TAB_SERIES = 3
+    # Outer tabs: 0=Chart  1=Style  2=Plots  3=Advanced
+    _OUTER_STYLE  = 1
+    _OUTER_PLOTS  = 2
+    # plots_inner_tabs add order: Data→Layout→Series→Axes→Annotations
+    _INNER_DATA        = 0
+    _INNER_LAYOUT      = 1
+    _INNER_SERIES      = 2
+    _INNER_AXES        = 3
+    _INNER_ANNOTATIONS = 4
+
+    def _goto_tab(self, outer: int, inner: int | None = None) -> None:
+        """Navigate to *outer* tab and optionally to *inner* plots sub-tab."""
+        mw = self.main_window
+        if mw is None:
+            return
+        try:
+            mw.tabs.setCurrentIndex(outer)
+            if inner is not None and hasattr(mw, 'plots_inner_tabs'):
+                mw.plots_inner_tabs.setCurrentIndex(inner)
+        except Exception:
+            pass
+
+    def _select_subplot(self, ax_idx: int) -> None:
+        """Switch every subplot selector to *ax_idx* and refresh tab state.
+
+        No-op when there is only one subplot so single-chart users see no
+        change in behaviour.
+        """
+        mw = self.main_window
+        if mw is None:
+            return
+        n = getattr(mw, 'subplot_rows', 1) * getattr(mw, 'subplot_cols', 1)
+        if n <= 1:
+            return
+        try:
+            mw._on_global_sp_changed(ax_idx)
+        except Exception:
+            pass
 
     def _nav_zone(self, event):
         """Classify a left-click for tab navigation.
@@ -229,12 +264,18 @@ class CanvasPlotter(FigureCanvas):
                 if hit['type'] == 'text':
                     self._drag_offx = x - hit['x']
                     self._drag_offy = y - hit['y']
+                    lbl = hit.get('label', '')
+                    self._show_status(f'Annotation: "{lbl}"' if lbl else 'Text annotation')
                 elif hit['type'] == 'arrow':
                     self._drag_offx = x - hit['x0']
                     self._drag_offy = y - hit['y0']
+                    self._show_status('Arrow annotation')
                 elif hit['type'] == 'image':
                     self._drag_offx = x - hit['x']
                     self._drag_offy = y - hit['y']
+                    self._show_status('Image annotation')
+                self._select_subplot(ax_idx)
+                self._goto_tab(self._OUTER_PLOTS, self._INNER_ANNOTATIONS)
                 return
             if self.annotation_mode == 'text':
                 self._place_text_annotation(ax, ax_idx, x, y)
@@ -269,25 +310,38 @@ class CanvasPlotter(FigureCanvas):
                     if hit['type'] == 'text':
                         self._drag_offx = x - hit['x']
                         self._drag_offy = y - hit['y']
+                        lbl = hit.get('label', '')
+                        self._show_status(f'Annotation: "{lbl}"' if lbl else 'Text annotation')
                     elif hit['type'] == 'arrow':
                         self._drag_offx = x - hit['x0']
                         self._drag_offy = y - hit['y0']
+                        self._show_status('Arrow annotation')
                     elif hit['type'] == 'image':
                         self._drag_offx = x - hit['x']
                         self._drag_offy = y - hit['y']
+                        self._show_status('Image annotation')
+                    self._select_subplot(ax_idx)
+                    self._goto_tab(self._OUTER_PLOTS, self._INNER_ANNOTATIONS)
                     return
-                # Series hit
+                # Series hit → Series tab
                 label = self._find_series_at(ax, x, y, event)
                 if label and mw:
                     mw.select_series_by_label(label)
+                    self._select_subplot(ax_idx)
+                    self._goto_tab(self._OUTER_PLOTS, self._INNER_SERIES)
                     return
-            # No series hit — do nothing; don't change tabs or option groups
+                # No artist hit — show coordinates and go to Layout tab
+                sp_label = self._subplot_label(ax)
+                self._show_status(
+                    f'{sp_label}  ·  x = {self._fmt(x)},  y = {self._fmt(y)}'
+                )
+                self._select_subplot(ax_idx)
+                self._goto_tab(self._OUTER_PLOTS, self._INNER_LAYOUT)
 
         elif zone == 'axes':
             # Axis decoration area — find which subplot and go to Axes tab
             px, py = event.x, event.y
             ax_idx = 0
-            # Pick the subplot whose inner box is closest vertically/horizontally
             best_d = float('inf')
             for i, ax in enumerate(self.axes_list):
                 b = ax.bbox
@@ -296,14 +350,14 @@ class CanvasPlotter(FigureCanvas):
                 d = (px - cx) ** 2 + (py - cy) ** 2
                 if d < best_d:
                     best_d, ax_idx = d, i
-            if mw:
-                if hasattr(mw, 'sp_active'):
-                    mw.sp_active.setCurrentIndex(ax_idx)
-                mw.tabs.setCurrentIndex(self._TAB_AXES)
+            sp_label = self._subplot_label(self.axes_list[ax_idx])
+            self._show_status(f'Axes — {sp_label}')
+            self._select_subplot(ax_idx)
+            self._goto_tab(self._OUTER_PLOTS, self._INNER_AXES)
 
-        else:  # 'style'
-            if mw:
-                mw.tabs.setCurrentIndex(self._TAB_STYLE)
+        else:  # 'style' — figure margins / title area
+            self._show_status('Figure — Style area')
+            self._goto_tab(self._OUTER_STYLE)
 
     def on_release(self, event):
         if self._drag_ann is not None:
@@ -511,6 +565,43 @@ class CanvasPlotter(FigureCanvas):
         if self.main_window:
             try: self.main_window.refresh_annotation_list()
             except Exception: pass
+
+    # ─── Status bar helper ────────────────────────────────────────────────────
+    def _show_status(self, msg: str, timeout: int = 4000) -> None:
+        """Write *msg* to the main window's status bar (bottom of app)."""
+        mw = self.main_window
+        if mw is None:
+            return
+        try:
+            mw.statusBar().showMessage(msg, timeout)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _fmt(v) -> str:
+        """Format a data-space coordinate concisely (4 significant figures)."""
+        try:
+            f = float(v)
+            if f == 0:
+                return '0'
+            return f'{f:.4g}'
+        except Exception:
+            return str(v)
+
+    def _subplot_label(self, ax) -> str:
+        """Return a human-readable label for *ax*: its title if set, otherwise
+        'Subplot N' (1-indexed), or just 'Subplot' for a single-panel chart."""
+        idx = self._axes_index(ax)
+        title = ''
+        try:
+            title = ax.get_title().strip()
+        except Exception:
+            pass
+        if title:
+            return title
+        if len(self.axes_list) > 1:
+            return f'Subplot {idx + 1}'
+        return 'Subplot'
 
     def redraw_annotations(self):
         surviving = []

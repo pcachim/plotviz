@@ -29,6 +29,10 @@ except ImportError:
 
 CFG_FILE = _CFG_DIR / 'settings.json'
 
+# Subdirectory names for user-managed data (seeded from the bundled data/ dir)
+PLOTS_DIR_NAME    = 'plots'
+DATASETS_DIR_NAME = 'datasets'
+
 # Maximum number of recent files to track
 MAX_RECENT = 12
 
@@ -171,3 +175,29 @@ def get_recent_files() -> list[str]:
 def prune_recent_files() -> None:
     """Remove entries that no longer exist from the recent-files list."""
     set('recent_files', get_recent_files())
+
+
+def user_data_dir() -> Path:
+    """Return the user data directory where plots/ and datasets/ live.
+
+    This is the same directory as the config/log dir so everything stays
+    in one place per platform:
+      macOS   ~/Library/Application Support/plotviz/
+      Linux   ~/.config/plotviz/
+      Windows %APPDATA%\\plotviz\\
+    """
+    return _CFG_DIR
+
+
+def plots_dir() -> Path:
+    """Return (and guarantee creation of) the user plots directory."""
+    p = _CFG_DIR / PLOTS_DIR_NAME
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def datasets_dir() -> Path:
+    """Return (and guarantee creation of) the user datasets directory."""
+    p = _CFG_DIR / DATASETS_DIR_NAME
+    p.mkdir(parents=True, exist_ok=True)
+    return p

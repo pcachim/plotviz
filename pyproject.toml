@@ -4,6 +4,14 @@ name = "plotviz"
 dynamic = ["version"]
 description = "Publication-Quality Chart Generator"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Paulo Cachim", email = "eurocodepy@gmail.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = [
     "seaborn>=0.13",
     "matplotlib>=3.7",
@@ -15,11 +23,6 @@ dependencies = [
     "openpyxl>=3.1",
     "platformdirs>=3.0",
 ]
-
-[project.optional-dependencies]
-# statsmodels is now a core dependency and bundled in the .app.
-# This extras group is kept for reference / pip install plotviz[stats].
-stats = ["statsmodels>=0.14"]
 
 [project.scripts]
 plotviz = "main:main"

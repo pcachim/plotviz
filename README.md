@@ -37,7 +37,7 @@ See [Getting Started](getting-started.md) for full installation and interface de
 
 ## Documentation
 
-Full documentation is available at **https://yourorg.github.io/plotviz/**
+Full documentation is available at **https://pcachim.github.io/plotviz/**
 
 | Document | Contents |
 |----------|----------|

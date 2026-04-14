@@ -145,6 +145,39 @@ class PlotVizQApplication(QApplication):
             return True
         return super().event(e)
 
+def _ensure_user_data(log_dir: 'Path') -> None:
+    """Seed the user data directories from the bundled data/ folder.
+
+    Called on every startup.  If plots/ or datasets/ are missing under
+    *log_dir* they are created and populated from the bundled data/ tree.
+    If the bundled data/ is not present (e.g. pip-installed without the
+    data directory), the subdirectories are simply created empty so the
+    rest of the app always has valid paths to work with.
+    """
+    import shutil
+
+    # Locate the bundled data/ directory
+    if getattr(sys, 'frozen', False):
+        # PyInstaller bundle: data/ lands at the root of _MEIPASS
+        bundled_data = Path(sys._MEIPASS) / 'data'       # type: ignore[attr-defined]
+    else:
+        # Running from source: data/ is at repo root (three levels up from main.py)
+        bundled_data = Path(__file__).parent.parent.parent / 'data'
+
+    for subdir in ('plots', 'datasets'):
+        dest = log_dir / subdir
+        if dest.exists():
+            continue  # already there — nothing to do
+        src = bundled_data / subdir
+        if src.is_dir():
+            try:
+                shutil.copytree(src, dest)
+            except Exception:
+                dest.mkdir(parents=True, exist_ok=True)
+        else:
+            dest.mkdir(parents=True, exist_ok=True)
+
+
 def main():
     _set_win_appusermodel_id()   # must be before QApplication on Windows
 
@@ -172,6 +205,10 @@ def main():
     log = logging.getLogger('plotviz')
     log.setLevel(logging.WARNING)
     log.warning('plotviz starting — log: %s', _log_file)
+
+    # ── User data directories (plots/ and datasets/) ──────────────────────────
+    # Seed from the bundled data/ on first run, or re-create if missing.
+    _ensure_user_data(_log_dir)
     # ─────────────────────────────────────────────────────────────────────────
 
     app = PlotVizQApplication(sys.argv)
