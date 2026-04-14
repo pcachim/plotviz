@@ -38,51 +38,51 @@ See [Getting Started](getting-started.md) for full setup instructions.
 
 <div class="grid cards" markdown>
 
-- :material-rocket-launch: **[Getting Started](getting-started.md)**
+- **[Getting Started](getting-started.md)**
 
     Install plotviz and create your first chart in minutes.
 
-- :material-table: **[Loading Data](data.md)**
+- **[Loading Data](data.md)**
 
     Load CSV, Excel, JSON or TXT files and build the series table.
 
-- :material-chart-line: **[Chart Types](chart-types.md)**
+- **[Chart Types](chart-types.md)**
 
     Reference for all 22 chart types and their options.
 
-- :material-palette: **[Style & Appearance](style.md)**
+- **[Style & Appearance](style.md)**
 
     Colors, themes, grid, figure size, and color schemes.
 
-- :material-axis-arrow: **[Axes](axes.md)**
+- **[Axes](axes.md)**
 
     Labels, limits, scales, ticks, formatters, secondary Y axis.
 
-- :material-text-box: **[Annotations](annotations.md)**
+- **[Annotations](annotations.md)**
 
     Subplot titles, legends, text, arrows, and images.
 
-- :material-chart-scatter-plot: **[Series & Curve Fitting](series.md)**
+- **[Series & Curve Fitting](series.md)**
 
     Per-curve style and 7 curve-fit models.
 
-- :material-view-grid: **[Subplots](subplots.md)**
+- **[Subplots](subplots.md)**
 
     Multi-panel layouts and mosaic editor.
 
-- :material-function: **[Advanced Tools](advanced.md)**
+- **[Advanced Tools](advanced.md)**
 
     Function generator and manual data table.
 
-- :material-file: **[File Formats](file-formats.md)**
+- **[File Formats](file-formats.md)**
 
     .pviz, .pvizt, .pvizc, .pvizp format reference.
 
-- :material-keyboard: **[Keyboard Shortcuts](shortcuts.md)**
+- **[Keyboard Shortcuts](shortcuts.md)**
 
     All keyboard shortcuts and canvas controls.
 
-- :material-package-variant: **[Building & Packaging](building.md)**
+- **[Building & Packaging](building.md)**
 
     Create macOS .app and Windows .exe distributions.
 
