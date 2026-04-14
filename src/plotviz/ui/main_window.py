@@ -567,7 +567,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def __init__(self):
         super().__init__()
         from config._version import __version__
-        self.setWindowTitle(f'plotviz {__version__}')
+        self.setWindowTitle(f'plotviz {__version__} - new chart')
 
         # ── Restore window geometry from settings ──────────────────────────────
         geom = settings.get('window_geometry')   # [x, y, w, h]
@@ -587,11 +587,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_chart_types  = {0: 'Line'}
         self.subplot_plot_modes   = {0: 'Standard'}
         self.subplot_chart_opts   = {}      # {subplot_idx: {opt_key: value}}
+        self.subplot_canvas_opts  = {}      # {subplot_idx: canvas/border opts}
+        self.subplot_grid_opts    = {}      # {subplot_idx: grid opts}
         self.sp_titles            = {0: ''}
         self.subplot_title_show   = {0: True}
-        self.subplot_title_font   = {0: 'sans-serif'}
-        self.subplot_title_size   = {0: 11}
-        self.subplot_title_color  = {0: '#000000'}
+        self.subplot_title_font     = {0: 'sans-serif'}
+        self.subplot_title_size     = {0: 11}
+        self.subplot_title_color    = {0: '#000000'}
+        self.subplot_title_pad      = {0: 6}
+        self.subplot_title_rotation = {0: 0}
+        self.subplot_title_ha       = {0: 'center'}
         self.subplot_xlabels      = {0: ''}
         self.subplot_xlabel_show  = {0: True}
         self.subplot_ylabels      = {0: ''}
@@ -634,6 +639,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._color_palette = settings.get('color_palette', 'Matplotlib')
         self.subplot_ann_visible  = {0: True}   # per-subplot annotation visibility
         self.subplot_equal_aspect = {0: False}  # per-subplot equal-scale (set_aspect('equal'))
+        self.subplot_xaxis_pos    = {0: 'bottom'}  # x-axis position: bottom / top / zero
+        self.subplot_yaxis_pos    = {0: 'left'}    # y-axis position: left / right / zero
+        self.subplot_xlabel_rotation = {0: 0}
+        self.subplot_xlabel_labelpad = {0: 4}
+        self.subplot_xlabel_loc      = {0: 'center'}
+        self.subplot_xlabel_ha       = {0: 'center'}
+        self.subplot_ylabel_rotation = {0: 90}
+        self.subplot_ylabel_labelpad = {0: 4}
+        self.subplot_ylabel_loc      = {0: 'center'}
+        self.subplot_ylabel_ha       = {0: 'center'}
         # fit_color / fit_linestyle / fit_linewidth removed in 2.0.0 —
         # fit curves are now styled via curve_styles like any other series.
 
@@ -691,15 +706,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # WINDOW TITLE
     # ═══════════════════════════════════════════════════════════════════════════
     def _update_window_title(self):
-        """Set the title bar to 'plotviz <version>' or 'plotviz <version> - <stem>'."""
+        """Set the title bar to 'plotviz <version> - <stem>' or 'plotviz <version> - new chart'."""
         from config._version import __version__
         fp = getattr(self, '_current_filepath', None)
         if fp:
             import os as _os
             stem = _os.path.splitext(_os.path.basename(fp))[0]
-            self.setWindowTitle(f'plotviz {__version__} - {stem}')
         else:
-            self.setWindowTitle(f'plotviz {__version__}')
+            stem = 'new chart'
+        self.setWindowTitle(f'plotviz {__version__} - {stem}')
 
     # ═══════════════════════════════════════════════════════════════════════════
     # STARTUP LOAD
@@ -810,13 +825,152 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._on_canvas_resized()
 
     def _on_canvas_resized(self):
-        """Debounced redraw triggered by splitter moves or window resize."""
+        """Debounced handler for window resize / splitter moves.
+
+        Just (re)starts the debounce timer.  All size-tracking logic lives in
+        _apply_resize_and_preview so that the baseline is established from the
+        settled window size — not from intermediate layout passes during startup.
+        """
         if not hasattr(self, '_resize_timer'):
             from PyQt6.QtCore import QTimer
             self._resize_timer = QTimer(self)
             self._resize_timer.setSingleShot(True)
-            self._resize_timer.timeout.connect(self.update_preview)
+            self._resize_timer.timeout.connect(self._apply_resize_and_preview)
         self._resize_timer.start(80)   # 80 ms debounce
+
+    def _apply_resize_and_preview(self):
+        """Scale export figure size / margins per resize_mode, then redraw.
+
+        Called once per debounced resize burst.  Uses the *window* size
+        (self.width / self.height) as the reference — the matplotlib canvas
+        widget is fixed at its figure's pixel size and does not track the
+        window size reliably.
+
+        On the very first call the baseline is recorded and no scaling is
+        applied, so startup resize events never corrupt the initial layout.
+        """
+        if not hasattr(self, 'canvas'):
+            return
+
+        # Use the *canvas widget* dimensions, not self.width()/self.height().
+        # The main window includes fixed-height chrome (toolbar, menu bar) and
+        # a fixed-width left panel (~520 px).  Those non-chart areas don't scale
+        # with the chart, so using the full window produces the wrong ratio --
+        # especially on Y where the toolbar is a larger fraction of total height.
+        new_w, new_h = self.canvas.width(), self.canvas.height()
+
+        # Guard against zero-size canvas during early startup layout passes.
+        if new_w <= 0 or new_h <= 0:
+            return
+
+        # First call: establish the baseline without scaling.
+        if not hasattr(self, '_window_size_baseline'):
+            self._window_size_baseline = (new_w, new_h)
+            self.update_preview()
+            return
+
+        prev_w, prev_h = self._window_size_baseline
+
+        if (prev_w > 0 and prev_h > 0
+                and (new_w != prev_w or new_h != prev_h)):
+            scale_x = new_w / prev_w
+            scale_y = new_h / prev_h
+            if scale_x != 1.0 or scale_y != 1.0:
+                self._scale_figsize(scale_x, scale_y)
+
+        # Always update baseline so the next burst computes the correct delta.
+        self._window_size_baseline = (new_w, new_h)
+        self.update_preview()
+
+    def _scale_figsize(self, sx: float, sy: float) -> None:
+        """Scale export figure width/height, margins, and title position.
+
+        All spinboxes are signal-blocked throughout to prevent cascading
+        redraws.  The order is critical:
+
+          1. Snapshot originals (before any mutation).
+          2. Block all signals.
+          3. Scale fig_width / fig_height.
+          4. Scale margins and title FROM ORIGINALS (not from post-range-clamp
+             values), clamping against the *new* fig dimension.
+          5. Refresh spinbox ranges (setRange / setDecimals) — done last so
+             the range-update cannot silently clamp the values we just wrote.
+          6. Unblock signals.
+
+        Args:
+            sx: horizontal scale factor (new_window_width  / old_window_width).
+            sy: vertical   scale factor (new_window_height / old_window_height).
+        """
+        # ── 1. Snapshot originals ─────────────────────────────────────────────
+        orig_w      = self.fig_width.value()
+        orig_h      = self.fig_height.value()
+        orig_left   = self.fig_left.value()
+        orig_right  = self.fig_right.value()
+        orig_bottom = self.fig_bottom.value()
+        orig_top    = self.fig_top.value()
+
+        title_x_sp  = getattr(self, 'title_x', None)
+        title_y_sp  = getattr(self, 'title_y', None)
+        orig_tx     = title_x_sp.value() if title_x_sp else None
+        orig_ty     = title_y_sp.value() if title_y_sp else None
+
+        # ── 2. Block all signals ──────────────────────────────────────────────
+        all_spins = [self.fig_width, self.fig_height,
+                     self.fig_left, self.fig_right,
+                     self.fig_bottom, self.fig_top]
+        if title_x_sp:
+            all_spins.append(title_x_sp)
+        if title_y_sp:
+            all_spins.append(title_y_sp)
+        for sp in all_spins:
+            sp.blockSignals(True)
+
+        # ── 3. Scale fig_width / fig_height ───────────────────────────────────
+        new_w = max(self.fig_width.minimum(),
+                    min(self.fig_width.maximum(),  orig_w * sx)) if sx != 1.0 else orig_w
+        new_h = max(self.fig_height.minimum(),
+                    min(self.fig_height.maximum(), orig_h * sy)) if sy != 1.0 else orig_h
+        self.fig_width.setValue(new_w)
+        self.fig_height.setValue(new_h)
+
+        # ── 4. Scale margins and title from originals, clamped to new dims ────
+        # Clamp margins to [0, new_w/new_h] so they stay inside the figure.
+        if sx != 1.0:
+            self.fig_left.setValue( max(0.0, min(new_w, orig_left   * sx)))
+            self.fig_right.setValue(max(0.0, min(new_w, orig_right  * sx)))
+        if sy != 1.0:
+            self.fig_bottom.setValue(max(0.0, min(new_h, orig_bottom * sy)))
+            self.fig_top.setValue(   max(0.0, min(new_h, orig_top    * sy)))
+
+        if sx != 1.0 and title_x_sp and orig_tx is not None:
+            title_x_sp.setValue(max(0.0, min(new_w, orig_tx * sx)))
+        if sy != 1.0 and title_y_sp and orig_ty is not None:
+            title_y_sp.setValue(max(0.0, min(new_h, orig_ty * sy)))
+
+        # ── 5. Refresh spinbox ranges AFTER writing values ────────────────────
+        # _update_margin_ranges / _update_title_pos_ranges call setRange() which
+        # would silently clamp our freshly-written values if called earlier.
+        # Set _in_scale_figsize so _update_title_pos_ranges skips re-scaling
+        # (we already scaled title_x/y in step 4 above).
+        self._in_scale_figsize = True
+        try:
+            self._update_margin_ranges()
+            if hasattr(self, '_update_title_pos_ranges'):
+                self._update_title_pos_ranges()
+        finally:
+            self._in_scale_figsize = False
+
+        # ── 6. Unblock ────────────────────────────────────────────────────────
+        for sp in all_spins:
+            sp.blockSignals(False)
+
+        # ── 7. Sync preset combo ──────────────────────────────────────────────
+        # Signals were blocked during scaling so _on_figsize_manual_change never
+        # fired.  Explicitly mark the preset as Custom so the combo stays accurate.
+        if hasattr(self, 'fig_preset_combo'):
+            self.fig_preset_combo.blockSignals(True)
+            self.fig_preset_combo.setCurrentText('Custom')
+            self.fig_preset_combo.blockSignals(False)
 
     # ── Seaborn Explorer ──────────────────────────────────────────────────────
     def _open_seaborn_explorer(self):
@@ -958,7 +1112,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 self.plots_inner_tabs.setCurrentIndex(0)  # Data inner tab
 
         # ── New ───────────────────────────────────────────────────────────────
-        act_new = QAction('New Plot', self)
+        act_new = QAction('New Chart', self)
         act_new.setShortcut('Ctrl+N')
         act_new.triggered.connect(lambda: (_go_chart_tab(), self._reset_app()))
         file_menu.addAction(act_new)
@@ -1143,8 +1297,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         top_bar_layout.setContentsMargins(6, 4, 6, 4)
         top_bar_layout.setSpacing(4)
 
-        btn_new = QPushButton('＋ New Plot')
-        btn_new.setToolTip('Start a new blank plot (Ctrl+N)')
+        btn_new = QPushButton('＋ New Chart')
+        btn_new.setToolTip('Start a new blank chart (Ctrl+N)')
         btn_new.clicked.connect(lambda: (self.tabs.setCurrentIndex(0), self._reset_app()))
         top_bar_layout.addWidget(btn_new)
 
@@ -1333,6 +1487,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 if self.subplot_chart_types.get(active_idx) in WHOLE_CHART_TYPES:
                     self.subplot_chart_types[active_idx] = ct
         self._update_option_group_visibility(ct)
+        self._update_margin_ranges()
         if hasattr(self, 'datasets'):
             self.update_preview()
 
@@ -1560,6 +1715,123 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.contour_levels_explicit.blockSignals(True)
             self.contour_levels_explicit.setText(opts.get('contour_levels_explicit', ''))
             self.contour_levels_explicit.blockSignals(False)
+
+    # ── Per-subplot canvas / grid opts ───────────────────────────────────────
+    def _default_canvas_opts(self):
+        return {
+            'bg': '#ffffff', 'fg': '#000000', 'plot_bg': '#ffffff',
+            'border_top': True, 'border_bottom': True,
+            'border_left': True, 'border_right': True,
+        }
+
+    def _default_grid_opts(self):
+        return {
+            'enabled': True,  'color': '#cccccc', 'ls': '--', 'lw': 0.5,  'alpha': 0.4,
+            'minor_enabled': False, 'minor_color': '#e8e8e8', 'minor_ls': ':',
+            'minor_lw': 0.3, 'minor_alpha': 0.2,
+        }
+
+    def _save_canvas_grid_opts(self, idx):
+        """Persist current widget values → subplot_canvas_opts[idx] / subplot_grid_opts[idx]."""
+        if not all(hasattr(self, a) for a in ('border_top', 'grid_check', 'grid_linestyle')):
+            return
+        self.subplot_canvas_opts[idx] = {
+            'bg':            getattr(self, 'chart_bg_color', '#ffffff'),
+            'fg':            getattr(self, 'chart_fg_color', '#000000'),
+            'plot_bg':       getattr(self, 'plot_bg_color',  '#ffffff'),
+            'border_top':    self.border_top.isChecked(),
+            'border_bottom': self.border_bottom.isChecked(),
+            'border_left':   self.border_left.isChecked(),
+            'border_right':  self.border_right.isChecked(),
+        }
+        self.subplot_grid_opts[idx] = {
+            'enabled':       self.grid_check.isChecked(),
+            'color':         getattr(self, 'grid_color',       '#cccccc'),
+            'ls':            self.grid_linestyle.currentText(),
+            'lw':            self.grid_linewidth.value(),
+            'alpha':         self.grid_alpha.value(),
+            'minor_enabled': self.minor_grid_check.isChecked(),
+            'minor_color':   getattr(self, 'minor_grid_color', '#e8e8e8'),
+            'minor_ls':      self.minor_grid_linestyle.currentText(),
+            'minor_lw':      self.minor_grid_linewidth.value(),
+            'minor_alpha':   self.minor_grid_alpha.value(),
+        }
+
+    def _load_canvas_grid_opts(self, idx):
+        """Load subplot_canvas_opts[idx] / subplot_grid_opts[idx] → widgets."""
+        if not all(hasattr(self, a) for a in ('border_top', 'grid_check', 'grid_linestyle')):
+            return
+        co = self.subplot_canvas_opts.get(idx, self._default_canvas_opts())
+        go = self.subplot_grid_opts.get(idx, self._default_grid_opts())
+        _SW = 'background-color:{};border:1px solid #888;border-radius:2px;'
+        # Canvas colors
+        for attr, key in [('chart_bg_color', 'bg'), ('chart_fg_color', 'fg'),
+                           ('plot_bg_color',  'plot_bg')]:
+            val = co.get(key, getattr(self, attr, '#ffffff'))
+            setattr(self, attr, val)
+            sw = getattr(self, attr + '_swatch', None)
+            if sw:
+                sw.setStyleSheet(_SW.format(val))
+        # Border checkboxes
+        for w, key in [(self.border_top,    'border_top'),
+                       (self.border_bottom, 'border_bottom'),
+                       (self.border_left,   'border_left'),
+                       (self.border_right,  'border_right')]:
+            w.blockSignals(True); w.setChecked(co.get(key, True)); w.blockSignals(False)
+        # Major grid
+        self.grid_check.blockSignals(True)
+        self.grid_check.setChecked(go.get('enabled', True))
+        self.grid_check.blockSignals(False)
+        val = go.get('color', '#cccccc')
+        self.grid_color = val
+        if hasattr(self, 'grid_color_sw'):
+            self.grid_color_sw.setStyleSheet(_SW.format(val))
+        self.grid_linestyle.blockSignals(True)
+        i = self.grid_linestyle.findText(go.get('ls', '--'))
+        if i >= 0: self.grid_linestyle.setCurrentIndex(i)
+        self.grid_linestyle.blockSignals(False)
+        self.grid_linewidth.blockSignals(True)
+        self.grid_linewidth.setValue(go.get('lw', 0.5))
+        self.grid_linewidth.blockSignals(False)
+        self.grid_alpha.blockSignals(True)
+        self.grid_alpha.setValue(go.get('alpha', 0.4))
+        self.grid_alpha.blockSignals(False)
+        # Minor grid
+        self.minor_grid_check.blockSignals(True)
+        self.minor_grid_check.setChecked(go.get('minor_enabled', False))
+        self.minor_grid_check.blockSignals(False)
+        val = go.get('minor_color', '#e8e8e8')
+        self.minor_grid_color = val
+        if hasattr(self, 'minor_grid_color_sw'):
+            self.minor_grid_color_sw.setStyleSheet(_SW.format(val))
+        self.minor_grid_linestyle.blockSignals(True)
+        i = self.minor_grid_linestyle.findText(go.get('minor_ls', ':'))
+        if i >= 0: self.minor_grid_linestyle.setCurrentIndex(i)
+        self.minor_grid_linestyle.blockSignals(False)
+        self.minor_grid_linewidth.blockSignals(True)
+        self.minor_grid_linewidth.setValue(go.get('minor_lw', 0.3))
+        self.minor_grid_linewidth.blockSignals(False)
+        self.minor_grid_alpha.blockSignals(True)
+        self.minor_grid_alpha.setValue(go.get('minor_alpha', 0.2))
+        self.minor_grid_alpha.blockSignals(False)
+
+    def _on_layout_sp_changed(self, idx):
+        """Layout tab subplot selector changed: save old subplot, load new one."""
+        if idx < 0:
+            return
+        old_idx = self.sp_active.currentIndex() if hasattr(self, 'sp_active') else 0
+        if old_idx >= 0 and old_idx != idx:
+            self._save_canvas_grid_opts(old_idx)
+        # Sync all subplot selectors silently
+        for combo_attr in ('sp_active', 'series_sp_active', 'ann_sp_active',
+                           'series_curve_sp_active', 'global_sp_active'):
+            combo = getattr(self, combo_attr, None)
+            if combo is not None:
+                combo.blockSignals(True)
+                combo.setCurrentIndex(idx)
+                combo.blockSignals(False)
+        self._load_canvas_grid_opts(idx)
+        self.update_preview()
 
     # ── Per-series option fields ──────────────────────────────────────────────
     # Each entry: (widget_attr, storage_key, default_value, widget_kind)
@@ -2214,12 +2486,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             QColor(_cur), self, palette_colors=self._active_palette_colors())
         if not color.isValid(): return
         hx = color.name()
-        # Chart-canvas colors
+        # Chart-canvas colors (per-subplot: stored in subplot_canvas_opts)
         if target in ('chart_bg', 'chart_fg', 'plot_bg'):
             attr = target + '_color'
             setattr(self, attr, hx)
             getattr(self, attr + '_swatch').setStyleSheet(
                 f'background-color:{hx};border:1px solid #888;border-radius:2px;')
+            # Persist to per-subplot dict immediately
+            sp_idx = self.layout_sp_active.currentIndex() if hasattr(self, 'layout_sp_active') else 0
+            if sp_idx < 0: sp_idx = 0
+            self._save_canvas_grid_opts(sp_idx)
             self.update_preview()
             return
         mapping = {
@@ -2283,13 +2559,29 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.fig_height.setValue(round(h_cm / 2.54 * dpi))
         self.fig_width.blockSignals(False)
         self.fig_height.blockSignals(False)
+        self._update_margin_ranges()
+        self._update_title_pos_ranges()
+        # Reset baseline so the next window resize scales correctly from the
+        # newly-applied preset dimensions rather than the stale previous baseline.
+        if hasattr(self, 'canvas'):
+            self._window_size_baseline = (self.canvas.width(), self.canvas.height())
         self.update_preview()
 
     def _on_figsize_manual_change(self):
-        """When user edits W/H manually, switch preset combo to 'Custom'."""
+        """When user edits W/H manually, switch preset combo to 'Custom'.
+
+        Also resets _window_size_baseline to the current window size so that
+        the next window-resize event computes its scale factor relative to the
+        moment the user last touched the spinboxes — not relative to whenever
+        the previous auto-resize fired.
+        """
         self.fig_preset_combo.blockSignals(True)
         self.fig_preset_combo.setCurrentText('Custom')
         self.fig_preset_combo.blockSignals(False)
+        # Reset so next window resize scales from the manually-set size.
+        # Use canvas dimensions so baseline stays consistent with _apply_resize_and_preview.
+        if hasattr(self, 'canvas'):
+            self._window_size_baseline = (self.canvas.width(), self.canvas.height())
         self.update_preview()
 
     def _on_fig_unit_changed(self, unit):
@@ -2339,7 +2631,195 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.fig_height.setValue(round(hi * dpi))
         self.fig_width.blockSignals(False)
         self.fig_height.blockSignals(False)
+
+        # ── Also convert the four margin spinboxes ────────────────────────────
+        # Read current physical values using prev_unit, convert to inches, then
+        # to the new unit — same pattern as fig_width/fig_height above.
+        m_vals_in = []
+        for sp in (self.fig_left, self.fig_right, self.fig_bottom, self.fig_top):
+            v = sp.value()
+            if prev_unit == 'cm':
+                m_vals_in.append(v / 2.54)
+            elif prev_unit == 'pixels':
+                m_vals_in.append(v / self.dpi_spin.value())
+            else:
+                m_vals_in.append(v)
+
+        # Update ranges (caps at new fig dimension) without proportional rescaling —
+        # _on_fig_unit_changed has already done the conversion explicitly above.
+        self._in_scale_figsize = True
+        self._update_margin_ranges()
+        self._in_scale_figsize = False
+        for sp, val_in in zip(
+            (self.fig_left, self.fig_right, self.fig_bottom, self.fig_top),
+            m_vals_in,
+        ):
+            sp.blockSignals(True)
+            if unit == 'cm':
+                sp.setValue(round(val_in * 2.54, 1))
+            elif unit == 'inches':
+                sp.setValue(round(val_in, 2))
+            elif unit == 'pixels':
+                sp.setValue(round(val_in * self.dpi_spin.value()))
+            sp.blockSignals(False)
+
+        # ── Convert title_x / title_y the same way ────────────────────────────
+        if hasattr(self, 'title_x') and hasattr(self, 'title_y'):
+            tx_in = self.title_x.value()
+            ty_in = self.title_y.value()
+            if prev_unit == 'cm':
+                tx_in, ty_in = tx_in / 2.54, ty_in / 2.54
+            elif prev_unit == 'pixels':
+                tx_in = tx_in / self.dpi_spin.value()
+                ty_in = ty_in / self.dpi_spin.value()
+            self._update_title_pos_ranges()
+            self.title_x.blockSignals(True)
+            self.title_y.blockSignals(True)
+            if unit == 'cm':
+                self.title_x.setValue(round(tx_in * 2.54, 1))
+                self.title_y.setValue(round(ty_in * 2.54, 1))
+            elif unit == 'inches':
+                self.title_x.setValue(round(tx_in, 2))
+                self.title_y.setValue(round(ty_in, 2))
+            elif unit == 'pixels':
+                self.title_x.setValue(round(tx_in * self.dpi_spin.value()))
+                self.title_y.setValue(round(ty_in * self.dpi_spin.value()))
+            self.title_x.blockSignals(False)
+            self.title_y.blockSignals(False)
+
         self.update_preview()
+
+    # Chart types that render a colorbar inside the axes-box area.
+    # For these the right margin is allowed to exceed fig_width so the
+    # user can deliberately push the colorbar outside the figure boundary.
+    _COLORBAR_TYPES = {'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
+
+    def _has_colorbar_subplot(self):
+        """Return True if any active subplot uses a colorbar chart type."""
+        return any(
+            ct in self._COLORBAR_TYPES
+            for ct in self.subplot_chart_types.values()
+        )
+
+    def _update_margin_ranges(self):
+        """Keep margin spinbox maxima equal to the current figure dimensions,
+        and proportionally rescale margin values when dimensions change.
+
+        right ≤ fig_width and top ≤ fig_height (both in the current fig_unit),
+        except when a colorbar chart type is active — in that case the right
+        margin is uncapped so the colorbar can bleed beyond the figure edge.
+        Called whenever fig_width, fig_height, fig_unit, or chart type changes.
+
+        Proportional rescaling is skipped when called from _scale_figsize
+        (which already rescales in step 4) or from _on_fig_unit_changed
+        (which already converts values to the new unit).  Both callers set
+        _in_scale_figsize = True before calling this method.
+        """
+        if not all(hasattr(self, a) for a in
+                   ('fig_left', 'fig_right', 'fig_bottom', 'fig_top',
+                    'fig_width', 'fig_height', 'fig_unit')):
+            return
+        w    = self.fig_width.value()
+        h    = self.fig_height.value()
+        unit = self.fig_unit.currentText()
+        if unit == 'cm':
+            dec, step, large = 1, 0.1, 9999.0
+        elif unit == 'inches':
+            dec, step, large = 2, 0.05, 9999.0
+        else:   # pixels
+            dec, step, large = 0, 5.0, 99999.0
+        right_cap = large if self._has_colorbar_subplot() else w
+
+        # Proportionally rescale margin values when figure dimensions change
+        # manually (spinbox edit or preset change).  Use fig_left/bottom maximums
+        # as a reliable proxy for the previous fig_width/height — they are always
+        # set to the figure dimension by this very method (never to 'large').
+        # Skip when _scale_figsize or _on_fig_unit_changed is handling it.
+        if not getattr(self, '_in_scale_figsize', False):
+            old_w = self.fig_left.maximum()    # previous fig_width
+            old_h = self.fig_bottom.maximum()  # previous fig_height
+            if old_w > 0 and old_w != w:
+                for sp, new_dim in (
+                    (self.fig_left,  w),
+                    (self.fig_right, w),   # cap applied below; use w for scaling
+                ):
+                    scaled = sp.value() * (w / old_w)
+                    sp.blockSignals(True)
+                    sp.setValue(max(0.0, min(w, scaled)))
+                    sp.blockSignals(False)
+            if old_h > 0 and old_h != h:
+                for sp in (self.fig_bottom, self.fig_top):
+                    scaled = sp.value() * (h / old_h)
+                    sp.blockSignals(True)
+                    sp.setValue(max(0.0, min(h, scaled)))
+                    sp.blockSignals(False)
+
+        for sp, cap in (
+            (self.fig_left,   w),
+            (self.fig_right,  right_cap),
+            (self.fig_bottom, h),
+            (self.fig_top,    h),
+        ):
+            sp.setRange(0.0, cap)
+            sp.setDecimals(dec)
+            sp.setSingleStep(step)
+
+    def _update_title_pos_ranges(self):
+        """Keep title_x max = fig_width and title_y max = fig_height (physical units).
+
+        When the figure dimensions change and we are NOT inside _scale_figsize
+        (which already handled proportional scaling), we scale title_x / title_y
+        to maintain their fractional position so the title doesn't jump or
+        disappear when the figure is made smaller.
+        """
+        if not all(hasattr(self, a) for a in
+                   ('title_x', 'title_y', 'fig_width', 'fig_height', 'fig_unit')):
+            return
+        w    = self.fig_width.value()
+        h    = self.fig_height.value()
+        unit = self.fig_unit.currentText()
+        if unit == 'cm':
+            dec, step = 1, 0.1
+        elif unit == 'inches':
+            dec, step = 2, 0.05
+        else:   # pixels
+            dec, step = 0, 5.0
+
+        # _scale_figsize has already written the correct proportional values;
+        # don't touch them again — just update the range bounds.
+        if getattr(self, '_in_scale_figsize', False):
+            self.title_x.setRange(0.0, w)
+            self.title_x.setDecimals(dec)
+            self.title_x.setSingleStep(step)
+            self.title_y.setRange(0.0, h)
+            self.title_y.setDecimals(dec)
+            self.title_y.setSingleStep(step)
+            return
+
+        # Outside _scale_figsize: figure size changed via manual spinbox edit,
+        # preset selection, or unit conversion.  Scale title_x/y proportionally
+        # so they keep the same fractional position within the figure.
+        old_w_max = self.title_x.maximum()   # previous fig_width (range max)
+        old_h_max = self.title_y.maximum()   # previous fig_height (range max)
+
+        for sp, new_max, old_max in (
+            (self.title_x, w, old_w_max),
+            (self.title_y, h, old_h_max),
+        ):
+            if old_max > 0 and old_max != new_max:
+                # Scale the current value to maintain fractional position,
+                # then clamp to the new range.
+                scaled = sp.value() * (new_max / old_max)
+                sp.blockSignals(True)
+                sp.setRange(0.0, new_max)
+                sp.setDecimals(dec)
+                sp.setSingleStep(step)
+                sp.setValue(max(0.0, min(new_max, scaled)))
+                sp.blockSignals(False)
+            else:
+                sp.setRange(0.0, new_max)
+                sp.setDecimals(dec)
+                sp.setSingleStep(step)
 
     def _pick_grid_color(self, which):
         cur = self.grid_color if which == 'major' else self.minor_grid_color
@@ -2353,6 +2833,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         else:
             self.minor_grid_color = hx
             self.minor_grid_color_sw.setStyleSheet(f'background-color:{hx};border:1px solid #888;border-radius:2px;')
+        # Persist to per-subplot dict immediately
+        sp_idx = self.layout_sp_active.currentIndex() if hasattr(self, 'layout_sp_active') else 0
+        if sp_idx < 0: sp_idx = 0
+        self._save_canvas_grid_opts(sp_idx)
         self.update_preview()
 
     def _pick_ann_color_attr(self, attr):
@@ -2618,7 +3102,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from ui.helpers import _get_dir, _remember_dir
 
         _stem = (os.path.splitext(os.path.basename(self._current_filepath))[0]
-                 if getattr(self, '_current_filepath', None) else 'untitled')
+                 if getattr(self, '_current_filepath', None) else 'new chart')
         name = _stem  # scheme name matches file stem; no separate prompt needed
 
         fp, _ = QFileDialog.getSaveFileName(
@@ -2914,6 +3398,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self._applying_settings = False
             self._undo_suspended = False
         self.update_preview()
+        # Cancel any pending snapshot timer.  update_preview() just scheduled one,
+        # but the restored state is already at the top of the undo stack — letting
+        # the timer fire would push a near-duplicate snapshot and wipe the redo stack.
+        if hasattr(self, '_snapshot_timer'):
+            self._snapshot_timer.stop()
         self._update_undo_buttons()
 
     def _undo(self):
@@ -2989,6 +3478,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'subplot_xticks_show':   _ser({0: True}),
             'subplot_yticks_show':   _ser({0: True}),
             'subplot_ann_visible':   _ser({0: True}),
+            'subplot_xaxis_pos':     _ser({0: 'bottom'}),
+            'subplot_yaxis_pos':     _ser({0: 'left'}),
             'xlabel_font': 'sans-serif', 'xlabel_size': 11, 'xlabel_color': '#000000',
             'ylabel_font': 'sans-serif', 'ylabel_size': 11, 'ylabel_color': '#000000',
             'y2label_font':'sans-serif', 'y2label_size':11, 'y2label_color':'#000000',
@@ -3034,12 +3525,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         return s
 
     def _reset_app(self):
-        """Clear all data and start a new plot."""
+        """Clear all data and start a new chart."""
         if getattr(self, '_is_dirty', False):
             mb = QMessageBox(self)
-            mb.setWindowTitle('New Plot')
+            mb.setWindowTitle('New Chart')
             mb.setText('You have unsaved changes.')
-            mb.setInformativeText('Do you want to save before starting a new plot?')
+            mb.setInformativeText('Do you want to save before starting a new chart?')
             btn_save   = mb.addButton('Save',    QMessageBox.ButtonRole.AcceptRole)
             btn_discard = mb.addButton('Discard', QMessageBox.ButtonRole.DestructiveRole)
             mb.addButton('Cancel', QMessageBox.ButtonRole.RejectRole)
@@ -3050,7 +3541,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             elif clicked is not btn_discard:
                 return  # Cancel
         else:
-            if QMessageBox.question(self, 'New Plot', 'Start a new plot?',
+            if QMessageBox.question(self, 'New Chart', 'Start a new chart?',
                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                                     ) != QMessageBox.StandardButton.Yes:
                 return
@@ -3089,6 +3580,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.on_subplot_layout_changed()
         self.update_preview()
         self.refresh_annotation_list()
+        # Immediately push the blank-chart snapshot so the first user change
+        # can always be undone (mirrors the direct _snapshot() call in _load_project_inner).
+        if hasattr(self, '_snapshot'):
+            self._snapshot()
         self._notify_sns_explorer()
 
     def load_data(self):
@@ -3831,6 +4326,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.subplot_title_font.setdefault(i, 'sans-serif')
             self.subplot_title_size.setdefault(i, 11)
             self.subplot_title_color.setdefault(i, '#000000')
+            self.subplot_title_pad.setdefault(i, 6)
+            self.subplot_title_rotation.setdefault(i, 0)
+            self.subplot_title_ha.setdefault(i, 'center')
             self.subplot_xlabels.setdefault(i, '')
             self.subplot_xlabel_show.setdefault(i, True)
             self.subplot_ylabels.setdefault(i, '')
@@ -3868,10 +4366,23 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.subplot_xticks_show.setdefault(i, True)
             self.subplot_yticks_show.setdefault(i, True)
             self.subplot_ann_visible.setdefault(i, True)
+            self.subplot_canvas_opts.setdefault(i, self._default_canvas_opts())
+            self.subplot_grid_opts.setdefault(i, self._default_grid_opts())
+            self.subplot_xaxis_pos.setdefault(i, 'bottom')
+            self.subplot_yaxis_pos.setdefault(i, 'left')
+            self.subplot_xlabel_rotation.setdefault(i, 0)
+            self.subplot_xlabel_labelpad.setdefault(i, 4)
+            self.subplot_xlabel_loc.setdefault(i, 'center')
+            self.subplot_xlabel_ha.setdefault(i, 'center')
+            self.subplot_ylabel_rotation.setdefault(i, 90)
+            self.subplot_ylabel_labelpad.setdefault(i, 4)
+            self.subplot_ylabel_loc.setdefault(i, 'center')
+            self.subplot_ylabel_ha.setdefault(i, 'center')
         # Prune entries beyond current grid
         all_dicts = (self.subplot_chart_types, self.subplot_plot_modes, self.subplot_chart_opts,
                      self.sp_titles, self.subplot_title_show,
                      self.subplot_title_font, self.subplot_title_size, self.subplot_title_color,
+                     self.subplot_title_pad, self.subplot_title_rotation, self.subplot_title_ha,
                      self.subplot_xlabels, self.subplot_xlabel_show,
                      self.subplot_ylabels, self.subplot_ylabel_show,
                      self.subplot_y2labels, self.subplot_y2label_show,
@@ -3890,7 +4401,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                      self.subplot_xtick_step, self.subplot_ytick_step,
                      self.subplot_x_formatter, self.subplot_y_formatter,
                      self.subplot_xticks_show, self.subplot_yticks_show,
-                     self.subplot_ann_visible)
+                     self.subplot_ann_visible,
+                     self.subplot_canvas_opts, self.subplot_grid_opts,
+                     self.subplot_xaxis_pos, self.subplot_yaxis_pos,
+                     self.subplot_xlabel_rotation, self.subplot_xlabel_labelpad,
+                     self.subplot_xlabel_loc, self.subplot_xlabel_ha,
+                     self.subplot_ylabel_rotation, self.subplot_ylabel_labelpad,
+                     self.subplot_ylabel_loc, self.subplot_ylabel_ha)
         for i in list(self.subplot_chart_types):
             if i >= n:
                 for d in all_dicts:
@@ -3903,6 +4420,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             (self.series_sp_active,       '_series_sp_row_widget'),
             (self.ann_sp_active,          '_ann_sp_row_widget'),
             (self.series_curve_sp_active, '_series_curve_sp_row_widget'),
+            (self.layout_sp_active,       '_layout_sp_row_widget'),
         ]:
             combo.blockSignals(True)
             combo.clear()
@@ -4004,7 +4522,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         if idx < 0: idx = 0
 
         # ── Sync all subplot selectors silently (including global top-bar combo) ─
-        for combo in (self.ann_sp_active, self.series_sp_active, self.series_curve_sp_active):
+        for combo in (self.ann_sp_active, self.series_sp_active,
+                      self.series_curve_sp_active, self.layout_sp_active):
             combo.blockSignals(True)
             combo.setCurrentIndex(idx)
             combo.blockSignals(False)
@@ -4024,8 +4543,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # Title
         _load(self.title_show_check, self.subplot_title_show.get(idx, True))
         _load(self.sp_title_input, self.sp_titles.get(idx, ''))
-        _load(self.sp_title_font, self.subplot_title_font.get(idx, 'sans-serif'))
-        _load(self.sp_title_size, self.subplot_title_size.get(idx, 11))
+        _load(self.sp_title_font,     self.subplot_title_font.get(idx, 'sans-serif'))
+        _load(self.sp_title_size,     self.subplot_title_size.get(idx, 11))
+        _load(self.sp_title_pad,      self.subplot_title_pad.get(idx, 6))
+        _load(self.sp_title_rotation, self.subplot_title_rotation.get(idx, 0))
+        _load(self.sp_title_ha,       self.subplot_title_ha.get(idx, 'center'))
         sp_tc = self.subplot_title_color.get(idx, '#000000')
         self.sp_title_color = sp_tc
         if hasattr(self, 'sp_title_color_label'):
@@ -4066,6 +4588,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _load(self.y_formatter,    self.subplot_y_formatter.get(idx, 'auto'))
         _load(self.yticks_show,    self.subplot_yticks_show.get(idx, True))
         _load(self.equal_scale_check, self.subplot_equal_aspect.get(idx, False))
+        _load(self.xaxis_pos, self.subplot_xaxis_pos.get(idx, 'bottom'))
+        _load(self.yaxis_pos, self.subplot_yaxis_pos.get(idx, 'left'))
+        _load(self.xlabel_rotation, self.subplot_xlabel_rotation.get(idx, 0))
+        _load(self.xlabel_labelpad, self.subplot_xlabel_labelpad.get(idx, 4))
+        _load(self.xlabel_loc,      self.subplot_xlabel_loc.get(idx, 'center'))
+        _load(self.xlabel_ha,       self.subplot_xlabel_ha.get(idx, 'center'))
+        _load(self.ylabel_rotation, self.subplot_ylabel_rotation.get(idx, 90))
+        _load(self.ylabel_labelpad, self.subplot_ylabel_labelpad.get(idx, 4))
+        _load(self.ylabel_loc,      self.subplot_ylabel_loc.get(idx, 'center'))
+        _load(self.ylabel_ha,       self.subplot_ylabel_ha.get(idx, 'center'))
         # Y2 axis
         _load(self.y2label_show_check, self.subplot_y2label_show.get(idx, True))
         _load(self.y2label_input,      self.subplot_y2labels.get(idx, ''))
@@ -4123,6 +4655,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._filter_series_table_by_subplot(idx)
         # Load per-subplot chart option group values into their widgets
         self._load_chart_opts(idx)
+        # Load per-subplot canvas/grid values into Layout tab widgets
+        self._load_canvas_grid_opts(idx)
 
         # ── Sync chart_type_combo / plot_mode_combo to this subplot's state ─────
         # For whole-chart types (Polar, Heatmap, Pie, etc.) the type lives in
@@ -4164,9 +4698,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         if ann_idx < 0: ann_idx = 0
         self.sp_titles[ann_idx]            = self.sp_title_input.text().strip()
         self.subplot_title_show[ann_idx]   = self.title_show_check.isChecked()
-        self.subplot_title_font[ann_idx]   = self.sp_title_font.currentText()
-        self.subplot_title_size[ann_idx]   = self.sp_title_size.value()
-        self.subplot_title_color[ann_idx]  = self.sp_title_color
+        self.subplot_title_font[ann_idx]     = self.sp_title_font.currentText()
+        self.subplot_title_size[ann_idx]     = self.sp_title_size.value()
+        self.subplot_title_color[ann_idx]    = self.sp_title_color
+        self.subplot_title_pad[ann_idx]      = self.sp_title_pad.value()
+        self.subplot_title_rotation[ann_idx] = self.sp_title_rotation.value()
+        self.subplot_title_ha[ann_idx]       = self.sp_title_ha.currentText()
         self.subplot_legends[ann_idx]      = self.legend_show_check.isChecked()
         self.subplot_legend_locs[ann_idx]  = (
             'best' if self.legend_auto_pos.isChecked() else self.legend_pos.currentText())
@@ -4206,6 +4743,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_xticks_show[idx]   = self.xticks_show.isChecked()
         self.subplot_yticks_show[idx]   = self.yticks_show.isChecked()
         self.subplot_equal_aspect[idx]  = self.equal_scale_check.isChecked()
+        self.subplot_xaxis_pos[idx]     = self.xaxis_pos.currentText()
+        self.subplot_yaxis_pos[idx]     = self.yaxis_pos.currentText()
+        self.subplot_xlabel_rotation[idx] = self.xlabel_rotation.value()
+        self.subplot_xlabel_labelpad[idx] = self.xlabel_labelpad.value()
+        self.subplot_xlabel_loc[idx]      = self.xlabel_loc.currentText()
+        self.subplot_xlabel_ha[idx]       = self.xlabel_ha.currentText()
+        self.subplot_ylabel_rotation[idx] = self.ylabel_rotation.value()
+        self.subplot_ylabel_labelpad[idx] = self.ylabel_labelpad.value()
+        self.subplot_ylabel_loc[idx]      = self.ylabel_loc.currentText()
+        self.subplot_ylabel_ha[idx]       = self.ylabel_ha.currentText()
         self.update_preview()
 
     # Legacy aliases kept so existing signal connections don't need changes
@@ -4213,6 +4760,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         idx = self.sp_active.currentIndex()
         if idx < 0: idx = 0
         self.subplot_chart_types[idx] = ct
+        self._update_margin_ranges()
         self.update_preview()
 
     def _pick_sp_title_color(self):

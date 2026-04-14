@@ -37,19 +37,25 @@ class SerializationMixin:
         # Title (global – stored in style tab, not per-subplot)
         s['title_show']   = self.title_check.isChecked()
         s['title_text']   = self.title_input.text()
-        s['title_font']   = self.title_font.currentText()
-        s['title_size']   = self.title_size.value()
-        s['title_color']  = self.title_color
+        s['title_font']     = self.title_font.currentText()
+        s['title_size']     = self.title_size.value()
+        s['title_color']    = self.title_color
+        s['title_rotation'] = self.title_rotation.value()
+        s['title_ha']       = self.title_ha.currentText()
 
         # Per-subplot axes (all axes customisation lives in subplot dicts)
         def _ser(d): return {str(k): v for k, v in d.items()}
         s['sp_titles']             = _ser(self.sp_titles)
         s['subplot_title_show']    = _ser(self.subplot_title_show)
-        s['subplot_title_font']    = _ser(self.subplot_title_font)
-        s['subplot_title_size']    = _ser(self.subplot_title_size)
-        s['subplot_title_color']   = _ser(self.subplot_title_color)
-        s['title_x']      = self.title_x.value() if hasattr(self, 'title_x') else 0.5
-        s['title_y']      = self.title_y.value() if hasattr(self, 'title_y') else 0.97
+        s['subplot_title_font']     = _ser(self.subplot_title_font)
+        s['subplot_title_size']     = _ser(self.subplot_title_size)
+        s['subplot_title_color']    = _ser(self.subplot_title_color)
+        s['subplot_title_pad']      = _ser(self.subplot_title_pad)
+        s['subplot_title_rotation'] = _ser(self.subplot_title_rotation)
+        s['subplot_title_ha']       = _ser(self.subplot_title_ha)
+        s['title_x']         = self.title_x.value() if hasattr(self, 'title_x') else 0.5
+        s['title_y']         = self.title_y.value() if hasattr(self, 'title_y') else 0.97
+        s['title_pos_format'] = 'physical'   # v>=2.5.8: title_x/y in fig_unit, not fractions
         s['sp_hspace']    = self.sp_hspace.value() if hasattr(self, 'sp_hspace') else 0.35
         s['sp_wspace']    = self.sp_wspace.value() if hasattr(self, 'sp_wspace') else 0.35
         s['subplot_xlabels']       = _ser(self.subplot_xlabels)
@@ -89,18 +95,32 @@ class SerializationMixin:
         s['subplot_xticks_show']   = _ser(self.subplot_xticks_show)
         s['subplot_yticks_show']   = _ser(self.subplot_yticks_show)
         s['subplot_equal_aspect']  = _ser(self.subplot_equal_aspect)
+        s['subplot_xaxis_pos']     = _ser(self.subplot_xaxis_pos)
+        s['subplot_yaxis_pos']     = _ser(self.subplot_yaxis_pos)
         s['subplot_ann_visible']   = _ser(self.subplot_ann_visible)
 
         # Axis label fonts/colors (global – same for all subplots, stored in Axes tab)
         s['xlabel_font']  = self.xlabel_font.currentText()
         s['xlabel_size']  = self.xlabel_size.value()
         s['xlabel_color'] = self.xlabel_color
+        s['subplot_xlabel_rotation'] = _ser(self.subplot_xlabel_rotation)
+        s['subplot_xlabel_labelpad'] = _ser(self.subplot_xlabel_labelpad)
+        s['subplot_xlabel_loc']      = _ser(self.subplot_xlabel_loc)
+        s['subplot_xlabel_ha']       = _ser(self.subplot_xlabel_ha)
         s['ylabel_font']  = self.ylabel_font.currentText()
         s['ylabel_size']  = self.ylabel_size.value()
         s['ylabel_color'] = self.ylabel_color
+        s['subplot_ylabel_rotation'] = _ser(self.subplot_ylabel_rotation)
+        s['subplot_ylabel_labelpad'] = _ser(self.subplot_ylabel_labelpad)
+        s['subplot_ylabel_loc']      = _ser(self.subplot_ylabel_loc)
+        s['subplot_ylabel_ha']       = _ser(self.subplot_ylabel_ha)
         s['y2label_font'] = self.y2label_font.currentText()
         s['y2label_size'] = self.y2label_size.value()
         s['y2label_color']= self.y2label_color
+        s['y2label_rotation'] = self.y2label_rotation.value()
+        s['y2label_labelpad'] = self.y2label_labelpad.value()
+        s['y2label_loc']      = self.y2label_loc.currentText()
+        s['y2label_ha']       = self.y2label_ha.currentText()
 
         # Style
         s['color_palette']  = getattr(self, '_color_palette', 'Matplotlib')
@@ -115,14 +135,15 @@ class SerializationMixin:
         s['curve_styles']   = self.curve_styles
 
         # Figure size
-        s['fig_preset']  = self.fig_preset_combo.currentText()
-        s['fig_unit']    = self.fig_unit.currentText()
-        s['fig_width']   = self.fig_width.value()
-        s['fig_height']  = self.fig_height.value()
-        s['fig_left']    = self.fig_left.value()
-        s['fig_right']   = self.fig_right.value()
-        s['fig_bottom']  = self.fig_bottom.value()
-        s['fig_top']     = self.fig_top.value()
+        s['fig_preset']       = self.fig_preset_combo.currentText()
+        s['fig_unit']         = self.fig_unit.currentText()
+        s['fig_width']        = self.fig_width.value()
+        s['fig_height']       = self.fig_height.value()
+        s['fig_left']         = self.fig_left.value()
+        s['fig_right']        = self.fig_right.value()
+        s['fig_bottom']       = self.fig_bottom.value()
+        s['fig_top']          = self.fig_top.value()
+        s['margin_format']    = 'physical'   # v≥2.5.8: margins in fig_unit, not fractions
 
         # Grid
         s['grid_on']              = self.grid_check.isChecked()
@@ -417,10 +438,35 @@ class SerializationMixin:
             self.fig_preset_combo.blockSignals(True)
             self.fig_preset_combo.setCurrentIndex(i)
             self.fig_preset_combo.blockSignals(False)
-        self.fig_left.setValue(s.get('fig_left', 0.10))
-        self.fig_right.setValue(s.get('fig_right', 0.95))
-        self.fig_bottom.setValue(s.get('fig_bottom', 0.10))
-        self.fig_top.setValue(s.get('fig_top', 0.95))
+
+        # ── Restore margin spinboxes ──────────────────────────────────────────
+        # Ranges must match the restored unit and figure dimensions.
+        self._update_margin_ranges()
+
+        # Detect old saves (pre-2.5.8) where margins were stored as fractions [0, 1].
+        # In that format fig_left ≤ 1 and fig_right ≤ 1; convert to current physical unit.
+        _raw_l = s.get('fig_left',   0.10)
+        _raw_r = s.get('fig_right',  0.95)
+        _raw_b = s.get('fig_bottom', 0.10)
+        _raw_t = s.get('fig_top',    0.95)
+        if s.get('margin_format') != 'physical':
+            # Old format: values are fractions → convert to physical unit
+            _ru  = self.fig_unit.currentText()
+            _wi, _hi = self._fig_size_in_inches()
+            if _ru == 'cm':
+                _fw, _fh, _dec = _wi * 2.54, _hi * 2.54, 1
+            elif _ru == 'pixels':
+                _fw, _fh, _dec = _wi * self.dpi_spin.value(), _hi * self.dpi_spin.value(), 0
+            else:
+                _fw, _fh, _dec = _wi, _hi, 2
+            _raw_l = round(_raw_l * _fw, _dec)
+            _raw_r = round(_raw_r * _fw, _dec)
+            _raw_b = round(_raw_b * _fh, _dec)
+            _raw_t = round(_raw_t * _fh, _dec)
+        self.fig_left.setValue(_raw_l)
+        self.fig_right.setValue(_raw_r)
+        self.fig_bottom.setValue(_raw_b)
+        self.fig_top.setValue(_raw_t)
 
         self.grid_check.setChecked(s.get('grid_on', True))
         self.grid_color = s.get('grid_color','#cccccc')
@@ -437,6 +483,15 @@ class SerializationMixin:
         self.minor_grid_linewidth.setValue(s.get('minor_grid_linewidth', 0.3))
         self.minor_grid_alpha.setValue(s.get('minor_grid_alpha', 0.2))
 
+        # Flush color/grid changes into per-subplot caches so the plot engine
+        # sees them immediately (e.g. when a color scheme is applied).
+        # _apply_settings updates the widget attrs but the render path reads from
+        # subplot_canvas_opts / subplot_grid_opts, so those must be kept in sync.
+        if hasattr(self, '_save_canvas_grid_opts') and hasattr(self, 'subplot_canvas_opts'):
+            idxs = list(self.subplot_canvas_opts.keys()) if self.subplot_canvas_opts else [0]
+            for _sp in idxs:
+                self._save_canvas_grid_opts(_sp)
+
         self.dpi_spin.setValue(s.get('dpi', 300))
 
         # Global title
@@ -449,6 +504,14 @@ class SerializationMixin:
         self.title_color = tc
         if hasattr(self, 'title_color_swatch'):
             self.title_color_swatch.setStyleSheet(_SW_CSS.format(tc))
+        self.title_rotation.blockSignals(True)
+        self.title_rotation.setValue(s.get('title_rotation', 0))
+        self.title_rotation.blockSignals(False)
+        _i = self.title_ha.findText(s.get('title_ha', 'center'))
+        if _i >= 0:
+            self.title_ha.blockSignals(True)
+            self.title_ha.setCurrentIndex(_i)
+            self.title_ha.blockSignals(False)
         i = self.xlabel_font.findText(s.get('xlabel_font','sans-serif'))
         if i >= 0: self.xlabel_font.setCurrentIndex(i)
         self.xlabel_size.setValue(s.get('xlabel_size', 11))
@@ -464,6 +527,12 @@ class SerializationMixin:
         self.y2label_size.setValue(s.get('y2label_size', 11))
         self.y2label_color = s.get('y2label_color','#000000')
         self.y2label_color_label.setStyleSheet(_SW_CSS.format(self.y2label_color))
+        self.y2label_rotation.setValue(s.get('y2label_rotation', 90))
+        self.y2label_labelpad.setValue(s.get('y2label_labelpad', 4))
+        i = self.y2label_loc.findText(s.get('y2label_loc', 'center'))
+        if i >= 0: self.y2label_loc.setCurrentIndex(i)
+        i = self.y2label_ha.findText(s.get('y2label_ha', 'center'))
+        if i >= 0: self.y2label_ha.setCurrentIndex(i)
 
         # Subplots (layout + appearance only — column assignments come from series.json)
         mosaic = s.get('subplot_mosaic', None)
@@ -484,21 +553,40 @@ class SerializationMixin:
         def _di(key, default={}): return {int(k): v for k, v in s.get(key, default).items()}
         def _dlim(key):
             return {int(k): (tuple(v) if v else None) for k, v in s.get(key, {}).items()}
+        self.subplot_xlabel_rotation = _di('subplot_xlabel_rotation', {'0': 0})
+        self.subplot_xlabel_labelpad = _di('subplot_xlabel_labelpad', {'0': 4})
+        self.subplot_xlabel_loc      = _di('subplot_xlabel_loc',      {'0': 'center'})
+        self.subplot_xlabel_ha       = _di('subplot_xlabel_ha',       {'0': 'center'})
+        self.subplot_ylabel_rotation = _di('subplot_ylabel_rotation', {'0': 90})
+        self.subplot_ylabel_labelpad = _di('subplot_ylabel_labelpad', {'0': 4})
+        self.subplot_ylabel_loc      = _di('subplot_ylabel_loc',      {'0': 'center'})
+        self.subplot_ylabel_ha       = _di('subplot_ylabel_ha',       {'0': 'center'})
         self.sp_titles             = _di('sp_titles', {'0': ''})
         self.subplot_title_show    = _di('subplot_title_show', {'0': True})
-        self.subplot_title_font    = _di('subplot_title_font', {'0': 'sans-serif'})
-        self.subplot_title_size    = _di('subplot_title_size', {'0': 11})
-        self.subplot_title_color   = _di('subplot_title_color', {'0': '#000000'})
-        if hasattr(self, 'title_x'): self.title_x.setValue(s.get('title_x', 0.5))
-        if hasattr(self, 'title_y'):
+        self.subplot_title_font     = _di('subplot_title_font',    {'0': 'sans-serif'})
+        self.subplot_title_size     = _di('subplot_title_size',    {'0': 11})
+        self.subplot_title_color    = _di('subplot_title_color',   {'0': '#000000'})
+        self.subplot_title_pad      = _di('subplot_title_pad',     {'0': 6})
+        self.subplot_title_rotation = _di('subplot_title_rotation',{'0': 0})
+        self.subplot_title_ha       = _di('subplot_title_ha',      {'0': 'center'})
+        if hasattr(self, 'title_x') and hasattr(self, 'title_y'):
+            _raw_tx = float(s.get('title_x', 0.5))
             _raw_ty = float(s['title_y'] if 'title_y' in s else s.get('title_y_offset', 0.97))
-            _clamped_ty = min(max(_raw_ty, 0.50), 1.00)
-            if _clamped_ty != _raw_ty:
-                import logging
-                logging.getLogger('plotviz').warning(
-                    'title_y value %.3f from saved file is outside the supported range '
-                    '[0.50, 1.00] and has been clamped to %.3f.', _raw_ty, _clamped_ty)
-            self.title_y.setValue(_clamped_ty)
+            if s.get('title_pos_format') != 'physical':
+                # Old format: values are fractions [0,1] — convert to physical units.
+                _wi, _hi = self._fig_size_in_inches()
+                _ru = self.fig_unit.currentText()
+                if _ru == 'cm':
+                    _fw, _fh, _dec = _wi * 2.54, _hi * 2.54, 1
+                elif _ru == 'pixels':
+                    _fw, _fh, _dec = _wi * self.dpi_spin.value(), _hi * self.dpi_spin.value(), 0
+                else:
+                    _fw, _fh, _dec = _wi, _hi, 2
+                _raw_tx = round(_raw_tx * _fw, _dec)
+                _raw_ty = round(_raw_ty * _fh, _dec)
+            self._update_title_pos_ranges()
+            self.title_x.setValue(_raw_tx)
+            self.title_y.setValue(_raw_ty)
         if hasattr(self, 'sp_hspace'): self.sp_hspace.setValue(s.get('sp_hspace', 0.35))
         if hasattr(self, 'sp_wspace'): self.sp_wspace.setValue(s.get('sp_wspace', 0.35))
         self.subplot_xlabels       = _di('subplot_xlabels', {'0': ''})
@@ -538,6 +626,8 @@ class SerializationMixin:
         self.subplot_xticks_show   = _di('subplot_xticks_show', {'0': True})
         self.subplot_yticks_show   = _di('subplot_yticks_show', {'0': True})
         self.subplot_equal_aspect  = _di('subplot_equal_aspect', {'0': False})
+        self.subplot_xaxis_pos     = _di('subplot_xaxis_pos',    {'0': 'bottom'})
+        self.subplot_yaxis_pos     = _di('subplot_yaxis_pos',    {'0': 'left'})
         self.subplot_ann_visible   = _di('subplot_ann_visible', {'0': True})
         self.sp_sharex.setChecked(s.get('sp_sharex', False))
         self.sp_sharey.setChecked(s.get('sp_sharey', False))
@@ -1040,6 +1130,8 @@ class SerializationMixin:
         if getattr(self, '_current_filepath', None):
             _stem = _os.path.splitext(_os.path.basename(self._current_filepath))[0]
             _default_dir = _os.path.join(_os.path.dirname(self._current_filepath), _stem)
+        else:
+            _default_dir = _os.path.join(_default_dir, 'new chart')
         fp, _ = QFileDialog.getSaveFileName(
             self, 'Save Chart', _default_dir,
             'plotviz File (*.pviz);;zip Archive (*.zip);;All Files (*)')

@@ -950,8 +950,15 @@ def generate_plot_script(settings: dict, series_meta: dict,
     title_font  = settings.get('title_font', 'sans-serif')
     title_size  = settings.get('title_size', 14)
     title_color = settings.get('title_color', '#000000')
-    title_x     = settings.get('title_x', 0.5)
-    title_y     = settings.get('title_y', 0.98)
+    # title_x/title_y stored as physical units (fig_unit) since v2.5.8;
+    # divide by the fig dimension in that same unit to get fractions [0,1].
+    _tx_raw = settings.get('title_x', 0.5)
+    _ty_raw = settings.get('title_y', 0.98)
+    if settings.get('title_pos_format') == 'physical' and fig_w_raw > 0 and fig_h_raw > 0:
+        title_x = _tx_raw / fig_w_raw
+        title_y = _ty_raw / fig_h_raw
+    else:
+        title_x, title_y = _tx_raw, _ty_raw   # old save: already fractions
     suptitle_lines = []
     if title_show and title_text:
         suptitle_lines = [
@@ -959,7 +966,7 @@ def generate_plot_script(settings: dict, series_meta: dict,
             f"fontsize={title_size}, "
             f"fontfamily='{_esc(title_font)}', "
             f"color='{_esc(title_color)}', "
-            f"x={title_x}, y={title_y})",
+            f"x={title_x:.4f}, y={title_y:.4f})",
         ]
     # When there is a suptitle, reserve space at the top for it so that
     # tight_layout() does not push subplot content over the title.

@@ -62,6 +62,13 @@ DEFAULTS: dict = {
     # Whether to show the navigator toolbar below the canvas
     'show_toolbar':     True,
 
+    # How the export figure size adjusts when the app window is resized.
+    # 'xy'   – scale both width and height proportionally  (default)
+    # 'x'    – scale width only
+    # 'y'    – scale height only
+    # 'none' – do not adjust figure size on window resize
+    'resize_mode':      'xy',
+
     # Active subplot-sharing defaults (user can still change per chart)
     'default_sharex':   False,
     'default_sharey':   False,

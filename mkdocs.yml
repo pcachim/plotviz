@@ -75,6 +75,9 @@ nav:
     - Series & Curve Fitting: series.md
     - Subplots: subplots.md
     - Advanced Tools: advanced.md
+    - Seaborn Explorer: seaborn-explorer.md
+    - Python Code Runner: code-runner.md
+    - Python Export Bundle: python-export.md
   - Reference:
     - File Formats: file-formats.md
     - Color Palettes: palettes.md

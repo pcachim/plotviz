@@ -886,37 +886,57 @@ class PlotEngineMixin:
             ax.set_xticks(tick_positions)
             ax.set_xticklabels(all_x_cats, rotation=45, ha='right')
 
-    def _apply_grid(self, ax):
-        """Apply major and minor grid styling to ax."""
-        if self.grid_check.isChecked():
+    def _apply_grid(self, ax, subplot_idx=0):
+        """Apply major and minor grid styling to ax.
+
+        Reads from the per-subplot dict (subplot_grid_opts[subplot_idx]) when
+        available; falls back to the global Layout tab widgets so existing
+        single-subplot charts keep working.
+        """
+        g = getattr(self, 'subplot_grid_opts', {}).get(subplot_idx, None)
+
+        major_on  = g['enabled']        if g else self.grid_check.isChecked()
+        maj_color = g['color']          if g else getattr(self, 'grid_color', '#cccccc')
+        maj_ls    = g['ls']             if g else self.grid_linestyle.currentText()
+        maj_lw    = g['lw']             if g else self.grid_linewidth.value()
+        maj_alpha = g['alpha']          if g else self.grid_alpha.value()
+        minor_on  = g['minor_enabled']  if g else self.minor_grid_check.isChecked()
+        min_color = g['minor_color']    if g else getattr(self, 'minor_grid_color', '#e8e8e8')
+        min_ls    = g['minor_ls']       if g else self.minor_grid_linestyle.currentText()
+        min_lw    = g['minor_lw']       if g else self.minor_grid_linewidth.value()
+        min_alpha = g['minor_alpha']    if g else self.minor_grid_alpha.value()
+
+        if major_on:
             ax.grid(True, which='major',
-                    color=self.grid_color,
-                    linestyle=self.grid_linestyle.currentText(),
-                    linewidth=self.grid_linewidth.value(),
-                    alpha=self.grid_alpha.value())
+                    color=maj_color, linestyle=maj_ls,
+                    linewidth=maj_lw, alpha=maj_alpha)
         else:
             ax.grid(False, which='major')
 
-        if self.minor_grid_check.isChecked():
+        if minor_on:
             ax.minorticks_on()
             ax.grid(True, which='minor',
-                    color=self.minor_grid_color,
-                    linestyle=self.minor_grid_linestyle.currentText(),
-                    linewidth=self.minor_grid_linewidth.value(),
-                    alpha=self.minor_grid_alpha.value())
+                    color=min_color, linestyle=min_ls,
+                    linewidth=min_lw, alpha=min_alpha)
         else:
             ax.grid(False, which='minor')
             try: ax.minorticks_off()
             except Exception: pass
 
     def _apply_canvas_style(self, ax, subplot_idx=0):
-        """Apply background color, tick styling and border visibility to an axes."""
+        """Apply background color, tick styling and border visibility to an axes.
+
+        Canvas/border values are read from the per-subplot dict
+        (subplot_canvas_opts[subplot_idx]) when available; falls back to the
+        global widget attrs so existing single-subplot charts keep working.
+        """
         from matplotlib.ticker import (AutoMinorLocator, MultipleLocator,
                                        ScalarFormatter, PercentFormatter,
                                        NullLocator, StrMethodFormatter)
         from matplotlib.patches import Wedge
-        fg      = self.chart_fg_color
-        plot_bg = self.plot_bg_color
+        c = getattr(self, 'subplot_canvas_opts', {}).get(subplot_idx, None)
+        fg      = c['fg']       if c else getattr(self, 'chart_fg_color',  '#000000')
+        plot_bg = c['plot_bg']  if c else getattr(self, 'plot_bg_color',   '#ffffff')
         ax.set_facecolor(plot_bg)
 
         # Pie axes: hide all ticks, tick labels, and spines — nothing to style
@@ -939,6 +959,8 @@ class PlotEngineMixin:
         y_fmt     = self.subplot_y_formatter.get(subplot_idx, 'auto')
         x_show    = self.subplot_xticks_show.get(subplot_idx, True)
         y_show    = self.subplot_yticks_show.get(subplot_idx, True)
+        x_pos     = self.subplot_xaxis_pos.get(subplot_idx, 'bottom')
+        y_pos     = self.subplot_yaxis_pos.get(subplot_idx, 'left')
 
         # ── Detect twin (secondary) y-axis ────────────────────────────────────
         # ax.twinx() places ticks on the RIGHT and leaves the left side off.
@@ -948,9 +970,14 @@ class PlotEngineMixin:
         _is_twinx = ax.yaxis.get_ticks_position() in ('right', 'unknown')
 
         # ── Major tick params ──────────────────────────────────────────────────
-        ax.tick_params(axis='x', which='major', colors=fg, labelsize=xtick_sz,
-                       direction=x_dir, labelrotation=x_rot,
-                       bottom=x_show, labelbottom=x_show)
+        if x_pos == 'top':
+            ax.tick_params(axis='x', which='major', colors=fg, labelsize=xtick_sz,
+                           direction=x_dir, labelrotation=x_rot,
+                           top=x_show, labeltop=x_show, bottom=False, labelbottom=False)
+        else:
+            ax.tick_params(axis='x', which='major', colors=fg, labelsize=xtick_sz,
+                           direction=x_dir, labelrotation=x_rot,
+                           bottom=x_show, labelbottom=x_show)
         if _is_twinx:
             # Secondary axis: style right-side ticks only; never show left labels
             ax.tick_params(axis='y', which='major', colors=fg, labelsize=ytick_sz,
@@ -958,20 +985,32 @@ class PlotEngineMixin:
                            right=y_show, labelright=y_show,
                            left=False, labelleft=False)
         else:
-            ax.tick_params(axis='y', which='major', colors=fg, labelsize=ytick_sz,
-                           direction=y_dir, labelrotation=y_rot,
-                           left=y_show, labelleft=y_show)
+            if y_pos == 'right':
+                ax.tick_params(axis='y', which='major', colors=fg, labelsize=ytick_sz,
+                               direction=y_dir, labelrotation=y_rot,
+                               right=y_show, labelright=y_show, left=False, labelleft=False)
+            else:
+                ax.tick_params(axis='y', which='major', colors=fg, labelsize=ytick_sz,
+                               direction=y_dir, labelrotation=y_rot,
+                               left=y_show, labelleft=y_show)
 
         # ── Minor ticks ───────────────────────────────────────────────────────
         if x_minor:
             ax.xaxis.set_minor_locator(AutoMinorLocator())
-            ax.tick_params(axis='x', which='minor', colors=fg, direction=x_dir,
-                           bottom=x_show)
+            if x_pos == 'top':
+                ax.tick_params(axis='x', which='minor', colors=fg, direction=x_dir,
+                               top=x_show, bottom=False)
+            else:
+                ax.tick_params(axis='x', which='minor', colors=fg, direction=x_dir,
+                               bottom=x_show)
         else:
             ax.xaxis.set_minor_locator(NullLocator())
         if y_minor:
             ax.yaxis.set_minor_locator(AutoMinorLocator())
             if _is_twinx:
+                ax.tick_params(axis='y', which='minor', colors=fg, direction=y_dir,
+                               right=y_show, left=False)
+            elif y_pos == 'right':
                 ax.tick_params(axis='y', which='minor', colors=fg, direction=y_dir,
                                right=y_show, left=False)
             else:
@@ -1009,14 +1048,50 @@ class PlotEngineMixin:
         # ── Polar axes don't have the standard spine set — skip ───────────────
         is_polar = getattr(ax, 'name', '') == 'polar'
         if not is_polar:
-            for spine_name, chk in [('top',    self.border_top),
-                                      ('bottom', self.border_bottom),
-                                      ('left',   self.border_left),
-                                      ('right',  self.border_right)]:
-                spine = ax.spines[spine_name]
-                spine.set_visible(chk.isChecked())
-                if chk.isChecked():
-                    spine.set_edgecolor(fg)
+            if c:
+                # Per-subplot border flags from canvas_opts dict
+                border_flags = {
+                    'top':    c.get('border_top',    True),
+                    'bottom': c.get('border_bottom', True),
+                    'left':   c.get('border_left',   True),
+                    'right':  c.get('border_right',  True),
+                }
+                for spine_name, visible in border_flags.items():
+                    spine = ax.spines[spine_name]
+                    spine.set_visible(visible)
+                    if visible:
+                        spine.set_edgecolor(fg)
+            else:
+                for spine_name, chk in [('top',    self.border_top),
+                                          ('bottom', self.border_bottom),
+                                          ('left',   self.border_left),
+                                          ('right',  self.border_right)]:
+                    spine = ax.spines[spine_name]
+                    spine.set_visible(chk.isChecked())
+                    if chk.isChecked():
+                        spine.set_edgecolor(fg)
+
+        # ── Axis line positions (x on y / y on x) ────────────────────────────
+        # Applied after border logic so spine visibility is already resolved.
+        # Skip for polar/3D axes and secondary (twinx) axes.
+        if not is_polar and not _is_twinx:
+            if x_pos == 'top':
+                ax.spines['bottom'].set_visible(False)
+                ax.spines['top'].set_visible(True)
+                ax.spines['top'].set_edgecolor(fg)
+                ax.xaxis.set_label_position('top')
+            elif x_pos == 'zero':
+                ax.spines['bottom'].set_position('zero')
+            # 'bottom': default — no extra action required
+
+            if y_pos == 'right':
+                ax.spines['left'].set_visible(False)
+                ax.spines['right'].set_visible(True)
+                ax.spines['right'].set_edgecolor(fg)
+                ax.yaxis.set_label_position('right')
+            elif y_pos == 'zero':
+                ax.spines['left'].set_position('zero')
+            # 'left': default — no extra action required
 
     @staticmethod
     def _align_twinx_ticks(ax, ax2, subplot_idx=0, y_step=0.0, y2_step=0.0):
@@ -1089,14 +1164,21 @@ class PlotEngineMixin:
             ax.set_title(_latex_safe(title_txt),
                          fontsize=self.subplot_title_size.get(subplot_idx, 11),
                          color=self.subplot_title_color.get(subplot_idx, '#000000'),
-                         fontfamily=self.subplot_title_font.get(subplot_idx, 'sans-serif'))
+                         fontfamily=self.subplot_title_font.get(subplot_idx, 'sans-serif'),
+                         pad=self.subplot_title_pad.get(subplot_idx, 6),
+                         rotation=self.subplot_title_rotation.get(subplot_idx, 0),
+                         loc=self.subplot_title_ha.get(subplot_idx, 'center'))
         # ── X label ──
         if self.subplot_xlabel_show.get(subplot_idx, True):
             xl = self.subplot_xlabels.get(subplot_idx, '') or ('' if ct in _NO_X_TYPES else xc)
             ax.set_xlabel(_latex_safe(xl),
                           fontsize=self.xlabel_size.value(),
                           color=self.xlabel_color,
-                          fontfamily=self.xlabel_font.currentText())
+                          fontfamily=self.xlabel_font.currentText(),
+                          rotation=self.subplot_xlabel_rotation.get(subplot_idx, 0),
+                          labelpad=self.subplot_xlabel_labelpad.get(subplot_idx, 4),
+                          loc=self.subplot_xlabel_loc.get(subplot_idx, 'center'))
+            ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(subplot_idx, 'center'))
         else:
             ax.set_xlabel('')
         # ── Y label ──
@@ -1105,7 +1187,11 @@ class PlotEngineMixin:
             ax.set_ylabel(_latex_safe(yl),
                           fontsize=self.ylabel_size.value(),
                           color=self.ylabel_color,
-                          fontfamily=self.ylabel_font.currentText())
+                          fontfamily=self.ylabel_font.currentText(),
+                          rotation=self.subplot_ylabel_rotation.get(subplot_idx, 90),
+                          labelpad=self.subplot_ylabel_labelpad.get(subplot_idx, 4),
+                          loc=self.subplot_ylabel_loc.get(subplot_idx, 'center'))
+            ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(subplot_idx, 'center'))
         else:
             ax.set_ylabel('')
 
@@ -1140,7 +1226,11 @@ class PlotEngineMixin:
                         ax2.set_ylabel(_latex_safe(y2l),
                                        fontsize=self.y2label_size.value(),
                                        color=self.y2label_color,
-                                       fontfamily=self.y2label_font.currentText())
+                                       fontfamily=self.y2label_font.currentText(),
+                                       rotation=self.y2label_rotation.value(),
+                                       labelpad=self.y2label_labelpad.value(),
+                                       loc=self.y2label_loc.currentText())
+                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
                 y2lim = self.subplot_y2lims.get(subplot_idx)
                 if y2lim:
                     ax2.set_ylim(y2lim[0], y2lim[1])
@@ -1196,12 +1286,45 @@ class PlotEngineMixin:
         if not is3d:
             self._apply_canvas_style(ax, subplot_idx)
             if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
-                self._apply_grid(ax)
+                self._apply_grid(ax, subplot_idx)
             if _y2_active:
                 self._align_twinx_ticks(
                     ax, ax2, subplot_idx,
                     y_step=self.subplot_ytick_step.get(subplot_idx, 0.0),
                     y2_step=self.subplot_ytick_step.get(subplot_idx, 0.0))
+
+    def _margins_as_fractions(self):
+        """Convert margin spinbox values (physical units) to figure fractions [0, 1].
+
+        Divides directly by fig_width / fig_height — both are already in the current
+        unit, so no conversion is needed and there is no floating-point round-trip
+        error (e.g. value/2.54*2.54 != value exactly in IEEE 754).
+        """
+        w = self.fig_width.value()
+        h = self.fig_height.value()
+        if w <= 0 or h <= 0:
+            return 0.10, 0.95, 0.10, 0.95
+        return (
+            self.fig_left.value()   / w,   # left   fraction
+            self.fig_right.value()  / w,   # right  fraction
+            self.fig_bottom.value() / h,   # bottom fraction
+            self.fig_top.value()    / h,   # top    fraction
+        )
+
+    def _title_pos_as_fractions(self):
+        """Convert title_x / title_y (physical units) to figure fractions.
+
+        Returns (tx, ty) where each is in [0, 1] (or slightly beyond for right
+        alignment). Divides directly by fig_width / fig_height — same no-round-trip
+        rationale as _margins_as_fractions.
+        """
+        w = self.fig_width.value()
+        h = self.fig_height.value()
+        if w <= 0 or h <= 0:
+            return 0.5, 0.97
+        tx = self.title_x.value() / w if hasattr(self, 'title_x') else 0.5
+        ty = self.title_y.value() / h if hasattr(self, 'title_y') else 0.97
+        return tx, ty
 
     # ═══════════════════════════════════════════════════════════════════════════
     # UPDATE PREVIEW
@@ -1235,6 +1358,11 @@ class PlotEngineMixin:
                 _active_sp = self.series_sp_active.currentIndex()
                 if _active_sp >= 0:
                     self._save_chart_opts(_active_sp)
+            # Persist current canvas/grid widgets into the active subplot's dict.
+            if hasattr(self, '_save_canvas_grid_opts') and hasattr(self, 'layout_sp_active'):
+                _layout_sp = self.layout_sp_active.currentIndex()
+                if _layout_sp >= 0:
+                    self._save_canvas_grid_opts(_layout_sp)
             series = self._get_series(primary_only=True)
             ct = self.chart_type_combo.currentText()
             is3d = ct in _3D_TYPES
@@ -1287,9 +1415,14 @@ class PlotEngineMixin:
                                 self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx,'') or ', '.join(y2_cols)
-                                    if y2lbl: ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
-                                                              color=self.y2label_color,
-                                                              fontfamily=self.y2label_font.currentText())
+                                    if y2lbl:
+                                        ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
+                                                       color=self.y2label_color,
+                                                       fontfamily=self.y2label_font.currentText(),
+                                                       rotation=self.y2label_rotation.value(),
+                                                       labelpad=self.y2label_labelpad.value(),
+                                                       loc=self.y2label_loc.currentText())
+                                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
                                 y2lim = self.subplot_y2lims.get(idx)
                                 if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
                                 self._apply_canvas_style(ax2, idx)
@@ -1299,19 +1432,30 @@ class PlotEngineMixin:
                             ax.set_title(_latex_safe(title_text),
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
-                                color=self.subplot_title_color.get(idx, '#000000'))
+                                color=self.subplot_title_color.get(idx, '#000000'),
+                                pad=self.subplot_title_pad.get(idx, 6),
+                                rotation=self.subplot_title_rotation.get(idx, 0),
+                                loc=self.subplot_title_ha.get(idx, 'center'))
                             if self.subplot_xlabel_show.get(idx, True):
                                 xl = self.subplot_xlabels.get(idx,'') or ('' if sub_ct in _NO_X_TYPES else ', '.join(x_cols))
                                 ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
                                               color=self.xlabel_color,
-                                              fontfamily=self.xlabel_font.currentText())
+                                              fontfamily=self.xlabel_font.currentText(),
+                                              rotation=self.subplot_xlabel_rotation.get(idx, 0),
+                                              labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
+                                              loc=self.subplot_xlabel_loc.get(idx, 'center'))
+                                ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
                             else:
                                 ax.set_xlabel('')
                             if self.subplot_ylabel_show.get(idx, True):
                                 yl = self.subplot_ylabels.get(idx,'') or ('' if sub_ct in _NO_X_TYPES else ', '.join(y_cols))
                                 ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
                                               color=self.ylabel_color,
-                                              fontfamily=self.ylabel_font.currentText())
+                                              fontfamily=self.ylabel_font.currentText(),
+                                              rotation=self.subplot_ylabel_rotation.get(idx, 90),
+                                              labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
+                                              loc=self.subplot_ylabel_loc.get(idx, 'center'))
+                                ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
                             else:
                                 ax.set_ylabel('')
                             xs = self.subplot_xscales.get(idx, 'linear')
@@ -1342,7 +1486,7 @@ class PlotEngineMixin:
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass
                             self._apply_canvas_style(ax, idx)
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax)
+                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax, idx)
                             self._apply_cat_ticks(ax, cat_info)
                             if ax2 is not None:
                                 self._align_twinx_ticks(ax, ax2, idx,
@@ -1393,7 +1537,11 @@ class PlotEngineMixin:
                                     if y2lbl:
                                         ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
                                                        color=self.y2label_color,
-                                                       fontfamily=self.y2label_font.currentText())
+                                                       fontfamily=self.y2label_font.currentText(),
+                                                       rotation=self.y2label_rotation.value(),
+                                                       labelpad=self.y2label_labelpad.value(),
+                                                       loc=self.y2label_loc.currentText())
+                                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
                                 y2lim = self.subplot_y2lims.get(idx)
                                 if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
                                 self._apply_canvas_style(ax2, idx)
@@ -1403,7 +1551,10 @@ class PlotEngineMixin:
                             ax.set_title(_latex_safe(title_text),
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
-                                color=self.subplot_title_color.get(idx, '#000000'))
+                                color=self.subplot_title_color.get(idx, '#000000'),
+                                pad=self.subplot_title_pad.get(idx, 6),
+                                rotation=self.subplot_title_rotation.get(idx, 0),
+                                loc=self.subplot_title_ha.get(idx, 'center'))
                             _horiz_bar = (sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False))
                             _default_xl_eff  = default_yl if _horiz_bar else default_xl
                             _default_yl_eff  = default_xl if _horiz_bar else default_yl
@@ -1413,14 +1564,22 @@ class PlotEngineMixin:
                                 xl = _custom_xl or ('' if sub_ct in _NO_X_TYPES else _default_xl_eff)
                                 ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
                                               color=self.xlabel_color,
-                                              fontfamily=self.xlabel_font.currentText())
+                                              fontfamily=self.xlabel_font.currentText(),
+                                              rotation=self.subplot_xlabel_rotation.get(idx, 0),
+                                              labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
+                                              loc=self.subplot_xlabel_loc.get(idx, 'center'))
+                                ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
                             else:
                                 ax.set_xlabel('')
                             if self.subplot_ylabel_show.get(idx, True):
                                 yl = _custom_yl or ('' if sub_ct in _NO_X_TYPES else _default_yl_eff)
                                 ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
                                               color=self.ylabel_color,
-                                              fontfamily=self.ylabel_font.currentText())
+                                              fontfamily=self.ylabel_font.currentText(),
+                                              rotation=self.subplot_ylabel_rotation.get(idx, 90),
+                                              labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
+                                              loc=self.subplot_ylabel_loc.get(idx, 'center'))
+                                ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
                             else:
                                 ax.set_ylabel('')
                             if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
@@ -1469,7 +1628,7 @@ class PlotEngineMixin:
                         _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
                         if _ax_ct not in _3D_TYPES:
                             self._apply_canvas_style(_ax, _ax_i)
-                            if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(_ax)
+                            if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(_ax, _ax_i)
                     # Re-align twinx ticks after the late canvas-style pass
                     for _ax_i, _ax2 in ax2_map.items():
                         _ax_primary = axes_list[_ax_i] if _ax_i < len(axes_list) else None
@@ -1494,10 +1653,7 @@ class PlotEngineMixin:
                 box_left   = (1.0 - box_w) / 2.0
                 box_bottom = (1.0 - box_h) / 2.0
 
-                ul = self.fig_left.value()
-                ur = self.fig_right.value()
-                ub = self.fig_bottom.value()
-                ut = self.fig_top.value()
+                ul, ur, ub, ut = self._margins_as_fractions()
 
                 adj_left   = box_left   + ul * box_w
                 adj_right  = box_left   + ur * box_w
@@ -1516,21 +1672,25 @@ class PlotEngineMixin:
                 if not _sup_raw and _n_sp == 1:
                     _sup_raw = self.title_input.placeholderText()
                 _sup_text = _latex_safe(_sup_raw) if _show_sup else ''
-                _title_y_fig = getattr(self, 'title_y', self.title_y_offset if hasattr(self, 'title_y_offset') else None)
-                _ty = _title_y_fig.value() if _title_y_fig else 0.97
+                _tx_frac, _ty_frac = self._title_pos_as_fractions()
 
                 if _show_sup and _sup_text:
-                    # Place suptitle at the user-set position (in canvas-box coords).
-                    # Do NOT clamp adj_top here — title_y only controls where the text
-                    # sits; subplot margins are controlled independently by fig_top.
-                    title_y_canvas = box_bottom + _ty * box_h
+                    # Place suptitle at the user-set position mapped into the
+                    # canvas box so that X and Y use the same coordinate frame.
+                    # The box is the region of the preview canvas that shows the
+                    # export-aspect content; both axes must be mapped through it
+                    # so "centre of figure" in the spinbox = centre of that box.
+                    title_x_canvas = box_left + _tx_frac * box_w
+                    title_y_canvas = box_bottom + _ty_frac * box_h
                     suptitle_pt = self.title_size.value()
                     self.canvas.figure.suptitle(_sup_text,
                         fontsize=suptitle_pt, color=self.title_color,
                         fontfamily=self.title_font.currentText(),
-                        x=self.title_x.value() if hasattr(self, 'title_x') else 0.5,
+                        x=title_x_canvas,
                         y=title_y_canvas,
-                        ha='center', va='top', transform=self.canvas.figure.transFigure)
+                        ha=self.title_ha.currentText(),
+                        rotation=self.title_rotation.value(),
+                        va='top', transform=self.canvas.figure.transFigure)
                 else:
                     self.canvas.figure.suptitle('')
 
@@ -1746,8 +1906,13 @@ class PlotEngineMixin:
                                 self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
                                 if self.subplot_y2label_show.get(idx, True):
                                     y2lbl = self.subplot_y2labels.get(idx,'') or ', '.join(y2_cols)
-                                    if y2lbl: ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
-                                                              color=self.y2label_color, fontfamily=self.y2label_font.currentText())
+                                    if y2lbl:
+                                        ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
+                                                       color=self.y2label_color, fontfamily=self.y2label_font.currentText(),
+                                                       rotation=self.y2label_rotation.value(),
+                                                       labelpad=self.y2label_labelpad.value(),
+                                                       loc=self.y2label_loc.currentText())
+                                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
                                 y2lim = self.subplot_y2lims.get(idx)
                                 if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
                                 self._apply_canvas_style(ax2, idx)
@@ -1757,17 +1922,28 @@ class PlotEngineMixin:
                             ax.set_title(_latex_safe(title_text),
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
-                                color=self.subplot_title_color.get(idx, '#000000'))
+                                color=self.subplot_title_color.get(idx, '#000000'),
+                                pad=self.subplot_title_pad.get(idx, 6),
+                                rotation=self.subplot_title_rotation.get(idx, 0),
+                                loc=self.subplot_title_ha.get(idx, 'center'))
                             if self.subplot_xlabel_show.get(idx, True):
                                 xl = self.subplot_xlabels.get(idx,'') or ('' if sub_ct in _NO_X_TYPES else ', '.join(x_cols))
                                 ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
-                                    color=self.xlabel_color, fontfamily=self.xlabel_font.currentText())
+                                    color=self.xlabel_color, fontfamily=self.xlabel_font.currentText(),
+                                    rotation=self.subplot_xlabel_rotation.get(idx, 0),
+                                    labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
+                                    loc=self.subplot_xlabel_loc.get(idx, 'center'))
+                                ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
                             else:
                                 ax.set_xlabel('')
                             if self.subplot_ylabel_show.get(idx, True):
                                 yl = self.subplot_ylabels.get(idx,'') or ('' if sub_ct in _NO_X_TYPES else ', '.join(y_cols))
                                 ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
-                                    color=self.ylabel_color, fontfamily=self.ylabel_font.currentText())
+                                    color=self.ylabel_color, fontfamily=self.ylabel_font.currentText(),
+                                    rotation=self.subplot_ylabel_rotation.get(idx, 90),
+                                    labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
+                                    loc=self.subplot_ylabel_loc.get(idx, 'center'))
+                                ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
                             else:
                                 ax.set_ylabel('')
                             xs = self.subplot_xscales.get(idx, 'linear')
@@ -1788,7 +1964,7 @@ class PlotEngineMixin:
                                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                                 except Exception: pass
                             self._apply_canvas_style(ax, idx)
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax)
+                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax, idx)
                             self._apply_cat_ticks(ax, cat_info)
                             if ax2 is not None:
                                 self._align_twinx_ticks(ax, ax2, idx,
@@ -1836,7 +2012,11 @@ class PlotEngineMixin:
                                     if y2lbl:
                                         ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
                                                        color=self.y2label_color,
-                                                       fontfamily=self.y2label_font.currentText())
+                                                       fontfamily=self.y2label_font.currentText(),
+                                                       rotation=self.y2label_rotation.value(),
+                                                       labelpad=self.y2label_labelpad.value(),
+                                                       loc=self.y2label_loc.currentText())
+                                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
                                 y2lim = self.subplot_y2lims.get(idx)
                                 if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
                                 self._apply_canvas_style(ax2, idx)
@@ -1846,7 +2026,10 @@ class PlotEngineMixin:
                             ax.set_title(_latex_safe(title_text),
                                 fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
                                 fontsize=self.subplot_title_size.get(idx, 11),
-                                color=self.subplot_title_color.get(idx, '#000000'))
+                                color=self.subplot_title_color.get(idx, '#000000'),
+                                pad=self.subplot_title_pad.get(idx, 6),
+                                rotation=self.subplot_title_rotation.get(idx, 0),
+                                loc=self.subplot_title_ha.get(idx, 'center'))
                             _horiz_bar = (sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False))
                             _default_xl_eff = default_yl if _horiz_bar else default_xl
                             _default_yl_eff = default_xl if _horiz_bar else default_yl
@@ -1855,13 +2038,21 @@ class PlotEngineMixin:
                             if self.subplot_xlabel_show.get(idx, True):
                                 xl = _custom_xl or ('' if sub_ct in _NO_X_TYPES else _default_xl_eff)
                                 ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
-                                              color=self.xlabel_color, fontfamily=self.xlabel_font.currentText())
+                                              color=self.xlabel_color, fontfamily=self.xlabel_font.currentText(),
+                                              rotation=self.subplot_xlabel_rotation.get(idx, 0),
+                                              labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
+                                              loc=self.subplot_xlabel_loc.get(idx, 'center'))
+                                ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
                             else:
                                 ax.set_xlabel('')
                             if self.subplot_ylabel_show.get(idx, True):
                                 yl = _custom_yl or ('' if sub_ct in _NO_X_TYPES else _default_yl_eff)
                                 ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
-                                              color=self.ylabel_color, fontfamily=self.ylabel_font.currentText())
+                                              color=self.ylabel_color, fontfamily=self.ylabel_font.currentText(),
+                                              rotation=self.subplot_ylabel_rotation.get(idx, 90),
+                                              labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
+                                              loc=self.subplot_ylabel_loc.get(idx, 'center'))
+                                ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
                             else:
                                 ax.set_ylabel('')
                             if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
@@ -1911,32 +2102,31 @@ class PlotEngineMixin:
                             y_step=self.subplot_ytick_step.get(_ax_i, 0.0),
                             y2_step=self.subplot_ytick_step.get(_ax_i, 0.0))
 
-            # Apply margins (user values map directly to the export figure)
-            exp_top = self.fig_top.value()
+            # Apply margins — convert physical-unit spinbox values to fractions
+            _ml, _mr, _mb, _mt = self._margins_as_fractions()
             _n_sp_exp = self.subplot_rows * self.subplot_cols
             _exp_title_raw = self.title_input.text().strip()
             # For a single subplot, fall back to the placeholder just like the preview does.
             if not _exp_title_raw and _n_sp_exp == 1:
                 _exp_title_raw = self.title_input.placeholderText()
             _exp_title_text = _latex_safe(_exp_title_raw)
-            _ty_widget = getattr(self, 'title_y', getattr(self, 'title_y_offset', None))
-            _exp_ty = _ty_widget.value() if _ty_widget else 0.97
+            _exp_tx_frac, _exp_ty_frac = self._title_pos_as_fractions()
             if self.title_check.isChecked() and _exp_title_text:
                 suptitle_pt = self.title_size.value()
                 # title_y positions the suptitle text; do not clamp exp_top by it.
                 exp_fig.suptitle(_exp_title_text,
                                  fontsize=suptitle_pt, color=self.title_color,
                                  fontfamily=self.title_font.currentText(),
-                                 x=self.title_x.value() if hasattr(self, 'title_x') else 0.5,
-                                 ha='center', va='top',
-                                 y=_exp_ty)
+                                 x=_exp_tx_frac,
+                                 ha=self.title_ha.currentText(),
+                                 rotation=self.title_rotation.value(),
+                                 va='top',
+                                 y=_exp_ty_frac)
             _hspace_exp = self.sp_hspace.value() if hasattr(self, 'sp_hspace') else 0.35
             _wspace_exp = self.sp_wspace.value() if hasattr(self, 'sp_wspace') else 0.35
             exp_fig.subplots_adjust(
-                left=self.fig_left.value(),
-                right=self.fig_right.value(),
-                bottom=self.fig_bottom.value(),
-                top=exp_top,
+                left=_ml, right=_mr,
+                bottom=_mb, top=_mt,
                 hspace=_hspace_exp,
                 wspace=_wspace_exp,
             )
