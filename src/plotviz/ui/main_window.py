@@ -649,6 +649,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_ylabel_labelpad = {0: 4}
         self.subplot_ylabel_loc      = {0: 'center'}
         self.subplot_ylabel_ha       = {0: 'center'}
+        self.subplot_zlabels         = {0: ''}
+        self.subplot_zlabel_show     = {0: True}
+        self.subplot_zlabel_rotation = {0: 90}
+        self.subplot_zlabel_labelpad = {0: 4}
         # fit_color / fit_linestyle / fit_linewidth removed in 2.0.0 —
         # fit curves are now styled via curve_styles like any other series.
 
@@ -1207,6 +1211,17 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         self._file_menu = file_menu
 
+        # ── Menu bar — Edit ───────────────────────────────────────────────────
+        edit_menu = menubar.addMenu('Edit')
+
+        act_copy_img = QAction('Copy Image to Clipboard', self)
+        act_copy_img.setShortcut('Ctrl+C')
+        act_copy_img.setStatusTip('Copy the current chart as an image to the clipboard')
+        act_copy_img.triggered.connect(self._copy_image_to_clipboard)
+        edit_menu.addAction(act_copy_img)
+
+        self._edit_menu = edit_menu
+
         # ── Menu bar — View ───────────────────────────────────────────────────
         view_menu = menubar.addMenu('View')
         for i in range(self.tabs.count()):
@@ -1483,6 +1498,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self._heat_contour_line_style_row.setVisible(ct == 'Contour')
         if hasattr(self, '_heat_3d_row'):
             self._heat_3d_row.setVisible(ct == '3D Surface')
+        if hasattr(self, '_layout_3d_view_widget'):
+            self._layout_3d_view_widget.setVisible(ct == '3D Surface')
+        if hasattr(self, '_z_axis_widget'):
+            self._z_axis_widget.setVisible(ct in {'3D Surface', 'Heatmap', 'Contour', 'Tricontour'})
         # Fix 4: vmin/vmax shown for Heatmap and Contour
         if hasattr(self, '_heat_vminmax_row'):
             self._heat_vminmax_row.setVisible(ct in ('Heatmap', 'Contour'))
@@ -1785,6 +1804,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'border_bottom': self.border_bottom.isChecked(),
             'border_left':   self.border_left.isChecked(),
             'border_right':  self.border_right.isChecked(),
+            '3d_elev':       self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30,
+            '3d_azim':       self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60,
         }
         self.subplot_grid_opts[idx] = {
             'enabled':       self.grid_check.isChecked(),
@@ -1856,6 +1877,16 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.minor_grid_alpha.blockSignals(True)
         self.minor_grid_alpha.setValue(go.get('minor_alpha', 0.2))
         self.minor_grid_alpha.blockSignals(False)
+        # 3D view angles
+        if hasattr(self, 'view3d_elev_spin'):
+            for sl, sp, key, default in [
+                (self.view3d_elev_slider, self.view3d_elev_spin, '3d_elev',  30),
+                (self.view3d_azim_slider, self.view3d_azim_spin, '3d_azim', -60),
+            ]:
+                val = co.get(key, default)
+                sl.blockSignals(True); sp.blockSignals(True)
+                sl.setValue(val);       sp.setValue(val)
+                sl.blockSignals(False); sp.blockSignals(False)
 
     def _on_layout_sp_changed(self, idx):
         """Layout tab subplot selector changed: save old subplot, load new one."""
@@ -2521,6 +2552,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'xlabel':       getattr(self, 'xlabel_color',      '#000000'),
             'ylabel':       getattr(self, 'ylabel_color',      '#000000'),
             'y2label':      getattr(self, 'y2label_color',     '#000000'),
+            'zlabel':       getattr(self, 'zlabel_color',      '#000000'),
             'curve':        getattr(self, 'curve_color',       '#1f77b4'),
             'curve_marker': getattr(self, 'curve_marker_color','#1f77b4'),
         }.get(target, '#000000')
@@ -2545,6 +2577,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'xlabel':       ('xlabel_color',        'xlabel_color_label',       'style'),
             'ylabel':       ('ylabel_color',        'ylabel_color_label',       'style'),
             'y2label':      ('y2label_color',       'y2label_color_label',      'style'),
+            'zlabel':       ('zlabel_color',        'zlabel_color_label',       'style'),
             'curve':        ('curve_color',         'curve_color_label',        'swatch'),
             'curve_marker': ('curve_marker_color',  'curve_marker_color_label', 'swatch'),
         }
@@ -4640,6 +4673,14 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         _load(self.ylabel_labelpad, self.subplot_ylabel_labelpad.get(idx, 4))
         _load(self.ylabel_loc,      self.subplot_ylabel_loc.get(idx, 'center'))
         _load(self.ylabel_ha,       self.subplot_ylabel_ha.get(idx, 'center'))
+        # Z axis (3D Surface only)
+        _load(self.zlabel_show_check, self.subplot_zlabel_show.get(idx, True))
+        _load(self.zlabel_input,      self.subplot_zlabels.get(idx, ''))
+        _load(self.zlabel_rotation,   self.subplot_zlabel_rotation.get(idx, 90))
+        _load(self.zlabel_labelpad,   self.subplot_zlabel_labelpad.get(idx, 4))
+        zcolor = getattr(self, 'zlabel_color', '#000000')
+        self.zlabel_color_label.setStyleSheet(
+            f'background-color:{zcolor};border:1px solid #888;border-radius:2px;')
         # Y2 axis
         _load(self.y2label_show_check, self.subplot_y2label_show.get(idx, True))
         _load(self.y2label_input,      self.subplot_y2labels.get(idx, ''))
@@ -4795,6 +4836,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_ylabel_labelpad[idx] = self.ylabel_labelpad.value()
         self.subplot_ylabel_loc[idx]      = self.ylabel_loc.currentText()
         self.subplot_ylabel_ha[idx]       = self.ylabel_ha.currentText()
+        self.subplot_zlabels[idx]         = self.zlabel_input.text().strip()
+        self.subplot_zlabel_show[idx]     = self.zlabel_show_check.isChecked()
+        self.subplot_zlabel_rotation[idx] = self.zlabel_rotation.value()
+        self.subplot_zlabel_labelpad[idx] = self.zlabel_labelpad.value()
         self.update_preview()
 
     # Legacy aliases kept so existing signal connections don't need changes
@@ -4843,6 +4888,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _on_sp_ylabel_show_changed(self): self._save_axes_state()
     def _on_sp_y2label_changed(self):     self._save_axes_state()
     def _on_sp_y2label_show_changed(self):self._save_axes_state()
+    def _on_sp_zlabel_changed(self):      self._save_axes_state()
+    def _on_sp_zlabel_show_changed(self): self._save_axes_state()
     def _update_legend_pos_enabled(self, *_):
         """Enable/disable position combo, X and Y based on the Auto position checkbox."""
         auto = self.legend_auto_pos.isChecked()
@@ -5857,7 +5904,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                      QTableWidget, QTableWidgetItem,
                                      QPushButton, QLabel, QSizePolicy,
-                                     QDialogButtonBox)
+                                     QLineEdit, QFrame)
         if not self.datasets:
             return
 
@@ -5871,7 +5918,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         dlg = QDialog(self)
         dlg.setWindowTitle('Inspect / Edit Series Values')
-        dlg.resize(min(140 + 110 * len(cols), 1100), 560)
+        dlg.resize(min(140 + 110 * len(cols), 1100), 600)
         vlay = QVBoxLayout(dlg)
 
         info = QLabel(
@@ -5879,6 +5926,22 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             '<b>double-click a cell to edit</b>')
         info.setStyleSheet('color:#555; font-size:11px;')
         vlay.addWidget(info)
+
+        # ── Column rename row ──────────────────────────────────────────────────
+        rename_frame = QFrame()
+        rename_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        rename_layout = QHBoxLayout(rename_frame)
+        rename_layout.setContentsMargins(6, 4, 6, 4)
+        rename_layout.setSpacing(6)
+        rename_layout.addWidget(QLabel('<b>Column name:</b>'))
+        name_edits = []   # one QLineEdit per column, same order as cols
+        for col in cols:
+            ed = QLineEdit(col)
+            ed.setPlaceholderText('column name')
+            ed.setMinimumWidth(90)
+            name_edits.append(ed)
+            rename_layout.addWidget(ed, 1)
+        vlay.addWidget(rename_frame)
 
         tbl = QTableWidget(n_rows, len(cols))
         tbl.setHorizontalHeaderLabels(cols)
@@ -5896,6 +5959,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 tbl.setItem(ri, ci, item)
             tbl.resizeColumnToContents(ci)
 
+        # Keep table header in sync as user types a new name
+        def _sync_header(ci, text):
+            tbl.setHorizontalHeaderItem(ci, QTableWidgetItem(text or cols[ci]))
+        for ci, ed in enumerate(name_edits):
+            ed.textChanged.connect(lambda text, ci=ci: _sync_header(ci, text))
+
         vlay.addWidget(tbl)
 
         note2 = QLabel('Changes are written back when you click Apply or OK.')
@@ -5903,16 +5972,34 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         vlay.addWidget(note2)
 
         def _apply_edits():
+            # ── 1. Apply column renames first ─────────────────────────────────
+            renamed = {}   # old_name -> new_name for changed names
+            for ci, (old_col, ed) in enumerate(zip(cols, name_edits)):
+                new_name = ed.text().strip()
+                if not new_name or new_name == old_col:
+                    continue
+                if new_name in self.datasets and new_name != old_col:
+                    info.setText(f'⚠  Column "{new_name}" already exists — rename skipped.')
+                    continue
+                # Rename: preserve insertion order by rebuilding the dict
+                self.datasets = {
+                    (new_name if k == old_col else k): v
+                    for k, v in self.datasets.items()
+                }
+                renamed[old_col] = new_name
+                cols[ci] = new_name   # update working list for the data-write step
+
+            # ── 2. Write edited cell values back ──────────────────────────────
             for ci, col in enumerate(cols):
                 arr = self.datasets[col]
                 is_cat = self._is_categorical(arr)
                 new_vals = []
                 for ri in range(n_rows):
-                    item = tbl.item(ri, ci)
-                    if item is None or item.text().strip() == '':
+                    cell = tbl.item(ri, ci)
+                    if cell is None or cell.text().strip() == '':
                         new_vals.append('' if is_cat else np.nan)
                         continue
-                    txt = item.text().strip()
+                    txt = cell.text().strip()
                     if is_cat:
                         new_vals.append(txt)
                     else:
@@ -5924,8 +6011,44 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                     self.datasets[col] = np.array(new_vals, dtype=object)
                 else:
                     self.datasets[col] = np.array(new_vals, dtype=float)
+
+            # ── 3. Refresh all column pickers if any rename happened ──────────
+            if renamed:
+                # update_lists() snapshots currentText() at the very top before
+                # clearing, so we must make each combo report the *new* name
+                # before update_lists() runs.  setCurrentText() only works when
+                # the text already exists as an item, so we rename the matching
+                # item in-place with setItemText() instead.
+                def _rename_item(cb, old_new):
+                    for i in range(cb.count()):
+                        txt = cb.itemText(i)
+                        if txt in old_new:
+                            cb.setItemText(i, old_new[txt])
+
+                # Series table X / Y combos (cols 0 and 1)
+                for row in range(self.series_table.rowCount()):
+                    for col_idx in (0, 1):
+                        cb = self.series_table.cellWidget(row, col_idx)
+                        if cb is not None:
+                            _rename_item(cb, renamed)
+
+                # Single-select combos that update_lists() snapshots at the top
+                for attr in ('combo_z', 'combo_err', 'combo_fill_y2',
+                             'quiver_u_combo', 'quiver_v_combo',
+                             'barbs_u_combo',  'barbs_v_combo',
+                             'stream_u_combo', 'stream_v_combo',
+                             'bubble_size_combo', 'fn_source_combo',
+                             'err_xerr_combo'):
+                    cb = getattr(self, attr, None)
+                    if cb is not None:
+                        _rename_item(cb, renamed)
+
+                self.update_lists()
+                parts = ', '.join(f'"{o}" → "{n}"' for o, n in renamed.items())
+                info.setText(f'✓  Renamed: {parts}')
+            else:
+                info.setText(f'✓  Applied edits to: {", ".join(cols)}')
             self.update_preview()
-            info.setText(f'✓  Applied edits to: {", ".join(cols)}')
 
         btn_row = QHBoxLayout()
         btn_apply = QPushButton('✔ Apply')

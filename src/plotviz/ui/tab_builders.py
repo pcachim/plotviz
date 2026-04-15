@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QPushButton, QFileDialog, QListWidget,
     QCheckBox, QScrollArea, QColorDialog, QButtonGroup, QRadioButton,
     QFrame, QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView,
-    QTabWidget, QSizePolicy, QPlainTextEdit,
+    QTabWidget, QSizePolicy, QPlainTextEdit, QSlider,
 )
 from PyQt6.QtCore import Qt, QObject, QEvent
 from PyQt6.QtGui import QFont
@@ -346,7 +346,7 @@ class TabBuildersMixin:
             sw.setStyleSheet('background:#ccc; border:1px solid #888; border-radius:2px;')
             self._cs_swatches.append(sw)
             sw_row.addWidget(sw)
-        sw_labels = [QLabel(t) for t in ('BG', 'Plot', 'FG', 'Grid', 'Title')]
+        sw_labels = [QLabel(t) for t in ('Background', 'Plot', 'Foreground', 'Grid', 'Title')]
         for lbl in sw_labels:
             lbl.setStyleSheet('font-size:9px; color:#888;')
         sw_detail = QHBoxLayout()
@@ -1619,6 +1619,77 @@ class TabBuildersMixin:
 
         layout.addWidget(self._hline())
 
+        # ══════════════════════════════════════════════════════════════════════
+        # ── Z Axis (3D Surface only) ──────────────────────────────────────────
+        self._z_axis_widget = QGroupBox('Z / Color Axis')
+        _zlay = QVBoxLayout(self._z_axis_widget)
+        _zlay.setSpacing(4)
+
+        self.zlabel_show_check = QCheckBox('Show Z label')
+        self.zlabel_show_check.setChecked(True)
+        self.zlabel_show_check.stateChanged.connect(self._on_sp_zlabel_show_changed)
+        _zlay.addWidget(self.zlabel_show_check)
+
+        self.zlabel_input = QLineEdit()
+        self.zlabel_input.setPlaceholderText('Z label (optional)')
+        self.zlabel_input.textChanged.connect(self._on_sp_zlabel_changed)
+        _zlay.addWidget(self.zlabel_input)
+
+        zfont_row1 = QHBoxLayout()
+        zfont_row1.setSpacing(4)
+        zfont_row1.addWidget(QLabel('Font:'))
+        self.zlabel_font = QComboBox()
+        self.zlabel_font.addItems(_FONTS)
+        self.zlabel_font.currentTextChanged.connect(self.update_preview)
+        zfont_row1.addWidget(self.zlabel_font, 1)
+        zfont_row1.addWidget(QLabel('Size:'))
+        self.zlabel_size = QSpinBox()
+        self.zlabel_size.setRange(6, 32)
+        self.zlabel_size.setValue(11)
+        self.zlabel_size.setFixedWidth(_SW)
+        self.zlabel_size.valueChanged.connect(self.update_preview)
+        zfont_row1.addWidget(self.zlabel_size)
+        _zlay.addLayout(zfont_row1)
+
+        zfont_row2 = QHBoxLayout()
+        zfont_row2.setSpacing(4)
+        zfont_row2.addWidget(QLabel('Color:'))
+        self.zlabel_color = '#000000'
+        self.zlabel_color_label = self._color_sw('#000000')
+        zfont_row2.addWidget(self.zlabel_color_label)
+        btn_zc = QPushButton('…')
+        btn_zc.setFixedWidth(28)
+        btn_zc.clicked.connect(lambda: self.pick_color('zlabel'))
+        zfont_row2.addWidget(btn_zc)
+        zfont_row2.addStretch()
+        _zlay.addLayout(zfont_row2)
+
+        zlabel_pos_row = QHBoxLayout()
+        zlabel_pos_row.setSpacing(4)
+        zlabel_pos_row.addWidget(QLabel('Rotation:'))
+        self.zlabel_rotation = QSpinBox()
+        self.zlabel_rotation.setRange(-180, 180)
+        self.zlabel_rotation.setValue(90)
+        self.zlabel_rotation.setFixedWidth(_SW)
+        self.zlabel_rotation.setToolTip('Rotation of the Z-axis label in degrees')
+        self.zlabel_rotation.valueChanged.connect(self._save_axes_state)
+        zlabel_pos_row.addWidget(self.zlabel_rotation)
+        zlabel_pos_row.addWidget(QLabel('Pad:'))
+        self.zlabel_labelpad = QSpinBox()
+        self.zlabel_labelpad.setRange(0, 50)
+        self.zlabel_labelpad.setValue(4)
+        self.zlabel_labelpad.setFixedWidth(_SW)
+        self.zlabel_labelpad.setToolTip('Distance between the Z-axis label and the axis (points)')
+        self.zlabel_labelpad.valueChanged.connect(self._save_axes_state)
+        zlabel_pos_row.addWidget(self.zlabel_labelpad)
+        zlabel_pos_row.addStretch()
+        _zlay.addLayout(zlabel_pos_row)
+
+        self._z_axis_widget.setVisible(False)
+        layout.addWidget(self._z_axis_widget)
+
+        layout.addWidget(self._hline())
+
         layout.addStretch()
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)
@@ -1889,8 +1960,8 @@ class TabBuildersMixin:
 
         # ── Colors ────────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('Colors'))
-        color_row('BG color:',  'chart_bg_color', '#ffffff', 'chart_bg')
-        color_row('FG color:',  'chart_fg_color', '#000000', 'chart_fg')
+        color_row('Background:',  'chart_bg_color', '#ffffff', 'chart_bg')
+        color_row('Foreground:',  'chart_fg_color', '#000000', 'chart_fg')
 
         layout.addStretch()
         scroll.setWidget(content)
@@ -2756,6 +2827,63 @@ class TabBuildersMixin:
         grid_row.addWidget(min_box)
 
         layout.addLayout(grid_row)
+
+        # ── 3D Viewpoint (shown only for 3D Surface charts) ───────────────────
+        layout.addWidget(self._hline())
+        self._layout_3d_view_widget = QGroupBox('3D Viewpoint')
+        _3dv_lay = QVBoxLayout(self._layout_3d_view_widget)
+        _3dv_lay.setSpacing(5)
+
+        def _make_angle_row(label_text, slider_attr, spin_attr, lo, hi, default):
+            row = QHBoxLayout()
+            row.setSpacing(6)
+            lbl = QLabel(label_text)
+            lbl.setFixedWidth(72)
+            row.addWidget(lbl)
+            slider = QSlider(Qt.Orientation.Horizontal)
+            slider.setRange(lo, hi)
+            slider.setValue(default)
+            row.addWidget(slider, 1)
+            spin = QSpinBox()
+            spin.setRange(lo, hi)
+            spin.setValue(default)
+            spin.setSuffix('°')
+            spin.setFixedWidth(62)
+            row.addWidget(spin)
+            # Keep slider and spinbox in sync (value equality prevents loops)
+            slider.valueChanged.connect(spin.setValue)
+            spin.valueChanged.connect(slider.setValue)
+            # Trigger preview on change
+            slider.valueChanged.connect(self.update_preview)
+            setattr(self, slider_attr, slider)
+            setattr(self, spin_attr, spin)
+            _3dv_lay.addLayout(row)
+
+        _make_angle_row('Elevation:', 'view3d_elev_slider', 'view3d_elev_spin',
+                        -90, 90, 30)
+        _make_angle_row('Azimuth:', 'view3d_azim_slider', 'view3d_azim_spin',
+                        -180, 180, -60)
+
+        _reset_3d_btn = QPushButton('Reset View')
+        _reset_3d_btn.setFixedWidth(100)
+        def _reset_3d_view():
+            for sl, sp, val in [
+                (self.view3d_elev_slider, self.view3d_elev_spin, 30),
+                (self.view3d_azim_slider, self.view3d_azim_spin, -60),
+            ]:
+                sl.blockSignals(True); sp.blockSignals(True)
+                sl.setValue(val);       sp.setValue(val)
+                sl.blockSignals(False); sp.blockSignals(False)
+            self.update_preview()
+        _reset_3d_btn.clicked.connect(_reset_3d_view)
+        _3dv_btn_row = QHBoxLayout()
+        _3dv_btn_row.addWidget(_reset_3d_btn)
+        _3dv_btn_row.addStretch()
+        _3dv_lay.addLayout(_3dv_btn_row)
+
+        self._layout_3d_view_widget.setVisible(False)
+        layout.addWidget(self._layout_3d_view_widget)
+
         layout.addStretch()
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)

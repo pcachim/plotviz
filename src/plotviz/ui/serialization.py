@@ -121,6 +121,13 @@ class SerializationMixin:
         s['y2label_labelpad'] = self.y2label_labelpad.value()
         s['y2label_loc']      = self.y2label_loc.currentText()
         s['y2label_ha']       = self.y2label_ha.currentText()
+        s['zlabel_font']  = self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif'
+        s['zlabel_size']  = self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11
+        s['zlabel_color'] = getattr(self, 'zlabel_color', '#000000')
+        s['subplot_zlabels']         = _ser(self.subplot_zlabels)
+        s['subplot_zlabel_show']     = _ser(self.subplot_zlabel_show)
+        s['subplot_zlabel_rotation'] = _ser(self.subplot_zlabel_rotation)
+        s['subplot_zlabel_labelpad'] = _ser(self.subplot_zlabel_labelpad)
 
         # Style
         s['color_palette']  = getattr(self, '_color_palette', 'Matplotlib')
@@ -533,6 +540,14 @@ class SerializationMixin:
         if i >= 0: self.y2label_loc.setCurrentIndex(i)
         i = self.y2label_ha.findText(s.get('y2label_ha', 'center'))
         if i >= 0: self.y2label_ha.setCurrentIndex(i)
+        if hasattr(self, 'zlabel_font'):
+            i = self.zlabel_font.findText(s.get('zlabel_font', 'sans-serif'))
+            if i >= 0: self.zlabel_font.setCurrentIndex(i)
+        if hasattr(self, 'zlabel_size'):
+            self.zlabel_size.setValue(s.get('zlabel_size', 11))
+        self.zlabel_color = s.get('zlabel_color', '#000000')
+        if hasattr(self, 'zlabel_color_label'):
+            self.zlabel_color_label.setStyleSheet(_SW_CSS.format(self.zlabel_color))
 
         # Subplots (layout + appearance only — column assignments come from series.json)
         mosaic = s.get('subplot_mosaic', None)
@@ -595,6 +610,10 @@ class SerializationMixin:
         self.subplot_ylabel_show   = _di('subplot_ylabel_show', {'0': True})
         self.subplot_y2labels      = _di('subplot_y2labels', {'0': ''})
         self.subplot_y2label_show  = _di('subplot_y2label_show', {'0': True})
+        self.subplot_zlabels         = _di('subplot_zlabels',         {'0': ''})
+        self.subplot_zlabel_show     = _di('subplot_zlabel_show',     {'0': True})
+        self.subplot_zlabel_rotation = _di('subplot_zlabel_rotation', {'0': 90})
+        self.subplot_zlabel_labelpad = _di('subplot_zlabel_labelpad', {'0': 4})
         self.subplot_legends          = _di('subplot_legends', {'0': True})
         self.subplot_legend_locs      = _di('subplot_legend_locs', {'0': 'best'})
         self.subplot_legend_x         = _di('subplot_legend_x', {'0': 0.01})

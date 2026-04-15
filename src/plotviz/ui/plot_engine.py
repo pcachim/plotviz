@@ -241,8 +241,14 @@ class PlotEngineMixin:
                                        interpolation=_o('heat_interpolation', 'nearest'),
                                        **extent_kw, **_vm_kw)
                         if _o('heat_colorbar', True):
-                            self.canvas.figure.colorbar(im, ax=ax,
+                            _cb = self.canvas.figure.colorbar(im, ax=ax,
                                 shrink=_o('heat_colorbar_shrink', 1.0))
+                            _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
+                            if _zlbl:
+                                _cb.set_label(_latex_safe(_zlbl),
+                                    fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                                    color=getattr(self, 'zlabel_color', '#000000'),
+                                    fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
             elif ct == 'Contour':
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
@@ -292,8 +298,14 @@ class PlotEngineMixin:
                                 cs = ax.contour(X, Y, Z, levels=lvl, colors=_lc, linewidths=_lw, alpha=0.5)
                                 if _last_contour_m is None: _last_contour_m = cs
                             if _last_contour_m is not None and _o('heat_colorbar', True):
-                                self.canvas.figure.colorbar(_last_contour_m, ax=ax,
+                                _cb = self.canvas.figure.colorbar(_last_contour_m, ax=ax,
                                     shrink=_o('heat_colorbar_shrink', 1.0))
+                                _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
+                                if _zlbl:
+                                    _cb.set_label(_latex_safe(_zlbl),
+                                        fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                                        color=getattr(self, 'zlabel_color', '#000000'),
+                                        fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
             elif ct == 'Tricontour':
                 zc = self.combo_z.currentText()
                 if zc != '(none)' and zc in self.datasets and series:
@@ -327,8 +339,14 @@ class PlotEngineMixin:
                         if _o('tri_triplot', False):
                             ax.triplot(x, y, color='k', linewidth=0.4, alpha=0.5)
                         if last_mappable is not None and _o('tri_colorbar', True):
-                            self.canvas.figure.colorbar(last_mappable, ax=ax,
+                            _cb = self.canvas.figure.colorbar(last_mappable, ax=ax,
                                 shrink=_o('tri_colorbar_shrink', 1.0))
+                            _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
+                            if _zlbl:
+                                _cb.set_label(_latex_safe(_zlbl),
+                                    fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                                    color=getattr(self, 'zlabel_color', '#000000'),
+                                    fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
 
             elif ct == '3D Surface':
                 # Bug 1: this block was previously stranded inside the Tricontour elif,
@@ -361,8 +379,14 @@ class PlotEngineMixin:
                                                        alpha=alp, rstride=st, cstride=st)
                                 # Fix 7: honour heat_colorbar for 3D Surface
                                 if _o('heat_colorbar', True):
-                                    self.canvas.figure.colorbar(surf, ax=ax,
+                                    _cb = self.canvas.figure.colorbar(surf, ax=ax,
                                         shrink=_o('heat_colorbar_shrink', 1.0))
+                                    _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
+                                    if _zlbl:
+                                        _cb.set_label(_latex_safe(_zlbl),
+                                            fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                                            color=getattr(self, 'zlabel_color', '#000000'),
+                                            fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
 
 
             elif ct == 'Hist2D':
@@ -1182,8 +1206,15 @@ class PlotEngineMixin:
         else:
             ax.set_xlabel('')
         # ── Y label ──
+        _YCOLNAME_TYPES = {'Heatmap', 'Contour', 'Tricontour', '3D Surface'}
         if self.subplot_ylabel_show.get(subplot_idx, True):
-            yl = self.subplot_ylabels.get(subplot_idx, '') or ('' if ct in _NO_X_TYPES else ', '.join(yd.keys()))
+            if ct in _YCOLNAME_TYPES and hasattr(self, 'series_table') and self.series_table.rowCount() > 0:
+                # For heatmap/contour/3D types: default to the actual y-column name (col 1)
+                _ycb = self.series_table.cellWidget(0, 1)
+                _yc_default = _ycb.currentText() if _ycb else ''
+                yl = self.subplot_ylabels.get(subplot_idx, '') or _yc_default
+            else:
+                yl = self.subplot_ylabels.get(subplot_idx, '') or ('' if ct in _NO_X_TYPES else ', '.join(yd.keys()))
             ax.set_ylabel(_latex_safe(yl),
                           fontsize=self.ylabel_size.value(),
                           color=self.ylabel_color,
@@ -1194,6 +1225,26 @@ class PlotEngineMixin:
             ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(subplot_idx, 'center'))
         else:
             ax.set_ylabel('')
+
+        # ── Z label (3D Surface only) ──
+        # When the colorbar is visible it carries the label; ax.set_zlabel is
+        # only used when the colorbar is hidden.
+        if is3d and hasattr(ax, 'set_zlabel'):
+            _colorbar_visible = self._sp_opt(subplot_idx, 'heat_colorbar', True)
+            if not _colorbar_visible:
+                if self.subplot_zlabel_show.get(subplot_idx, True):
+                    _series_label_default = next(iter(yd), '') if yd else ''
+                    zl = self.subplot_zlabels.get(subplot_idx, '') or _series_label_default
+                    ax.set_zlabel(
+                        _latex_safe(zl),
+                        fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                        color=getattr(self, 'zlabel_color', '#000000'),
+                        fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif',
+                        rotation=self.subplot_zlabel_rotation.get(subplot_idx, 90),
+                        labelpad=self.subplot_zlabel_labelpad.get(subplot_idx, 4),
+                    )
+                else:
+                    ax.set_zlabel('')
 
         # ── Secondary Y axis ──
         _y2_active = False
@@ -1381,6 +1432,10 @@ class PlotEngineMixin:
                     _proj = 'polar' if ct in ('Polar', 'Radar') else ('3d' if is3d else None)
                     ax = self.canvas.figure.add_subplot(111, projection=_proj)
                     axes_list.append(ax)
+                    if is3d:
+                        _elev = self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30
+                        _azim = self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60
+                        ax.view_init(elev=_elev, azim=_azim)
                     if series or ct in _NO_X_TYPES:
                         cat_info = self._plot_on(ax, series, ct, subplot_idx=0)
                     else:
@@ -1519,6 +1574,10 @@ class PlotEngineMixin:
                                 if self.sp_sharey.isChecked(): kw['sharey'] = first
                             ax = self.canvas.figure.add_subplot(rows, cols, idx+1,
                                     projection=sub_proj, **kw)
+                            if sub_is3d:
+                                _elev = self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30
+                                _azim = self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60
+                                ax.view_init(elev=_elev, azim=_azim)
                             if first is None: first = ax
                             axes_list.append(ax)
                             sub_series, sub_y2_series = self._get_series_for_subplot(idx)
@@ -1723,6 +1782,94 @@ class PlotEngineMixin:
     # ═══════════════════════════════════════════════════════════════════════════
     # EXPORT
     # ═══════════════════════════════════════════════════════════════════════════
+    def _copy_image_to_clipboard(self):
+        """Show a small DPI picker then copy the chart as PNG to the system clipboard."""
+        try:
+            import io
+            from PyQt6.QtGui import QImage, QPixmap, QClipboard
+            from PyQt6.QtWidgets import (QApplication, QDialog, QVBoxLayout,
+                                         QHBoxLayout, QLabel, QSpinBox,
+                                         QPushButton, QDialogButtonBox)
+
+            if not hasattr(self, 'canvas') or self.canvas.figure is None:
+                return
+
+            fig_dpi = int(self.canvas.figure.get_dpi())
+
+            # ── DPI picker dialog ─────────────────────────────────────────────
+            dlg = QDialog(self)
+            dlg.setWindowTitle('Copy Image to Clipboard')
+            dlg.setFixedWidth(300)
+            vlay = QVBoxLayout(dlg)
+            vlay.setSpacing(10)
+
+            row = QHBoxLayout()
+            row.addWidget(QLabel('Resolution (DPI):'))
+            dpi_spin = QSpinBox()
+            dpi_spin.setRange(36, 600)
+            dpi_spin.setValue(getattr(self, '_clipboard_dpi', fig_dpi))
+            dpi_spin.setSuffix(' dpi')
+            dpi_spin.setFixedWidth(90)
+            row.addWidget(dpi_spin)
+            row.addStretch()
+            vlay.addLayout(row)
+
+            # Live pixel-size hint
+            def _update_hint():
+                d = dpi_spin.value()
+                fw = self.canvas.figure.get_figwidth()
+                fh = self.canvas.figure.get_figheight()
+                px_w = int(fw * d)
+                px_h = int(fh * d)
+                hint_lbl.setText(f'Output size: {px_w} × {px_h} px')
+            hint_lbl = QLabel()
+            hint_lbl.setStyleSheet('color:#666; font-size:11px;')
+            vlay.addWidget(hint_lbl)
+            dpi_spin.valueChanged.connect(_update_hint)
+            _update_hint()
+
+            btns = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Ok |
+                QDialogButtonBox.StandardButton.Cancel)
+            btns.accepted.connect(dlg.accept)
+            btns.rejected.connect(dlg.reject)
+            vlay.addWidget(btns)
+
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+
+            chosen_dpi = dpi_spin.value()
+            self._clipboard_dpi = chosen_dpi   # remember for next time
+
+            # ── Render and copy (hide page-boundary indicator temporarily) ───
+            border_rect = getattr(self.canvas, '_border_rect', None)
+            if border_rect is not None:
+                border_rect.set_visible(False)
+            try:
+                buf = io.BytesIO()
+                self.canvas.figure.savefig(buf, format='png', dpi=chosen_dpi,
+                                           bbox_inches='tight')
+                buf.seek(0)
+            finally:
+                if border_rect is not None:
+                    border_rect.set_visible(True)
+            img = QImage.fromData(buf.read())
+            if img.isNull():
+                return
+            QApplication.clipboard().setPixmap(
+                QPixmap.fromImage(img), QClipboard.Mode.Clipboard)
+
+            if hasattr(self, 'statusBar'):
+                fw = self.canvas.figure.get_figwidth()
+                fh = self.canvas.figure.get_figheight()
+                px_w = int(fw * chosen_dpi)
+                px_h = int(fh * chosen_dpi)
+                self.statusBar().showMessage(
+                    f'Image copied to clipboard  ({px_w}×{px_h} px, {chosen_dpi} dpi).', 4000)
+        except Exception as e:
+            import logging
+            logging.getLogger('plotviz').warning('Copy to clipboard failed: %s', e)
+
     def export_chart(self, fmt=None):
         try:
             import os
@@ -1882,6 +2029,10 @@ class PlotEngineMixin:
                 _proj = 'polar' if ct in ('Polar', 'Radar') else ('3d' if is3d else None)
                 ax = exp_fig.add_subplot(111, projection=_proj)
                 axes_list.append(ax)
+                if is3d:
+                    _elev = self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30
+                    _azim = self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60
+                    ax.view_init(elev=_elev, azim=_azim)
                 cat_info = self._plot_on(ax, series, ct, row_offset=self._get_series_row_offset(0), subplot_idx=0) if (series or ct in _NO_X_TYPES) else None
                 yd = {s[2]: s[1] for s in series}
                 self._decorate(ax, xc, yd, is3d, subplot_idx=0)
