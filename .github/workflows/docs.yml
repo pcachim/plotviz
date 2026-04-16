@@ -1,49 +1,67 @@
-name: Deploy docs
+# .github/workflows/docs.yml
+#
+# Builds and publishes the MkDocs documentation to GitHub Pages.
+#
+# Triggers:
+#   - Push to main       → deploys as the "latest" alias (dev docs)
+#   - Push of a v* tag   → deploys as a versioned release (e.g. "2.7.0")
+#                          and updates the "stable" alias to point to it
+#
+# The site is published to: https://pcachim.github.io/plotviz/
+# Versioning is handled by `mike` (configured in mkdocs.yml).
+#
+# ── First-time setup ──────────────────────────────────────────────────────────
+# Enable GitHub Pages for your repo:
+#   Settings → Pages → Source → Deploy from a branch → gh-pages → / (root)
+
+name: Docs
 
 on:
   push:
     branches:
       - main
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - 'pyproject.toml'
-  workflow_dispatch:
+    tags:
+      - 'v*'
 
 permissions:
-  contents: write
+  contents: write   # needed for mike to push to the gh-pages branch
 
 jobs:
   deploy:
+    name: Build & deploy docs
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history needed for mike versioning
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+    steps:
+      - name: Checkout (full history required by mike)
+        uses: actions/checkout@v4
         with:
-          python-version: '3.12'
+          fetch-depth: 0   # mike needs the full git history to manage versions
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
 
-      - name: Install dependencies
-        run: uv sync --group dev
+      - name: Sync dependencies
+        run: uv sync
 
-      - name: Read version
-        id: version
-        run: |
-          VERSION=$(uv run python -c "import sys; sys.path.insert(0,'src/plotviz'); from config._version import __version__; print(__version__)")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Configure git for mike
+      - name: Configure git (required for mike to commit to gh-pages)
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Deploy docs with mike
+      # ── Tag push → versioned release docs ────────────────────────────────────
+      - name: Deploy versioned docs (tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          uv run mike deploy --push --update-aliases ${{ steps.version.outputs.version }} latest
-          uv run mike set-default --push latest
+          VERSION=$(uv run python -c \
+            "import sys; sys.path.insert(0,'src/plotviz'); \
+             from config._version import __version__; print(__version__)")
+          uv run mike deploy --push --update-aliases "$VERSION" stable
+          uv run mike set-default --push stable
+
+      # ── Push to main → "latest" alias (dev / unreleased docs) ────────────────
+      - name: Deploy latest docs (main branch push)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          uv run mike deploy --push --update-aliases latest

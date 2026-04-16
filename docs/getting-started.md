@@ -7,6 +7,15 @@
 
 ## Installation
 
+### Pre-built binary (recommended — no Python required)
+
+Download the latest release for your platform from GitHub:
+
+[macOS DMG / Windows ZIP → GitHub Releases](https://github.com/pcachim/plotviz/releases/latest)
+
+- **macOS** — open the `.dmg`, drag `plotviz.app` to Applications.
+- **Windows** — extract the `.zip` and run `plotviz.exe`.
+
 ### From PyPI
 
 ```bash
@@ -16,7 +25,7 @@ pip install plotviz
 ### From source (recommended for development)
 
 ```bash
-git clone https://github.com/yourorg/plotviz.git
+git clone https://github.com/pcachim/plotviz.git
 cd plotviz
 uv sync          # installs all dependencies into .venv
 uv run plotviz   # launches the app
@@ -30,9 +39,11 @@ plotviz installs these packages automatically:
 |---------|---------|---------|
 | PyQt6 | ≥ 6.5 | UI framework |
 | matplotlib | ≥ 3.7 | Chart rendering |
+| seaborn | ≥ 0.13 | Statistical charts |
 | numpy | ≥ 1.24 | Numerical arrays |
 | pandas | ≥ 2.0 | Data loading |
 | scipy | ≥ 1.10 | Curve fitting and statistics |
+| statsmodels | ≥ 0.14 | Regression and LOWESS |
 | openpyxl | ≥ 3.1 | Excel file support |
 | platformdirs | ≥ 3.0 | Settings directory |
 

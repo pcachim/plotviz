@@ -140,6 +140,50 @@ Run `dist\plotviz\register_filetypes.reg` as Administrator to register the file 
 
 ---
 
+## Automated releases with GitHub Actions
+
+The repository includes two GitHub Actions workflows that run automatically in the cloud — no local build machine is required for releases.
+
+### `.github/workflows/release.yml` — build and publish
+
+Triggered by any tag push matching `v*` (e.g. `git push origin v2.7.0`).
+
+GitHub spins up a **macOS virtual machine** and a **Windows virtual machine** in parallel. Each machine checks out the code, installs `uv`, syncs dependencies, and runs PyInstaller. Once both builds succeed, a third job creates a GitHub Release and attaches the artifacts.
+
+| Artifact | Built on | Produced by |
+|----------|----------|-------------|
+| `plotviz-VERSION-macos.dmg` | `macos-latest` (Apple Silicon) | `plotviz.spec` + `create-dmg` |
+| `plotviz-VERSION-windows.zip` | `windows-latest` | `plotviz.spec` (BUNDLE step skipped on Windows) |
+
+**To publish a release:**
+
+```bash
+# 1. Bump __version__ in src/plotviz/config/_version.py
+# 2. Commit and push
+git add src/plotviz/config/_version.py
+git commit -m "chore: bump version to 2.7.0"
+git push
+
+# 3. Tag and push — this triggers the workflow
+git tag v2.7.0
+git push origin v2.7.0
+```
+
+Monitor progress at `https://github.com/pcachim/plotviz/actions`. The finished release appears at `https://github.com/pcachim/plotviz/releases`.
+
+### `.github/workflows/docs.yml` — publish documentation
+
+Triggered by pushes to `main` and by tag pushes.
+
+- **Push to `main`** → deploys docs to GitHub Pages under the `latest` alias.
+- **Tag push** → deploys a frozen versioned snapshot (e.g. `2.7.0`) and updates the `stable` alias.
+
+Versioning is handled by `mike`. The published site is available at `https://pcachim.github.io/plotviz/`.
+
+One-time setup: go to **Settings → Pages → Source** and set the source to the `gh-pages` branch.
+
+---
+
 ## Troubleshooting
 
 ### PyInstaller build fails

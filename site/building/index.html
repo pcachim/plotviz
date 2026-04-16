@@ -12,7 +12,7 @@
         <meta name="author" content="Paulo Cachim">
       
       
-        <link rel="canonical" href="https://pcachim.github.io/plotviz/2.6.0/building/">
+        <link rel="canonical" href="https://pcachim.github.io/plotviz/building/">
       
       
         <link rel="prev" href="../shortcuts/">
@@ -1250,6 +1250,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#automated-releases-with-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated releases with GitHub Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Automated releases with GitHub Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#githubworkflowsreleaseyml-build-and-publish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .github/workflows/release.yml — build and publish
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#githubworkflowsdocsyml-publish-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .github/workflows/docs.yml — publish documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1527,6 +1566,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#automated-releases-with-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated releases with GitHub Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Automated releases with GitHub Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#githubworkflowsreleaseyml-build-and-publish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .github/workflows/release.yml — build and publish
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#githubworkflowsdocsyml-publish-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .github/workflows/docs.yml — publish documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1766,14 +1844,61 @@
 <h3 id="file-type-associations-without-the-installer">File-type associations without the installer<a class="headerlink" href="#file-type-associations-without-the-installer" title="Permanent link">&para;</a></h3>
 <p>Run <code>dist\plotviz\register_filetypes.reg</code> as Administrator to register the file associations manually (for the portable zip distribution).</p>
 <hr />
+<h2 id="automated-releases-with-github-actions">Automated releases with GitHub Actions<a class="headerlink" href="#automated-releases-with-github-actions" title="Permanent link">&para;</a></h2>
+<p>The repository includes two GitHub Actions workflows that run automatically in the cloud — no local build machine is required for releases.</p>
+<h3 id="githubworkflowsreleaseyml-build-and-publish"><code>.github/workflows/release.yml</code> — build and publish<a class="headerlink" href="#githubworkflowsreleaseyml-build-and-publish" title="Permanent link">&para;</a></h3>
+<p>Triggered by any tag push matching <code>v*</code> (e.g. <code>git push origin v2.7.0</code>).</p>
+<p>GitHub spins up a <strong>macOS virtual machine</strong> and a <strong>Windows virtual machine</strong> in parallel. Each machine checks out the code, installs <code>uv</code>, syncs dependencies, and runs PyInstaller. Once both builds succeed, a third job creates a GitHub Release and attaches the artifacts.</p>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Built on</th>
+<th>Produced by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>plotviz-VERSION-macos.dmg</code></td>
+<td><code>macos-latest</code> (Apple Silicon)</td>
+<td><code>plotviz.spec</code> + <code>create-dmg</code></td>
+</tr>
+<tr>
+<td><code>plotviz-VERSION-windows.zip</code></td>
+<td><code>windows-latest</code></td>
+<td><code>plotviz.spec</code> (BUNDLE step skipped on Windows)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>To publish a release:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># 1. Bump __version__ in src/plotviz/config/_version.py</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># 2. Commit and push</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>git<span class="w"> </span>add<span class="w"> </span>src/plotviz/config/_version.py
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;chore: bump version to 2.7.0&quot;</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>git<span class="w"> </span>push
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># 3. Tag and push — this triggers the workflow</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>git<span class="w"> </span>tag<span class="w"> </span>v2.7.0
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v2.7.0
+</code></pre></div>
+<p>Monitor progress at <code>https://github.com/pcachim/plotviz/actions</code>. The finished release appears at <code>https://github.com/pcachim/plotviz/releases</code>.</p>
+<h3 id="githubworkflowsdocsyml-publish-documentation"><code>.github/workflows/docs.yml</code> — publish documentation<a class="headerlink" href="#githubworkflowsdocsyml-publish-documentation" title="Permanent link">&para;</a></h3>
+<p>Triggered by pushes to <code>main</code> and by tag pushes.</p>
+<ul>
+<li><strong>Push to <code>main</code></strong> → deploys docs to GitHub Pages under the <code>latest</code> alias.</li>
+<li><strong>Tag push</strong> → deploys a frozen versioned snapshot (e.g. <code>2.7.0</code>) and updates the <code>stable</code> alias.</li>
+</ul>
+<p>Versioning is handled by <code>mike</code>. The published site is available at <code>https://pcachim.github.io/plotviz/</code>.</p>
+<p>One-time setup: go to <strong>Settings → Pages → Source</strong> and set the source to the <code>gh-pages</code> branch.</p>
+<hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="pyinstaller-build-fails">PyInstaller build fails<a class="headerlink" href="#pyinstaller-build-fails" title="Permanent link">&para;</a></h3>
 <p>Run with verbose logging:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># macOS / Linux</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uv<span class="w"> </span>run<span class="w"> </span>pyinstaller<span class="w"> </span>plotviz.spec<span class="w"> </span>--noconfirm<span class="w"> </span>--clean<span class="w"> </span>--log-level<span class="w"> </span>DEBUG
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Windows</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>uv<span class="w"> </span>run<span class="w"> </span>pyinstaller<span class="w"> </span>plotviz_win.spec<span class="w"> </span>--noconfirm<span class="w"> </span>--clean<span class="w"> </span>--log-level<span class="w"> </span>DEBUG
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># macOS / Linux</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>uv<span class="w"> </span>run<span class="w"> </span>pyinstaller<span class="w"> </span>plotviz.spec<span class="w"> </span>--noconfirm<span class="w"> </span>--clean<span class="w"> </span>--log-level<span class="w"> </span>DEBUG
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Windows</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>uv<span class="w"> </span>run<span class="w"> </span>pyinstaller<span class="w"> </span>plotviz_win.spec<span class="w"> </span>--noconfirm<span class="w"> </span>--clean<span class="w"> </span>--log-level<span class="w"> </span>DEBUG
 </code></pre></div>
 <h3 id="missing-icons-on-windows-taskbar">Missing icons on Windows taskbar<a class="headerlink" href="#missing-icons-on-windows-taskbar" title="Permanent link">&para;</a></h3>
 <p>Ensure <code>assets/plotviz.ico</code> exists. The build script generates it from <code>plotviz.icns</code> using Pillow. If the <code>.icns</code> file is missing, the icon conversion step is skipped and the app runs without a taskbar icon.</p>

@@ -17,14 +17,18 @@
 
 ## Installation
 
+**Pre-built binaries (no Python required):**
+[Download macOS DMG / Windows ZIP → GitHub Releases](https://github.com/pcachim/plotviz/releases/latest)
+
 ```bash
+# from PyPI
 pip install plotviz
 ```
 
 Or run directly from source:
 
 ```bash
-git clone https://github.com/yourorg/plotviz.git
+git clone https://github.com/pcachim/plotviz.git
 cd plotviz
 uv sync
 uv run plotviz
@@ -38,51 +42,51 @@ See [Getting Started](getting-started.md) for full setup instructions.
 
 <div class="grid cards" markdown>
 
-- **[Getting Started](getting-started.md)**
+- :material-rocket-launch: **[Getting Started](getting-started.md)**
 
     Install plotviz and create your first chart in minutes.
 
-- **[Loading Data](data.md)**
+- :material-table: **[Loading Data](data.md)**
 
     Load CSV, Excel, JSON or TXT files and build the series table.
 
-- **[Chart Types](chart-types.md)**
+- :material-chart-line: **[Chart Types](chart-types.md)**
 
     Reference for all 22 chart types and their options.
 
-- **[Style & Appearance](style.md)**
+- :material-palette: **[Style & Appearance](style.md)**
 
     Colors, themes, grid, figure size, and color schemes.
 
-- **[Axes](axes.md)**
+- :material-axis-arrow: **[Axes](axes.md)**
 
     Labels, limits, scales, ticks, formatters, secondary Y axis.
 
-- **[Annotations](annotations.md)**
+- :material-text-box: **[Annotations](annotations.md)**
 
     Subplot titles, legends, text, arrows, and images.
 
-- **[Series & Curve Fitting](series.md)**
+- :material-chart-scatter-plot: **[Series & Curve Fitting](series.md)**
 
     Per-curve style and 7 curve-fit models.
 
-- **[Subplots](subplots.md)**
+- :material-view-grid: **[Subplots](subplots.md)**
 
     Multi-panel layouts and mosaic editor.
 
-- **[Advanced Tools](advanced.md)**
+- :material-function: **[Advanced Tools](advanced.md)**
 
     Function generator and manual data table.
 
-- **[File Formats](file-formats.md)**
+- :material-file: **[File Formats](file-formats.md)**
 
     .pviz, .pvizt, .pvizc, .pvizp format reference.
 
-- **[Keyboard Shortcuts](shortcuts.md)**
+- :material-keyboard: **[Keyboard Shortcuts](shortcuts.md)**
 
     All keyboard shortcuts and canvas controls.
 
-- **[Building & Packaging](building.md)**
+- :material-package-variant: **[Building & Packaging](building.md)**
 
     Create macOS .app and Windows .exe distributions.
 
@@ -103,5 +107,5 @@ See [Getting Started](getting-started.md) for full setup instructions.
 
 ## Version
 
-Current release: **1.6.1**  
+Current release: **2.7.0**  
 Requires Python **3.10+**
