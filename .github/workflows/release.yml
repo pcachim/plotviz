@@ -160,14 +160,28 @@ jobs:
         shell: cmd
         run: create_pkg_win.bat
 
-      - name: Collect Windows artifacts
-        id: meta
-        shell: bash
+      - name: Fix artifact filenames
+        # The bat script reads the version independently in its NSIS generator.
+        # If that read produces an empty string, files are named plotviz--setup.exe
+        # and plotviz--win.zip. This step renames them to the correct version using
+        # the tag name (e.g. v2.7.2 → 2.7.2) as the authoritative source.
+        shell: pwsh
         run: |
-          VERSION=$(uv run python -c \
-            "import sys; sys.path.insert(0,'src/plotviz'); \
-             from config._version import __version__; print(__version__)")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
+          Get-ChildItem dist\plotviz-*-setup.exe | ForEach-Object {
+            $want = "dist\plotviz-$ver-setup.exe"
+            if ($_.Name -ne "plotviz-$ver-setup.exe") {
+              Rename-Item $_.FullName $want -Force
+              Write-Host "Renamed $($_.Name) -> plotviz-$ver-setup.exe"
+            }
+          }
+          Get-ChildItem dist\plotviz-*-win.zip | ForEach-Object {
+            $want = "dist\plotviz-$ver-win.zip"
+            if ($_.Name -ne "plotviz-$ver-win.zip") {
+              Rename-Item $_.FullName $want -Force
+              Write-Host "Renamed $($_.Name) -> plotviz-$ver-win.zip"
+            }
+          }
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
