@@ -169,16 +169,16 @@ jobs:
         run: |
           $ver = "${{ github.ref_name }}" -replace '^v', ''
           Get-ChildItem dist\plotviz-*-setup.exe | ForEach-Object {
-            $want = "dist\plotviz-$ver-setup.exe"
-            if ($_.Name -ne "plotviz-$ver-setup.exe") {
-              Rename-Item $_.FullName $want -Force
+            $want = Join-Path $_.DirectoryName "plotviz-$ver-setup.exe"
+            if ($_.FullName -ne $want) {
+              Move-Item $_.FullName $want -Force
               Write-Host "Renamed $($_.Name) -> plotviz-$ver-setup.exe"
             }
           }
           Get-ChildItem dist\plotviz-*-win.zip | ForEach-Object {
-            $want = "dist\plotviz-$ver-win.zip"
-            if ($_.Name -ne "plotviz-$ver-win.zip") {
-              Rename-Item $_.FullName $want -Force
+            $want = Join-Path $_.DirectoryName "plotviz-$ver-win.zip"
+            if ($_.FullName -ne $want) {
+              Move-Item $_.FullName $want -Force
               Write-Host "Renamed $($_.Name) -> plotviz-$ver-win.zip"
             }
           }
