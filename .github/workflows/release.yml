@@ -136,9 +136,9 @@ jobs:
           path: dist/${{ steps.meta.outputs.dmg }}
 
 
-  # ── Windows .exe folder → .zip ───────────────────────────────────────────────
+  # ── Windows NSIS installer + portable .zip ───────────────────────────────────
   build-windows:
-    name: Build Windows ZIP
+    name: Build Windows Installer & ZIP
     runs-on: windows-latest
 
     steps:
@@ -150,40 +150,31 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Read version
+      - name: Install NSIS
+        run: choco install nsis --yes
+
+      - name: Build installer and zip (create_pkg_win.bat)
+        # The bat script handles everything:
+        #   uv sync → .ico conversion → Windows spec generation →
+        #   PyInstaller → register_filetypes.reg → NSIS installer → portable zip
+        run: create_pkg_win.bat
+
+      - name: Collect Windows artifacts
         id: meta
         shell: bash
         run: |
           VERSION=$(uv run python -c \
             "import sys; sys.path.insert(0,'src/plotviz'); \
              from config._version import __version__; print(__version__)")
-          echo "version=$VERSION"               >> "$GITHUB_OUTPUT"
-          echo "zip=plotviz-${VERSION}-windows.zip" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Sync dependencies (including PyInstaller)
-        run: uv sync
-
-      - name: Build Windows executable
-        # plotviz.spec: BUNDLE is macOS-only and silently skipped on Windows.
-        # The EXE + COLLECT steps produce dist\plotviz\ with plotviz.exe inside.
-        run: |
-          uv run pyinstaller plotviz.spec `
-            --noconfirm `
-            --clean `
-            --log-level WARN
-
-      - name: Zip distribution folder
-        shell: pwsh
-        run: |
-          Compress-Archive `
-            -Path   "dist\plotviz\*" `
-            -DestinationPath "dist\${{ steps.meta.outputs.zip }}"
-
-      - name: Upload Windows artifact
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-zip
-          path: dist/${{ steps.meta.outputs.zip }}
+          name: windows-artifacts
+          path: |
+            dist/plotviz-*-setup.exe
+            dist/plotviz-*-win.zip
 
 
   # ── GitHub Release ───────────────────────────────────────────────────────────
@@ -201,10 +192,10 @@ jobs:
           name: macos-dmg
           path: artifacts/
 
-      - name: Download Windows artifact
+      - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          name: windows-zip
+          name: windows-artifacts
           path: artifacts/
 
       - name: Create release and attach assets
@@ -219,4 +210,5 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}  # e.g. v2.6.1-beta → pre-release
           files: |
             artifacts/*.dmg
+            artifacts/*.exe
             artifacts/*.zip
