@@ -1,5 +1,7 @@
 # plotviz
 
+[![Latest Release](https://img.shields.io/github/v/release/pcachim/plotviz?label=download&style=flat-square)](https://github.com/pcachim/plotviz/releases/latest)
+
 **plotviz** is a desktop chart editor for scientists, engineers, and analysts. Load tabular data, build publication-quality charts through a point-and-click interface, and export to PNG, SVG, PDF, or JPEG — no code required.
 
 ---
@@ -20,12 +22,15 @@
 
 ## Quick start
 
+**Download the latest release** (no Python required):
+[macOS DMG / Windows ZIP → GitHub Releases](https://github.com/pcachim/plotviz/releases/latest)
+
 ```bash
 # from PyPI
 pip install plotviz
 
 # from source (recommended for development)
-git clone https://github.com/yourorg/plotviz.git
+git clone https://github.com/pcachim/plotviz.git
 cd plotviz
 uv sync
 uv run plotviz
