@@ -157,6 +157,7 @@ jobs:
         # The bat script handles everything:
         #   uv sync → .ico conversion → Windows spec generation →
         #   PyInstaller → register_filetypes.reg → NSIS installer → portable zip
+        shell: cmd
         run: create_pkg_win.bat
 
       - name: Collect Windows artifacts

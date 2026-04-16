@@ -94,4 +94,4 @@ MIT — see [LICENSE.md](LICENSE.md).
 
 ## Version
 
-Current release: **2.7.0**
+Current release: **2.7.2**

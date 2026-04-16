@@ -12,3 +12,10 @@ util/
 
 # Virtual environments
 .venv
+.python-version
+
+# Not necessary for Git
+RELEASE.md
+uv.lock
+todo.md
+DISTRIBUTION.md
