@@ -36,7 +36,7 @@ uv sync
 uv run plotviz
 ```
 
-See [Getting Started](getting-started.md) for full installation and interface details.
+See [Getting Started](docs/getting-started.md) for full installation and interface details.
 
 ---
 
@@ -46,22 +46,22 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 
 | Document | Contents |
 |----------|----------|
-| [Getting Started](getting-started.md) | Installation, first chart, interface overview |
-| [Data](data.md) | Loading files, the series table, column types |
-| [Chart Types](chart-types.md) | All 22 chart types and their options |
-| [Style & Appearance](style.md) | Colors, fonts, grid, figure size, color schemes |
-| [Axes](axes.md) | Labels, limits, scales, ticks, formatters |
-| [Annotations](annotations.md) | Subplot titles, legends, text, arrows, images |
-| [Series](series.md) | Per-curve style, markers, curve fitting |
-| [Subplots](subplots.md) | Multi-panel layouts, mosaic, shared axes |
-| [Advanced](advanced.md) | Function generator, manual data entry table |
-| [Seaborn Explorer](seaborn-explorer.md) | Statistical charts via seaborn |
-| [Python Code Runner](code-runner.md) | Built-in Python editor with live preview |
-| [Python Export Bundle](python-export.md) | Export charts as standalone Python projects |
-| [File Formats](file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |
-| [Color Palettes](palettes.md) | Built-in palettes, custom palettes |
-| [Keyboard Shortcuts](shortcuts.md) | All keyboard shortcuts |
-| [Building & Packaging](building.md) | macOS .app and Windows .exe |
+| [Getting Started](docs/getting-started.md) | Installation, first chart, interface overview |
+| [Data](docs/data.md) | Loading files, the series table, column types |
+| [Chart Types](docs/chart-types.md) | All 22 chart types and their options |
+| [Style & Appearance](docs/style.md) | Colors, fonts, grid, figure size, color schemes |
+| [Axes](docs/axes.md) | Labels, limits, scales, ticks, formatters |
+| [Annotations](docs/annotations.md) | Subplot titles, legends, text, arrows, images |
+| [Series](docs/series.md) | Per-curve style, markers, curve fitting |
+| [Subplots](docs/subplots.md) | Multi-panel layouts, mosaic, shared axes |
+| [Advanced](docs/advanced.md) | Function generator, manual data entry table |
+| [Seaborn Explorer](docs/seaborn-explorer.md) | Statistical charts via seaborn |
+| [Python Code Runner](docs/code-runner.md) | Built-in Python editor with live preview |
+| [Python Export Bundle](docs/python-export.md) | Export charts as standalone Python projects |
+| [File Formats](docs/file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |
+| [Color Palettes](docs/palettes.md) | Built-in palettes, custom palettes |
+| [Keyboard Shortcuts](docs/shortcuts.md) | All keyboard shortcuts |
+| [Building & Packaging](docs/building.md) | macOS .app and Windows .exe |
 
 ---
 
@@ -94,4 +94,4 @@ MIT — see [LICENSE.md](LICENSE.md).
 
 ## Version
 
-Current release: **2.5.10**
+Current release: **2.6.1**
