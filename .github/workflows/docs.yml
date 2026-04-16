@@ -23,6 +23,13 @@ on:
     tags:
       - 'v*'
 
+# Only one deployment can run at a time.
+# A second run triggered while one is in progress will wait (not cancel),
+# preventing gh-pages push conflicts when a tag and main push land together.
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false
+
 permissions:
   contents: write   # needed for mike to push to the gh-pages branch
 
