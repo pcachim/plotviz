@@ -45,6 +45,13 @@ try:
 except ImportError:
     from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 
+
+class _NavToolbar(NavigationToolbar2QT):
+    """Standard matplotlib toolbar with the Save button removed.
+    The app has its own export workflow that controls DPI and format."""
+    toolitems = [t for t in NavigationToolbar2QT.toolitems
+                 if t[0] != 'Save']
+
 from ui.canvas import CanvasPlotter
 from ui.tab_builders import (
     TabBuildersMixin, COLOR_PALETTES, get_all_palettes, add_custom_palette,
@@ -1286,30 +1293,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         self._help_menu = help_menu
 
-        # ── Configurations menu ───────────────────────────────────────────────
-        config_menu = menubar.addMenu('Configurations')
-
-        _prefs_label = 'Preferences…' if sys.platform == 'darwin' else 'Settings…'
-        act_prefs = QAction(_prefs_label, self)
-        act_prefs.setShortcut('Ctrl+,' if sys.platform == 'darwin' else 'Ctrl+Alt+S')
-        act_prefs.setStatusTip('Open application settings / preferences')
-        act_prefs.triggered.connect(self._open_app_settings_dialog)
-        config_menu.addAction(act_prefs)
-
-        config_menu.addSeparator()
-
-        act_about_cfg = QAction('About plotviz…', self)
-        act_about_cfg.setStatusTip('About this application')
-        act_about_cfg.triggered.connect(self._show_about)
-        config_menu.addAction(act_about_cfg)
-
-        self._config_menu = config_menu
-
-        # ── macOS application menu (plotviz / python) ─────────────────────────
-        # On macOS Qt maps QMenu with the same name as the app to the system
-        # application menu that appears left of "File". We add Preferences and
-        # About there so they appear in the native location.
+        # ── Settings and About placement ──────────────────────────────────────
         if sys.platform == 'darwin':
+            # macOS: Qt maps a menu named after the app to the native application
+            # menu (left of "File"). Preferences and About go there.
             app_menu = menubar.addMenu('plotviz')
 
             act_about_app = QAction('About plotviz', self)
@@ -1322,6 +1309,20 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             act_prefs_app.setShortcut('Ctrl+,')
             act_prefs_app.triggered.connect(self._open_app_settings_dialog)
             app_menu.addAction(act_prefs_app)
+        else:
+            # Windows / Linux: Settings at the end of Edit, About at the end of Help.
+            edit_menu.addSeparator()
+            act_prefs = QAction('Settings…', self)
+            act_prefs.setShortcut('Ctrl+Alt+S')
+            act_prefs.setStatusTip('Open application settings / preferences')
+            act_prefs.triggered.connect(self._open_app_settings_dialog)
+            edit_menu.addAction(act_prefs)
+
+            help_menu.addSeparator()
+            act_about = QAction('About plotviz…', self)
+            act_about.setStatusTip('About this application')
+            act_about.triggered.connect(self._show_about)
+            help_menu.addAction(act_about)
 
         # Tooltips
         for i, tip in enumerate([
@@ -1334,7 +1335,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         self.canvas = CanvasPlotter()
         self.canvas.main_window = self
-        self.toolbar = NavigationToolbar2QT(self.canvas, self)
+        self.toolbar = _NavToolbar(self.canvas, self)
 
         cv_layout = QVBoxLayout()
         cv_layout.addWidget(self.toolbar)
@@ -5505,47 +5506,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 if attr == 'stored_x': stored_x = base
                 else: stored_y = base
             self.update_lists()
-
-            # Show editable popup before inserting series
-            popup = self._show_new_series_info(stored_y, n, source='f(x)', x_col=stored_x, y_col=stored_y)
-            if popup is None:
-                self.gen_status.setText(f'✓  Datasets created — series not added')
-                return
-            series_label, subplot_num, chart_type = popup
-
-            self.series_table.blockSignals(True)
-            row = self.series_table.rowCount()
-            self.series_table.insertRow(row)
-            cols_sorted = sorted(self.datasets)
-            for col_idx, col_name in ((0, stored_x), (1, stored_y)):
-                cb = QComboBox()
-                cb.addItems(cols_sorted)
-                idx2 = cb.findText(col_name)
-                if idx2 >= 0: cb.setCurrentIndex(idx2)
-                handler = self._on_x_col_changed if col_idx == 0 else self.update_preview
-                cb.currentIndexChanged.connect(handler)
-                self.series_table.setCellWidget(row, col_idx, cb)
-            self.series_table.setItem(row, 2, QTableWidgetItem(series_label))
-            _mode = self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard'
-            _allowed = list(PLOT_MODE_GROUPS.get(_mode, PER_SERIES_TYPES))
-            type_cb = QComboBox()
-            type_cb.addItems(_allowed)
-            i_type = type_cb.findText(chart_type) if chart_type in _allowed else 0
-            type_cb.setCurrentIndex(max(i_type, 0))
-            type_cb.currentTextChanged.connect(self._on_series_row_type_changed)
-            self.series_table.setCellWidget(row, 3, type_cb)
-            plot_spin = QSpinBox()
-            plot_spin.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
-            plot_spin.setValue(subplot_num)
-            plot_spin.valueChanged.connect(self.update_preview)
-            self.series_table.setCellWidget(row, 4, plot_spin)
-            y2_item = QTableWidgetItem()
-            y2_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            y2_item.setCheckState(Qt.CheckState.Unchecked)
-            self.series_table.setItem(row, 5, y2_item)
-            self.series_table.blockSignals(False)
-            self._refresh_curve_select()
-            self.update_preview()
             self.gen_status.setText(f'✓  Created "{stored_x}" and "{stored_y}"  ({n} points)')
         except Exception as e:
             self.gen_status.setText(f'❌  {e}')
@@ -5812,39 +5772,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 cnt += 1
             self.datasets[stored_nm] = result
             self.update_lists()
-
-            # Show editable popup before inserting series
-            n2 = len(result)
-            popup = self._show_new_series_info(stored_nm, n2, source='f(col)', x_col=src_col, y_col=stored_nm)
-            if popup is None:
-                self.fn_status.setText(f'✓  Column "{stored_nm}" created — series not added')
-                return
-            series_label, subplot_num, chart_type = popup
-
-            self._add_series_row()
-            last = self.series_table.rowCount() - 1
-            lbl_item = self.series_table.item(last, 2)
-            if lbl_item: lbl_item.setText(series_label)
-            sp_spin = self.series_table.cellWidget(last, 4)
-            if sp_spin: sp_spin.setValue(subplot_num)
-            type_cb2 = self.series_table.cellWidget(last, 3)
-            if type_cb2:
-                i = type_cb2.findText(chart_type)
-                if i >= 0: type_cb2.setCurrentIndex(i)
-            xcb = self.series_table.cellWidget(last, 0)
-            ycb = self.series_table.cellWidget(last, 1)
-            if xcb:
-                xcb.blockSignals(True)
-                i = xcb.findText(src_col)
-                if i >= 0: xcb.setCurrentIndex(i)
-                xcb.blockSignals(False)
-            if ycb:
-                ycb.blockSignals(True)
-                i = ycb.findText(stored_nm)
-                if i >= 0: ycb.setCurrentIndex(i)
-                ycb.blockSignals(False)
-            self.update_preview()
-            self.fn_status.setText(f'✓  Created "{stored_nm}"  ({n2} points)')
+            self.fn_status.setText(f'✓  Created "{stored_nm}"  ({len(result)} points)')
         except Exception as e:
             self.fn_status.setText(f'❌  {e}')
 

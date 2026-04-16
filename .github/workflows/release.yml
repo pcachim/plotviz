@@ -1,0 +1,222 @@
+# .github/workflows/release.yml
+#
+# Triggered by any tag push matching v* (e.g. v2.6.1).
+# Builds plotviz with PyInstaller on macOS and Windows,
+# then creates a GitHub Release and attaches both artifacts.
+#
+# ── How to release ────────────────────────────────────────────────────────────
+#   1. Bump __version__ in src/plotviz/config/_version.py
+#   2. Commit and push the change
+#   3. git tag v2.6.1 && git push origin v2.6.1
+#   The workflow will fire automatically.
+#
+# ── Secrets / permissions ─────────────────────────────────────────────────────
+#   No extra secrets needed.  The default GITHUB_TOKEN is used to create the
+#   release (the "contents: write" permission is granted below).
+#
+# ── macOS code-signing ────────────────────────────────────────────────────────
+#   The build uses ad-hoc signing (codesign -s -) so the app runs on the
+#   builder's architecture without a paid Apple Developer certificate.
+#   To enable full notarisation add the following repository secrets and
+#   uncomment the "Notarise" step:
+#     APPLE_CERT_B64        – base64-encoded .p12 Developer ID certificate
+#     APPLE_CERT_PASSWORD   – password for the .p12
+#     APPLE_TEAM_ID         – 10-character Apple Team ID
+#     APPLE_ID              – Apple ID email used for notarytool
+#     APPLE_APP_PASSWORD    – app-specific password for notarytool
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ── macOS .app → .dmg ───────────────────────────────────────────────────────
+  build-macos:
+    name: Build macOS DMG
+    # macos-latest → Apple Silicon (M-series).
+    # Change to macos-13 for an Intel build, or add a matrix for both.
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Read version
+        id: meta
+        run: |
+          VERSION=$(uv run python -c \
+            "import sys; sys.path.insert(0,'src/plotviz'); \
+             from config._version import __version__; print(__version__)")
+          echo "version=$VERSION"          >> "$GITHUB_OUTPUT"
+          echo "dmg=plotviz-${VERSION}-macos.dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Sync dependencies (including PyInstaller)
+        run: uv sync
+
+      - name: Build plotviz.app
+        run: |
+          uv run pyinstaller plotviz.spec \
+            --noconfirm \
+            --clean \
+            --log-level WARN
+
+      - name: Copy file-type icons into bundle Resources
+        run: |
+          RESOURCES="dist/plotviz.app/Contents/Resources"
+          for ft in pviz pvizt pvizc pvizp; do
+            if [ -f "assets/${ft}.icns" ]; then
+              cp "assets/${ft}.icns" "$RESOURCES/${ft}.icns"
+            fi
+          done
+
+      - name: Ad-hoc code-sign
+        run: codesign --force --deep --sign - dist/plotviz.app
+
+      # ── (Optional) Notarise ─────────────────────────────────────────────────
+      # Uncomment when Apple Developer ID secrets are configured.
+      #
+      # - name: Import Developer ID certificate
+      #   env:
+      #     CERT_B64: ${{ secrets.APPLE_CERT_B64 }}
+      #     CERT_PWD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      #   run: |
+      #     echo "$CERT_B64" | base64 --decode > /tmp/cert.p12
+      #     security create-keychain -p ci build.keychain
+      #     security import /tmp/cert.p12 -k build.keychain -P "$CERT_PWD" -T /usr/bin/codesign
+      #     security set-key-partition-list -S apple-tool:,apple: -s -k ci build.keychain
+      #     security list-keychain -d user -s build.keychain
+      #
+      # - name: Re-sign with Developer ID
+      #   run: |
+      #     codesign --force --deep --options runtime \
+      #       --entitlements entitlements.plist \
+      #       --sign "Developer ID Application: YOUR NAME (${{ secrets.APPLE_TEAM_ID }})" \
+      #       dist/plotviz.app
+      #
+      # - name: Notarise
+      #   run: |
+      #     xcrun notarytool submit dist/plotviz.app \
+      #       --apple-id "${{ secrets.APPLE_ID }}" \
+      #       --password "${{ secrets.APPLE_APP_PASSWORD }}" \
+      #       --team-id  "${{ secrets.APPLE_TEAM_ID }}" \
+      #       --wait
+      #     xcrun stapler staple dist/plotviz.app
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "plotviz ${{ steps.meta.outputs.version }}" \
+            --volicon "assets/plotviz.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "plotviz.app" 175 190 \
+            --hide-extension "plotviz.app" \
+            --app-drop-link 425 190 \
+            "dist/${{ steps.meta.outputs.dmg }}" \
+            "dist/plotviz.app"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist/${{ steps.meta.outputs.dmg }}
+
+
+  # ── Windows .exe folder → .zip ───────────────────────────────────────────────
+  build-windows:
+    name: Build Windows ZIP
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Read version
+        id: meta
+        shell: bash
+        run: |
+          VERSION=$(uv run python -c \
+            "import sys; sys.path.insert(0,'src/plotviz'); \
+             from config._version import __version__; print(__version__)")
+          echo "version=$VERSION"               >> "$GITHUB_OUTPUT"
+          echo "zip=plotviz-${VERSION}-windows.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Sync dependencies (including PyInstaller)
+        run: uv sync
+
+      - name: Build Windows executable
+        # plotviz.spec: BUNDLE is macOS-only and silently skipped on Windows.
+        # The EXE + COLLECT steps produce dist\plotviz\ with plotviz.exe inside.
+        run: |
+          uv run pyinstaller plotviz.spec `
+            --noconfirm `
+            --clean `
+            --log-level WARN
+
+      - name: Zip distribution folder
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path   "dist\plotviz\*" `
+            -DestinationPath "dist\${{ steps.meta.outputs.zip }}"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: dist/${{ steps.meta.outputs.zip }}
+
+
+  # ── GitHub Release ───────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to create releases and upload assets
+
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+          path: artifacts/
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-zip
+          path: artifacts/
+
+      - name: Create release and attach assets
+        uses: softprops/action-gh-release@v2
+        with:
+          # Tag name comes from the push event (e.g. "v2.6.1")
+          tag_name: ${{ github.ref_name }}
+          name: plotviz ${{ github.ref_name }}
+          # Auto-generates release notes from merged PRs / commits since last tag.
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}  # e.g. v2.6.1-beta → pre-release
+          files: |
+            artifacts/*.dmg
+            artifacts/*.zip

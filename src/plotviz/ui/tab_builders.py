@@ -3080,6 +3080,13 @@ class TabBuildersMixin:
                    'geomspace — evenly spaced in log scale (start/stop must be > 0)\n'
                    'random    — Normal(μ=mid, σ=(max−min)/6), sorted ascending\n'
                    'uniform   — Uniform(start, stop), sorted ascending')
+        # ─ Meshgrid ─
+        self.fxy_meshgrid = QCheckBox('Meshgrid  (expand x × y → n² points)')
+        self.fxy_meshgrid.setToolTip(
+            'When checked, a full meshgrid is created (every x_i × y_j combination).\n'
+            'x, y, and z columns are all flattened to length nx * ny.\n'
+            'Ideal for Heatmap, Contour, 3D Surface, or Scatter with Z colour.')
+        fxy_lay.addWidget(self.fxy_meshgrid)
         # ─ X series ─
         fxy_lay.addWidget(self._sec_label('x series'))
         _fxm = QHBoxLayout()
@@ -3228,14 +3235,8 @@ class TabBuildersMixin:
         _ycw.addStretch()
         fxy_lay.addWidget(self._fxy_y_col_widget)
         self._fxy_y_col_widget.setVisible(False)
-        # ─ Meshgrid ─
-        self.fxy_meshgrid = QCheckBox('Meshgrid  (expand x × y → n² points)')
-        self.fxy_meshgrid.setToolTip(
-            'When checked, a full meshgrid is created (every x_i × y_j combination).\n'
-            'x, y, and z columns are all flattened to length nx * ny.\n'
-            'Ideal for Heatmap, Contour, 3D Surface, or Scatter with Z colour.')
-        fxy_lay.addWidget(self.fxy_meshgrid)
-        # ─ Expression & output ─
+        # ─ Z series ─
+        fxy_lay.addWidget(self._sec_label('z series'))
         fxy_lay.addWidget(QLabel('z = expr (np, sin, cos, exp, log, pi …):'))
         self.fxy_expr = QLineEdit('x**2 + sin(y)')
         fxy_lay.addWidget(self.fxy_expr)
@@ -3277,6 +3278,14 @@ class TabBuildersMixin:
                        'geomspace — evenly spaced in log scale (start/stop must be > 0)\n'
                        'random    — Normal(μ=mid, σ=(max−min)/6), sorted ascending\n'
                        'uniform   — Uniform(start, stop), sorted ascending')
+        # ─ Meshgrid ─
+        self.fuv_meshgrid = QCheckBox('Meshgrid  (expand x × y → n² points)')
+        self.fuv_meshgrid.setChecked(True)
+        self.fuv_meshgrid.setToolTip(
+            'When checked, a full meshgrid is created (every x_i × y_j combination).\n'
+            'x, y, u, and v columns are all flattened to length nx * ny.\n'
+            'Ideal for Quiver, Barbs, or Streamplot.')
+        fuv_lay.addWidget(self.fuv_meshgrid)
         # ─ X series ─
         fuv_lay.addWidget(self._sec_label('x series'))
         _fuvxm = QHBoxLayout()
@@ -3425,15 +3434,8 @@ class TabBuildersMixin:
         _fuvycw.addStretch()
         fuv_lay.addWidget(self._fuv_y_col_widget)
         self._fuv_y_col_widget.setVisible(False)
-        # ─ Meshgrid ─
-        self.fuv_meshgrid = QCheckBox('Meshgrid  (expand x × y → n² points)')
-        self.fuv_meshgrid.setChecked(True)
-        self.fuv_meshgrid.setToolTip(
-            'When checked, a full meshgrid is created (every x_i × y_j combination).\n'
-            'x, y, u, and v columns are all flattened to length nx * ny.\n'
-            'Ideal for Quiver, Barbs, or Streamplot.')
-        fuv_lay.addWidget(self.fuv_meshgrid)
-        # ─ Expressions & output ─
+        # ─ U series ─
+        fuv_lay.addWidget(self._sec_label('u series'))
         fuv_lay.addWidget(QLabel('u = expr (np, sin, cos, exp, log, pi …):'))
         self.fuv_u_expr = QLineEdit('cos(y)')
         fuv_lay.addWidget(self.fuv_u_expr)
@@ -3445,6 +3447,8 @@ class TabBuildersMixin:
         _fuvun.addWidget(self.fuv_u_name)
         _fuvun.addStretch()
         fuv_lay.addLayout(_fuvun)
+        # ─ V series ─
+        fuv_lay.addWidget(self._sec_label('v series'))
         fuv_lay.addWidget(QLabel('v = expr (np, sin, cos, exp, log, pi …):'))
         self.fuv_v_expr = QLineEdit('sin(x)')
         fuv_lay.addWidget(self.fuv_v_expr)
