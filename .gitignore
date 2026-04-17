@@ -9,12 +9,14 @@ util_files/
 
 # MacOS
 .DS_Store
+**/.DS_Store
 
 # Virtual environments
 .venv
 .python-version
 
 # Not necessary for Git
+update.sh
 RELEASE.md
 uv.lock
 todo.md

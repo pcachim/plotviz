@@ -25,17 +25,6 @@
 **Download the latest release** (no Python required):
 [macOS DMG / Windows ZIP → GitHub Releases](https://github.com/pcachim/plotviz/releases/latest)
 
-```bash
-# from PyPI
-pip install plotviz
-
-# from source (recommended for development)
-git clone https://github.com/pcachim/plotviz.git
-cd plotviz
-uv sync
-uv run plotviz
-```
-
 See [Getting Started](docs/getting-started.md) for full installation and interface details.
 
 ---
