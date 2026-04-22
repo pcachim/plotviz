@@ -606,6 +606,12 @@ class PlotEngineMixin:
         bar_bottoms_num = None
         bar_offs = np.linspace(-(n_bar-1)/2, (n_bar-1)/2, n_bar) * (bar_w / max(n_bar, 1)) if n_bar else []
         bar_idx_counter = 0
+        # Range-bar Y-min column (draws bars from ymin to yd instead of 0 to yd)
+        _bar_ymin_col = None
+        if hasattr(self, 'combo_bar_ymin'):
+            _raw = self.combo_bar_ymin.currentText()
+            if _raw and _raw != '(none)' and _raw in self.datasets:
+                _bar_ymin_col = _raw
 
         for i, (xd, yd, lbl, sct) in enumerate(series):
             s = self.curve_styles.get(lbl, {})
@@ -713,7 +719,15 @@ class PlotEngineMixin:
                 if bar_cat:
                     xd_s = [str(v) for v in xd]
                     positions = np.array([cat_pos.get(v, 0) for v in xd_s], dtype=float)
-                    if b_stk:
+                    if _bar_ymin_col:
+                        # Range-bar mode: bottom from ymin column, height = yd - ymin
+                        ymin_d = np.asarray(self.datasets[_bar_ymin_col], dtype=float)
+                        n = min(len(positions), len(yd), len(ymin_d))
+                        bot = ymin_d[:n]
+                        heights = np.asarray(yd[:n], dtype=float) - bot
+                        _bar_s(ax, positions[:n], heights, b_w, bottom=bot, label=lbl,
+                               color=_bar_colors(heights, color), alpha=b_al)
+                    elif b_stk:
                         bot = np.array([bar_bottoms_cat.get(v, 0.0) for v in xd_s], dtype=float)
                         _bar_s(ax, positions, yd, b_w, bottom=bot, label=lbl,
                                color=_bar_colors(yd, color), alpha=b_al)
@@ -727,14 +741,28 @@ class PlotEngineMixin:
                         xd_f = np.asarray(xd, dtype=float)
                         yd_f = np.asarray(yd, dtype=float)
                     except (ValueError, TypeError): continue
-                    if bar_bottoms_num is None: bar_bottoms_num = np.zeros(len(xd_f))
-                    if b_stk:
-                        _bar_s(ax, xd_f, yd_f, b_w, bottom=bar_bottoms_num[:len(yd_f)], label=lbl,
-                               color=_bar_colors(yd_f, color), alpha=b_al)
-                        bar_bottoms_num[:len(yd_f)] += yd_f
+                    if _bar_ymin_col:
+                        # Range-bar mode: bottom from ymin column, height = yd - ymin
+                        ymin_d = np.asarray(self.datasets[_bar_ymin_col], dtype=float)
+                        n = min(len(xd_f), len(yd_f), len(ymin_d))
+                        bot = ymin_d[:n]
+                        heights = yd_f[:n] - bot
+                        _bar_s(ax, xd_f[:n] + bar_offs[bi], heights, b_w/max(n_bar,1),
+                               bottom=bot, label=lbl,
+                               color=_bar_colors(heights, color), alpha=b_al)
                     else:
-                        _bar_s(ax, xd_f + bar_offs[bi], yd_f, b_w/max(n_bar,1), label=lbl,
-                               color=_bar_colors(yd_f, color), alpha=b_al)
+                        if bar_bottoms_num is None:
+                            bar_bottoms_num = np.zeros(len(xd_f))
+                        elif len(bar_bottoms_num) < len(xd_f):
+                            bar_bottoms_num = np.concatenate([bar_bottoms_num,
+                                                              np.zeros(len(xd_f) - len(bar_bottoms_num))])
+                        if b_stk:
+                            _bar_s(ax, xd_f, yd_f, b_w, bottom=bar_bottoms_num[:len(yd_f)], label=lbl,
+                                   color=_bar_colors(yd_f, color), alpha=b_al)
+                            bar_bottoms_num[:len(yd_f)] += yd_f
+                        else:
+                            _bar_s(ax, xd_f + bar_offs[bi], yd_f, b_w/max(n_bar,1), label=lbl,
+                                   color=_bar_colors(yd_f, color), alpha=b_al)
 
             elif sct == 'Area':
                 al  = o.get('area_alpha',   _o('area_alpha', 0.4))

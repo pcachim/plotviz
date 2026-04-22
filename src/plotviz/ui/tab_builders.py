@@ -548,6 +548,17 @@ class TabBuildersMixin:
         self.bar_horizontal = QCheckBox('Horizontal')
         self.bar_horizontal.stateChanged.connect(self.update_preview)
         bg.addWidget(self.bar_horizontal)
+        # Range bars: draw each bar from a Y-min column to the Y column
+        _bar_ymin_row = QHBoxLayout()
+        _bar_ymin_row.addWidget(QLabel('Y min col:'))
+        self.combo_bar_ymin = QComboBox()
+        self.combo_bar_ymin.addItem('(none)')
+        self.combo_bar_ymin.setToolTip(
+            'Range bars — each bar spans from this column (bottom) to the Y column (top).\n'
+            'Stacking is ignored when a Y min column is set.')
+        self.combo_bar_ymin.currentIndexChanged.connect(self.update_preview)
+        _bar_ymin_row.addWidget(self.combo_bar_ymin)
+        bg.addLayout(_bar_ymin_row)
         layout.addWidget(self.bar_group)
 
         # ── Histogram (chart-mode options only) ───────────────────────────────

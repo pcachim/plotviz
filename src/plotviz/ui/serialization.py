@@ -342,6 +342,7 @@ class SerializationMixin:
             'z_col':                self.combo_z.currentText(),
             'err_col':              self.combo_err.currentText(),
             'fill_y2_col':          self.combo_fill_y2.currentText() if hasattr(self, 'combo_fill_y2') else '(none)',
+            'bar_ymin_col':         self.combo_bar_ymin.currentText() if hasattr(self, 'combo_bar_ymin') else '(none)',
             'quiver_u_col':         self.quiver_u_combo.currentText() if hasattr(self, 'quiver_u_combo') else '(none)',
             'quiver_v_col':         self.quiver_v_combo.currentText() if hasattr(self, 'quiver_v_combo') else '(none)',
             'barbs_u_col':          self.barbs_u_combo.currentText()  if hasattr(self, 'barbs_u_combo')  else '(none)',
@@ -990,6 +991,9 @@ class SerializationMixin:
         if hasattr(self, 'combo_fill_y2'):
             i = self.combo_fill_y2.findText(m.get('fill_y2_col', '(none)'))
             if i >= 0: self.combo_fill_y2.setCurrentIndex(i)
+        if hasattr(self, 'combo_bar_ymin'):
+            i = self.combo_bar_ymin.findText(m.get('bar_ymin_col', '(none)'))
+            if i >= 0: self.combo_bar_ymin.setCurrentIndex(i)
 
         # Restore subplot chart types, plot modes, legend locs, and chart opts
         saved_ct = m.get('subplot_chart_types', {})
@@ -1014,6 +1018,16 @@ class SerializationMixin:
                 merged = dict(_defaults)
                 merged.update(self.subplot_chart_opts[idx])
                 self.subplot_chart_opts[idx] = merged
+        # Backward-compat: old files stored chart-level opts as flat top-level keys
+        # (e.g. bar_stacked, hist_bins) rather than inside subplot_chart_opts.
+        # Migrate those values into subplot_chart_opts[0] so _load_chart_opts
+        # restores them correctly and they are not overwritten by defaults.
+        if 'subplot_chart_opts' not in m:
+            _co_fields = getattr(self, 'CHART_OPT_FIELDS', [])
+            old_vals = {key: m[key] for _, key, _, _ in _co_fields if key in m}
+            if old_vals:
+                self.subplot_chart_opts.setdefault(0, dict(_defaults))
+                self.subplot_chart_opts[0].update(old_vals)
 
         # Restore extra column combos (quiver/barbs/streamplot U/V, bubble size, X error)
         for attr, key, sentinel in [

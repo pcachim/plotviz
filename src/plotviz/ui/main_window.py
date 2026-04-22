@@ -3705,6 +3705,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         ep = self.combo_err.currentText()
         fy2p = getattr(self, 'combo_fill_y2', None)
         fy2p = fy2p.currentText() if fy2p else '(none)'
+        bymp = getattr(self, 'combo_bar_ymin', None)
+        bymp = bymp.currentText() if bymp else '(none)'
         qup = getattr(self.quiver_u_combo,  'currentText', lambda: '(none)')()
         qvp = getattr(self.quiver_v_combo,  'currentText', lambda: '(none)')()
         bup = getattr(self.barbs_u_combo,   'currentText', lambda: '(none)')()
@@ -3724,6 +3726,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.combo_fill_y2.blockSignals(True)
             self.combo_fill_y2.clear()
             self.combo_fill_y2.addItem('(none)')
+        if hasattr(self, 'combo_bar_ymin'):
+            self.combo_bar_ymin.blockSignals(True)
+            self.combo_bar_ymin.clear()
+            self.combo_bar_ymin.addItem('(none)')
 
         for col in cols:
             self.dataset_list.addItem(col)
@@ -3733,11 +3739,17 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.combo_err.addItem(col)
             if hasattr(self, 'combo_fill_y2'):
                 self.combo_fill_y2.addItem(col)
+            if hasattr(self, 'combo_bar_ymin'):
+                self.combo_bar_ymin.addItem(col)
 
         if hasattr(self, 'combo_fill_y2'):
             i = self.combo_fill_y2.findText(fy2p)
             self.combo_fill_y2.setCurrentIndex(i if i >= 0 else 0)
             self.combo_fill_y2.blockSignals(False)
+        if hasattr(self, 'combo_bar_ymin'):
+            i = self.combo_bar_ymin.findText(bymp)
+            self.combo_bar_ymin.setCurrentIndex(i if i >= 0 else 0)
+            self.combo_bar_ymin.blockSignals(False)
 
         for combo, prev in [(self.combo_z, zp), (self.combo_err, ep)]:
             i = combo.findText(prev)
