@@ -73,6 +73,22 @@ def _series_style(settings, series, i, palette):
 def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palette, ax_var):
     lines = []
     chart_type = settings.get('chart_type', 'Line')
+
+    # ── Bar chart-level options (injected from subplot_chart_opts by generate_plot_script) ──
+    bar_ymin_col = settings.get('_bar_ymin_col', '')
+    bar_stacked  = settings.get('bar_stacked',  False)
+    bar_horiz    = settings.get('bar_horizontal', False)
+
+    # Emit stacking state initialisation once, before the per-series loop,
+    # so every bar series in this subplot can share the running-bottom vars.
+    bar_any = any(s.get('series_type', chart_type) == 'Bar' for s in series)
+    _range_mode = bool(bar_ymin_col and bar_ymin_col in datasets)
+    if bar_stacked and bar_any and not _range_mode:
+        lines += [
+            "_bar_cat_bots = {}   # accumulated bottom per category (stacked bars)",
+            "_bar_num_bots = None  # accumulated bottom array (numeric stacked bars)",
+        ]
+
     for i, s in enumerate(series):
         xc, yc = s.get('x_col', ''), s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
@@ -97,7 +113,76 @@ def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palett
         elif ct == 'Scatter':
             lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={sal}, s={ms**2})")
         elif ct == 'Bar':
-            lines.append(f"{ax_var}.bar({xexpr}, {yexpr}, label='{lbl}', color={col})")
+            # Resolve per-series bar opts (fall back to chart-level values from settings)
+            curve_opts = ((settings.get('curve_styles') or {}).get(s.get('label', '')) or {}).get('opts', {})
+            b_w  = curve_opts.get('bar_width',    settings.get('bar_width',    0.8))
+            b_al = curve_opts.get('bar_alpha',    settings.get('bar_alpha',    1.0))
+            b_ec = curve_opts.get('bar_edgecolor', settings.get('bar_edgecolor', 'none'))
+            b_hor = curve_opts.get('bar_horizontal', bar_horiz)
+            b_stk = curve_opts.get('bar_stacked',  bar_stacked)
+            ec_kw = f", edgecolor='{_esc(b_ec)}'" if b_ec != 'none' else ''
+
+            if _range_mode:
+                # ── Range-bar mode: each bar spans ymin_col (bottom) → y_col (top) ──
+                ymin_expr = _col_ref(bar_ymin_col)
+                lines.append(f"# Range bar: '{lbl}' — bottom='{_esc(bar_ymin_col)}', top=y column")
+                lines.append(f"_rb_n   = min(len(list({xexpr})), len({yexpr}), len({ymin_expr}))")
+                lines.append(f"_rb_x   = list({xexpr})[:_rb_n]")
+                lines.append(f"_rb_bot = np.asarray(list({ymin_expr}), dtype=float)[:_rb_n]")
+                lines.append(f"_rb_h   = np.asarray(list({yexpr}),    dtype=float)[:_rb_n] - _rb_bot")
+                if b_hor:
+                    lines.append(
+                        f"{ax_var}.barh(_rb_x, _rb_h, height={b_w}, left=_rb_bot, "
+                        f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
+                else:
+                    lines.append(
+                        f"{ax_var}.bar(_rb_x, _rb_h, width={b_w}, bottom=_rb_bot, "
+                        f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
+
+            elif b_stk:
+                # ── Stacked mode: accumulate running bottom across series ──
+                lines.append(f"# Stacked bar: '{lbl}'")
+                lines.append(f"_bs_x = list({xexpr})")
+                lines.append(f"_bs_y = list({yexpr})")
+                lines.append(f"_bs_n = min(len(_bs_x), len(_bs_y))")
+                lines.append(f"_bs_x, _bs_y = _bs_x[:_bs_n], _bs_y[:_bs_n]")
+                lines.append(f"_bs_is_cat = isinstance(_bs_x[0], str) if _bs_x else False")
+                lines.append(f"if _bs_is_cat:")
+                lines.append(f"    _bs_bot = [_bar_cat_bots.get(str(v), 0.0) for v in _bs_x]")
+                if b_hor:
+                    lines.append(
+                        f"    {ax_var}.barh(_bs_x, _bs_y, height={b_w}, left=_bs_bot, "
+                        f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
+                else:
+                    lines.append(
+                        f"    {ax_var}.bar(_bs_x, _bs_y, width={b_w}, bottom=_bs_bot, "
+                        f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
+                lines.append(f"    for _bv, _by in zip(_bs_x, _bs_y): _bar_cat_bots[str(_bv)] = _bar_cat_bots.get(str(_bv), 0.0) + float(_by)")
+                lines.append(f"else:")
+                lines.append(f"    _bs_xf = np.asarray(_bs_x, dtype=float)")
+                lines.append(f"    _bs_yf = np.asarray(_bs_y, dtype=float)")
+                lines.append(f"    if _bar_num_bots is None: _bar_num_bots = np.zeros(len(_bs_xf))")
+                lines.append(f"    elif len(_bar_num_bots) < len(_bs_xf): _bar_num_bots = np.concatenate([_bar_num_bots, np.zeros(len(_bs_xf) - len(_bar_num_bots))])")
+                if b_hor:
+                    lines.append(
+                        f"    {ax_var}.barh(_bs_xf, _bs_yf, height={b_w}, left=_bar_num_bots[:len(_bs_yf)], "
+                        f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
+                else:
+                    lines.append(
+                        f"    {ax_var}.bar(_bs_xf, _bs_yf, width={b_w}, bottom=_bar_num_bots[:len(_bs_yf)], "
+                        f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
+                lines.append(f"    _bar_num_bots[:len(_bs_yf)] += _bs_yf")
+
+            elif b_hor:
+                # ── Horizontal bars ──
+                lines.append(
+                    f"{ax_var}.barh({xexpr}, {yexpr}, height={b_w}, "
+                    f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
+            else:
+                # ── Normal vertical bars ──
+                lines.append(
+                    f"{ax_var}.bar({xexpr}, {yexpr}, width={b_w}, "
+                    f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
         elif ct == 'Area':
             lines.append(f"{ax_var}.fill_between({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={aal})")
         elif ct == 'Fill Between':
@@ -757,6 +842,7 @@ def generate_plot_script(settings: dict, series_meta: dict,
     settings['_z_col']       = series_meta.get('z_col', '')
     settings['_err_col']     = series_meta.get('err_col', '')
     settings['_fill_y2_col'] = series_meta.get('fill_y2_col', '')
+    settings['_bar_ymin_col'] = series_meta.get('bar_ymin_col', '')
     # subplot_chart_types lives in series_meta, not settings — merge it in
     if not settings.get('subplot_chart_types'):
         settings['subplot_chart_types'] = series_meta.get('subplot_chart_types', {})
@@ -771,6 +857,16 @@ def generate_plot_script(settings: dict, series_meta: dict,
                     'stream_u_col', 'stream_v_col'):
         if _uv_key in series_meta:
             settings[_uv_key] = series_meta[_uv_key]
+    # Per-subplot chart opts (bar_stacked, bar_horizontal, bar_width, bar_alpha,
+    # bar_edgecolor, etc.) are stored in series_meta['subplot_chart_opts'].
+    # For single-subplot charts, flatten subplot 0's opts into settings so
+    # generators can read them as plain keys.  For multi-subplot, they are merged
+    # per-subplot into sub_settings below.
+    _all_sp_chart_opts = series_meta.get('subplot_chart_opts', {})
+    if n_subplots == 1:
+        _sp0 = _all_sp_chart_opts.get('0', _all_sp_chart_opts.get(0, {}))
+        for _k, _v in _sp0.items():
+            settings.setdefault(_k, _v)
 
     # ── Collect dataset filenames ──────────────────────────────────────────────
     used_cols = {s.get('x_col') for s in series_list} | {s.get('y_col') for s in series_list}
@@ -899,6 +995,10 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 sub_settings = dict(settings)
                 sub_settings['chart_type'] = sub_ct
                 sub_settings['_z_col']     = sub_z
+                # Merge per-subplot chart opts (bar_stacked, bar_horizontal, etc.)
+                _sp_opts = _all_sp_chart_opts.get(str(idx), _all_sp_chart_opts.get(idx, {}))
+                for _k, _v in _sp_opts.items():
+                    sub_settings.setdefault(_k, _v)
                 lines.append(f"# Subplot {idx+1} ({seen_order[idx]}): {sub_ct}")
                 gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
                 for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
@@ -933,6 +1033,10 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 sub_settings = dict(settings)
                 sub_settings['chart_type'] = sub_ct
                 sub_settings['_z_col']     = sub_z
+                # Merge per-subplot chart opts (bar_stacked, bar_horizontal, etc.)
+                _sp_opts = _all_sp_chart_opts.get(str(idx), _all_sp_chart_opts.get(idx, {}))
+                for _k, _v in _sp_opts.items():
+                    sub_settings.setdefault(_k, _v)
                 lines.append(f"# Subplot {idx+1}: {sub_ct}")
                 gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
                 for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
@@ -1309,7 +1413,7 @@ class PythonExportMixin:
                 c = s.get(k, '')
                 if c and c in self.datasets:
                     used_cols.add(c)
-        for attr in ('combo_z', 'combo_err'):
+        for attr in ('combo_z', 'combo_err', 'combo_bar_ymin'):
             cb = getattr(self, attr, None)
             if cb:
                 txt = cb.currentText()
@@ -1421,7 +1525,7 @@ class PythonExportMixin:
                 c = s.get(k, '')
                 if c and c in self.datasets:
                     used_cols.add(c)
-        for attr in ('combo_z', 'combo_err'):
+        for attr in ('combo_z', 'combo_err', 'combo_bar_ymin'):
             cb = getattr(self, attr, None)
             if cb:
                 txt = cb.currentText()

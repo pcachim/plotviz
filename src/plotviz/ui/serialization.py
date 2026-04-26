@@ -1187,10 +1187,13 @@ class SerializationMixin:
                     txt = cb.currentText()
                     if txt and txt in self.datasets:
                         used_cols.add(txt)
-        # Also include z, err, bubble-size, quiver/barbs/streamplot U/V, and x-error columns
+        # Also include complementary column pickers (z, err, fill-y2, bar-ymin,
+        # bubble-size, quiver/barbs/streamplot U/V, and x-error)
         for attr, sentinel in [
             ('combo_z',           '(none)'),
             ('combo_err',         '(none)'),
+            ('combo_fill_y2',     '(none)'),
+            ('combo_bar_ymin',    '(none)'),
             ('bubble_size_combo', '(uniform)'),
             ('quiver_u_combo',    '(none)'),
             ('quiver_v_combo',    '(none)'),
@@ -1205,6 +1208,13 @@ class SerializationMixin:
                 txt = cb.currentText()
                 if txt and txt != sentinel and txt in self.datasets:
                     used_cols.add(txt)
+        # Also check per-series column overrides stored in curve_styles
+        # (e.g. fill_between_y2_col set individually per Fill Between series)
+        for _style in (getattr(self, 'curve_styles', None) or {}).values():
+            for _col_key in ('fill_between_y2_col',):
+                _col = (_style.get('opts') or {}).get(_col_key, '')
+                if _col and _col in self.datasets:
+                    used_cols.add(_col)
 
         all_cols = set(self.datasets.keys())
         if used_cols >= all_cols:
@@ -1244,10 +1254,13 @@ class SerializationMixin:
                         col = sd.get(key, '')
                         if col and col in self.datasets:
                             keep.add(col)
-                # Also keep z, err, bubble-size, quiver/barbs/streamplot U/V, and x-error columns
+                # Also keep complementary column assignments (z, err, fill-y2, bar-ymin,
+                # bubble-size, quiver/barbs/streamplot U/V, and x-error)
                 for key, sentinel in [
                     ('z_col',           '(none)'),
                     ('err_col',         '(none)'),
+                    ('fill_y2_col',     '(none)'),
+                    ('bar_ymin_col',    '(none)'),
                     ('bubble_size_col', '(uniform)'),
                     ('quiver_u_col',    '(none)'),
                     ('quiver_v_col',    '(none)'),
@@ -1260,6 +1273,13 @@ class SerializationMixin:
                     col = series_meta.get(key, '')
                     if col and col != sentinel and col in self.datasets:
                         keep.add(col)
+                # Also check per-series column overrides stored in curve_styles
+                # (e.g. fill_between_y2_col set individually per Fill Between series)
+                for _style in (settings.get('curve_styles') or {}).values():
+                    for _col_key in ('fill_between_y2_col',):
+                        _col = (_style.get('opts') or {}).get(_col_key, '')
+                        if _col and _col in self.datasets:
+                            keep.add(_col)
             else:
                 keep = set(self.datasets.keys())
 
