@@ -127,3 +127,12 @@ Then uncomment the **Import Developer ID certificate**, **Re-sign with Developer
 | macOS | 2,000 / month | 10× |
 
 Each plotviz release consumes roughly 30–50 macOS minutes and 10–15 Windows minutes. For **public repositories**, GitHub Actions is completely free with no minute limits.
+
+## Remove old release artifacts
+
+GitHub does not automatically delete old release assets, so you may want to periodically clean up old `.dmg` and `.zip` files from the **Releases** page to save storage space.
+
+```bash
+git tag -d v1.0              # delete locally
+git push origin :refs/tags/v1.0   # delete remotely
+```
