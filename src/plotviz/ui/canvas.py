@@ -655,3 +655,57 @@ class CanvasPlotter(FigureCanvas):
                 ann['artist'] = artist
                 surviving.append(ann)
         self.annotations = surviving
+
+    def draw_annotations_on(self, axes_list):
+        """Replay the current annotations onto an arbitrary list of axes.
+
+        Used by the export path, which builds a fresh Figure and therefore
+        needs the annotations re-created on its own axes.  Unlike
+        redraw_annotations(), this does NOT touch the live artists stored in
+        self.annotations — it only draws onto the supplied axes_list.
+        """
+        mw = getattr(self, 'main_window', None)
+        for ann in self.annotations:
+            ax_idx = ann['axes_index']
+            if ax_idx >= len(axes_list):
+                continue
+            # Honour per-subplot visibility toggle
+            if mw and not mw.subplot_ann_visible.get(ax_idx, True):
+                continue
+            ax = axes_list[ax_idx]
+            s  = ann.get('style', self.ann_style)
+            if ann['type'] == 'text':
+                bp = None if s.get('bg_alpha', 0.9) == 0 else dict(
+                    boxstyle='round,pad=0.3',
+                    facecolor=s.get('bg_color', '#ffffcc'),
+                    edgecolor=s.get('edge_color', '#aaaaaa'),
+                    alpha=s.get('bg_alpha', 0.9))
+                ax.annotate(ann['label'],
+                            xy=(ann['x'], ann['y']),
+                            xytext=(ann['x'], ann['y']),
+                            fontsize=s.get('fontsize', 10),
+                            color=s.get('fontcolor', '#000000'),
+                            fontfamily=s.get('fontfamily', 'sans-serif'),
+                            bbox=bp, zorder=50, annotation_clip=False)
+            elif ann['type'] == 'arrow':
+                ax.annotate(ann['label'],
+                            xy=(ann['x1'], ann['y1']),
+                            xytext=(ann['x0'], ann['y0']),
+                            fontsize=s.get('fontsize', 10),
+                            color=s.get('fontcolor', '#000000'),
+                            arrowprops=dict(arrowstyle='->',
+                                            color=s.get('fontcolor', '#cc3300'), lw=1.8),
+                            zorder=50, annotation_clip=False)
+            elif ann['type'] == 'image':
+                try:
+                    img = mpimg.imread(ann['filepath'])
+                    ib = OffsetImage(img, zoom=ann.get('zoom', 0.15))
+                    ib.image.axes = ax
+                    artist = AnnotationBbox(ib, (ann['x'], ann['y']),
+                                            frameon=True,
+                                            bboxprops=dict(edgecolor='#aaaaaa', linewidth=1.0),
+                                            zorder=50, annotation_clip=False)
+                    ax.add_artist(artist)
+                except Exception as e:
+                    print(f'Export image annotation error: {e}')
+                    continue

@@ -2310,6 +2310,16 @@ class PlotEngineMixin:
                 wspace=_wspace_exp,
             )
 
+            # Replay annotations (text / arrow / image) onto the export axes.
+            # The export figure is built fresh, so annotations drawn on the
+            # live canvas must be re-created here or they are lost from the file.
+            # Must run after subplots_adjust so axes limits/positions are final.
+            if not is3d:
+                try:
+                    self.canvas.draw_annotations_on(axes_list)
+                except Exception:
+                    traceback.print_exc()
+
             exp_fig.savefig(fp, dpi=dpi, format=mpl_fmt, bbox_inches=None)
             plt.close(exp_fig)
             matplotlib.rcParams['font.family'] = _old_font

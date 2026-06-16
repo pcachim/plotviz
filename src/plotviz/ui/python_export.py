@@ -822,6 +822,81 @@ def _projection_for(ct):
     return 'None'
 
 
+def _gen_annotations(settings, n_subplots):
+    """Emit code that reproduces text / arrow / image annotations.
+
+    Mirrors canvas.redraw_annotations(). Honours the per-subplot visibility
+    toggle (subplot_ann_visible). Image annotations are loaded from
+    images/<basename> relative to the generated plot.py.
+    """
+    anns = settings.get('annotations') or []
+    if not anns:
+        return []
+
+    vis = settings.get('subplot_ann_visible') or {}
+
+    def _visible(idx):
+        return vis.get(str(idx), vis.get(idx, True))
+
+    def _ax_name(idx):
+        return 'ax' if n_subplots == 1 else f'ax{idx}'
+
+    lines = ["", "# ── Annotations ──────────────────────────────────────────────────"]
+    if any(a.get('type') == 'image' for a in anns):
+        lines += [
+            "import matplotlib.image as _mpimg",
+            "from matplotlib.offsetbox import OffsetImage, AnnotationBbox",
+            "_HERE = os.path.dirname(os.path.abspath(__file__))",
+        ]
+    for a in anns:
+        idx = a.get('axes_index', 0)
+        if n_subplots == 1 and idx != 0:
+            continue
+        if not _visible(idx):
+            continue
+        axn = _ax_name(idx)
+        s = a.get('style', {}) or {}
+        fs = s.get('fontsize', 10)
+        fc = _esc(s.get('fontcolor', '#000000'))
+        ff = _esc(s.get('fontfamily', 'sans-serif'))
+        t = a.get('type')
+        if t == 'text':
+            if s.get('bg_alpha', 0.9) == 0:
+                bbox = "None"
+            else:
+                bbox = ("dict(boxstyle='round,pad=0.3', facecolor='%s', "
+                        "edgecolor='%s', alpha=%s)" % (
+                            _esc(s.get('bg_color', '#ffffcc')),
+                            _esc(s.get('edge_color', '#aaaaaa')),
+                            s.get('bg_alpha', 0.9)))
+            lines.append(
+                f"{axn}.annotate('{_esc(a.get('label', ''))}', "
+                f"xy=({a['x']!r}, {a['y']!r}), xytext=({a['x']!r}, {a['y']!r}), "
+                f"fontsize={fs}, color='{fc}', fontfamily='{ff}', "
+                f"bbox={bbox}, zorder=50, annotation_clip=False)")
+        elif t == 'arrow':
+            lines.append(
+                f"{axn}.annotate('{_esc(a.get('label', ''))}', "
+                f"xy=({a['x1']!r}, {a['y1']!r}), xytext=({a['x0']!r}, {a['y0']!r}), "
+                f"fontsize={fs}, color='{fc}', "
+                f"arrowprops=dict(arrowstyle='->', color='{fc}', lw=1.8), "
+                f"zorder=50, annotation_clip=False)")
+        elif t == 'image':
+            imgfile = a.get('image_file', '')
+            lines += [
+                "try:",
+                f"    _img = _mpimg.imread(os.path.join(_HERE, {imgfile!r}))",
+                f"    _ib = OffsetImage(_img, zoom={a.get('zoom', 0.15)})",
+                f"    _ab = AnnotationBbox(_ib, ({a['x']!r}, {a['y']!r}), frameon=True, "
+                "bboxprops=dict(edgecolor='#aaaaaa', linewidth=1.0), zorder=50, "
+                "annotation_clip=False)",
+                f"    {axn}.add_artist(_ab)",
+                "except Exception as _e:",
+                "    print('Image annotation error:', _e)",
+            ]
+    return lines
+
+
 def generate_plot_script(settings: dict, series_meta: dict,
                          datasets: dict, palette: list[str],
                          chart_title: str) -> str:
@@ -1045,6 +1120,9 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 if sp_title: lines.append(f"{ax_var}.set_title('{_esc(sp_title)}')")
                 lines.append(_legend_call(settings, idx, ax_var))
                 lines.append("")
+
+    # ── Annotations (text / arrow / image) ─────────────────────────────────────
+    lines += _gen_annotations(settings, n_subplots)
 
     # ── Final touches ─────────────────────────────────────────────────────────
     hspace = settings.get('sp_hspace', 0.35)
@@ -1403,6 +1481,9 @@ class PythonExportMixin:
 
         # ── Collect state ──────────────────────────────────────────────────────
         settings    = self._collect_settings()
+        # Annotations (text / arrow / image) are not part of _collect_settings();
+        # add them so the generated script can reproduce them.
+        settings['annotations'] = self._collect_annotations_meta()
         series_meta = self._collect_series_meta()
         series_list = series_meta.get('series', [])
 
@@ -1467,6 +1548,18 @@ class PythonExportMixin:
                 zf.writestr('plot.py', script)
                 zf.writestr('README.md', _build_readme(chart_title, datasets_to_export, n_subplots))
                 zf.writestr('pyproject.toml', _build_pyproject_toml(chart_title, script))
+
+                # Embed any image-annotation files referenced by the script
+                # (script loads them from images/<basename> relative to plot.py).
+                for _ann in self.canvas.annotations:
+                    if _ann.get('type') != 'image':
+                        continue
+                    _src = _ann.get('filepath', '')
+                    if _src and os.path.isfile(_src):
+                        try:
+                            zf.write(_src, 'images/' + os.path.basename(_src))
+                        except Exception:
+                            pass
 
                 if use_combined:
                     # Single CSV with all columns
