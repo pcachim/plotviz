@@ -1408,6 +1408,279 @@ class PlotEngineMixin:
     # ═══════════════════════════════════════════════════════════════════════════
     # UPDATE PREVIEW
     # ═══════════════════════════════════════════════════════════════════════════
+    def _render_axes(self, fig):
+        """Build every subplot axis on *fig*, plot all series, and apply
+        per-subplot decoration (labels, scales, limits, grid, legend, twinx).
+
+        This is the single source of truth for turning the current settings
+        into rendered axes. Both the live preview (update_preview) and the
+        image export (export_chart) call it so the on-screen chart and the
+        exported file are guaranteed to render identically.
+
+        The caller is responsible for the font rc-context, figure-level layout
+        (margins / suptitle / border), and annotations, which differ between
+        the preview (canvas-box coordinates) and export (figure coordinates).
+
+        Returns (axes_list, ax2_map, is3d, n).
+        """
+        series = self._get_series(primary_only=True)
+        ct = self.chart_type_combo.currentText()
+        is3d = ct in _3D_TYPES
+        rows, cols, n = self.subplot_rows, self.subplot_cols, self.subplot_rows * self.subplot_cols
+
+        axes_list = []
+        ax2_map = {}  # {subplot_idx: ax2} for twinx alignment
+
+        if n == 1:
+            _proj = 'polar' if ct in ('Polar', 'Radar') else ('3d' if is3d else None)
+            ax = fig.add_subplot(111, projection=_proj)
+            axes_list.append(ax)
+            if is3d:
+                _elev = self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30
+                _azim = self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60
+                ax.view_init(elev=_elev, azim=_azim)
+            cat_info = self._plot_on(ax, series, ct, row_offset=self._get_series_row_offset(0), subplot_idx=0) if (series or ct in _NO_X_TYPES) else None
+            yd = {s[2]: s[1] for s in series}
+            xc = self.series_table.cellWidget(0, 0).currentText() if self.series_table.rowCount() > 0 and self.series_table.cellWidget(0, 0) else ''
+            self._decorate(ax, xc, yd, is3d, subplot_idx=0)
+            self._apply_cat_ticks(ax, cat_info)
+        else:
+            mosaic = getattr(self, '_subplot_mosaic', None)
+            first = None
+
+            if mosaic is not None:
+                # ── Mosaic layout ──────────────────────────────────────
+                ax_dict = fig.subplot_mosaic(mosaic)
+                # Order axes by first appearance of each cell letter
+                seen_order = list(dict.fromkeys(c for row in mosaic for c in row))
+                axes_list = [ax_dict[k] for k in seen_order]
+                for idx, ax in enumerate(axes_list):
+                    sub_ct = self.subplot_chart_types.get(idx, 'Line')
+                    sub_series, sub_y2_series = self._get_series_for_subplot(idx)
+                    x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
+                    cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
+                    ax2 = None
+                    if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
+                        ax2 = ax.twinx()
+                        ax2_map[idx] = ax2
+                        self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
+                        if self.subplot_y2label_show.get(idx, True):
+                            y2lbl = self.subplot_y2labels.get(idx, '') or ', '.join(y2_cols)
+                            if y2lbl:
+                                ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
+                                               color=self.y2label_color,
+                                               fontfamily=self.y2label_font.currentText(),
+                                               rotation=self.y2label_rotation.value(),
+                                               labelpad=self.y2label_labelpad.value(),
+                                               loc=self.y2label_loc.currentText())
+                                ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
+                        y2lim = self.subplot_y2lims.get(idx)
+                        if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
+                        self._apply_canvas_style(ax2, idx)
+                    t = self.sp_titles.get(idx, '')
+                    show_title = self.subplot_title_show.get(idx, True)
+                    title_text = (t or f'Subplot {idx+1}') if show_title else ''
+                    ax.set_title(_latex_safe(title_text),
+                        fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
+                        fontsize=self.subplot_title_size.get(idx, 11),
+                        color=self.subplot_title_color.get(idx, '#000000'),
+                        pad=self.subplot_title_pad.get(idx, 6),
+                        rotation=self.subplot_title_rotation.get(idx, 0),
+                        loc=self.subplot_title_ha.get(idx, 'center'))
+                    if self.subplot_xlabel_show.get(idx, True):
+                        xl = self.subplot_xlabels.get(idx, '') or ('' if sub_ct in _NO_X_TYPES else ', '.join(x_cols))
+                        ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
+                                      color=self.xlabel_color,
+                                      fontfamily=self.xlabel_font.currentText(),
+                                      rotation=self.subplot_xlabel_rotation.get(idx, 0),
+                                      labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
+                                      loc=self.subplot_xlabel_loc.get(idx, 'center'))
+                        ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
+                    else:
+                        ax.set_xlabel('')
+                    if self.subplot_ylabel_show.get(idx, True):
+                        yl = self.subplot_ylabels.get(idx, '') or ('' if sub_ct in _NO_X_TYPES else ', '.join(y_cols))
+                        ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
+                                      color=self.ylabel_color,
+                                      fontfamily=self.ylabel_font.currentText(),
+                                      rotation=self.subplot_ylabel_rotation.get(idx, 90),
+                                      labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
+                                      loc=self.subplot_ylabel_loc.get(idx, 'center'))
+                        ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
+                    else:
+                        ax.set_ylabel('')
+                    xs = self.subplot_xscales.get(idx, 'linear')
+                    ys = self.subplot_yscales.get(idx, 'linear')
+                    _mosaic_no_scale  = {'Pie', 'Heatmap', 'Polar', 'Radar', '3D Surface'}
+                    _mosaic_no_limits = {'Pie', 'Heatmap'}
+                    if sub_ct not in _mosaic_no_scale:
+                        if cat_info is None:  # don't set_xscale for categorical axes
+                            try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
+                            except Exception: ax.set_xscale('linear')
+                        try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
+                        except Exception: ax.set_yscale('linear')
+                    xlim = self.subplot_xlims.get(idx)
+                    ylim = self.subplot_ylims.get(idx)
+                    if sub_ct not in _mosaic_no_limits:
+                        if xlim: ax.set_xlim(xlim[0], xlim[1])
+                        if ylim: ax.set_ylim(ylim[0], ylim[1])
+                    # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
+                    if sub_ct not in _mosaic_no_scale:
+                        if cat_info is None and xs == 'inverted': ax.invert_xaxis()
+                        if ys == 'inverted': ax.invert_yaxis()
+                    if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+                        try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
+                        except Exception: pass
+                    self._apply_canvas_style(ax, idx)
+                    if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax, idx)
+                    self._apply_cat_ticks(ax, cat_info)
+                    if ax2 is not None:
+                        self._align_twinx_ticks(ax, ax2, idx,
+                            y_step=self.subplot_ytick_step.get(idx, 0.0),
+                            y2_step=self.subplot_ytick_step.get(idx, 0.0))
+                    show_leg = self.subplot_legends.get(idx, True)
+                    if show_leg and sub_ct not in (_NO_LEGEND_TYPES - {'Pie'}):
+                        if ax2 and (sub_series or sub_y2_series):
+                            h1, l1 = ax.get_legend_handles_labels()
+                            h2, l2 = ax2.get_legend_handles_labels()
+                            if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
+                        elif sub_series:
+                            ax.legend(**self._legend_kwargs(idx))
+            else:
+                # ── Regular grid layout ────────────────────────────────
+                for idx in range(n):
+                    r, c = divmod(idx, cols)
+                    sub_ct = self.subplot_chart_types.get(idx, 'Line')
+                    sub_is3d = sub_ct in _3D_TYPES
+                    sub_is_polar = sub_ct in ('Polar', 'Radar')
+                    sub_proj = 'polar' if sub_is_polar else ('3d' if sub_is3d else None)
+                    kw = {}
+                    _no_share = sub_is3d or sub_is_polar or sub_ct in {'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
+                    if not _no_share and first:
+                        if self.sp_sharex.isChecked(): kw['sharex'] = first
+                        if self.sp_sharey.isChecked(): kw['sharey'] = first
+                    ax = fig.add_subplot(rows, cols, idx+1, projection=sub_proj, **kw)
+                    if sub_is3d:
+                        _elev = self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30
+                        _azim = self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60
+                        ax.view_init(elev=_elev, azim=_azim)
+                    if first is None: first = ax
+                    axes_list.append(ax)
+                    sub_series, sub_y2_series = self._get_series_for_subplot(idx)
+                    x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
+                    default_xl  = ', '.join(x_cols)
+                    default_yl  = ', '.join(y_cols)
+                    default_y2l = ', '.join(y2_cols)
+                    cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
+                    ax2 = None
+                    if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
+                        ax2 = ax.twinx()
+                        ax2_map[idx] = ax2
+                        self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
+                        if self.subplot_y2label_show.get(idx, True):
+                            y2lbl = self.subplot_y2labels.get(idx, '') or default_y2l
+                            if y2lbl:
+                                ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
+                                               color=self.y2label_color,
+                                               fontfamily=self.y2label_font.currentText(),
+                                               rotation=self.y2label_rotation.value(),
+                                               labelpad=self.y2label_labelpad.value(),
+                                               loc=self.y2label_loc.currentText())
+                                ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
+                        y2lim = self.subplot_y2lims.get(idx)
+                        if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
+                        self._apply_canvas_style(ax2, idx)
+                    t = self.sp_titles.get(idx, '')
+                    show_title = self.subplot_title_show.get(idx, True)
+                    title_text = (t or f'Subplot {idx+1}') if show_title else ''
+                    ax.set_title(_latex_safe(title_text),
+                        fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
+                        fontsize=self.subplot_title_size.get(idx, 11),
+                        color=self.subplot_title_color.get(idx, '#000000'),
+                        pad=self.subplot_title_pad.get(idx, 6),
+                        rotation=self.subplot_title_rotation.get(idx, 0),
+                        loc=self.subplot_title_ha.get(idx, 'center'))
+                    _horiz_bar = (sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False))
+                    _default_xl_eff  = default_yl if _horiz_bar else default_xl
+                    _default_yl_eff  = default_xl if _horiz_bar else default_yl
+                    _custom_xl = self.subplot_xlabels.get(idx, '')
+                    _custom_yl = self.subplot_ylabels.get(idx, '')
+                    if self.subplot_xlabel_show.get(idx, True):
+                        xl = _custom_xl or ('' if sub_ct in _NO_X_TYPES else _default_xl_eff)
+                        ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
+                                      color=self.xlabel_color,
+                                      fontfamily=self.xlabel_font.currentText(),
+                                      rotation=self.subplot_xlabel_rotation.get(idx, 0),
+                                      labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
+                                      loc=self.subplot_xlabel_loc.get(idx, 'center'))
+                        ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
+                    else:
+                        ax.set_xlabel('')
+                    if self.subplot_ylabel_show.get(idx, True):
+                        yl = _custom_yl or ('' if sub_ct in _NO_X_TYPES else _default_yl_eff)
+                        ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
+                                      color=self.ylabel_color,
+                                      fontfamily=self.ylabel_font.currentText(),
+                                      rotation=self.subplot_ylabel_rotation.get(idx, 90),
+                                      labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
+                                      loc=self.subplot_ylabel_loc.get(idx, 'center'))
+                        ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
+                    else:
+                        ax.set_ylabel('')
+                    if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
+                        xs = self.subplot_xscales.get(idx, 'linear')
+                        ys = self.subplot_yscales.get(idx, 'linear')
+                        if cat_info is None:  # skip set_xscale for categorical
+                            try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
+                            except Exception: ax.set_xscale('linear')
+                        _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
+                        _sub_x_is_cat = cat_info is not None
+                        _protect_y = _sub_x_is_cat and _sub_horiz
+                        if not _protect_y:
+                            try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
+                            except Exception: ax.set_yscale('linear')
+                    else:
+                        xs = self.subplot_xscales.get(idx, 'linear')
+                        ys = self.subplot_yscales.get(idx, 'linear')
+                        _protect_y = False
+                    _grid_no_limits = {'Pie', 'Heatmap'}
+                    xlim = self.subplot_xlims.get(idx, None)
+                    if xlim and sub_ct not in _grid_no_limits: ax.set_xlim(xlim[0], xlim[1])
+                    ylim = self.subplot_ylims.get(idx, None)
+                    if ylim and sub_ct not in _grid_no_limits: ax.set_ylim(ylim[0], ylim[1])
+                    # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
+                    if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
+                        if cat_info is None and xs == 'inverted': ax.invert_xaxis()
+                        if not _protect_y and ys == 'inverted': ax.invert_yaxis()
+                    if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+                        try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
+                        except Exception: pass
+                    self._apply_cat_ticks(ax, cat_info)
+                    show_leg = self.subplot_legends.get(idx, True)
+                    if show_leg and sub_ct not in (_NO_LEGEND_TYPES - {'Pie'}):
+                        if ax2 and (sub_series or sub_y2_series):
+                            h1, l1 = ax.get_legend_handles_labels()
+                            h2, l2 = ax2.get_legend_handles_labels()
+                            if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
+                        elif sub_series:
+                            ax.legend(**self._legend_kwargs(idx))
+
+        # ── Late canvas-style / grid / twinx pass (multi-subplot) ───────────
+        if n > 1:
+            for _ax_i, _ax in enumerate(axes_list):
+                _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
+                if _ax_ct not in _3D_TYPES:
+                    self._apply_canvas_style(_ax, _ax_i)
+                    if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(_ax, _ax_i)
+            for _ax_i, _ax2 in ax2_map.items():
+                _ax_primary = axes_list[_ax_i] if _ax_i < len(axes_list) else None
+                if _ax_primary is not None:
+                    self._align_twinx_ticks(_ax_primary, _ax2, _ax_i,
+                        y_step=self.subplot_ytick_step.get(_ax_i, 0.0),
+                        y2_step=self.subplot_ytick_step.get(_ax_i, 0.0))
+
+        return axes_list, ax2_map, is3d, n
+
     def update_preview(self):
         try:
             # Guard: bail silently if core widgets aren't built yet
@@ -1454,275 +1727,10 @@ class PlotEngineMixin:
                 self.canvas._border_rect = None   # figure.clear() removes all artists
                 self.canvas.figure.patch.set_facecolor(self.chart_bg_color)
 
-                axes_list = []
-
-                if n == 1:
-                    _proj = 'polar' if ct in ('Polar', 'Radar') else ('3d' if is3d else None)
-                    ax = self.canvas.figure.add_subplot(111, projection=_proj)
-                    axes_list.append(ax)
-                    if is3d:
-                        _elev = self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30
-                        _azim = self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60
-                        ax.view_init(elev=_elev, azim=_azim)
-                    if series or ct in _NO_X_TYPES:
-                        cat_info = self._plot_on(ax, series, ct, subplot_idx=0)
-                    else:
-                        cat_info = None
-                    # For _decorate compat: build yd dict and use first x col name
-                    yd = {s[2]: s[1] for s in series}
-                    xc = self.series_table.cellWidget(0, 0).currentText() if self.series_table.rowCount() > 0 and self.series_table.cellWidget(0, 0) else ''
-                    self._decorate(ax, xc, yd, is3d, subplot_idx=0)
-                    # Apply categorical ticks AFTER _decorate (which calls set_xscale)
-                    self._apply_cat_ticks(ax, cat_info)
-                else:
-                    mosaic = getattr(self, '_subplot_mosaic', None)
-                    first = None
-
-                    ax2_map = {}  # {subplot_idx: ax2} for twinx alignment
-                    if mosaic is not None:
-                        # ── Mosaic layout ──────────────────────────────────────
-                        ax_dict = self.canvas.figure.subplot_mosaic(mosaic)
-                        # Order axes by first appearance of each cell letter
-                        seen_order = list(dict.fromkeys(c for row in mosaic for c in row))
-                        axes_list = [ax_dict[k] for k in seen_order]
-                        n_mosaic = len(axes_list)
-                        for idx, ax in enumerate(axes_list):
-                            sub_ct = self.subplot_chart_types.get(idx, 'Line')
-                            sub_series, sub_y2_series = self._get_series_for_subplot(idx)
-                            x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
-                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
-                            ax2 = None
-                            if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
-                                ax2 = ax.twinx()
-                                ax2_map[idx] = ax2
-                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
-                                if self.subplot_y2label_show.get(idx, True):
-                                    y2lbl = self.subplot_y2labels.get(idx,'') or ', '.join(y2_cols)
-                                    if y2lbl:
-                                        ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
-                                                       color=self.y2label_color,
-                                                       fontfamily=self.y2label_font.currentText(),
-                                                       rotation=self.y2label_rotation.value(),
-                                                       labelpad=self.y2label_labelpad.value(),
-                                                       loc=self.y2label_loc.currentText())
-                                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
-                                y2lim = self.subplot_y2lims.get(idx)
-                                if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
-                                self._apply_canvas_style(ax2, idx)
-                            t = self.sp_titles.get(idx,'')
-                            show_title = self.subplot_title_show.get(idx, True)
-                            title_text = (t or f'Subplot {idx+1}') if show_title else ''
-                            ax.set_title(_latex_safe(title_text),
-                                fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
-                                fontsize=self.subplot_title_size.get(idx, 11),
-                                color=self.subplot_title_color.get(idx, '#000000'),
-                                pad=self.subplot_title_pad.get(idx, 6),
-                                rotation=self.subplot_title_rotation.get(idx, 0),
-                                loc=self.subplot_title_ha.get(idx, 'center'))
-                            if self.subplot_xlabel_show.get(idx, True):
-                                xl = self.subplot_xlabels.get(idx,'') or ('' if sub_ct in _NO_X_TYPES else ', '.join(x_cols))
-                                ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
-                                              color=self.xlabel_color,
-                                              fontfamily=self.xlabel_font.currentText(),
-                                              rotation=self.subplot_xlabel_rotation.get(idx, 0),
-                                              labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
-                                              loc=self.subplot_xlabel_loc.get(idx, 'center'))
-                                ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
-                            else:
-                                ax.set_xlabel('')
-                            if self.subplot_ylabel_show.get(idx, True):
-                                yl = self.subplot_ylabels.get(idx,'') or ('' if sub_ct in _NO_X_TYPES else ', '.join(y_cols))
-                                ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
-                                              color=self.ylabel_color,
-                                              fontfamily=self.ylabel_font.currentText(),
-                                              rotation=self.subplot_ylabel_rotation.get(idx, 90),
-                                              labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
-                                              loc=self.subplot_ylabel_loc.get(idx, 'center'))
-                                ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
-                            else:
-                                ax.set_ylabel('')
-                            xs = self.subplot_xscales.get(idx, 'linear')
-                            ys = self.subplot_yscales.get(idx, 'linear')
-                            # Bugs 15/16: guard scale and limits against heatmap-group types,
-                            # mirroring the existing guard in the regular-grid path.
-                            # Only Heatmap (imshow pixel-space) and non-Cartesian types
-                            # need scale/inversion suppressed.  Contour, Tricontour,
-                            # Hist2D, and Hexbin all use data coordinates and work fine.
-                            _mosaic_no_scale  = {'Pie', 'Heatmap', 'Polar', 'Radar', '3D Surface'}
-                            _mosaic_no_limits = {'Pie', 'Heatmap'}
-                            if sub_ct not in _mosaic_no_scale:
-                                if cat_info is None:  # don't set_xscale for categorical axes
-                                    try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                                    except Exception: ax.set_xscale('linear')
-                                try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                                except Exception: ax.set_yscale('linear')
-                            xlim = self.subplot_xlims.get(idx)
-                            ylim = self.subplot_ylims.get(idx)
-                            if sub_ct not in _mosaic_no_limits:
-                                if xlim: ax.set_xlim(xlim[0], xlim[1])
-                                if ylim: ax.set_ylim(ylim[0], ylim[1])
-                            # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
-                            if sub_ct not in _mosaic_no_scale:
-                                if cat_info is None and xs == 'inverted': ax.invert_xaxis()
-                                if ys == 'inverted': ax.invert_yaxis()
-                            if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
-                                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-                                except Exception: pass
-                            self._apply_canvas_style(ax, idx)
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax, idx)
-                            self._apply_cat_ticks(ax, cat_info)
-                            if ax2 is not None:
-                                self._align_twinx_ticks(ax, ax2, idx,
-                                    y_step=self.subplot_ytick_step.get(idx, 0.0),
-                                    y2_step=self.subplot_ytick_step.get(idx, 0.0))
-                            show_leg = self.subplot_legends.get(idx, True)
-                            sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
-                            if show_leg and sub_ct not in (_NO_LEGEND_TYPES - {'Pie'}):
-                                if ax2 and (sub_series or sub_y2_series):
-                                    h1,l1 = ax.get_legend_handles_labels()
-                                    h2,l2 = ax2.get_legend_handles_labels()
-                                    if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
-                                elif sub_series:
-                                    ax.legend(**self._legend_kwargs(idx))
-                    else:
-                        # ── Regular grid layout ────────────────────────────────
-                        for idx in range(n):
-                            r, c = divmod(idx, cols)
-                            sub_ct = self.subplot_chart_types.get(idx, 'Line')
-                            sub_is3d = sub_ct in _3D_TYPES
-                            sub_is_polar = sub_ct in ('Polar', 'Radar')
-                            sub_proj = 'polar' if sub_is_polar else ('3d' if sub_is3d else None)
-                            kw = {}
-                            # Bug 21: exclude heatmap-group types from sharex/sharey —
-                            # imshow uses pixel-space (0..n-1) while adjacent charts use
-                            # data coordinates, so linking axes corrupts both scales.
-                            _no_share = sub_is3d or sub_is_polar or sub_ct in {'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
-                            if not _no_share and first:
-                                if self.sp_sharex.isChecked(): kw['sharex'] = first
-                                if self.sp_sharey.isChecked(): kw['sharey'] = first
-                            ax = self.canvas.figure.add_subplot(rows, cols, idx+1,
-                                    projection=sub_proj, **kw)
-                            if sub_is3d:
-                                _elev = self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30
-                                _azim = self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60
-                                ax.view_init(elev=_elev, azim=_azim)
-                            if first is None: first = ax
-                            axes_list.append(ax)
-                            sub_series, sub_y2_series = self._get_series_for_subplot(idx)
-                            x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
-                            default_xl  = ', '.join(x_cols)
-                            default_yl  = ', '.join(y_cols)
-                            default_y2l = ', '.join(y2_cols)
-                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
-                            ax2 = None
-                            if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
-                                ax2 = ax.twinx()
-                                ax2_map[idx] = ax2
-                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
-                                if self.subplot_y2label_show.get(idx, True):
-                                    y2lbl = self.subplot_y2labels.get(idx, '') or default_y2l
-                                    if y2lbl:
-                                        ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
-                                                       color=self.y2label_color,
-                                                       fontfamily=self.y2label_font.currentText(),
-                                                       rotation=self.y2label_rotation.value(),
-                                                       labelpad=self.y2label_labelpad.value(),
-                                                       loc=self.y2label_loc.currentText())
-                                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
-                                y2lim = self.subplot_y2lims.get(idx)
-                                if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
-                                self._apply_canvas_style(ax2, idx)
-                            t = self.sp_titles.get(idx, '')
-                            show_title = self.subplot_title_show.get(idx, True)
-                            title_text = (t or f'Subplot {idx+1}') if show_title else ''
-                            ax.set_title(_latex_safe(title_text),
-                                fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
-                                fontsize=self.subplot_title_size.get(idx, 11),
-                                color=self.subplot_title_color.get(idx, '#000000'),
-                                pad=self.subplot_title_pad.get(idx, 6),
-                                rotation=self.subplot_title_rotation.get(idx, 0),
-                                loc=self.subplot_title_ha.get(idx, 'center'))
-                            _horiz_bar = (sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False))
-                            _default_xl_eff  = default_yl if _horiz_bar else default_xl
-                            _default_yl_eff  = default_xl if _horiz_bar else default_yl
-                            _custom_xl = self.subplot_xlabels.get(idx, '')
-                            _custom_yl = self.subplot_ylabels.get(idx, '')
-                            if self.subplot_xlabel_show.get(idx, True):
-                                xl = _custom_xl or ('' if sub_ct in _NO_X_TYPES else _default_xl_eff)
-                                ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
-                                              color=self.xlabel_color,
-                                              fontfamily=self.xlabel_font.currentText(),
-                                              rotation=self.subplot_xlabel_rotation.get(idx, 0),
-                                              labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
-                                              loc=self.subplot_xlabel_loc.get(idx, 'center'))
-                                ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
-                            else:
-                                ax.set_xlabel('')
-                            if self.subplot_ylabel_show.get(idx, True):
-                                yl = _custom_yl or ('' if sub_ct in _NO_X_TYPES else _default_yl_eff)
-                                ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
-                                              color=self.ylabel_color,
-                                              fontfamily=self.ylabel_font.currentText(),
-                                              rotation=self.subplot_ylabel_rotation.get(idx, 90),
-                                              labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
-                                              loc=self.subplot_ylabel_loc.get(idx, 'center'))
-                                ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
-                            else:
-                                ax.set_ylabel('')
-                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
-                                xs = self.subplot_xscales.get(idx, 'linear')
-                                ys = self.subplot_yscales.get(idx, 'linear')
-                                if cat_info is None:  # skip set_xscale for categorical
-                                    try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                                    except Exception: ax.set_xscale('linear')
-                                _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
-                                _sub_x_is_cat = cat_info is not None
-                                _protect_y = _sub_x_is_cat and _sub_horiz
-                                if not _protect_y:
-                                    try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                                    except Exception: ax.set_yscale('linear')
-                            # Bug 13: only Heatmap (imshow pixel-space) needs this guard;
-                            # Contour, Tricontour, Hist2D, Hexbin all use data coordinates.
-                            _grid_no_limits = {'Pie', 'Heatmap'}
-                            xlim = self.subplot_xlims.get(idx, None)
-                            if xlim and sub_ct not in _grid_no_limits: ax.set_xlim(xlim[0], xlim[1])
-                            ylim = self.subplot_ylims.get(idx, None)
-                            if ylim and sub_ct not in _grid_no_limits: ax.set_ylim(ylim[0], ylim[1])
-                            # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
-                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
-                                if cat_info is None and xs == 'inverted': ax.invert_xaxis()
-                                if not _protect_y and ys == 'inverted': ax.invert_yaxis()
-                            if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
-                                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-                                except Exception: pass
-                            self._apply_cat_ticks(ax, cat_info)
-                            show_leg = self.subplot_legends.get(idx, True)
-                            sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
-                            if show_leg and sub_ct not in (_NO_LEGEND_TYPES - {'Pie'}):
-                                if ax2 and (sub_series or sub_y2_series):
-                                    h1,l1 = ax.get_legend_handles_labels()
-                                    h2,l2 = ax2.get_legend_handles_labels()
-                                    if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
-                                elif sub_series:
-                                    ax.legend(**self._legend_kwargs(idx))
+                axes_list, ax2_map, is3d, n = self._render_axes(self.canvas.figure)
 
                 self.canvas.axes_list = axes_list
                 if axes_list: self.canvas.axes = axes_list[0]
-
-                # Apply canvas style to every subplot (multi-subplot path)
-                if n > 1:
-                    for _ax_i, _ax in enumerate(axes_list):
-                        _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
-                        if _ax_ct not in _3D_TYPES:
-                            self._apply_canvas_style(_ax, _ax_i)
-                            if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(_ax, _ax_i)
-                    # Re-align twinx ticks after the late canvas-style pass
-                    for _ax_i, _ax2 in ax2_map.items():
-                        _ax_primary = axes_list[_ax_i] if _ax_i < len(axes_list) else None
-                        if _ax_primary is not None:
-                            self._align_twinx_ticks(_ax_primary, _ax2, _ax_i,
-                                y_step=self.subplot_ytick_step.get(_ax_i, 0.0),
-                                y2_step=self.subplot_ytick_step.get(_ax_i, 0.0))
 
                 # ── Margins / centering ────────────────────────────────────────────
                 wi, hi = self._fig_size_in_inches()   # export size in inches
@@ -2042,244 +2050,13 @@ class PlotEngineMixin:
             exp_fig = MplFigure(figsize=(wi, hi), dpi=dpi)
             exp_fig.patch.set_facecolor(self.chart_bg_color)
 
-            # Re-run plotting on the export figure
-            series = self._get_series(primary_only=True)
-            ct = self.chart_type_combo.currentText()
-            is3d = ct in _3D_TYPES
-            rows, cols, n = self.subplot_rows, self.subplot_cols, self.subplot_rows*self.subplot_cols
-            xc = self.series_table.cellWidget(0, 0).currentText() if series and self.series_table.cellWidget(0, 0) else ''
+            # Re-run plotting on a fresh export figure via the shared renderer
+            # so the exported image matches the on-screen preview exactly.
             chart_font = self.title_font.currentText()
             _old_font = matplotlib.rcParams.get('font.family', ['sans-serif'])
             matplotlib.rcParams['font.family'] = chart_font
 
-            axes_list = []
-            if n == 1:
-                _proj = 'polar' if ct in ('Polar', 'Radar') else ('3d' if is3d else None)
-                ax = exp_fig.add_subplot(111, projection=_proj)
-                axes_list.append(ax)
-                if is3d:
-                    _elev = self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30
-                    _azim = self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60
-                    ax.view_init(elev=_elev, azim=_azim)
-                cat_info = self._plot_on(ax, series, ct, row_offset=self._get_series_row_offset(0), subplot_idx=0) if (series or ct in _NO_X_TYPES) else None
-                yd = {s[2]: s[1] for s in series}
-                self._decorate(ax, xc, yd, is3d, subplot_idx=0)
-                self._apply_cat_ticks(ax, cat_info)
-            else:
-                    ax2_map = {}  # {subplot_idx: ax2} for twinx alignment
-                    mosaic = getattr(self, '_subplot_mosaic', None)
-                    if mosaic is not None:
-                        # ── Mosaic layout ──────────────────────────────────────
-                        ax_dict = exp_fig.subplot_mosaic(mosaic)
-                        seen_order = list(dict.fromkeys(c for row in mosaic for c in row))
-                        axes_list = [ax_dict[k] for k in seen_order]
-                        for idx, ax in enumerate(axes_list):
-                            sub_ct = self.subplot_chart_types.get(idx, 'Line')
-                            sub_series, sub_y2_series = self._get_series_for_subplot(idx)
-                            x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
-                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
-                            ax2 = None
-                            if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
-                                ax2 = ax.twinx()
-                                ax2_map[idx] = ax2
-                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
-                                if self.subplot_y2label_show.get(idx, True):
-                                    y2lbl = self.subplot_y2labels.get(idx,'') or ', '.join(y2_cols)
-                                    if y2lbl:
-                                        ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
-                                                       color=self.y2label_color, fontfamily=self.y2label_font.currentText(),
-                                                       rotation=self.y2label_rotation.value(),
-                                                       labelpad=self.y2label_labelpad.value(),
-                                                       loc=self.y2label_loc.currentText())
-                                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
-                                y2lim = self.subplot_y2lims.get(idx)
-                                if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
-                                self._apply_canvas_style(ax2, idx)
-                            t = self.sp_titles.get(idx,'')
-                            show_title = self.subplot_title_show.get(idx, True)
-                            title_text = (t or f'Subplot {idx+1}') if show_title else ''
-                            ax.set_title(_latex_safe(title_text),
-                                fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
-                                fontsize=self.subplot_title_size.get(idx, 11),
-                                color=self.subplot_title_color.get(idx, '#000000'),
-                                pad=self.subplot_title_pad.get(idx, 6),
-                                rotation=self.subplot_title_rotation.get(idx, 0),
-                                loc=self.subplot_title_ha.get(idx, 'center'))
-                            if self.subplot_xlabel_show.get(idx, True):
-                                xl = self.subplot_xlabels.get(idx,'') or ('' if sub_ct in _NO_X_TYPES else ', '.join(x_cols))
-                                ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
-                                    color=self.xlabel_color, fontfamily=self.xlabel_font.currentText(),
-                                    rotation=self.subplot_xlabel_rotation.get(idx, 0),
-                                    labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
-                                    loc=self.subplot_xlabel_loc.get(idx, 'center'))
-                                ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
-                            else:
-                                ax.set_xlabel('')
-                            if self.subplot_ylabel_show.get(idx, True):
-                                yl = self.subplot_ylabels.get(idx,'') or ('' if sub_ct in _NO_X_TYPES else ', '.join(y_cols))
-                                ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
-                                    color=self.ylabel_color, fontfamily=self.ylabel_font.currentText(),
-                                    rotation=self.subplot_ylabel_rotation.get(idx, 90),
-                                    labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
-                                    loc=self.subplot_ylabel_loc.get(idx, 'center'))
-                                ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
-                            else:
-                                ax.set_ylabel('')
-                            xs = self.subplot_xscales.get(idx, 'linear')
-                            ys = self.subplot_yscales.get(idx, 'linear')
-                            if cat_info is None:
-                                try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                                except Exception: ax.set_xscale('linear')
-                            try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                            except Exception: ax.set_yscale('linear')
-                            xlim = self.subplot_xlims.get(idx)
-                            if xlim: ax.set_xlim(xlim[0], xlim[1])
-                            ylim = self.subplot_ylims.get(idx)
-                            if ylim: ax.set_ylim(ylim[0], ylim[1])
-                            # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
-                            if cat_info is None and xs == 'inverted': ax.invert_xaxis()
-                            if ys == 'inverted': ax.invert_yaxis()
-                            if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
-                                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-                                except Exception: pass
-                            self._apply_canvas_style(ax, idx)
-                            if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax, idx)
-                            self._apply_cat_ticks(ax, cat_info)
-                            if ax2 is not None:
-                                self._align_twinx_ticks(ax, ax2, idx,
-                                    y_step=self.subplot_ytick_step.get(idx, 0.0),
-                                    y2_step=self.subplot_ytick_step.get(idx, 0.0))
-                            show_leg = self.subplot_legends.get(idx, True)
-                            sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
-                            if show_leg and sub_ct not in (_NO_LEGEND_TYPES - {'Pie'}):
-                                if ax2 and (sub_series or sub_y2_series):
-                                    h1,l1 = ax.get_legend_handles_labels()
-                                    h2,l2 = ax2.get_legend_handles_labels()
-                                    if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
-                                elif sub_series:
-                                    ax.legend(**self._legend_kwargs(idx))
-                    else:
-                    # ── Regular grid layout ────────────────────────────────────
-                        first = None
-                        for idx in range(n):
-                            r, c = divmod(idx, cols)
-                            sub_ct = self.subplot_chart_types.get(idx, 'Line')
-                            sub_is3d = sub_ct in _3D_TYPES
-                            sub_is_polar = sub_ct in ('Polar', 'Radar')
-                            sub_proj = 'polar' if sub_is_polar else ('3d' if sub_is3d else None)
-                            kw = {}
-                            if not sub_is3d and not sub_is_polar and first:
-                                if self.sp_sharex.isChecked(): kw['sharex'] = first
-                                if self.sp_sharey.isChecked(): kw['sharey'] = first
-                            ax = exp_fig.add_subplot(rows, cols, idx+1,
-                                                     projection=sub_proj, **kw)
-                            if first is None: first = ax
-                            axes_list.append(ax)
-                            sub_series, sub_y2_series = self._get_series_for_subplot(idx)
-                            x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
-                            default_xl  = ', '.join(x_cols)
-                            default_yl  = ', '.join(y_cols)
-                            default_y2l = ', '.join(y2_cols)
-                            cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
-                            ax2 = None
-                            if sub_y2_series and sub_ct not in _NO_LEGEND_TYPES:
-                                ax2 = ax.twinx()
-                                ax2_map[idx] = ax2
-                                self._plot_on(ax2, sub_y2_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx)
-                                if self.subplot_y2label_show.get(idx, True):
-                                    y2lbl = self.subplot_y2labels.get(idx, '') or default_y2l
-                                    if y2lbl:
-                                        ax2.set_ylabel(_latex_safe(y2lbl), fontsize=self.y2label_size.value(),
-                                                       color=self.y2label_color,
-                                                       fontfamily=self.y2label_font.currentText(),
-                                                       rotation=self.y2label_rotation.value(),
-                                                       labelpad=self.y2label_labelpad.value(),
-                                                       loc=self.y2label_loc.currentText())
-                                        ax2.yaxis.label.set_ha(self.y2label_ha.currentText())
-                                y2lim = self.subplot_y2lims.get(idx)
-                                if y2lim: ax2.set_ylim(y2lim[0], y2lim[1])
-                                self._apply_canvas_style(ax2, idx)
-                            t = self.sp_titles.get(idx, '')
-                            show_title = self.subplot_title_show.get(idx, True)
-                            title_text = (t or f'Subplot {idx+1}') if show_title else ''
-                            ax.set_title(_latex_safe(title_text),
-                                fontfamily=self.subplot_title_font.get(idx, 'sans-serif'),
-                                fontsize=self.subplot_title_size.get(idx, 11),
-                                color=self.subplot_title_color.get(idx, '#000000'),
-                                pad=self.subplot_title_pad.get(idx, 6),
-                                rotation=self.subplot_title_rotation.get(idx, 0),
-                                loc=self.subplot_title_ha.get(idx, 'center'))
-                            _horiz_bar = (sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False))
-                            _default_xl_eff = default_yl if _horiz_bar else default_xl
-                            _default_yl_eff = default_xl if _horiz_bar else default_yl
-                            _custom_xl = self.subplot_xlabels.get(idx, '')
-                            _custom_yl = self.subplot_ylabels.get(idx, '')
-                            if self.subplot_xlabel_show.get(idx, True):
-                                xl = _custom_xl or ('' if sub_ct in _NO_X_TYPES else _default_xl_eff)
-                                ax.set_xlabel(_latex_safe(xl), fontsize=self.xlabel_size.value(),
-                                              color=self.xlabel_color, fontfamily=self.xlabel_font.currentText(),
-                                              rotation=self.subplot_xlabel_rotation.get(idx, 0),
-                                              labelpad=self.subplot_xlabel_labelpad.get(idx, 4),
-                                              loc=self.subplot_xlabel_loc.get(idx, 'center'))
-                                ax.xaxis.label.set_ha(self.subplot_xlabel_ha.get(idx, 'center'))
-                            else:
-                                ax.set_xlabel('')
-                            if self.subplot_ylabel_show.get(idx, True):
-                                yl = _custom_yl or ('' if sub_ct in _NO_X_TYPES else _default_yl_eff)
-                                ax.set_ylabel(_latex_safe(yl), fontsize=self.ylabel_size.value(),
-                                              color=self.ylabel_color, fontfamily=self.ylabel_font.currentText(),
-                                              rotation=self.subplot_ylabel_rotation.get(idx, 90),
-                                              labelpad=self.subplot_ylabel_labelpad.get(idx, 4),
-                                              loc=self.subplot_ylabel_loc.get(idx, 'center'))
-                                ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
-                            else:
-                                ax.set_ylabel('')
-                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
-                                xs = self.subplot_xscales.get(idx, 'linear')
-                                ys = self.subplot_yscales.get(idx, 'linear')
-                                if cat_info is None:
-                                    try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                                    except Exception: ax.set_xscale('linear')
-                                _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
-                                _protect_y = (cat_info is not None) and _sub_horiz
-                                if not _protect_y:
-                                    try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                                    except Exception: ax.set_yscale('linear')
-                            xlim = self.subplot_xlims.get(idx)
-                            if xlim: ax.set_xlim(xlim[0], xlim[1])
-                            ylim = self.subplot_ylims.get(idx)
-                            if ylim: ax.set_ylim(ylim[0], ylim[1])
-                            # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
-                            if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
-                                if cat_info is None and xs == 'inverted': ax.invert_xaxis()
-                                if not _protect_y and ys == 'inverted': ax.invert_yaxis()
-                            if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
-                                try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-                                except Exception: pass
-                            self._apply_cat_ticks(ax, cat_info)
-                            show_leg = self.subplot_legends.get(idx, True)
-                            sp_leg_loc = self.subplot_legend_locs.get(idx, 'best')
-                            if show_leg and sub_ct not in (_NO_LEGEND_TYPES - {'Pie'}):
-                                if ax2 and (sub_series or sub_y2_series):
-                                    h1,l1 = ax.get_legend_handles_labels()
-                                    h2,l2 = ax2.get_legend_handles_labels()
-                                    if h1 or h2: ax.legend(h1+h2, l1+l2, **self._legend_kwargs(idx))
-                                elif sub_series:
-                                    ax.legend(**self._legend_kwargs(idx))
-
-            if n > 1:
-                for _ax_i, _ax in enumerate(axes_list):
-                    _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
-                    if _ax_ct not in _3D_TYPES:
-                        self._apply_canvas_style(_ax, _ax_i)
-                        if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(_ax)
-                # Re-align twinx ticks after the late canvas-style pass
-                for _ax_i, _ax2 in ax2_map.items():
-                    _ax_primary = axes_list[_ax_i] if _ax_i < len(axes_list) else None
-                    if _ax_primary is not None:
-                        self._align_twinx_ticks(_ax_primary, _ax2, _ax_i,
-                            y_step=self.subplot_ytick_step.get(_ax_i, 0.0),
-                            y2_step=self.subplot_ytick_step.get(_ax_i, 0.0))
+            axes_list, ax2_map, is3d, n = self._render_axes(exp_fig)
 
             # Apply margins — convert physical-unit spinbox values to fractions
             _ml, _mr, _mb, _mt = self._margins_as_fractions()

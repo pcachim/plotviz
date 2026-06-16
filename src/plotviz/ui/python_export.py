@@ -787,6 +787,8 @@ _GENERATORS = {
 
 _3D_TYPES    = {'3D Surface'}
 _POLAR_TYPES = {'Polar', 'Radar'}
+# Chart types that have no meaningful x column (mirrors tab_builders._NO_X_TYPES)
+_NO_X_TYPES  = {'Histogram', 'Boxplot', 'Violin', 'Pie', 'ECDF'}
 
 
 def _legend_call(settings, idx, ax_var):
@@ -820,6 +822,158 @@ def _projection_for(ct):
     if ct in _3D_TYPES:    return "'3d'"
     if ct in _POLAR_TYPES: return "'polar'"
     return 'None'
+
+
+# Chart types for which scale / limit / grid / tick decoration is skipped,
+# mirroring the guards in plot_engine._decorate / update_preview.
+_DECOR_NO_SCALE  = {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}
+_DECOR_NO_LIMITS = {'Pie', 'Heatmap'}
+_DECOR_NO_TICKS  = {'Pie', 'Polar', 'Radar', '3D Surface'}
+
+
+def _gen_decoration(settings, idx, ax_var, sub_ct, xl, yl, sp_title):
+    """Emit decoration for one subplot that matches the live canvas.
+
+    Reproduces the styling applied by plot_engine._decorate / _apply_grid /
+    _apply_canvas_style: styled axis labels and title, axis scales, limits and
+    inversion, equal aspect, axes background, tick styling (size / direction /
+    rotation / minor / step / formatter), grid (major + minor) and spine
+    visibility. Label / title text is resolved by the caller and passed in.
+
+    Note: this is the standalone-script counterpart to the interactive engine.
+    It covers the common Cartesian cases; a few rarely-used canvas options
+    (top/zero axis positions, per-subplot grid/canvas override dicts) are not
+    reproduced.
+    """
+    k = str(idx)
+
+    def d(key, default):
+        dd = settings.get(key) or {}
+        return dd.get(k, dd.get(idx, default))
+
+    fg      = settings.get('chart_fg_color', '#000000')
+    plot_bg = settings.get('plot_bg_color', '#ffffff')
+    L = []
+
+    # ── Axes background ────────────────────────────────────────────────────
+    L.append(f"{ax_var}.set_facecolor('{_esc(plot_bg)}')")
+
+    # ── Axis labels (styled) ───────────────────────────────────────────────
+    if d('subplot_xlabel_show', True):
+        L.append(
+            f"{ax_var}.set_xlabel('{_esc(xl)}', fontsize={settings.get('xlabel_size', 11)}, "
+            f"color='{_esc(settings.get('xlabel_color', '#000000'))}', "
+            f"fontfamily='{_esc(settings.get('xlabel_font', 'sans-serif'))}', "
+            f"rotation={d('subplot_xlabel_rotation', 0)}, "
+            f"labelpad={d('subplot_xlabel_labelpad', 4)}, "
+            f"loc='{_esc(d('subplot_xlabel_loc', 'center'))}')")
+        L.append(f"{ax_var}.xaxis.label.set_ha('{_esc(d('subplot_xlabel_ha', 'center'))}')")
+    if d('subplot_ylabel_show', True):
+        L.append(
+            f"{ax_var}.set_ylabel('{_esc(yl)}', fontsize={settings.get('ylabel_size', 11)}, "
+            f"color='{_esc(settings.get('ylabel_color', '#000000'))}', "
+            f"fontfamily='{_esc(settings.get('ylabel_font', 'sans-serif'))}', "
+            f"rotation={d('subplot_ylabel_rotation', 90)}, "
+            f"labelpad={d('subplot_ylabel_labelpad', 4)}, "
+            f"loc='{_esc(d('subplot_ylabel_loc', 'center'))}')")
+        L.append(f"{ax_var}.yaxis.label.set_ha('{_esc(d('subplot_ylabel_ha', 'center'))}')")
+
+    # ── Subplot title (styled) ─────────────────────────────────────────────
+    if sp_title is not None:
+        L.append(
+            f"{ax_var}.set_title('{_esc(sp_title)}', "
+            f"fontfamily='{_esc(d('subplot_title_font', 'sans-serif'))}', "
+            f"fontsize={d('subplot_title_size', 11)}, "
+            f"color='{_esc(d('subplot_title_color', '#000000'))}', "
+            f"pad={d('subplot_title_pad', 6)}, "
+            f"rotation={d('subplot_title_rotation', 0)}, "
+            f"loc='{_esc(d('subplot_title_ha', 'center'))}')")
+
+    # ── Scales / limits / inversion / aspect ───────────────────────────────
+    xs = d('subplot_xscales', 'linear')
+    ys = d('subplot_yscales', 'linear')
+    xlim = d('subplot_xlims', None)
+    ylim = d('subplot_ylims', None)
+    if sub_ct not in _DECOR_NO_SCALE:
+        L.append(f"{ax_var}.set_xscale('{xs if xs != 'inverted' else 'linear'}')")
+        L.append(f"{ax_var}.set_yscale('{ys if ys != 'inverted' else 'linear'}')")
+    if sub_ct not in _DECOR_NO_LIMITS:
+        if xlim: L.append(f"{ax_var}.set_xlim({xlim[0]!r}, {xlim[1]!r})")
+        if ylim: L.append(f"{ax_var}.set_ylim({ylim[0]!r}, {ylim[1]!r})")
+    if sub_ct not in _DECOR_NO_SCALE:
+        if xs == 'inverted': L.append(f"{ax_var}.invert_xaxis()")
+        if ys == 'inverted': L.append(f"{ax_var}.invert_yaxis()")
+    if d('subplot_equal_aspect', False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+        adj = 'box' if (xlim or ylim) else 'datalim'
+        L.append(f"{ax_var}.set_aspect('equal', adjustable='{adj}')")
+
+    # ── Tick styling ───────────────────────────────────────────────────────
+    if sub_ct not in _DECOR_NO_TICKS:
+        x_sz  = d('subplot_xtick_sizes', settings.get('xtick_size', 9))
+        y_sz  = d('subplot_ytick_sizes', settings.get('ytick_size', 9))
+        x_dir = d('subplot_xtick_dir', 'out')
+        y_dir = d('subplot_ytick_dir', 'out')
+        x_rot = d('subplot_xtick_rotation', 0)
+        y_rot = d('subplot_ytick_rotation', 0)
+        x_show = d('subplot_xticks_show', True)
+        y_show = d('subplot_yticks_show', True)
+        L.append(
+            f"{ax_var}.tick_params(axis='x', which='major', colors='{_esc(fg)}', "
+            f"labelsize={x_sz}, direction='{_esc(x_dir)}', labelrotation={x_rot}, "
+            f"bottom={bool(x_show)}, labelbottom={bool(x_show)})")
+        L.append(
+            f"{ax_var}.tick_params(axis='y', which='major', colors='{_esc(fg)}', "
+            f"labelsize={y_sz}, direction='{_esc(y_dir)}', labelrotation={y_rot}, "
+            f"left={bool(y_show)}, labelleft={bool(y_show)})")
+        # Minor ticks
+        if d('subplot_xtick_minor', False):
+            L.append(f"{ax_var}.xaxis.set_minor_locator(_AutoMinorLocator())")
+        if d('subplot_ytick_minor', False):
+            L.append(f"{ax_var}.yaxis.set_minor_locator(_AutoMinorLocator())")
+        # Major tick step
+        x_step = d('subplot_xtick_step', 0.0)
+        y_step = d('subplot_ytick_step', 0.0)
+        if x_step and x_step > 0:
+            L.append(f"{ax_var}.xaxis.set_major_locator(_MultipleLocator({x_step}))")
+        if y_step and y_step > 0:
+            L.append(f"{ax_var}.yaxis.set_major_locator(_MultipleLocator({y_step}))")
+        # Formatters
+        for axis_attr, fmt in (('xaxis', d('subplot_x_formatter', 'auto')),
+                               ('yaxis', d('subplot_y_formatter', 'auto'))):
+            if fmt == 'plain':
+                L.append(f"_f = _ScalarFormatter(useOffset=False, useMathText=False); _f.set_scientific(False); {ax_var}.{axis_attr}.set_major_formatter(_f)")
+            elif fmt == 'sci':
+                L.append(f"_f = _ScalarFormatter(useMathText=True); _f.set_scientific(True); {ax_var}.{axis_attr}.set_major_formatter(_f)")
+            elif fmt == 'percent':
+                L.append(f"{ax_var}.{axis_attr}.set_major_formatter(_PercentFormatter(xmax=1.0))")
+            elif isinstance(fmt, str) and '{x' in fmt:
+                L.append(f"{ax_var}.{axis_attr}.set_major_formatter(_StrMethodFormatter('{_esc(fmt)}'))")
+
+    # ── Spines (borders) ───────────────────────────────────────────────────
+    if sub_ct not in _DECOR_NO_TICKS:
+        for sp_name, key in (('top', 'border_top'), ('bottom', 'border_bottom'),
+                             ('left', 'border_left'), ('right', 'border_right')):
+            vis = settings.get(key, True)
+            L.append(f"{ax_var}.spines['{sp_name}'].set_visible({bool(vis)})")
+            if vis:
+                L.append(f"{ax_var}.spines['{sp_name}'].set_edgecolor('{_esc(fg)}')")
+
+    # ── Grid (major + minor), from global Layout settings ──────────────────
+    if sub_ct not in _DECOR_NO_SCALE:
+        if settings.get('grid_on', False):
+            L.append(
+                f"{ax_var}.grid(True, which='major', color='{_esc(settings.get('grid_color', '#cccccc'))}', "
+                f"linestyle='{_esc(settings.get('grid_linestyle', '-'))}', "
+                f"linewidth={settings.get('grid_linewidth', 0.8)}, "
+                f"alpha={settings.get('grid_alpha', 1.0)})")
+        if settings.get('minor_grid_on', False):
+            L.append(f"{ax_var}.minorticks_on()")
+            L.append(
+                f"{ax_var}.grid(True, which='minor', color='{_esc(settings.get('minor_grid_color', '#e8e8e8'))}', "
+                f"linestyle='{_esc(settings.get('minor_grid_linestyle', '-'))}', "
+                f"linewidth={settings.get('minor_grid_linewidth', 0.5)}, "
+                f"alpha={settings.get('minor_grid_alpha', 1.0)})")
+    return L
 
 
 def _gen_annotations(settings, n_subplots):
@@ -971,6 +1125,14 @@ def generate_plot_script(settings: dict, series_meta: dict,
         "import matplotlib",
         "import matplotlib.pyplot as plt",
         "from matplotlib.figure import Figure",
+        "from matplotlib.ticker import (AutoMinorLocator as _AutoMinorLocator,",
+        "                               MultipleLocator as _MultipleLocator,",
+        "                               ScalarFormatter as _ScalarFormatter,",
+        "                               PercentFormatter as _PercentFormatter,",
+        "                               StrMethodFormatter as _StrMethodFormatter)",
+        "",
+        f"# Global chart font (matches the plotviz canvas)",
+        f"matplotlib.rcParams['font.family'] = '{_esc(settings.get('title_font', 'sans-serif'))}'",
         "",
         "# ── Data loading ─────────────────────────────────────────────────────",
     ]
@@ -1038,12 +1200,13 @@ def generate_plot_script(settings: dict, series_meta: dict,
             "",
             "# ── Decoration ───────────────────────────────────────────────────",
         ]
-        xl = settings.get('subplot_xlabels', {}).get('0', '')
-        yl = settings.get('subplot_ylabels', {}).get('0', '')
-        if xl: lines.append(f"ax.set_xlabel('{_esc(xl)}')")
-        if yl: lines.append(f"ax.set_ylabel('{_esc(yl)}')")
-        sp_title = (settings.get('sp_titles') or {}).get('0', '')
-        if sp_title: lines.append(f"ax.set_title('{_esc(sp_title)}')")
+        # Default label text from the series columns (matches the canvas).
+        _xc0 = series_list[0].get('x_col', '') if series_list else ''
+        _yc0 = ', '.join(dict.fromkeys(s.get('y_col', '') for s in series_list if s.get('y_col')))
+        xl = settings.get('subplot_xlabels', {}).get('0', '') or ('' if ct in _NO_X_TYPES else _xc0)
+        yl = settings.get('subplot_ylabels', {}).get('0', '') or ('' if ct in _NO_X_TYPES else _yc0)
+        # Single-subplot title is rendered via suptitle below, not ax.set_title.
+        lines += _gen_decoration(settings, 0, 'ax', ct, xl, yl, None)
         lines.append(_legend_call(settings, 0, 'ax'))
     else:
         subplot_types = settings.get('subplot_chart_types') or {}
@@ -1078,12 +1241,13 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
                 for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
                     lines.append(l)
-                sp_title = settings.get('sp_titles', {}).get(str(idx), f'Subplot {idx+1}')
-                xl = settings.get('subplot_xlabels', {}).get(str(idx), '')
-                yl = settings.get('subplot_ylabels', {}).get(str(idx), '')
-                if sp_title: lines.append(f"{ax_var}.set_title('{_esc(sp_title)}')")
-                if xl: lines.append(f"{ax_var}.set_xlabel('{_esc(xl)}')")
-                if yl: lines.append(f"{ax_var}.set_ylabel('{_esc(yl)}')")
+                _show_t = (settings.get('subplot_title_show') or {}).get(str(idx), True)
+                sp_title = (settings.get('sp_titles', {}).get(str(idx), '') or f'Subplot {idx+1}') if _show_t else ''
+                _sx = ', '.join(dict.fromkeys(s.get('x_col', '') for s in sub_series if s.get('x_col')))
+                _sy = ', '.join(dict.fromkeys(s.get('y_col', '') for s in sub_series if s.get('y_col')))
+                xl = settings.get('subplot_xlabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _sx)
+                yl = settings.get('subplot_ylabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _sy)
+                lines += _gen_decoration(sub_settings, idx, ax_var, sub_ct, xl, yl, sp_title)
                 lines.append(_legend_call(settings, idx, ax_var))
                 lines.append("")
         else:
@@ -1116,8 +1280,16 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
                 for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
                     lines.append(l)
-                sp_title = settings.get('sp_titles', {}).get(str(idx), f'Subplot {idx+1}')
-                if sp_title: lines.append(f"{ax_var}.set_title('{_esc(sp_title)}')")
+                _show_t = (settings.get('subplot_title_show') or {}).get(str(idx), True)
+                sp_title = (settings.get('sp_titles', {}).get(str(idx), '') or f'Subplot {idx+1}') if _show_t else ''
+                _sx = ', '.join(dict.fromkeys(s.get('x_col', '') for s in sub_series if s.get('x_col')))
+                _sy = ', '.join(dict.fromkeys(s.get('y_col', '') for s in sub_series if s.get('y_col')))
+                _horiz = (sub_ct == 'Bar' and sub_settings.get('bar_horizontal', False))
+                _def_xl = _sy if _horiz else _sx
+                _def_yl = _sx if _horiz else _sy
+                xl = settings.get('subplot_xlabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _def_xl)
+                yl = settings.get('subplot_ylabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _def_yl)
+                lines += _gen_decoration(sub_settings, idx, ax_var, sub_ct, xl, yl, sp_title)
                 lines.append(_legend_call(settings, idx, ax_var))
                 lines.append("")
 
@@ -1608,6 +1780,9 @@ class PythonExportMixin:
 
         # ── Collect state ──────────────────────────────────────────────────────
         settings    = self._collect_settings()
+        # Annotations are not part of _collect_settings(); add them so the
+        # generated script reproduces them in the Code Runner.
+        settings['annotations'] = self._collect_annotations_meta()
         series_meta = self._collect_series_meta()
         series_list = series_meta.get('series', [])
 
@@ -1668,6 +1843,17 @@ class PythonExportMixin:
                 zf.writestr('plot.py', script)
                 zf.writestr('README.md', _build_readme(chart_title, datasets_to_export, n_subplots))
                 zf.writestr('pyproject.toml', _build_pyproject_toml(chart_title, script))
+
+                # Embed any image-annotation files referenced by the script.
+                for _ann in self.canvas.annotations:
+                    if _ann.get('type') != 'image':
+                        continue
+                    _src = _ann.get('filepath', '')
+                    if _src and os.path.isfile(_src):
+                        try:
+                            zf.write(_src, 'images/' + os.path.basename(_src))
+                        except Exception:
+                            pass
 
                 if use_combined:
                     buf = io.StringIO()

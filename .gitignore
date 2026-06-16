@@ -18,6 +18,6 @@ util_files/
 # Not necessary for Git
 update.sh
 RELEASE.md
-uv.lock
 todo.md
 DISTRIBUTION.md
+site
