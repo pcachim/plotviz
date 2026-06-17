@@ -16,6 +16,7 @@ from core.constants import (
     _3D_TYPES, _POLAR_TYPES, _NO_X_TYPES,
     _DECOR_NO_SCALE, _DECOR_NO_LIMITS, _DECOR_NO_TICKS,
 )
+from core.settings_schema import SubplotStyle, subplot_get
 
 # ── Chart-type → code-generation function ─────────────────────────────────────
 # Each generator receives (settings, series_list, datasets, palette, ax_var) and
@@ -839,55 +840,46 @@ def _gen_decoration(settings, idx, ax_var, sub_ct, xl, yl, sp_title):
     (top/zero axis positions, per-subplot grid/canvas override dicts) are not
     reproduced.
     """
-    k = str(idx)
-
-    def d(key, default):
-        dd = settings.get(key) or {}
-        return dd.get(k, dd.get(idx, default))
-
-    fg      = settings.get('chart_fg_color', '#000000')
-    plot_bg = settings.get('plot_bg_color', '#ffffff')
+    st = SubplotStyle.from_settings(settings, idx)
+    fg = st.fg
     L = []
 
     # ── Axes background ────────────────────────────────────────────────────
-    L.append(f"{ax_var}.set_facecolor('{_esc(plot_bg)}')")
+    L.append(f"{ax_var}.set_facecolor('{_esc(st.plot_bg)}')")
 
     # ── Axis labels (styled) ───────────────────────────────────────────────
-    if d('subplot_xlabel_show', True):
+    if st.xlabel_show:
         L.append(
-            f"{ax_var}.set_xlabel('{_esc(xl)}', fontsize={settings.get('xlabel_size', 11)}, "
-            f"color='{_esc(settings.get('xlabel_color', '#000000'))}', "
-            f"fontfamily='{_esc(settings.get('xlabel_font', 'sans-serif'))}', "
-            f"rotation={d('subplot_xlabel_rotation', 0)}, "
-            f"labelpad={d('subplot_xlabel_labelpad', 4)}, "
-            f"loc='{_esc(d('subplot_xlabel_loc', 'center'))}')")
-        L.append(f"{ax_var}.xaxis.label.set_ha('{_esc(d('subplot_xlabel_ha', 'center'))}')")
-    if d('subplot_ylabel_show', True):
+            f"{ax_var}.set_xlabel('{_esc(xl)}', fontsize={st.xlabel_size}, "
+            f"color='{_esc(st.xlabel_color)}', "
+            f"fontfamily='{_esc(st.xlabel_font)}', "
+            f"rotation={st.xlabel_rotation}, "
+            f"labelpad={st.xlabel_labelpad}, "
+            f"loc='{_esc(st.xlabel_loc)}')")
+        L.append(f"{ax_var}.xaxis.label.set_ha('{_esc(st.xlabel_ha)}')")
+    if st.ylabel_show:
         L.append(
-            f"{ax_var}.set_ylabel('{_esc(yl)}', fontsize={settings.get('ylabel_size', 11)}, "
-            f"color='{_esc(settings.get('ylabel_color', '#000000'))}', "
-            f"fontfamily='{_esc(settings.get('ylabel_font', 'sans-serif'))}', "
-            f"rotation={d('subplot_ylabel_rotation', 90)}, "
-            f"labelpad={d('subplot_ylabel_labelpad', 4)}, "
-            f"loc='{_esc(d('subplot_ylabel_loc', 'center'))}')")
-        L.append(f"{ax_var}.yaxis.label.set_ha('{_esc(d('subplot_ylabel_ha', 'center'))}')")
+            f"{ax_var}.set_ylabel('{_esc(yl)}', fontsize={st.ylabel_size}, "
+            f"color='{_esc(st.ylabel_color)}', "
+            f"fontfamily='{_esc(st.ylabel_font)}', "
+            f"rotation={st.ylabel_rotation}, "
+            f"labelpad={st.ylabel_labelpad}, "
+            f"loc='{_esc(st.ylabel_loc)}')")
+        L.append(f"{ax_var}.yaxis.label.set_ha('{_esc(st.ylabel_ha)}')")
 
     # ── Subplot title (styled) ─────────────────────────────────────────────
     if sp_title is not None:
         L.append(
             f"{ax_var}.set_title('{_esc(sp_title)}', "
-            f"fontfamily='{_esc(d('subplot_title_font', 'sans-serif'))}', "
-            f"fontsize={d('subplot_title_size', 11)}, "
-            f"color='{_esc(d('subplot_title_color', '#000000'))}', "
-            f"pad={d('subplot_title_pad', 6)}, "
-            f"rotation={d('subplot_title_rotation', 0)}, "
-            f"loc='{_esc(d('subplot_title_ha', 'center'))}')")
+            f"fontfamily='{_esc(st.title_font)}', "
+            f"fontsize={st.title_size}, "
+            f"color='{_esc(st.title_color)}', "
+            f"pad={st.title_pad}, "
+            f"rotation={st.title_rotation}, "
+            f"loc='{_esc(st.title_loc)}')")
 
     # ── Scales / limits / inversion / aspect ───────────────────────────────
-    xs = d('subplot_xscales', 'linear')
-    ys = d('subplot_yscales', 'linear')
-    xlim = d('subplot_xlims', None)
-    ylim = d('subplot_ylims', None)
+    xs, ys, xlim, ylim = st.xscale, st.yscale, st.xlim, st.ylim
     if sub_ct not in _DECOR_NO_SCALE:
         L.append(f"{ax_var}.set_xscale('{xs if xs != 'inverted' else 'linear'}')")
         L.append(f"{ax_var}.set_yscale('{ys if ys != 'inverted' else 'linear'}')")
@@ -897,43 +889,32 @@ def _gen_decoration(settings, idx, ax_var, sub_ct, xl, yl, sp_title):
     if sub_ct not in _DECOR_NO_SCALE:
         if xs == 'inverted': L.append(f"{ax_var}.invert_xaxis()")
         if ys == 'inverted': L.append(f"{ax_var}.invert_yaxis()")
-    if d('subplot_equal_aspect', False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
+    if st.equal_aspect and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
         adj = 'box' if (xlim or ylim) else 'datalim'
         L.append(f"{ax_var}.set_aspect('equal', adjustable='{adj}')")
 
     # ── Tick styling ───────────────────────────────────────────────────────
     if sub_ct not in _DECOR_NO_TICKS:
-        x_sz  = d('subplot_xtick_sizes', settings.get('xtick_size', 9))
-        y_sz  = d('subplot_ytick_sizes', settings.get('ytick_size', 9))
-        x_dir = d('subplot_xtick_dir', 'out')
-        y_dir = d('subplot_ytick_dir', 'out')
-        x_rot = d('subplot_xtick_rotation', 0)
-        y_rot = d('subplot_ytick_rotation', 0)
-        x_show = d('subplot_xticks_show', True)
-        y_show = d('subplot_yticks_show', True)
         L.append(
             f"{ax_var}.tick_params(axis='x', which='major', colors='{_esc(fg)}', "
-            f"labelsize={x_sz}, direction='{_esc(x_dir)}', labelrotation={x_rot}, "
-            f"bottom={bool(x_show)}, labelbottom={bool(x_show)})")
+            f"labelsize={st.xtick_size}, direction='{_esc(st.xtick_dir)}', labelrotation={st.xtick_rotation}, "
+            f"bottom={bool(st.xticks_show)}, labelbottom={bool(st.xticks_show)})")
         L.append(
             f"{ax_var}.tick_params(axis='y', which='major', colors='{_esc(fg)}', "
-            f"labelsize={y_sz}, direction='{_esc(y_dir)}', labelrotation={y_rot}, "
-            f"left={bool(y_show)}, labelleft={bool(y_show)})")
+            f"labelsize={st.ytick_size}, direction='{_esc(st.ytick_dir)}', labelrotation={st.ytick_rotation}, "
+            f"left={bool(st.yticks_show)}, labelleft={bool(st.yticks_show)})")
         # Minor ticks
-        if d('subplot_xtick_minor', False):
+        if st.xtick_minor:
             L.append(f"{ax_var}.xaxis.set_minor_locator(_AutoMinorLocator())")
-        if d('subplot_ytick_minor', False):
+        if st.ytick_minor:
             L.append(f"{ax_var}.yaxis.set_minor_locator(_AutoMinorLocator())")
         # Major tick step
-        x_step = d('subplot_xtick_step', 0.0)
-        y_step = d('subplot_ytick_step', 0.0)
-        if x_step and x_step > 0:
-            L.append(f"{ax_var}.xaxis.set_major_locator(_MultipleLocator({x_step}))")
-        if y_step and y_step > 0:
-            L.append(f"{ax_var}.yaxis.set_major_locator(_MultipleLocator({y_step}))")
+        if st.xtick_step and st.xtick_step > 0:
+            L.append(f"{ax_var}.xaxis.set_major_locator(_MultipleLocator({st.xtick_step}))")
+        if st.ytick_step and st.ytick_step > 0:
+            L.append(f"{ax_var}.yaxis.set_major_locator(_MultipleLocator({st.ytick_step}))")
         # Formatters
-        for axis_attr, fmt in (('xaxis', d('subplot_x_formatter', 'auto')),
-                               ('yaxis', d('subplot_y_formatter', 'auto'))):
+        for axis_attr, fmt in (('xaxis', st.x_formatter), ('yaxis', st.y_formatter)):
             if fmt == 'plain':
                 L.append(f"_f = _ScalarFormatter(useOffset=False, useMathText=False); _f.set_scientific(False); {ax_var}.{axis_attr}.set_major_formatter(_f)")
             elif fmt == 'sci':
@@ -945,28 +926,27 @@ def _gen_decoration(settings, idx, ax_var, sub_ct, xl, yl, sp_title):
 
     # ── Spines (borders) ───────────────────────────────────────────────────
     if sub_ct not in _DECOR_NO_TICKS:
-        for sp_name, key in (('top', 'border_top'), ('bottom', 'border_bottom'),
-                             ('left', 'border_left'), ('right', 'border_right')):
-            vis = settings.get(key, True)
+        for sp_name, vis in (('top', st.border_top), ('bottom', st.border_bottom),
+                             ('left', st.border_left), ('right', st.border_right)):
             L.append(f"{ax_var}.spines['{sp_name}'].set_visible({bool(vis)})")
             if vis:
                 L.append(f"{ax_var}.spines['{sp_name}'].set_edgecolor('{_esc(fg)}')")
 
     # ── Grid (major + minor), from global Layout settings ──────────────────
     if sub_ct not in _DECOR_NO_SCALE:
-        if settings.get('grid_on', False):
+        if st.grid_on:
             L.append(
-                f"{ax_var}.grid(True, which='major', color='{_esc(settings.get('grid_color', '#cccccc'))}', "
-                f"linestyle='{_esc(settings.get('grid_linestyle', '-'))}', "
-                f"linewidth={settings.get('grid_linewidth', 0.8)}, "
-                f"alpha={settings.get('grid_alpha', 1.0)})")
-        if settings.get('minor_grid_on', False):
+                f"{ax_var}.grid(True, which='major', color='{_esc(st.grid_color)}', "
+                f"linestyle='{_esc(st.grid_linestyle)}', "
+                f"linewidth={st.grid_linewidth}, "
+                f"alpha={st.grid_alpha})")
+        if st.minor_grid_on:
             L.append(f"{ax_var}.minorticks_on()")
             L.append(
-                f"{ax_var}.grid(True, which='minor', color='{_esc(settings.get('minor_grid_color', '#e8e8e8'))}', "
-                f"linestyle='{_esc(settings.get('minor_grid_linestyle', '-'))}', "
-                f"linewidth={settings.get('minor_grid_linewidth', 0.5)}, "
-                f"alpha={settings.get('minor_grid_alpha', 1.0)})")
+                f"{ax_var}.grid(True, which='minor', color='{_esc(st.minor_grid_color)}', "
+                f"linestyle='{_esc(st.minor_grid_linestyle)}', "
+                f"linewidth={st.minor_grid_linewidth}, "
+                f"alpha={st.minor_grid_alpha})")
     return L
 
 
@@ -981,10 +961,8 @@ def _gen_annotations(settings, n_subplots):
     if not anns:
         return []
 
-    vis = settings.get('subplot_ann_visible') or {}
-
     def _visible(idx):
-        return vis.get(str(idx), vis.get(idx, True))
+        return subplot_get(settings, 'subplot_ann_visible', idx, True)
 
     def _ax_name(idx):
         return 'ax' if n_subplots == 1 else f'ax{idx}'
