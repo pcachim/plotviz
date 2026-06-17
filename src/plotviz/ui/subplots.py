@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
+from ui.helpers import _show_color_dialog
 
 
 class SubplotMixin:

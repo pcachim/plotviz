@@ -55,8 +55,8 @@ git push
 The tag must start with `v` to trigger the workflow:
 
 ```bash
-git tag v2.7.0
-git push origin v2.7.0
+git tag v2026.06.2
+git push origin v2026.06.2
 ```
 
 That's it. The workflow fires immediately.
