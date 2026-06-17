@@ -20,6 +20,8 @@ except ImportError:
 from matplotlib.figure import Figure
 import matplotlib.patches as mpatches
 
+from core.geometry import point_segment_distance
+
 
 class CanvasPlotter(FigureCanvas):
     def __init__(self, parent=None):
@@ -44,6 +46,7 @@ class CanvasPlotter(FigureCanvas):
         self._drag_ann  = None
         self._drag_offx = 0.0
         self._drag_offy = 0.0
+        self._drag_part = 'both'   # arrows: 'tail' | 'tip' | 'both'
 
         # Border rect artist (page boundary indicator)
         self._border_rect = None
@@ -134,17 +137,28 @@ class CanvasPlotter(FigureCanvas):
                 except Exception:
                     pass
             elif ann['type'] == 'arrow':
-                dx = nx - ann['x0']
-                dy = ny - ann['y0']
-                ann['x0'] += dx
-                ann['y0'] += dy
-                ann['x1'] += dx
-                ann['y1'] += dy
-                try:
-                    ann['artist'].set_position((ann['x0'], ann['y0']))
-                    ann['artist'].xy = (ann['x1'], ann['y1'])
-                except Exception:
-                    pass
+                if self._drag_part == 'tip':
+                    # Move only the tip (re-aim the arrow); tail stays put.
+                    ann['x1'], ann['y1'] = nx, ny
+                elif self._drag_part == 'tail':
+                    # Move only the tail; tip stays put.
+                    ann['x0'], ann['y0'] = nx, ny
+                else:
+                    # Rigid translation of the whole arrow. nx/ny is the new
+                    # tail position (grab offset removed).
+                    dx = nx - ann['x0']
+                    dy = ny - ann['y0']
+                    ann['x0'] += dx
+                    ann['y0'] += dy
+                    ann['x1'] += dx
+                    ann['y1'] += dy
+                # Update the existing artist in place — set the text/tail anchor
+                # (xytext) and the arrow tip (xy). Mutating rather than
+                # recreating keeps the font/size untouched and avoids artist
+                # accumulation during the drag.
+                art = ann['artist']
+                art.set_position((ann['x0'], ann['y0']))
+                art.xy = (ann['x1'], ann['y1'])
             elif ann['type'] == 'image':
                 ann['x'], ann['y'] = nx, ny
                 try:
@@ -257,25 +271,7 @@ class CanvasPlotter(FigureCanvas):
             x, y   = event.xdata, event.ydata
             if x is None or y is None:
                 return
-            hit = self._find_annotation_at(ax, x, y)
-            if hit is not None:
-                self._drag_ann = hit
-                self._deactivate_toolbar()
-                if hit['type'] == 'text':
-                    self._drag_offx = x - hit['x']
-                    self._drag_offy = y - hit['y']
-                    lbl = hit.get('label', '')
-                    self._show_status(f'Annotation: "{lbl}"' if lbl else 'Text annotation')
-                elif hit['type'] == 'arrow':
-                    self._drag_offx = x - hit['x0']
-                    self._drag_offy = y - hit['y0']
-                    self._show_status('Arrow annotation')
-                elif hit['type'] == 'image':
-                    self._drag_offx = x - hit['x']
-                    self._drag_offy = y - hit['y']
-                    self._show_status('Image annotation')
-                self._select_subplot(ax_idx)
-                self._goto_tab(self._OUTER_PLOTS, self._INNER_ANNOTATIONS)
+            if self._try_grab_annotation(ax, ax_idx, x, y, event):
                 return
             if self.annotation_mode == 'text':
                 self._place_text_annotation(ax, ax_idx, x, y)
@@ -302,26 +298,8 @@ class CanvasPlotter(FigureCanvas):
             ax_idx = self._axes_index(ax)
             x, y   = event.xdata, event.ydata
             if x is not None and y is not None:
-                # Annotation drag
-                hit = self._find_annotation_at(ax, x, y)
-                if hit is not None:
-                    self._drag_ann = hit
-                    self._deactivate_toolbar()
-                    if hit['type'] == 'text':
-                        self._drag_offx = x - hit['x']
-                        self._drag_offy = y - hit['y']
-                        lbl = hit.get('label', '')
-                        self._show_status(f'Annotation: "{lbl}"' if lbl else 'Text annotation')
-                    elif hit['type'] == 'arrow':
-                        self._drag_offx = x - hit['x0']
-                        self._drag_offy = y - hit['y0']
-                        self._show_status('Arrow annotation')
-                    elif hit['type'] == 'image':
-                        self._drag_offx = x - hit['x']
-                        self._drag_offy = y - hit['y']
-                        self._show_status('Image annotation')
-                    self._select_subplot(ax_idx)
-                    self._goto_tab(self._OUTER_PLOTS, self._INNER_ANNOTATIONS)
+                # Annotation drag / select / double-click-to-edit
+                if self._try_grab_annotation(ax, ax_idx, x, y, event):
                     return
                 # Series hit → Series tab
                 label = self._find_series_at(ax, x, y, event)
@@ -370,20 +348,95 @@ class CanvasPlotter(FigureCanvas):
         except ValueError:
             return 0
 
+    def _arrow_grab_part(self, ax, x, y, ann, end_tol=0.06):
+        """Decide which part of an arrow a click grabs.
+
+        Returns 'tail' or 'tip' when the click is within *end_tol* of that
+        endpoint, otherwise 'both' (translate the whole arrow).
+        """
+        xlim = ax.get_xlim(); ylim = ax.get_ylim()
+        itx = 1.0 / max(abs(xlim[1] - xlim[0]) * end_tol, 1e-15)
+        ity = 1.0 / max(abs(ylim[1] - ylim[0]) * end_tol, 1e-15)
+        dt = ((x - ann['x0']) * itx) ** 2 + ((y - ann['y0']) * ity) ** 2
+        dp = ((x - ann['x1']) * itx) ** 2 + ((y - ann['y1']) * ity) ** 2
+        if dt < 1.0 or dp < 1.0:
+            return 'tail' if dt <= dp else 'tip'
+        return 'both'
+
+    def _try_grab_annotation(self, ax, ax_idx, x, y, event):
+        """Hit-test annotations at (x, y); on a hit, either open the edit form
+        (double-click) or begin a drag, and mirror the selection into the list.
+
+        Returns True if an annotation was hit (caller should stop), else False.
+        """
+        hit = self._find_annotation_at(ax, x, y)
+        if hit is None:
+            return False
+        mw = self.main_window
+
+        # Double-click → open the edit dialog for this annotation.
+        if getattr(event, 'dblclick', False):
+            self._drag_ann = None   # cancel any drag started by the first click
+            self._select_subplot(ax_idx)
+            self._goto_tab(self._OUTER_PLOTS, self._INNER_ANNOTATIONS)
+            if mw is not None and hasattr(mw, 'select_annotation_in_list'):
+                mw.select_annotation_in_list(hit)
+            if mw is not None and hasattr(mw, 'edit_annotation'):
+                mw.edit_annotation(hit)
+            return True
+
+        self._drag_ann = hit
+        self._deactivate_toolbar()
+        if hit['type'] == 'arrow':
+            self._drag_part = self._arrow_grab_part(ax, x, y, hit)
+            if self._drag_part == 'tip':
+                self._drag_offx = x - hit['x1']
+                self._drag_offy = y - hit['y1']
+            else:  # 'tail' or 'both' anchor at the tail
+                self._drag_offx = x - hit['x0']
+                self._drag_offy = y - hit['y0']
+            self._show_status({'tip': 'Arrow tip', 'tail': 'Arrow tail',
+                               'both': 'Arrow annotation'}[self._drag_part])
+        elif hit['type'] == 'text':
+            self._drag_part = 'both'
+            self._drag_offx = x - hit['x']
+            self._drag_offy = y - hit['y']
+            lbl = hit.get('label', '')
+            self._show_status(f'Annotation: "{lbl}"' if lbl else 'Text annotation')
+        elif hit['type'] == 'image':
+            self._drag_part = 'both'
+            self._drag_offx = x - hit['x']
+            self._drag_offy = y - hit['y']
+            self._show_status('Image annotation')
+
+        self._select_subplot(ax_idx)
+        self._goto_tab(self._OUTER_PLOTS, self._INNER_ANNOTATIONS)
+        if mw is not None and hasattr(mw, 'select_annotation_in_list'):
+            mw.select_annotation_in_list(hit)
+        return True
+
     def _find_annotation_at(self, ax, x, y, tol_frac=0.05):
         """Find the closest annotation within tol_frac of axis range."""
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
         tx = abs(xlim[1] - xlim[0]) * tol_frac
         ty = abs(ylim[1] - ylim[0]) * tol_frac
+        itx, ity = 1.0 / max(tx, 1e-15), 1.0 / max(ty, 1e-15)
         best, best_d = None, float('inf')
         for ann in self.annotations:
             if ann['axes_index'] != self._axes_index(ax): continue
-            cx, cy = (ann['x'],  ann['y'])  if ann['type'] in ('text','image') \
-                else (ann['x0'], ann['y0'])
-            dx = (x - cx) / max(tx, 1e-15)
-            dy = (y - cy) / max(ty, 1e-15)
-            d  = dx*dx + dy*dy
+            if ann['type'] == 'arrow':
+                # Grabbable anywhere along the shaft: distance (in tolerance-
+                # normalised space) from the click to the tail→tip segment.
+                d = point_segment_distance(
+                    x * itx, y * ity,
+                    ann['x0'] * itx, ann['y0'] * ity,
+                    ann['x1'] * itx, ann['y1'] * ity) ** 2
+            else:
+                cx, cy = ann['x'], ann['y']
+                dx = (x - cx) * itx
+                dy = (y - cy) * ity
+                d  = dx * dx + dy * dy
             if d < 1.0 and d < best_d:
                 best, best_d = ann, d
         return best
@@ -506,11 +559,25 @@ class CanvasPlotter(FigureCanvas):
         self.draw_idle()
         self._notify()
 
-    def _place_arrow_annotation(self, ax, ax_idx, x0, y0, x1, y1, label=''):
+    def _place_arrow_annotation(self, ax, ax_idx, x0, y0, x1, y1, label=None):
+        # Prompt for an optional label (parity with text annotations); an empty
+        # entry or Cancel still creates a plain arrow with no text.
+        if label is None:
+            from PyQt6.QtWidgets import QInputDialog
+            text, ok = QInputDialog.getText(self.main_window, 'Arrow label',
+                                             'Label (optional):')
+            label = text.strip() if ok else ''
         s = self.ann_style
+        abp = None if s.get('bg_alpha', 0.0) == 0 else dict(
+            boxstyle='round,pad=0.3',
+            facecolor=s.get('bg_color', '#ffffcc'),
+            edgecolor=s.get('edge_color', '#aaaaaa'),
+            alpha=s.get('bg_alpha', 0.0))
         artist = ax.annotate(label, xy=(x1, y1), xytext=(x0, y0),
                              fontsize=s.get('fontsize', 10),
-                             color=s.get('fontcolor', '#000000'),
+                             color=s.get('fontcolor', '#cc3300'),
+                             fontfamily=s.get('fontfamily', 'sans-serif'),
+                             bbox=abp,
                              arrowprops=dict(arrowstyle='->',
                                              color=s.get('fontcolor', '#cc3300'), lw=1.8),
                              zorder=50, annotation_clip=False)
@@ -630,11 +697,18 @@ class CanvasPlotter(FigureCanvas):
                                      fontfamily=s.get('fontfamily', 'sans-serif'),
                                      bbox=bp, zorder=50, annotation_clip=False)
             elif ann['type'] == 'arrow':
+                abp = None if s.get('bg_alpha', 0.0) == 0 else dict(
+                    boxstyle='round,pad=0.3',
+                    facecolor=s.get('bg_color', '#ffffcc'),
+                    edgecolor=s.get('edge_color', '#aaaaaa'),
+                    alpha=s.get('bg_alpha', 0.0))
                 artist = ax.annotate(ann['label'],
                                      xy=(ann['x1'], ann['y1']),
                                      xytext=(ann['x0'], ann['y0']),
                                      fontsize=s.get('fontsize', 10),
-                                     color=s.get('fontcolor', '#000000'),
+                                     color=s.get('fontcolor', '#cc3300'),
+                                     fontfamily=s.get('fontfamily', 'sans-serif'),
+                                     bbox=abp,
                                      arrowprops=dict(arrowstyle='->',
                                                      color=s.get('fontcolor', '#cc3300'), lw=1.8),
                                      zorder=50, annotation_clip=False)
@@ -688,11 +762,18 @@ class CanvasPlotter(FigureCanvas):
                             fontfamily=s.get('fontfamily', 'sans-serif'),
                             bbox=bp, zorder=50, annotation_clip=False)
             elif ann['type'] == 'arrow':
+                abp = None if s.get('bg_alpha', 0.0) == 0 else dict(
+                    boxstyle='round,pad=0.3',
+                    facecolor=s.get('bg_color', '#ffffcc'),
+                    edgecolor=s.get('edge_color', '#aaaaaa'),
+                    alpha=s.get('bg_alpha', 0.0))
                 ax.annotate(ann['label'],
                             xy=(ann['x1'], ann['y1']),
                             xytext=(ann['x0'], ann['y0']),
                             fontsize=s.get('fontsize', 10),
-                            color=s.get('fontcolor', '#000000'),
+                            color=s.get('fontcolor', '#cc3300'),
+                            fontfamily=s.get('fontfamily', 'sans-serif'),
+                            bbox=abp,
                             arrowprops=dict(arrowstyle='->',
                                             color=s.get('fontcolor', '#cc3300'), lw=1.8),
                             zorder=50, annotation_clip=False)

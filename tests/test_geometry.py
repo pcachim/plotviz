@@ -45,5 +45,28 @@ class TestRoundTrip(unittest.TestCase):
                                10 / 2.54 * 300)
 
 
+class TestPointSegmentDistance(unittest.TestCase):
+    def test_endpoint(self):
+        self.assertAlmostEqual(geo.point_segment_distance(0, 0, 0, 0, 10, 0), 0)
+
+    def test_on_segment(self):
+        self.assertAlmostEqual(geo.point_segment_distance(5, 0, 0, 0, 10, 0), 0)
+
+    def test_perpendicular(self):
+        self.assertAlmostEqual(geo.point_segment_distance(5, 3, 0, 0, 10, 0), 3)
+
+    def test_beyond_endpoint_clamps(self):
+        # point past the B end projects onto B, not the infinite line
+        self.assertAlmostEqual(geo.point_segment_distance(13, 0, 0, 0, 10, 0), 3)
+
+    def test_degenerate_segment(self):
+        self.assertAlmostEqual(geo.point_segment_distance(3, 4, 1, 1, 1, 1),
+                               ((3 - 1) ** 2 + (4 - 1) ** 2) ** 0.5)
+
+    def test_diagonal_midpoint(self):
+        # midpoint of the segment lies on it → distance 0
+        self.assertAlmostEqual(geo.point_segment_distance(5, 5, 0, 0, 10, 10), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -44,3 +44,23 @@ def from_inches(inches: float, unit: str, dpi: float = 300) -> float:
 def convert(value: float, from_unit: str, to_unit: str, dpi: float = 300) -> float:
     """Convert *value* directly from one unit to another."""
     return from_inches(to_inches(value, from_unit, dpi), to_unit, dpi)
+
+
+def point_segment_distance(px, py, ax, ay, bx, by) -> float:
+    """Euclidean distance from point (px, py) to the segment (ax, ay)-(bx, by).
+
+    Used for hit-testing arrow annotations along their whole length rather than
+    only near an endpoint. Caller may pre-normalise coordinates (e.g. divide by
+    a per-axis tolerance) so the distance is comparable across axes with
+    different scales.
+    """
+    dx, dy = bx - ax, by - ay
+    seg_sq = dx * dx + dy * dy
+    if seg_sq <= 1e-30:
+        # Degenerate segment → distance to the (coincident) endpoint.
+        return ((px - ax) ** 2 + (py - ay) ** 2) ** 0.5
+    # Projection parameter t of the point onto the segment, clamped to [0, 1].
+    t = ((px - ax) * dx + (py - ay) * dy) / seg_sq
+    t = max(0.0, min(1.0, t))
+    cx, cy = ax + t * dx, ay + t * dy
+    return ((px - cx) ** 2 + (py - cy) ** 2) ** 0.5

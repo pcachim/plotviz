@@ -1121,6 +1121,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def init_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
+        # Instantiate the status bar up front so it reserves its bottom space
+        # from the start. Otherwise the first _show_status() call (on the first
+        # canvas click) creates it lazily, shrinking the content and producing a
+        # one-off downward "jump" of the canvas and tabs.
+        self.statusBar()
         main_layout = QHBoxLayout(central)
 
         self.tabs = QTabWidget()
@@ -2958,10 +2963,19 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     def refresh_annotation_list(self):
         if not hasattr(self,'ann_list_widget'): return
+        # Preserve the current selection across the rebuild (clear() drops it).
+        # Track the selected annotation by identity so it survives a refresh
+        # triggered by a drag/redraw.
+        sel_idx = self._selected_ann_index()
+        sel_ann = (self.canvas.annotations[sel_idx]
+                   if 0 <= sel_idx < len(self.canvas.annotations)
+                   else getattr(self, '_selected_ann_obj', None))
         self.ann_list_widget.clear()
         # Filter to current subplot shown in annotations tab
         filter_idx = self.ann_sp_active.currentIndex() if hasattr(self, 'ann_sp_active') else -1
-        for i, ann in enumerate(self.canvas.annotations):
+        sel_row = -1
+        row = 0
+        for ann in self.canvas.annotations:
             if filter_idx >= 0 and ann.get('axes_index', 0) != filter_idx:
                 continue
             if ann['type']=='text':
@@ -2972,6 +2986,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             elif ann['type']=='image':
                 self.ann_list_widget.addItem(
                     f"🖼 {os.path.basename(ann['filepath'])}  zoom={ann.get('zoom',0.15):.2f}  @ ({ann['x']:.3g},{ann['y']:.3g})")
+            if ann is sel_ann:
+                sel_row = row
+            row += 1
+        if sel_row >= 0:
+            self.ann_list_widget.setCurrentRow(sel_row)
 
     def _selected_ann_index(self):
         """Return the index into canvas.annotations for the selected list item."""
@@ -2988,6 +3007,31 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 return i
             count += 1
         return -1
+
+    def select_annotation_in_list(self, ann):
+        """Select, in the annotations list, the row matching *ann* (the object
+        clicked on the canvas). Honours the current subplot filter."""
+        if not hasattr(self, 'ann_list_widget'):
+            return
+        self._selected_ann_obj = ann   # remembered so refresh() can restore it
+        filter_idx = self.ann_sp_active.currentIndex() if hasattr(self, 'ann_sp_active') else -1
+        row = 0
+        for a in self.canvas.annotations:
+            if filter_idx >= 0 and a.get('axes_index', 0) != filter_idx:
+                continue
+            if a is ann:
+                self.ann_list_widget.setCurrentRow(row)
+                return
+            row += 1
+
+    def edit_annotation(self, ann):
+        """Open the edit dialog for a specific annotation (e.g. from a canvas
+        double-click)."""
+        dlg = AnnotationEditDialog(ann, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            dlg.apply()
+            self.update_preview()
+            self.refresh_annotation_list()
 
     def _edit_selected_annotation(self):
         idx = self._selected_ann_index()

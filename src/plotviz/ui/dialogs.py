@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QCheckBox, QWidget, QMessageBox, QApplication,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from ui.helpers import _show_color_dialog
 
 class PaletteColorDialog:
@@ -87,10 +88,18 @@ class AnnotationEditDialog(QDialog):
                 sb.setValue(ann[k])
                 self.fields[k] = sb
                 form.addRow(label+':', sb)
+            s = ann.get('style', {})
+
+            # ── Label + full text styling (parity with text annotations) ──────
             self.fields['label'] = QLineEdit(ann.get('label',''))
             form.addRow('Label:', self.fields['label'])
-            s = ann.get('style', {})
-            self.fields['fontcolor'] = QLineEdit(s.get('fontcolor','#000000'))
+
+            self.fields['fontsize'] = QSpinBox()
+            self.fields['fontsize'].setRange(6,72)
+            self.fields['fontsize'].setValue(s.get('fontsize',10))
+            form.addRow('Font size:', self.fields['fontsize'])
+
+            self.fields['fontcolor'] = QLineEdit(s.get('fontcolor','#cc3300'))
             btn_fc2 = QPushButton('…')
             btn_fc2.setFixedWidth(28)
             btn_fc2.clicked.connect(lambda: self._pick_color('fontcolor'))
@@ -99,8 +108,25 @@ class AnnotationEditDialog(QDialog):
             row3.addWidget(btn_fc2)
             w3 = QWidget()
             w3.setLayout(row3)
-            form.addRow('Arrow color:', w3)
- 
+            form.addRow('Arrow / text color:', w3)
+
+            self.fields['bg_alpha'] = QDoubleSpinBox()
+            self.fields['bg_alpha'].setRange(0,1)
+            self.fields['bg_alpha'].setSingleStep(0.05)
+            self.fields['bg_alpha'].setValue(s.get('bg_alpha',0.0))
+            form.addRow('Label BG opacity:', self.fields['bg_alpha'])
+
+            self.fields['bg_color'] = QLineEdit(s.get('bg_color','#ffffcc'))
+            btn_bg2 = QPushButton('…')
+            btn_bg2.setFixedWidth(28)
+            btn_bg2.clicked.connect(lambda: self._pick_color('bg_color'))
+            row4 = QHBoxLayout()
+            row4.addWidget(self.fields['bg_color'])
+            row4.addWidget(btn_bg2)
+            w4 = QWidget()
+            w4.setLayout(row4)
+            form.addRow('Label BG color:', w4)
+
         elif atype == 'image':
             self.fields['x'] = QDoubleSpinBox()
             self.fields['x'].setRange(-1e9,1e9)
@@ -156,8 +182,11 @@ class AnnotationEditDialog(QDialog):
                 ann[k] = self.fields[k].value()
             ann['label'] = self.fields['label'].text()
             ann.setdefault('style', {})
+            ann['style']['fontsize']  = self.fields['fontsize'].value()
             ann['style']['fontcolor'] = self.fields['fontcolor'].text()
-            ann['style'].setdefault('fontsize', 10)
+            ann['style']['bg_alpha']  = self.fields['bg_alpha'].value()
+            ann['style']['bg_color']  = self.fields['bg_color'].text()
+            ann['style'].setdefault('edge_color', '#aaaaaa')
             ann['style'].setdefault('fontfamily', 'sans-serif')
         elif atype == 'image':
             ann['x']    = self.fields['x'].value()

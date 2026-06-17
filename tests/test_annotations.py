@@ -11,9 +11,9 @@ def _text(idx=0, label="note", **style):
             "label": label, "style": style}
 
 
-def _arrow(idx=0):
+def _arrow(idx=0, label="a", **style):
     return {"type": "arrow", "axes_index": idx, "x0": 0, "y0": 0,
-            "x1": 1, "y1": 1, "label": "a", "style": {}}
+            "x1": 1, "y1": 1, "label": label, "style": style}
 
 
 def _image(idx=0):
@@ -58,6 +58,26 @@ class TestAnnotationGen(unittest.TestCase):
         s = {"annotations": [_text(idx=1)], "subplot_ann_visible": {"1": True}}
         code = "\n".join(pe._gen_annotations(s, 4))
         self.assertIn("ax1.annotate(", code)
+
+    def test_arrow_emits_label_font_and_arrowprops(self):
+        s = {"annotations": [_arrow(label="here", fontsize=14,
+                                    fontfamily="Serif", fontcolor="#112233")]}
+        code = "\n".join(pe._gen_annotations(s, 1))
+        compile(code, "<ann>", "exec")
+        self.assertIn("'here'", code)            # label text
+        self.assertIn("fontsize=14", code)
+        self.assertIn("fontfamily='Serif'", code)
+        self.assertIn("color='#112233'", code)   # text + arrow share the colour
+        self.assertIn("arrowprops=", code)
+
+    def test_arrow_label_background(self):
+        # bg_alpha == 0 -> no box; > 0 -> styled bbox dict
+        plain = "\n".join(pe._gen_annotations({"annotations": [_arrow()]}, 1))
+        self.assertIn("bbox=None", plain)
+        boxed = "\n".join(pe._gen_annotations(
+            {"annotations": [_arrow(bg_alpha=0.8, bg_color="#fff0aa")]}, 1))
+        self.assertIn("facecolor='#fff0aa'", boxed)
+        self.assertIn("boxstyle='round,pad=0.3'", boxed)
 
 
 if __name__ == "__main__":

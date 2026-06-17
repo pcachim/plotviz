@@ -1002,11 +1002,20 @@ def _gen_annotations(settings, n_subplots):
                 f"fontsize={fs}, color='{fc}', fontfamily='{ff}', "
                 f"bbox={bbox}, zorder=50, annotation_clip=False)")
         elif t == 'arrow':
+            afc = _esc(s.get('fontcolor', '#cc3300'))
+            if s.get('bg_alpha', 0.0) == 0:
+                abbox = "None"
+            else:
+                abbox = ("dict(boxstyle='round,pad=0.3', facecolor='%s', "
+                         "edgecolor='%s', alpha=%s)" % (
+                             _esc(s.get('bg_color', '#ffffcc')),
+                             _esc(s.get('edge_color', '#aaaaaa')),
+                             s.get('bg_alpha', 0.0)))
             lines.append(
                 f"{axn}.annotate('{_esc(a.get('label', ''))}', "
                 f"xy=({a['x1']!r}, {a['y1']!r}), xytext=({a['x0']!r}, {a['y0']!r}), "
-                f"fontsize={fs}, color='{fc}', "
-                f"arrowprops=dict(arrowstyle='->', color='{fc}', lw=1.8), "
+                f"fontsize={fs}, color='{afc}', fontfamily='{ff}', bbox={abbox}, "
+                f"arrowprops=dict(arrowstyle='->', color='{afc}', lw=1.8), "
                 f"zorder=50, annotation_clip=False)")
         elif t == 'image':
             imgfile = a.get('image_file', '')
