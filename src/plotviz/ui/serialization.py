@@ -9,6 +9,9 @@ Mixin providing settings collection/apply, series meta, and project save/load.
 """
 import json, zipfile, os, tempfile
 from ui.helpers import _get_dir, _remember_dir
+from core.serialize import (
+    encode_datasets, decode_datasets, write_project_zip, read_project_zip,
+)
 import numpy as np
 from PyQt6.QtWidgets import (
     QFileDialog, QMessageBox, QComboBox, QTableWidgetItem, QSpinBox,
@@ -1283,31 +1286,14 @@ class SerializationMixin:
             else:
                 keep = set(self.datasets.keys())
 
-            datasets = {}
-            for k in keep:
-                v = self.datasets[k]
-                is_cat = hasattr(v, 'dtype') and v.dtype.kind in ('U', 'S', 'O')
-                datasets[k] = {
-                    'dtype': 'object' if is_cat else 'float',
-                    'values': (v.tolist() if hasattr(v, 'tolist') else list(v)),
-                }
+            datasets = encode_datasets({k: self.datasets[k] for k in keep})
 
-            with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr('settings.json', json.dumps(settings,    indent=2))
-                zf.writestr('series.json',   json.dumps(series_meta, indent=2))
-                zf.writestr('data.json',     json.dumps(datasets,    indent=2))
-                custom_pal_json = self._custom_palettes_json()
-                if custom_pal_json != '{}':
-                    zf.writestr('palette.json', custom_pal_json)
-                seen = set()
-                for ann in self.canvas.annotations:
-                    if ann['type'] == 'image':
-                        src = ann.get('filepath', '')
-                        if src and os.path.isfile(src):
-                            bname = os.path.basename(src)
-                            if bname not in seen:
-                                zf.write(src, 'images/' + bname)
-                                seen.add(bname)
+            image_paths = [ann.get('filepath', '')
+                           for ann in self.canvas.annotations
+                           if ann['type'] == 'image']
+            write_project_zip(fp, settings, series_meta, datasets,
+                              palette_json=self._custom_palettes_json(),
+                              image_paths=image_paths)
 
             import config.settings as _cfg
             _cfg.add_recent_file(fp)
@@ -1397,51 +1383,22 @@ class SerializationMixin:
             self.series_table.blockSignals(False)
         # ───────────────────────────────────────────────────────────────────────
         try:
-            with zipfile.ZipFile(fp, 'r') as zf:
-                names = zf.namelist()
-                if 'settings.json' not in names:
-                    QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.')
-                    return
-                settings    = json.loads(zf.read('settings.json'))
-                series_meta = json.loads(zf.read('series.json')) if 'series.json' in names else None
-                # Load custom palettes if present
-                if 'palette.json' in names:
-                    self._load_custom_palettes_json(zf.read('palette.json').decode())
-                # Backwards compat: series embedded inside old settings.json
-                if series_meta is None and 'series' in settings:
-                    series_meta = {
-                        'series':  settings.get('series', []),
-                        'z_col':   settings.get('z_col', '(none)'),
-                        'err_col': settings.get('err_col', '(none)'),
-                        'y2_cols': settings.get('y2_cols', []),
-                    }
-                if 'data.json' in names:
-                    raw_ds = json.loads(zf.read('data.json'))
-                    self.datasets = {}
-                    for k, v in raw_ds.items():
-                        # New format: {'dtype': 'float'|'object', 'values': [...]}
-                        # Old format: plain list
-                        if isinstance(v, dict) and 'values' in v:
-                            vals = v['values']
-                            if v.get('dtype') == 'object':
-                                self.datasets[k] = np.array(vals, dtype=object)
-                            else:
-                                self.datasets[k] = np.array(vals, dtype=float)
-                        else:
-                            # Backwards compat: plain list — infer dtype
-                            try:
-                                self.datasets[k] = np.array(v, dtype=float)
-                            except (ValueError, TypeError):
-                                self.datasets[k] = np.array(v, dtype=object)
-                else:
-                    self.datasets = {}
-                img_dir = tempfile.mkdtemp(prefix='plotviz_imgs_')
-                for name in names:
-                    if name.startswith('images/') and name != 'images/':
-                        bname = os.path.basename(name)
-                        dest  = os.path.join(img_dir, bname)
-                        with open(dest, 'wb') as f2:
-                            f2.write(zf.read(name))
+            try:
+                bundle = read_project_zip(fp)
+            except ValueError:
+                QMessageBox.warning(self, 'Invalid', 'No settings.json in archive.')
+                return
+            settings    = bundle['settings']
+            series_meta = bundle['series_meta']
+            # Load custom palettes if present
+            if bundle['palette_json']:
+                self._load_custom_palettes_json(bundle['palette_json'])
+            self.datasets = decode_datasets(bundle['datasets_raw'])
+            # Extract image-annotation files to a temp dir for runtime use.
+            img_dir = tempfile.mkdtemp(prefix='plotviz_imgs_')
+            for bname, data in bundle['images'].items():
+                with open(os.path.join(img_dir, bname), 'wb') as f2:
+                    f2.write(data)
 
             # ── Restore order matters: ──────────────────────────────────────────
             # 1. Apply all settings EXCEPT subplot layout (which triggers signals

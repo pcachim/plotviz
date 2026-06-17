@@ -49,8 +49,7 @@ def _latex_safe(text: str) -> str:
     return text.translate(_LATEX_SPECIAL)
 
 
-_3D_TYPES = {'3D Surface'}
-_NO_LEGEND_TYPES = {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Contour', 'Tricontour', '3D Surface', 'Violin', 'Boxplot', 'Radar', 'Quiver', 'Barbs', 'Streamplot'}
+from core.constants import _3D_TYPES, _NO_LEGEND_TYPES
 
 
 class PlotEngineMixin:

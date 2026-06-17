@@ -44,8 +44,9 @@ WHOLE_CHART_TYPES = {
     'ECDF', 'Quiver', 'Barbs', 'Streamplot',
 }
 
-_NO_X_TYPES = {'Histogram', 'Boxplot', 'Violin', 'Pie', 'ECDF',
-}
+# Re-exported from the canonical source so existing `from ui.tab_builders
+# import _NO_X_TYPES` call sites keep working.
+from core.constants import _NO_X_TYPES
 
 # Master colormap list — sorted alphabetically (case-insensitive).
 _CMAP_LIST = sorted([

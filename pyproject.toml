@@ -37,7 +37,7 @@ path = "src/plotviz/config/_version.py"
 
 [tool.hatch.build.targets.wheel]
 sources = ["src/plotviz"]
-packages = ["ui", "data", "styling", "config"]
+packages = ["ui", "data", "styling", "config", "core"]
 
 [dependency-groups]
 dev = [
@@ -45,4 +45,10 @@ dev = [
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
     "mike>=2.1",
+    "pytest>=8.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
