@@ -25,9 +25,17 @@ if _SRC not in sys.path:
 
 
 def _stub_pyqt6() -> None:
-    """Insert minimal PyQt6 stubs so pure modules import without Qt."""
+    """Insert minimal PyQt6 stubs so pure modules import without Qt.
+
+    No-op when a real PyQt6 is installed — so the GUI smoke tests can use the
+    real toolkit in the same test process (CI), while the pure tests still run
+    without Qt locally.
+    """
     if "PyQt6.QtWidgets" in sys.modules:
         return
+    import importlib.util
+    if importlib.util.find_spec("PyQt6") is not None:
+        return  # real PyQt6 available — don't shadow it
 
     class _Dummy:  # stands in for QFileDialog / QMessageBox (never instantiated in tests)
         pass

@@ -27,6 +27,10 @@ Only `matplotlib`, `numpy` and `pandas` are needed to run the smoke tests
 - `test_annotations.py` — annotation code emission (text / arrow / image).
 - `test_script_gen.py` — decoration emission + end-to-end smoke run of the
   generated script for single and multi-subplot charts.
+- `test_gui_smoke.py` — headless Qt smoke tests (app construction, loading a
+  .pviz, the shared render path, annotations, multi-subplot). Runs only where
+  a real PyQt6 is installed, with `QT_QPA_PLATFORM=offscreen`; skipped
+  otherwise. CI installs PyQt6 so these run there.
 
 ## Adding tests
 

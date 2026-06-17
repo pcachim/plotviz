@@ -574,13 +574,24 @@ class CodeRunnerDialog(QDialog):
         except ImportError:
             pass
 
-        with matplotlib.rc_context({'text.usetex': False}):
-            try:
-                exec(compile(code, '<code_runner>', 'exec'), sandbox)   # noqa: S102
-            except Exception:
-                tb = traceback.format_exc()
-                self._show_error(tb)
-                return
+        # Neutralise plt.show() for the duration of the run: with the
+        # interactive Qt backend it would pop a separate native figure window
+        # that steals focus from the app. The Code Runner embeds the figure
+        # itself (below), so a real show() is both unnecessary and disruptive.
+        # The generated standalone script keeps plt.show() so it still displays
+        # when run on its own outside plotviz.
+        _orig_show = plt.show
+        plt.show = lambda *a, **k: None
+        try:
+            with matplotlib.rc_context({'text.usetex': False}):
+                try:
+                    exec(compile(code, '<code_runner>', 'exec'), sandbox)   # noqa: S102
+                except Exception:
+                    tb = traceback.format_exc()
+                    self._show_error(tb)
+                    return
+        finally:
+            plt.show = _orig_show
 
         # Collect whichever figure(s) the code produced.
         figs = [plt.figure(n) for n in plt.get_fignums()]
