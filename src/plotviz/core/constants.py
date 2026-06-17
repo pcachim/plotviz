@@ -37,6 +37,14 @@ DECOR_NO_LIMITS = {"Pie", "Heatmap"}
 #: Types for which tick styling / spine styling is skipped.
 DECOR_NO_TICKS = {"Pie", "Polar", "Radar", "3D Surface"}
 
+#: Non-Cartesian / pixel-space types for which axis scale + inversion are
+#: skipped in the multi-subplot (mosaic / grid) paths.
+AXSCALE_SKIP_TYPES = {"Pie", "Heatmap", "Polar", "Radar", "3D Surface"}
+
+#: The "heatmap group": types drawn in pixel/data space that carry a colorbar
+#: and must be excluded from shared axes (sharex/sharey).
+HEATMAP_GROUP_TYPES = {"Heatmap", "Contour", "Tricontour", "Hist2D", "Hexbin"}
+
 # ── Historical underscore aliases ───────────────────────────────────────────
 _3D_TYPES = THREE_D_TYPES
 _POLAR_TYPES = POLAR_TYPES
@@ -45,3 +53,5 @@ _NO_LEGEND_TYPES = NO_LEGEND_TYPES
 _DECOR_NO_SCALE = DECOR_NO_SCALE
 _DECOR_NO_LIMITS = DECOR_NO_LIMITS
 _DECOR_NO_TICKS = DECOR_NO_TICKS
+_AXSCALE_SKIP_TYPES = AXSCALE_SKIP_TYPES
+_HEATMAP_GROUP_TYPES = HEATMAP_GROUP_TYPES

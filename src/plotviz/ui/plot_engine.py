@@ -49,7 +49,10 @@ def _latex_safe(text: str) -> str:
     return text.translate(_LATEX_SPECIAL)
 
 
-from core.constants import _3D_TYPES, _NO_LEGEND_TYPES
+from core.constants import (
+    _3D_TYPES, _NO_LEGEND_TYPES, _DECOR_NO_SCALE, _DECOR_NO_LIMITS,
+    _AXSCALE_SKIP_TYPES, _HEATMAP_GROUP_TYPES,
+)
 
 
 class PlotEngineMixin:
@@ -1327,8 +1330,8 @@ class PlotEngineMixin:
             # Heatmap uses imshow pixel-space, Pie/Polar/Radar use non-Cartesian projections.
             # Contour, Tricontour, Hist2D, Hexbin all use data coordinates and CAN receive
             # set_xscale / set_xlim / set_ylim normally.
-            _NO_SCALE_TYPES  = {'Pie', 'Heatmap', 'Polar', 'Radar', '3D Surface'}
-            _NO_LIMITS_TYPES = _NO_X_TYPES | {'Pie', 'Heatmap'}
+            _NO_SCALE_TYPES  = _AXSCALE_SKIP_TYPES
+            _NO_LIMITS_TYPES = _NO_X_TYPES | _DECOR_NO_LIMITS
             _horiz    = ct == 'Bar' and self._sp_opt(subplot_idx, 'bar_horizontal', False)
             _protect_y = _x_is_cat and _horiz
             xs = self.subplot_xscales.get(subplot_idx, 'linear')
@@ -1363,7 +1366,7 @@ class PlotEngineMixin:
             ax.legend(**self._legend_kwargs(subplot_idx))
         if not is3d:
             self._apply_canvas_style(ax, subplot_idx)
-            if ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
+            if ct not in _DECOR_NO_SCALE:
                 self._apply_grid(ax, subplot_idx)
             if _y2_active:
                 self._align_twinx_ticks(
@@ -1510,8 +1513,8 @@ class PlotEngineMixin:
                         ax.set_ylabel('')
                     xs = self.subplot_xscales.get(idx, 'linear')
                     ys = self.subplot_yscales.get(idx, 'linear')
-                    _mosaic_no_scale  = {'Pie', 'Heatmap', 'Polar', 'Radar', '3D Surface'}
-                    _mosaic_no_limits = {'Pie', 'Heatmap'}
+                    _mosaic_no_scale  = _AXSCALE_SKIP_TYPES
+                    _mosaic_no_limits = _DECOR_NO_LIMITS
                     if sub_ct not in _mosaic_no_scale:
                         if cat_info is None:  # don't set_xscale for categorical axes
                             try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
@@ -1531,7 +1534,7 @@ class PlotEngineMixin:
                         try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
                         except Exception: pass
                     self._apply_canvas_style(ax, idx)
-                    if sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(ax, idx)
+                    if sub_ct not in _DECOR_NO_SCALE: self._apply_grid(ax, idx)
                     self._apply_cat_ticks(ax, cat_info)
                     if ax2 is not None:
                         self._align_twinx_ticks(ax, ax2, idx,
@@ -1554,7 +1557,7 @@ class PlotEngineMixin:
                     sub_is_polar = sub_ct in ('Polar', 'Radar')
                     sub_proj = 'polar' if sub_is_polar else ('3d' if sub_is3d else None)
                     kw = {}
-                    _no_share = sub_is3d or sub_is_polar or sub_ct in {'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
+                    _no_share = sub_is3d or sub_is_polar or sub_ct in _HEATMAP_GROUP_TYPES
                     if not _no_share and first:
                         if self.sp_sharex.isChecked(): kw['sharex'] = first
                         if self.sp_sharey.isChecked(): kw['sharey'] = first
@@ -1626,7 +1629,7 @@ class PlotEngineMixin:
                         ax.yaxis.label.set_ha(self.subplot_ylabel_ha.get(idx, 'center'))
                     else:
                         ax.set_ylabel('')
-                    if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
+                    if not sub_is3d and sub_ct not in _DECOR_NO_SCALE:
                         xs = self.subplot_xscales.get(idx, 'linear')
                         ys = self.subplot_yscales.get(idx, 'linear')
                         if cat_info is None:  # skip set_xscale for categorical
@@ -1642,13 +1645,13 @@ class PlotEngineMixin:
                         xs = self.subplot_xscales.get(idx, 'linear')
                         ys = self.subplot_yscales.get(idx, 'linear')
                         _protect_y = False
-                    _grid_no_limits = {'Pie', 'Heatmap'}
+                    _grid_no_limits = _DECOR_NO_LIMITS
                     xlim = self.subplot_xlims.get(idx, None)
                     if xlim and sub_ct not in _grid_no_limits: ax.set_xlim(xlim[0], xlim[1])
                     ylim = self.subplot_ylims.get(idx, None)
                     if ylim and sub_ct not in _grid_no_limits: ax.set_ylim(ylim[0], ylim[1])
                     # Bug 3 fix: invert after limits so set_xlim/ylim can't undo it
-                    if not sub_is3d and sub_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}:
+                    if not sub_is3d and sub_ct not in _DECOR_NO_SCALE:
                         if cat_info is None and xs == 'inverted': ax.invert_xaxis()
                         if not _protect_y and ys == 'inverted': ax.invert_yaxis()
                     if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
@@ -1670,7 +1673,7 @@ class PlotEngineMixin:
                 _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
                 if _ax_ct not in _3D_TYPES:
                     self._apply_canvas_style(_ax, _ax_i)
-                    if _ax_ct not in {'Pie', 'Heatmap', 'Hist2D', 'Hexbin', 'Polar', 'Radar', '3D Surface', 'Tricontour'}: self._apply_grid(_ax, _ax_i)
+                    if _ax_ct not in _DECOR_NO_SCALE: self._apply_grid(_ax, _ax_i)
             for _ax_i, _ax2 in ax2_map.items():
                 _ax_primary = axes_list[_ax_i] if _ax_i < len(axes_list) else None
                 if _ax_primary is not None:

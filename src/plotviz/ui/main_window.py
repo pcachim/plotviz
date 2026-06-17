@@ -58,6 +58,7 @@ from ui.tab_builders import (
     PER_SERIES_TYPES, _CUSTOM_PALETTES,
     PLOT_MODE_GROUPS, TYPE_TO_PLOT_MODE,
 )
+from core.constants import _HEATMAP_GROUP_TYPES
 from ui.plot_engine import PlotEngineMixin
 from ui.serialization import SerializationMixin
 from ui.python_export import PythonExportMixin
@@ -2768,7 +2769,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # Chart types that render a colorbar inside the axes-box area.
     # For these the right margin is allowed to exceed fig_width so the
     # user can deliberately push the colorbar outside the figure boundary.
-    _COLORBAR_TYPES = {'Heatmap', 'Contour', 'Tricontour', 'Hist2D', 'Hexbin'}
+    _COLORBAR_TYPES = _HEATMAP_GROUP_TYPES
 
     def _has_colorbar_subplot(self):
         """Return True if any active subplot uses a colorbar chart type."""
