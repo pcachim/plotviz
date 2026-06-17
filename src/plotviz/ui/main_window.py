@@ -59,6 +59,7 @@ from ui.tab_builders import (
     PLOT_MODE_GROUPS, TYPE_TO_PLOT_MODE,
 )
 from core.constants import _HEATMAP_GROUP_TYPES
+from core.geometry import to_inches, from_inches
 from ui.plot_engine import PlotEngineMixin
 from ui.serialization import SerializationMixin
 from ui.python_export import PythonExportMixin
@@ -2608,32 +2609,28 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     def _fig_size_in_inches(self):
         """Convert current fig_width/fig_height spinbox values to inches."""
-        w, h = self.fig_width.value(), self.fig_height.value()
         unit = self.fig_unit.currentText()
-        if unit == 'cm':
-            return w / 2.54, h / 2.54
-        elif unit == 'pixels':
-            dpi = self.dpi_spin.value()
-            return w / dpi, h / dpi
-        return w, h   # already inches
+        dpi = self.dpi_spin.value()
+        return (to_inches(self.fig_width.value(), unit, dpi),
+                to_inches(self.fig_height.value(), unit, dpi))
 
     def _on_fig_preset_changed(self, idx):
         """Apply a size preset (values are always in cm; convert to current unit)."""
         _, w_cm, h_cm = self._fig_presets[idx]
         if w_cm is None: return  # Custom — don't touch spinboxes
         unit = self.fig_unit.currentText()
+        dpi = self.dpi_spin.value()
+        # Preset values are in cm; convert to the active unit.
+        w = from_inches(to_inches(w_cm, 'cm', dpi), unit, dpi)
+        h = from_inches(to_inches(h_cm, 'cm', dpi), unit, dpi)
+        if unit != 'pixels':
+            w, h = round(w, 2), round(h, 2)
+        else:
+            w, h = round(w), round(h)
         self.fig_width.blockSignals(True)
         self.fig_height.blockSignals(True)
-        if unit == 'cm':
-            self.fig_width.setValue(w_cm)
-            self.fig_height.setValue(h_cm)
-        elif unit == 'inches':
-            self.fig_width.setValue(round(w_cm / 2.54, 2))
-            self.fig_height.setValue(round(h_cm / 2.54, 2))
-        elif unit == 'pixels':
-            dpi = self.dpi_spin.value()
-            self.fig_width.setValue(round(w_cm / 2.54 * dpi))
-            self.fig_height.setValue(round(h_cm / 2.54 * dpi))
+        self.fig_width.setValue(w)
+        self.fig_height.setValue(h)
         self.fig_width.blockSignals(False)
         self.fig_height.blockSignals(False)
         self._update_margin_ranges()
@@ -2667,14 +2664,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # currentTextChanged fires after the combo already reflects the new value, so
         # we must convert manually from _prev_fig_unit rather than via _fig_size_in_inches().
         prev_unit = getattr(self, '_prev_fig_unit', 'cm')
-        w_raw, h_raw = self.fig_width.value(), self.fig_height.value()
-        if prev_unit == 'cm':
-            wi, hi = w_raw / 2.54, h_raw / 2.54
-        elif prev_unit == 'pixels':
-            dpi = self.dpi_spin.value()
-            wi, hi = w_raw / dpi, h_raw / dpi
-        else:
-            wi, hi = w_raw, h_raw
+        dpi = self.dpi_spin.value()
+        wi = to_inches(self.fig_width.value(), prev_unit, dpi)
+        hi = to_inches(self.fig_height.value(), prev_unit, dpi)
         self._prev_fig_unit = unit
         self.fig_width.blockSignals(True)
         self.fig_height.blockSignals(True)
@@ -2685,8 +2677,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.fig_height.setDecimals(1)
             self.fig_width.setSingleStep(0.5)
             self.fig_height.setSingleStep(0.5)
-            self.fig_width.setValue(round(wi * 2.54, 1))
-            self.fig_height.setValue(round(hi * 2.54, 1))
+            self.fig_width.setValue(round(from_inches(wi, 'cm', dpi), 1))
+            self.fig_height.setValue(round(from_inches(hi, 'cm', dpi), 1))
         elif unit == 'inches':
             self.fig_width.setRange(1, 200)
             self.fig_height.setRange(1, 200)
@@ -2697,15 +2689,14 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.fig_width.setValue(round(wi, 2))
             self.fig_height.setValue(round(hi, 2))
         elif unit == 'pixels':
-            dpi = self.dpi_spin.value()
             self.fig_width.setRange(50, 20000)
             self.fig_height.setRange(50, 20000)
             self.fig_width.setDecimals(0)
             self.fig_height.setDecimals(0)
             self.fig_width.setSingleStep(10)
             self.fig_height.setSingleStep(10)
-            self.fig_width.setValue(round(wi * dpi))
-            self.fig_height.setValue(round(hi * dpi))
+            self.fig_width.setValue(round(from_inches(wi, 'pixels', dpi)))
+            self.fig_height.setValue(round(from_inches(hi, 'pixels', dpi)))
         self.fig_width.blockSignals(False)
         self.fig_height.blockSignals(False)
 

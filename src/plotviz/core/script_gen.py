@@ -17,6 +17,7 @@ from core.constants import (
     _DECOR_NO_SCALE, _DECOR_NO_LIMITS, _DECOR_NO_TICKS,
 )
 from core.settings_schema import SubplotStyle, subplot_get
+from core.geometry import to_inches
 
 # ── Chart-type → code-generation function ─────────────────────────────────────
 # Each generator receives (settings, series_list, datasets, palette, ax_var) and
@@ -1137,14 +1138,8 @@ def generate_plot_script(settings: dict, series_meta: dict,
     fig_w_raw = settings.get('fig_width',  20.0)
     fig_h_raw = settings.get('fig_height', 15.0)
     _dpi = settings.get('dpi', 300)   # always read; only emitted for pixel-unit figures
-    if fig_unit == 'cm':
-        fig_w = fig_w_raw / 2.54
-        fig_h = fig_h_raw / 2.54
-    elif fig_unit == 'pixels':
-        fig_w = fig_w_raw / _dpi
-        fig_h = fig_h_raw / _dpi
-    else:  # inches
-        fig_w, fig_h = fig_w_raw, fig_h_raw
+    fig_w = to_inches(fig_w_raw, fig_unit, _dpi)
+    fig_h = to_inches(fig_h_raw, fig_unit, _dpi)
     fig_w = round(max(fig_w, 4.0), 2)
     fig_h = round(max(fig_h, 3.0), 2)
     # For pixel-unit figures emit dpi= so the rendered pixel dimensions match the app.

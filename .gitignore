@@ -21,3 +21,4 @@ RELEASE.md
 todo.md
 DISTRIBUTION.md
 site
+tests/fixtures/*.pviz
