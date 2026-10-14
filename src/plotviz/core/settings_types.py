@@ -303,23 +303,5 @@ class DerivedSettings(TypedDict, total=False):
     subplot_z_cols: dict[str | int, str]
 
 
-class LegacySettings(TypedDict, total=False):
-    """Fallback keys that core.script_gen still reads but the current UI never writes
-    at the top level (the real values live in the per-series ``opts`` of
-    curve_styles). They only matter for old project files; otherwise the
-    defaults in script_gen apply."""
-    scatter_alpha: float
-    area_alpha: float
-    bar_alpha: float
-    bar_edgecolor: str
-    bar_width: float
-    fill_between_alpha: float
-    fill_between_lw: float
-    fill_between_showline: bool
-    hist_edgecolor: str
-    tri_filled: bool
-    tri_tripcolor: bool
-
-
-class PlotSettings(UiSettings, ChartOpts, DerivedSettings, LegacySettings, total=False):
+class PlotSettings(UiSettings, ChartOpts, DerivedSettings, total=False):
     """The complete settings dict as seen by core.script_gen."""

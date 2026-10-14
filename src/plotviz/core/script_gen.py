@@ -94,8 +94,8 @@ def _series_style(settings: Settings, series: SeriesDict, i: int,
         "marker":        curve.get("marker",      "None"),
         "markersize":    curve.get("markersize",   6),
         "marker_color":  curve.get("marker_color") or color,
-        "scatter_alpha": settings.get("scatter_alpha", 0.6),
-        "area_alpha":    settings.get("area_alpha",    0.35),
+        "scatter_alpha": 0.6,
+        "area_alpha":    0.35,
     }
 
 
@@ -144,11 +144,11 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
         elif ct == 'Scatter':
             lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={sal}, s={ms**2})")
         elif ct == 'Bar':
-            # Resolve per-series bar opts (fall back to chart-level values from settings)
+            # Resolve per-series bar opts (the series' own opts, else the defaults)
             curve_opts = ((settings.get('curve_styles') or {}).get(s.get('label', '')) or {}).get('opts', {})
-            b_w  = curve_opts.get('bar_width',    settings.get('bar_width',    0.8))
-            b_al = curve_opts.get('bar_alpha',    settings.get('bar_alpha',    1.0))
-            b_ec = curve_opts.get('bar_edgecolor', settings.get('bar_edgecolor', 'none'))
+            b_w  = curve_opts.get('bar_width',    0.8)
+            b_al = curve_opts.get('bar_alpha',    1.0)
+            b_ec = curve_opts.get('bar_edgecolor', 'none')
             b_hor = curve_opts.get('bar_horizontal', bar_horiz)
             b_stk = curve_opts.get('bar_stacked',  bar_stacked)
             ec_kw = f", edgecolor='{_esc(b_ec)}'" if b_ec != 'none' else ''
@@ -218,9 +218,9 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
             lines.append(f"{ax_var}.fill_between({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={aal})")
         elif ct == 'Fill Between':
             curve_opts  = ((settings.get('curve_styles') or {}).get(s.get('label', '')) or {}).get('opts', {})
-            fb_al       = curve_opts.get('fill_between_alpha',   settings.get('fill_between_alpha',   0.4))
-            fb_lw       = curve_opts.get('fill_between_lw',      settings.get('fill_between_lw',      0.8))
-            fb_showline = curve_opts.get('fill_between_showline', settings.get('fill_between_showline', True))
+            fb_al       = curve_opts.get('fill_between_alpha',   0.4)
+            fb_lw       = curve_opts.get('fill_between_lw',      0.8)
+            fb_showline = curve_opts.get('fill_between_showline', True)
             y2_col      = curve_opts.get('fill_between_y2_col') or settings.get('_fill_y2_col', '')
             if y2_col and y2_col in datasets:
                 y2expr = _col_ref(y2_col)
@@ -275,7 +275,7 @@ def _gen_histogram(settings: Settings, series: list[SeriesDict], datasets: Datas
     histtype  = settings.get('hist_histtype', 'bar')
     orient    = settings.get('hist_orientation', 'vertical')
     alpha     = settings.get('heat_alpha', 0.7)
-    edgecolor = settings.get('hist_edgecolor', 'white')
+    edgecolor = 'white'
     for i, s in enumerate(series):
         yc  = s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
@@ -517,14 +517,10 @@ def _gen_tricontour(settings: Settings, series: list[SeriesDict], datasets: Data
             cmap      = settings.get('tri_cmap', 'rainbow')
             alpha     = settings.get('tri_alpha', 1.0)
             fill_mode = settings.get('tri_fill_mode', 'Filled contour')
-            # Backward compat: old saves used boolean tri_filled / tri_tripcolor
+            # Old saves used booleans (tri_filled / tri_tripcolor); the UI converts
+            # them to tri_fill_mode when it loads the file (see _apply_settings).
             if fill_mode not in ('Filled contour', 'Face colours', 'None'):
-                if settings.get('tri_tripcolor', False):
-                    fill_mode = 'Face colours'
-                elif settings.get('tri_filled', True):
-                    fill_mode = 'Filled contour'
-                else:
-                    fill_mode = 'None'
+                fill_mode = 'Filled contour'
             tri_lines = settings.get('tri_lines', True)
             triplot   = settings.get('tri_triplot', False)
             show_cb   = settings.get('tri_colorbar', True)
