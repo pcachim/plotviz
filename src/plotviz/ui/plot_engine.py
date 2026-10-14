@@ -9,6 +9,7 @@ Mixin providing all matplotlib plotting, decorating, preview and export methods.
 """
 import logging
 import traceback
+from contextlib import contextmanager
 from types import SimpleNamespace
 import numpy as np
 import matplotlib
@@ -1973,16 +1974,24 @@ class PlotEngineMixin:
         """Render the export figure to bytes in *fmt* at *dpi* (as File > Export does)."""
         import io
         wi, hi = self._fig_size_in_inches()
-        old_font = matplotlib.rcParams.get('font.family', ['sans-serif'])
-        matplotlib.rcParams['font.family'] = self.title_font.currentText()
-        try:
+        with self._export_rc():
             fig = self._build_export_figure(wi, hi, dpi)
             buf = io.BytesIO()
             fig.savefig(buf, format=fmt, dpi=dpi, bbox_inches=None)
             plt.close(fig)
-        finally:
-            matplotlib.rcParams['font.family'] = old_font
         return buf.getvalue()
+
+    @contextmanager
+    def _export_rc(self):
+        """The matplotlib settings every export path draws under.
+
+        The chart font, and no LaTeX: the preview and the exported script never use
+        it, so neither may the exported image (even if the user's matplotlibrc turns
+        it on), or the three would typeset the same text differently.
+        """
+        with matplotlib.rc_context({'font.family': self.title_font.currentText(),
+                                    'text.usetex': False}):
+            yield
 
     def _ask_export_options(self, wi, hi, fmt=None):
         """Ask for the export format and DPI.
@@ -2193,22 +2202,14 @@ class PlotEngineMixin:
                 self._export_fmt_combo.setCurrentIndex(_fi)
                 self._export_fmt_combo.blockSignals(False)
 
-            chart_font = self.title_font.currentText()
-            _old_font = matplotlib.rcParams.get('font.family', ['sans-serif'])
-            matplotlib.rcParams['font.family'] = chart_font
-
-            exp_fig = self._build_export_figure(wi, hi, dpi)
-
-            exp_fig.savefig(fp, dpi=dpi, format=mpl_fmt, bbox_inches=None)
-            plt.close(exp_fig)
-            matplotlib.rcParams['font.family'] = _old_font
+            with self._export_rc():
+                exp_fig = self._build_export_figure(wi, hi, dpi)
+                exp_fig.savefig(fp, dpi=dpi, format=mpl_fmt, bbox_inches=None)
+                plt.close(exp_fig)
 
             _remember_dir(fp)
             QMessageBox.information(self, 'Success', f'Exported to {fp}')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
-            try: matplotlib.rcParams['font.family'] = _old_font
-            except (NameError, KeyError, ValueError):
-                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             QMessageBox.critical(self, 'Error', str(e))
 
     # ═══════════════════════════════════════════════════════════════════════════

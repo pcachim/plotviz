@@ -9,7 +9,6 @@ Core application class. Tab UI, helpers, and event handlers.
 Tab building, plot engine and serialization live in their own mixin modules.
 """
 
-import logging
 import os
 import zipfile
 import sys
@@ -24,8 +23,6 @@ if _PKG not in sys.path:
     sys.path.insert(0, _PKG)
 # ─────────────────────────────────────────────────────────────────────────────
 
-import shutil
-import matplotlib.pyplot as plt
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
@@ -682,15 +679,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ── Apply saved preferences to freshly-built widgets ──────────────────
         self._restore_prefs_from_settings()
 
-        # Only enable LaTeX rendering if a LaTeX installation is present.
-        # In a frozen .app bundle (or any machine without LaTeX) kpsewhich
-        # does not exist, so usetex must stay False or every render call fails.
-        if not getattr(__import__('sys'), 'frozen', False) and shutil.which('latex'):
-            try:
-                plt.rcParams['text.usetex'] = True
-                plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}\usepackage{amssymb}'
-            except (KeyError, ValueError):
-                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+        # LaTeX typesetting (text.usetex) is deliberately NOT enabled, whether or not
+        # a LaTeX installation exists: the preview and the exported script never use
+        # it, so the app must behave the same from source, from the .app and on any
+        # machine. Maths such as $x^2$ still renders through matplotlib's mathtext.
 
         # ── Load last chart (or sample) once the event loop is running ─────────
         # Connect per-series option widgets AFTER all tab builders have run so

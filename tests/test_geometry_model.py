@@ -342,6 +342,60 @@ class TestMarginLimits(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_QT, "real PyQt6 not available")
+class TestNoLatexTypesetting(unittest.TestCase):
+    """LaTeX (text.usetex) is never used: the preview, the script and the export
+    must typeset the same text the same way, on any machine."""
+
+    @classmethod
+    def setUpClass(cls):
+        from PyQt6.QtWidgets import QApplication
+        from ui.main_window import PlotVizApp
+        cls._app = QApplication.instance() or QApplication([])
+        cls._orig = PlotVizApp._load_on_startup
+        PlotVizApp._load_on_startup = lambda self: None
+        cls.PlotVizApp = PlotVizApp
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.PlotVizApp._load_on_startup = cls._orig
+
+    def test_starting_the_app_does_not_turn_latex_on_even_if_latex_exists(self):
+        import matplotlib
+        from unittest import mock
+        before = matplotlib.rcParams["text.usetex"]
+        try:
+            matplotlib.rcParams["text.usetex"] = False
+            with mock.patch("shutil.which", return_value="/Library/TeX/texbin/latex"):
+                self.PlotVizApp()
+            self.assertFalse(matplotlib.rcParams["text.usetex"])
+        finally:
+            matplotlib.rcParams["text.usetex"] = before
+
+    def test_exports_ignore_a_matplotlibrc_that_turns_latex_on(self):
+        import matplotlib
+        from matplotlib.figure import Figure
+        from unittest import mock
+        w = self.PlotVizApp()
+        seen = []
+        real_savefig = Figure.savefig
+
+        def spy(fig, *a, **k):
+            seen.append(matplotlib.rcParams["text.usetex"])
+            return real_savefig(fig, *a, **k)
+
+        before = matplotlib.rcParams["text.usetex"]
+        try:
+            matplotlib.rcParams["text.usetex"] = True          # as if set by the user's matplotlibrc
+            with mock.patch.object(Figure, "savefig", spy):
+                data = w._render_export_bytes("png", 72)
+            self.assertEqual(seen, [False])                    # drawn without LaTeX ...
+            self.assertTrue(matplotlib.rcParams["text.usetex"])  # ... and the setting is restored
+            self.assertGreater(len(data), 100)
+        finally:
+            matplotlib.rcParams["text.usetex"] = before
+
+
+@unittest.skipUnless(HAVE_QT, "real PyQt6 not available")
 class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
     """Resizing the window used to rescale the export figure (and drift)."""
 
