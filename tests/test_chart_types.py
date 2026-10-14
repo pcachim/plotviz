@@ -64,6 +64,33 @@ if HAVE_QT:
         write_project_zip(path, settings, meta, encode_datasets(datasets))
 
 
+    def _write_multi_pviz(path, types):
+        """Project with one series per subplot; *types* is a list of chart types."""
+        from ui.tab_builders import TYPE_TO_PLOT_MODE
+        n = len(types)
+        by_idx = {str(i): t for i, t in enumerate(types)}
+        settings = {
+            "_app": "plotviz", "_version": "1.2", "_file_type": "project",
+            "chart_type": types[0], "subplot_rows": 2, "subplot_cols": 2,
+            "title_show": True, "title_text": "mosaic", "title_font": "DejaVu Sans",
+            "title_size": 14, "title_color": "#000", "title_x": 0.5, "title_y": 0.98,
+            "title_pos_format": "fractions", "title_ha": "center", "title_rotation": 0,
+            "fig_unit": "cm", "fig_width": 20.0, "fig_height": 15.0, "dpi": 100,
+            "chart_bg_color": "#fff", "plot_bg_color": "#fff", "chart_fg_color": "#000",
+            "grid_on": True, "subplot_chart_types": by_idx,
+        }
+        series = [{"x_col": "x", "y_col": "y", "label": "s%d" % i, "series_type": t,
+                   "plot_num": i + 1, "y2": False} for i, t in enumerate(types)]
+        meta = {"series": series, "z_col": "z", "err_col": "e",
+                "subplot_chart_types": by_idx,
+                "subplot_plot_modes": {k: TYPE_TO_PLOT_MODE.get(t, "Standard")
+                                       for k, t in by_idx.items()}}
+        x = np.linspace(0, 10, 40)
+        datasets = {"x": list(x), "y": list(np.sin(x) + 1.5),
+                    "z": list(np.cos(x) + 1.5), "e": [0.1] * len(x)}
+        write_project_zip(path, settings, meta, encode_datasets(datasets))
+
+
 def _chart_types():
     if not HAVE_QT:
         return []
@@ -114,6 +141,20 @@ class TestChartTypes(unittest.TestCase):
             w.hist2d_log.setChecked(True)
             axes_list, _ax2, _is3d, _n = w._render_axes(Figure(figsize=(6, 4)))
             self.assertGreaterEqual(len(axes_list), 1)
+
+    def test_mosaic_gives_polar_and_3d_cells_their_projection(self):
+        # Regression: subplot_mosaic created plain axes, so a 3D Surface cell
+        # raised "no attribute 'plot_surface'" and a Polar cell was not polar.
+        w = self.PlotVizApp()
+        _app.processEvents()
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "p.pviz")
+            _write_multi_pviz(fp, ["3D Surface", "Polar", "Line"])
+            w._load_project_inner(fp, silent=True)
+            w._subplot_mosaic = [["A", "B"], ["C", "C"]]
+            axes_list, _ax2, _is3d, _n = w._render_axes(Figure(figsize=(6, 4)))
+            self.assertEqual([a.name for a in axes_list],
+                             ["3d", "polar", "rectilinear"])
 
 
 if __name__ == "__main__":

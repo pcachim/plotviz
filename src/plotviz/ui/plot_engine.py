@@ -1621,12 +1621,22 @@ class PlotEngineMixin:
 
     def _render_mosaic(self, fig, mosaic, ax2_map):
         """Mosaic layout (letters in *mosaic* name the cells). Returns the axes list."""
-        ax_dict = fig.subplot_mosaic(mosaic)
         # Order axes by first appearance of each cell letter
         seen_order = list(dict.fromkeys(c for row in mosaic for c in row))
+        # Polar/3D cells need their projection fixed when the axes are created.
+        per_subplot_kw = {}
+        for idx, letter in enumerate(seen_order):
+            sub_ct = self.subplot_chart_types.get(idx, 'Line')
+            if sub_ct in ('Polar', 'Radar'):
+                per_subplot_kw[letter] = {'projection': 'polar'}
+            elif sub_ct in _3D_TYPES:
+                per_subplot_kw[letter] = {'projection': '3d'}
+        ax_dict = fig.subplot_mosaic(mosaic, per_subplot_kw=per_subplot_kw or None)
         axes_list = [ax_dict[k] for k in seen_order]
         for idx, ax in enumerate(axes_list):
             sub_ct = self.subplot_chart_types.get(idx, 'Line')
+            if sub_ct in _3D_TYPES:
+                self._init_3d_view(ax)
             sub_series, sub_y2_series = self._get_series_for_subplot(idx)
             x_cols, y_cols, y2_cols = self._get_col_names_for_subplot(idx)
             cat_info = self._plot_on(ax, sub_series, sub_ct, row_offset=self._get_series_row_offset(idx), subplot_idx=idx) if (sub_series or sub_ct in _NO_X_TYPES) else None
