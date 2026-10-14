@@ -9,6 +9,7 @@ Mixin providing all matplotlib plotting, decorating, preview and export methods.
 """
 import logging
 import traceback
+from types import SimpleNamespace
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -150,15 +151,23 @@ class PlotEngineMixin:
                 cat_pos[c] = len(cat_pos)
                 all_x_cats.append(c)
         bar_bottoms_cat = {c: 0.0 for c in all_cats}
-        bar_bottoms_num = None
         bar_offs = np.linspace(-(n_bar-1)/2, (n_bar-1)/2, n_bar) * (bar_w / max(n_bar, 1)) if n_bar else []
-        bar_idx_counter = 0
         # Range-bar Y-min column (draws bars from ymin to yd instead of 0 to yd)
         _bar_ymin_col = None
         if hasattr(self, 'combo_bar_ymin'):
             _raw = self.combo_bar_ymin.currentText()
             if _raw and _raw != '(none)' and _raw in self.datasets:
                 _bar_ymin_col = _raw
+
+        # Mutable state shared by the Bar series (grouping offsets, stacking
+        # baselines, running bar index). See _plot_series_bar.
+        st = SimpleNamespace(
+            bar_w=bar_w, bar_stk=bar_stk, bar_horiz=bar_horiz, bar_ec=bar_ec,
+            bar_elw=bar_elw, bar_al=bar_al, bar_cat=bar_cat, cat_pos=cat_pos,
+            bar_bottoms_cat=bar_bottoms_cat, bar_bottoms_num=None,
+            bar_offs=bar_offs, n_bar=n_bar, bar_idx_counter=0,
+            _bar_ymin_col=_bar_ymin_col,
+        )
 
         for i, (xd, yd, lbl, sct) in enumerate(series):
             s = self.curve_styles.get(lbl, {})
@@ -167,309 +176,337 @@ class PlotEngineMixin:
             # Per-series type options stored by _save_series_options
             o = s.get('opts', {})
 
-            if sct == 'Line':
-                ls = s.get('linestyle', '-') or '-'
-                if ls in ('default', ''): ls = '-'
-                mk = s.get('marker', 'None')
-                if mk in ('default', 'None', 'none', ''): mk = None
-                lw = s.get('linewidth', 1.5)
-                mk_color = s.get('marker_color', color)
-                xplot = _cat_xplot(xd) if is_cat else xd
-                ds = o.get('line_drawstyle', self.line_drawstyle.currentText())
-                plot_kw = dict(label=lbl, color=color, linestyle=ls, linewidth=lw,
-                               markersize=s.get('markersize', 6),
-                               drawstyle=ds if ds != 'default' else 'default')
-                if mk:
-                    plot_kw['marker'] = mk
-                    plot_kw['markerfacecolor'] = mk_color
-                    plot_kw['markeredgecolor'] = mk_color
-                _lines = ax.plot(xplot, yd, **plot_kw)
-                for _l in _lines: _l.set_pickradius(6)
-                upper_key = lbl + ' CI upper'
-                lower_key = lbl + ' CI lower'
-                if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
-                    ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
-                                    alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-                pi_upper_key = lbl + ' PI upper'
-                pi_lower_key = lbl + ' PI lower'
-                if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
-                    ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
-                                    alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
-                                    label=f'{lbl} PI')
-
-            elif sct == 'Scatter':
-                xplot = _cat_xplot(xd) if is_cat else xd
-                mk = s.get('marker', 'o')
-                mk = 'o' if mk in ('None', 'none', '') else mk
-                mk_color = s.get('marker_color', color)
-                sc_ec = o.get('sc_edgecolor', self.scatter_edgecolor.currentText())
-                if sc_ec == 'auto': sc_ec = mk_color
-                # Color by Z column if requested
-                c_arg = None
-                if o.get('sc_colorby', self.scatter_colorby_check.isChecked()):
-                    zc = self.combo_z.currentText()
-                    if zc != '(none)' and zc in self.datasets:
-                        z = self.datasets[zc]
-                        n = min(len(xplot), len(yd), len(z))
-                        c_arg = z[:n]
-                        xplot = xplot[:n]
-                        yd = yd[:n]
-                _sc = ax.scatter(xplot, yd, label=lbl,
-                           s=o.get('sc_size', self.scatter_size.value()),
-                           alpha=o.get('sc_alpha', self.scatter_alpha.value()),
-                           c=c_arg if c_arg is not None else mk_color,
-                           cmap=_cmap('scatter_cmap_combo') if c_arg is not None else None,
-                           marker=mk,
-                           edgecolors=sc_ec,
-                           linewidths=o.get('sc_lw', self.scatter_lw.value()))
-                _sc.set_picker(True)
-                upper_key = lbl + ' CI upper'
-                lower_key = lbl + ' CI lower'
-                if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
-                    ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
-                                    alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-                pi_upper_key = lbl + ' PI upper'
-                pi_lower_key = lbl + ' PI lower'
-                if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
-                    ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
-                                    alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
-                                    label=f'{lbl} PI')
-
-            elif sct == 'Bar':
-                bi = bar_idx_counter
-                bar_idx_counter += 1
-                b_w   = o.get('bar_width',    bar_w)
-                b_stk = o.get('bar_stacked',  bar_stk)
-                b_hor = o.get('bar_horizontal', bar_horiz)
-                b_ec  = o.get('bar_edgecolor', bar_ec)
-                b_elw = o.get('bar_edge_lw',  bar_elw)
-                b_al  = o.get('bar_alpha',    bar_al)
-                b_cbv = o.get('bar_colorbyval', _o('bar_colorbyval', False))
-                # Color bars by value if requested
-                def _bar_colors(vals, base_color, _cbv=b_cbv):
-                    if _cbv:
-                        return [plt.cm.RdYlGn(0.8 if v >= 0 else 0.2) for v in vals]
-                    return base_color
-                # Per-series _bar helper using this series' opts
-                def _bar_s(ax, positions, values, width, bottom=None,
-                           _ec=b_ec, _elw=b_elw, _hor=b_hor, **kw):
-                    ec_kw = {'edgecolor': _ec if _ec != 'none' else 'none',
-                             'linewidth': _elw if _ec != 'none' else 0}
-                    kw.update(ec_kw)
-                    if _hor:
-                        ax.barh(positions, values, height=width,
-                                left=bottom if bottom is not None else 0, **kw)
-                    else:
-                        kw2 = dict(kw)
-                        if bottom is not None: kw2['bottom'] = bottom
-                        ax.bar(positions, values, width=width, **kw2)
-                if bar_cat:
-                    xd_s = [str(v) for v in xd]
-                    positions = np.array([cat_pos.get(v, 0) for v in xd_s], dtype=float)
-                    if _bar_ymin_col:
-                        # Range-bar mode: bottom from ymin column, height = yd - ymin
-                        ymin_d = np.asarray(self.datasets[_bar_ymin_col], dtype=float)
-                        n = min(len(positions), len(yd), len(ymin_d))
-                        bot = ymin_d[:n]
-                        heights = np.asarray(yd[:n], dtype=float) - bot
-                        _bar_s(ax, positions[:n], heights, b_w, bottom=bot, label=lbl,
-                               color=_bar_colors(heights, color), alpha=b_al)
-                    elif b_stk:
-                        bot = np.array([bar_bottoms_cat.get(v, 0.0) for v in xd_s], dtype=float)
-                        _bar_s(ax, positions, yd, b_w, bottom=bot, label=lbl,
-                               color=_bar_colors(yd, color), alpha=b_al)
-                        for v, y in zip(xd_s, yd): bar_bottoms_cat[v] = bar_bottoms_cat.get(v, 0.0) + float(y)
-                    else:
-                        _bar_s(ax, positions + bar_offs[bi], yd, b_w/max(n_bar,1), label=lbl,
-                               color=_bar_colors(yd, color), alpha=b_al)
-                else:
-                    if is_cat or self._is_categorical(yd): continue
-                    try:
-                        xd_f = np.asarray(xd, dtype=float)
-                        yd_f = np.asarray(yd, dtype=float)
-                    except (ValueError, TypeError): continue
-                    if _bar_ymin_col:
-                        # Range-bar mode: bottom from ymin column, height = yd - ymin
-                        ymin_d = np.asarray(self.datasets[_bar_ymin_col], dtype=float)
-                        n = min(len(xd_f), len(yd_f), len(ymin_d))
-                        bot = ymin_d[:n]
-                        heights = yd_f[:n] - bot
-                        _bar_s(ax, xd_f[:n] + bar_offs[bi], heights, b_w/max(n_bar,1),
-                               bottom=bot, label=lbl,
-                               color=_bar_colors(heights, color), alpha=b_al)
-                    else:
-                        if bar_bottoms_num is None:
-                            bar_bottoms_num = np.zeros(len(xd_f))
-                        elif len(bar_bottoms_num) < len(xd_f):
-                            bar_bottoms_num = np.concatenate([bar_bottoms_num,
-                                                              np.zeros(len(xd_f) - len(bar_bottoms_num))])
-                        if b_stk:
-                            _bar_s(ax, xd_f, yd_f, b_w, bottom=bar_bottoms_num[:len(yd_f)], label=lbl,
-                                   color=_bar_colors(yd_f, color), alpha=b_al)
-                            bar_bottoms_num[:len(yd_f)] += yd_f
-                        else:
-                            _bar_s(ax, xd_f + bar_offs[bi], yd_f, b_w/max(n_bar,1), label=lbl,
-                                   color=_bar_colors(yd_f, color), alpha=b_al)
-
-            elif sct == 'Area':
-                al  = o.get('area_alpha',   _o('area_alpha', 0.4))
-                lw  = o.get('area_lw',      _o('area_lw', 0.8))
-                stk = o.get('area_stacked', _o('area_stacked', False))
-                bl  = o.get('area_baseline', _o('area_baseline', 0.0))
-                xplot = _cat_xplot(xd) if is_cat else xd
-                base_key = '_area_base'
-                base = getattr(ax, base_key, None)
-                if base is None or len(base) != len(xplot):
-                    base = np.full(len(xplot), bl)
-                if stk:
-                    ax.fill_between(xplot, base, base + yd, alpha=al, label=lbl, color=color)
-                    if o.get('area_showline', _o('area_showline', True)):
-                        ax.plot(xplot, base + yd, color=color, lw=lw)
-                    setattr(ax, base_key, base + yd)
-                else:
-                    ax.fill_between(xplot, bl, yd, alpha=al, label=lbl, color=color)
-                    if o.get('area_showline', _o('area_showline', True)):
-                        ax.plot(xplot, yd, color=color, lw=lw)
-
-            elif sct == 'Fill Between':
-                if self._is_categorical(yd): continue
-                xplot = _cat_xplot(xd) if is_cat else xd
-                al        = o.get('fill_between_alpha',   _o('fill_between_alpha',   0.4))
-                lw        = o.get('fill_between_lw',      _o('fill_between_lw',      0.8))
-                show_line = o.get('fill_between_showline', True)
-                y2_col = o.get('fill_between_y2_col') or None
-                if not y2_col and hasattr(self, 'combo_fill_y2'):
-                    raw = self.combo_fill_y2.currentText()
-                    if raw and raw != '(none)': y2_col = raw
-                if y2_col and y2_col in self.datasets:
-                    y2d = self.datasets[y2_col]
-                    n   = min(len(xplot), len(yd), len(y2d))
-                    xp, y1, y2 = xplot[:n], yd[:n], y2d[:n]
-                    ax.fill_between(xp, y1, y2, alpha=al, label=lbl, color=color)
-                    if show_line:
-                        ax.plot(xp, y1, color=color, lw=lw, alpha=0.8)
-                        ax.plot(xp, y2, color=color, lw=lw, alpha=0.8)
-                else:
-                    n = min(len(xplot), len(yd))
-                    xp, yp = xplot[:n], yd[:n]
-                    ax.fill_between(xp, 0, yp, alpha=al, label=lbl, color=color)
-                    if show_line:
-                        ax.plot(xp, yp, color=color, lw=lw, alpha=0.8)
-
-            elif sct == 'Errorbar':
-                ec   = self.combo_err.currentText()
-                xerr_c = self.err_xerr_combo.currentText()
-                err  = self.datasets.get(ec)  if ec      != '(none)' else None
-                xerr = self.datasets.get(xerr_c) if xerr_c != '(none)' else None
-                xplot = _cat_xplot(xd) if is_cat else xd
-                mk = s.get('marker', 'o')
-                mk = 'o' if mk in ('None', 'none', '') else mk
-                ax.errorbar(xplot, yd, yerr=err, xerr=xerr, label=lbl,
-                            capsize=o.get('err_capsize',   self.err_capsize.value()),
-                            capthick=o.get('err_capthick', self.err_capthick.value()),
-                            elinewidth=o.get('err_elinewidth', self.err_elinewidth.value()),
-                            barsabove=o.get('err_barsabove',   self.err_barsabove.isChecked()),
-                            fmt=mk, color=color,
-                            linewidth=s.get('linewidth', 1.5))
-
-            elif sct == 'Step':
-                if self._is_categorical(yd): continue
-                xplot = _cat_xplot(xd) if is_cat else xd
-                where = _o('step_where', 'pre')
-                lw = s.get('linewidth', 1.5)
-                ax.step(xplot, yd, where=where, label=lbl, color=color, linewidth=lw)
-                if o.get('step_fill', _o('step_fill', False)):
-                    ax.fill_between(xplot, yd, step=where,
-                                    alpha=o.get('step_fill_alpha', _o('step_fill_alpha', 0.2)), color=color)
-
-            elif sct == 'Stem':
-                if self._is_categorical(yd): continue
-                xplot = _cat_xplot(xd) if is_cat else xd
-                baseline = _o('stem_baseline', 0.0)
-                mk = s.get('marker', 'o')
-                mk_color = s.get('marker_color', color)
-                lw = s.get('linewidth', 1.2)
-                ms = s.get('markersize', 8)
-                markerline, stemlines, baseline_line = ax.stem(
-                    xplot, yd, linefmt='-', markerfmt=mk,
-                    basefmt='k-', label=lbl, bottom=baseline)
-                plt.setp(stemlines, color=color, linewidth=lw)
-                plt.setp(markerline, color=mk_color, markersize=ms)
-
-            elif sct == 'Bubble':
-                if self._is_categorical(yd): continue
-                xplot = _cat_xplot(xd) if is_cat else xd
-                sc_name = self.bubble_size_combo.currentText()
-                b_scale = o.get('bubble_scale', self.bubble_scale.value())
-                if sc_name != '(uniform)' and sc_name in self.datasets:
-                    raw_s = self.datasets[sc_name].astype(float)
-                    n = min(len(xplot), len(yd), len(raw_s))
-                    raw_s = raw_s[:n]
-                    mn, mx = np.nanmin(np.abs(raw_s)), np.nanmax(np.abs(raw_s))
-                    if mx > mn:
-                        sizes = 10 + (np.abs(raw_s) - mn) / (mx - mn) * b_scale
-                    else:
-                        sizes = np.full(n, b_scale / 2)
-                else:
-                    n = min(len(xplot), len(yd))
-                    sizes = b_scale / 4
-                mk_color = s.get('marker_color', color)
-                mk = s.get('marker', 'o')
-                mk = 'o' if mk in ('None', 'none', '') else mk
-                b_ec = o.get('bubble_edgecolor', self.bubble_edgecolor.currentText())
-                if b_ec == 'auto': b_ec = mk_color
-                ax.scatter(xplot[:n], yd[:n], s=sizes, alpha=o.get('bubble_alpha', self.bubble_alpha.value()),
-                           color=mk_color, edgecolors=b_ec if b_ec != 'none' else 'none',
-                           marker=mk, label=lbl)
-
-            elif sct == 'Waterfall':
-                if self._is_categorical(yd): continue
-                try:
-                    yd_f = np.asarray(yd, dtype=float)
-                except (ValueError, TypeError): continue
-                # x can be categorical labels or numeric — always use integer positions
-                # so string labels like "Revenue Start" never cause a float-cast failure
-                is_cat_x = self._is_categorical(xd)
-                if is_cat_x:
-                    x_labels = list(xd)
-                    xd_f = np.arange(len(x_labels), dtype=float)
-                else:
-                    try:
-                        xd_f = np.asarray(xd, dtype=float)
-                    except (ValueError, TypeError): continue
-                    x_labels = None
-                n = min(len(xd_f), len(yd_f))
-                xd_f, yd_f = xd_f[:n], yd_f[:n]
-                if x_labels is not None:
-                    x_labels = x_labels[:n]
-                w   = _o('waterfall_width', 0.6)
-                al  = _o('waterfall_alpha', 1.0)
-                pos_c = _o('waterfall_pos_color', None) or '#2ecc71'
-                neg_c = _o('waterfall_neg_color', None) or '#e74c3c'
-                running = 0.0
-                prev_top = None
-                for k in range(n):
-                    val = float(yd_f[k])
-                    fc = pos_c if val >= 0 else neg_c
-                    ax.bar(xd_f[k], val, width=w, bottom=running,
-                           color=fc, edgecolor='white', linewidth=0.5, alpha=al,
-                           label=(lbl if k == 0 else '_nolegend_'))
-                    top = running + val
-                    if _o('waterfall_connector', True) and prev_top is not None:
-                        ax.plot([xd_f[k-1]+w/2, xd_f[k]-w/2], [prev_top, prev_top],
-                                color='#555', linewidth=0.8, linestyle='--')
-                    prev_top = top
-                    running = top
-                # Apply string tick labels for categorical x after all bars are drawn
-                if x_labels is not None:
-                    ax.set_xticks(xd_f)
-                    ax.set_xticklabels(x_labels, rotation=45, ha='right')
+            plot_series = self._SERIES_PLOTTERS.get(sct)
+            if plot_series:
+                getattr(self, plot_series)(ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st)
 
         # Return categorical tick info — caller must apply AFTER set_xscale/set_yscale
         # so scale changes don't wipe out the FixedLocator set here.
         if any_cat_x and all_x_cats:
             return (all_x_cats, bar_horiz)
         return None
+
+    def _plot_series_line(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Line' series onto *ax*."""
+        ls = s.get('linestyle', '-') or '-'
+        if ls in ('default', ''): ls = '-'
+        mk = s.get('marker', 'None')
+        if mk in ('default', 'None', 'none', ''): mk = None
+        lw = s.get('linewidth', 1.5)
+        mk_color = s.get('marker_color', color)
+        xplot = _cat_xplot(xd) if is_cat else xd
+        ds = o.get('line_drawstyle', self.line_drawstyle.currentText())
+        plot_kw = dict(label=lbl, color=color, linestyle=ls, linewidth=lw,
+                       markersize=s.get('markersize', 6),
+                       drawstyle=ds if ds != 'default' else 'default')
+        if mk:
+            plot_kw['marker'] = mk
+            plot_kw['markerfacecolor'] = mk_color
+            plot_kw['markeredgecolor'] = mk_color
+        _lines = ax.plot(xplot, yd, **plot_kw)
+        for _l in _lines: _l.set_pickradius(6)
+        upper_key = lbl + ' CI upper'
+        lower_key = lbl + ' CI lower'
+        if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
+            ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
+                            alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
+        pi_upper_key = lbl + ' PI upper'
+        pi_lower_key = lbl + ' PI lower'
+        if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
+            ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
+                            alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
+                            label=f'{lbl} PI')
+
+    def _plot_series_scatter(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Scatter' series onto *ax*."""
+        xplot = _cat_xplot(xd) if is_cat else xd
+        mk = s.get('marker', 'o')
+        mk = 'o' if mk in ('None', 'none', '') else mk
+        mk_color = s.get('marker_color', color)
+        sc_ec = o.get('sc_edgecolor', self.scatter_edgecolor.currentText())
+        if sc_ec == 'auto': sc_ec = mk_color
+        # Color by Z column if requested
+        c_arg = None
+        if o.get('sc_colorby', self.scatter_colorby_check.isChecked()):
+            zc = self.combo_z.currentText()
+            if zc != '(none)' and zc in self.datasets:
+                z = self.datasets[zc]
+                n = min(len(xplot), len(yd), len(z))
+                c_arg = z[:n]
+                xplot = xplot[:n]
+                yd = yd[:n]
+        _sc = ax.scatter(xplot, yd, label=lbl,
+                   s=o.get('sc_size', self.scatter_size.value()),
+                   alpha=o.get('sc_alpha', self.scatter_alpha.value()),
+                   c=c_arg if c_arg is not None else mk_color,
+                   cmap=_cmap('scatter_cmap_combo') if c_arg is not None else None,
+                   marker=mk,
+                   edgecolors=sc_ec,
+                   linewidths=o.get('sc_lw', self.scatter_lw.value()))
+        _sc.set_picker(True)
+        upper_key = lbl + ' CI upper'
+        lower_key = lbl + ' CI lower'
+        if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
+            ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
+                            alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
+        pi_upper_key = lbl + ' PI upper'
+        pi_lower_key = lbl + ' PI lower'
+        if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
+            ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
+                            alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
+                            label=f'{lbl} PI')
+
+    def _plot_series_bar(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Bar' series onto *ax*."""
+        bi = st.bar_idx_counter
+        st.bar_idx_counter += 1
+        b_w   = o.get('bar_width',    st.bar_w)
+        b_stk = o.get('bar_stacked',  st.bar_stk)
+        b_hor = o.get('bar_horizontal', st.bar_horiz)
+        b_ec  = o.get('bar_edgecolor', st.bar_ec)
+        b_elw = o.get('bar_edge_lw',  st.bar_elw)
+        b_al  = o.get('bar_alpha',    st.bar_al)
+        b_cbv = o.get('bar_colorbyval', _o('bar_colorbyval', False))
+        # Color bars by value if requested
+        def _bar_colors(vals, base_color, _cbv=b_cbv):
+            if _cbv:
+                return [plt.cm.RdYlGn(0.8 if v >= 0 else 0.2) for v in vals]
+            return base_color
+        # Per-series _bar helper using this series' opts
+        def _bar_s(ax, positions, values, width, bottom=None,
+                   _ec=b_ec, _elw=b_elw, _hor=b_hor, **kw):
+            ec_kw = {'edgecolor': _ec if _ec != 'none' else 'none',
+                     'linewidth': _elw if _ec != 'none' else 0}
+            kw.update(ec_kw)
+            if _hor:
+                ax.barh(positions, values, height=width,
+                        left=bottom if bottom is not None else 0, **kw)
+            else:
+                kw2 = dict(kw)
+                if bottom is not None: kw2['bottom'] = bottom
+                ax.bar(positions, values, width=width, **kw2)
+        if st.bar_cat:
+            xd_s = [str(v) for v in xd]
+            positions = np.array([st.cat_pos.get(v, 0) for v in xd_s], dtype=float)
+            if st._bar_ymin_col:
+                # Range-bar mode: bottom from ymin column, height = yd - ymin
+                ymin_d = np.asarray(self.datasets[st._bar_ymin_col], dtype=float)
+                n = min(len(positions), len(yd), len(ymin_d))
+                bot = ymin_d[:n]
+                heights = np.asarray(yd[:n], dtype=float) - bot
+                _bar_s(ax, positions[:n], heights, b_w, bottom=bot, label=lbl,
+                       color=_bar_colors(heights, color), alpha=b_al)
+            elif b_stk:
+                bot = np.array([st.bar_bottoms_cat.get(v, 0.0) for v in xd_s], dtype=float)
+                _bar_s(ax, positions, yd, b_w, bottom=bot, label=lbl,
+                       color=_bar_colors(yd, color), alpha=b_al)
+                for v, y in zip(xd_s, yd): st.bar_bottoms_cat[v] = st.bar_bottoms_cat.get(v, 0.0) + float(y)
+            else:
+                _bar_s(ax, positions + st.bar_offs[bi], yd, b_w/max(st.n_bar,1), label=lbl,
+                       color=_bar_colors(yd, color), alpha=b_al)
+        else:
+            if is_cat or self._is_categorical(yd): return
+            try:
+                xd_f = np.asarray(xd, dtype=float)
+                yd_f = np.asarray(yd, dtype=float)
+            except (ValueError, TypeError): return
+            if st._bar_ymin_col:
+                # Range-bar mode: bottom from ymin column, height = yd - ymin
+                ymin_d = np.asarray(self.datasets[st._bar_ymin_col], dtype=float)
+                n = min(len(xd_f), len(yd_f), len(ymin_d))
+                bot = ymin_d[:n]
+                heights = yd_f[:n] - bot
+                _bar_s(ax, xd_f[:n] + st.bar_offs[bi], heights, b_w/max(st.n_bar,1),
+                       bottom=bot, label=lbl,
+                       color=_bar_colors(heights, color), alpha=b_al)
+            else:
+                if st.bar_bottoms_num is None:
+                    st.bar_bottoms_num = np.zeros(len(xd_f))
+                elif len(st.bar_bottoms_num) < len(xd_f):
+                    st.bar_bottoms_num = np.concatenate([st.bar_bottoms_num,
+                                                      np.zeros(len(xd_f) - len(st.bar_bottoms_num))])
+                if b_stk:
+                    _bar_s(ax, xd_f, yd_f, b_w, bottom=st.bar_bottoms_num[:len(yd_f)], label=lbl,
+                           color=_bar_colors(yd_f, color), alpha=b_al)
+                    st.bar_bottoms_num[:len(yd_f)] += yd_f
+                else:
+                    _bar_s(ax, xd_f + st.bar_offs[bi], yd_f, b_w/max(st.n_bar,1), label=lbl,
+                           color=_bar_colors(yd_f, color), alpha=b_al)
+
+    def _plot_series_area(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Area' series onto *ax*."""
+        al  = o.get('area_alpha',   _o('area_alpha', 0.4))
+        lw  = o.get('area_lw',      _o('area_lw', 0.8))
+        stk = o.get('area_stacked', _o('area_stacked', False))
+        bl  = o.get('area_baseline', _o('area_baseline', 0.0))
+        xplot = _cat_xplot(xd) if is_cat else xd
+        base_key = '_area_base'
+        base = getattr(ax, base_key, None)
+        if base is None or len(base) != len(xplot):
+            base = np.full(len(xplot), bl)
+        if stk:
+            ax.fill_between(xplot, base, base + yd, alpha=al, label=lbl, color=color)
+            if o.get('area_showline', _o('area_showline', True)):
+                ax.plot(xplot, base + yd, color=color, lw=lw)
+            setattr(ax, base_key, base + yd)
+        else:
+            ax.fill_between(xplot, bl, yd, alpha=al, label=lbl, color=color)
+            if o.get('area_showline', _o('area_showline', True)):
+                ax.plot(xplot, yd, color=color, lw=lw)
+
+    def _plot_series_fill_between(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Fill Between' series onto *ax*."""
+        if self._is_categorical(yd): return
+        xplot = _cat_xplot(xd) if is_cat else xd
+        al        = o.get('fill_between_alpha',   _o('fill_between_alpha',   0.4))
+        lw        = o.get('fill_between_lw',      _o('fill_between_lw',      0.8))
+        show_line = o.get('fill_between_showline', True)
+        y2_col = o.get('fill_between_y2_col') or None
+        if not y2_col and hasattr(self, 'combo_fill_y2'):
+            raw = self.combo_fill_y2.currentText()
+            if raw and raw != '(none)': y2_col = raw
+        if y2_col and y2_col in self.datasets:
+            y2d = self.datasets[y2_col]
+            n   = min(len(xplot), len(yd), len(y2d))
+            xp, y1, y2 = xplot[:n], yd[:n], y2d[:n]
+            ax.fill_between(xp, y1, y2, alpha=al, label=lbl, color=color)
+            if show_line:
+                ax.plot(xp, y1, color=color, lw=lw, alpha=0.8)
+                ax.plot(xp, y2, color=color, lw=lw, alpha=0.8)
+        else:
+            n = min(len(xplot), len(yd))
+            xp, yp = xplot[:n], yd[:n]
+            ax.fill_between(xp, 0, yp, alpha=al, label=lbl, color=color)
+            if show_line:
+                ax.plot(xp, yp, color=color, lw=lw, alpha=0.8)
+
+    def _plot_series_errorbar(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Errorbar' series onto *ax*."""
+        ec   = self.combo_err.currentText()
+        xerr_c = self.err_xerr_combo.currentText()
+        err  = self.datasets.get(ec)  if ec      != '(none)' else None
+        xerr = self.datasets.get(xerr_c) if xerr_c != '(none)' else None
+        xplot = _cat_xplot(xd) if is_cat else xd
+        mk = s.get('marker', 'o')
+        mk = 'o' if mk in ('None', 'none', '') else mk
+        ax.errorbar(xplot, yd, yerr=err, xerr=xerr, label=lbl,
+                    capsize=o.get('err_capsize',   self.err_capsize.value()),
+                    capthick=o.get('err_capthick', self.err_capthick.value()),
+                    elinewidth=o.get('err_elinewidth', self.err_elinewidth.value()),
+                    barsabove=o.get('err_barsabove',   self.err_barsabove.isChecked()),
+                    fmt=mk, color=color,
+                    linewidth=s.get('linewidth', 1.5))
+
+    def _plot_series_step(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Step' series onto *ax*."""
+        if self._is_categorical(yd): return
+        xplot = _cat_xplot(xd) if is_cat else xd
+        where = _o('step_where', 'pre')
+        lw = s.get('linewidth', 1.5)
+        ax.step(xplot, yd, where=where, label=lbl, color=color, linewidth=lw)
+        if o.get('step_fill', _o('step_fill', False)):
+            ax.fill_between(xplot, yd, step=where,
+                            alpha=o.get('step_fill_alpha', _o('step_fill_alpha', 0.2)), color=color)
+
+    def _plot_series_stem(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Stem' series onto *ax*."""
+        if self._is_categorical(yd): return
+        xplot = _cat_xplot(xd) if is_cat else xd
+        baseline = _o('stem_baseline', 0.0)
+        mk = s.get('marker', 'o')
+        mk_color = s.get('marker_color', color)
+        lw = s.get('linewidth', 1.2)
+        ms = s.get('markersize', 8)
+        markerline, stemlines, baseline_line = ax.stem(
+            xplot, yd, linefmt='-', markerfmt=mk,
+            basefmt='k-', label=lbl, bottom=baseline)
+        plt.setp(stemlines, color=color, linewidth=lw)
+        plt.setp(markerline, color=mk_color, markersize=ms)
+
+    def _plot_series_bubble(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Bubble' series onto *ax*."""
+        if self._is_categorical(yd): return
+        xplot = _cat_xplot(xd) if is_cat else xd
+        sc_name = self.bubble_size_combo.currentText()
+        b_scale = o.get('bubble_scale', self.bubble_scale.value())
+        if sc_name != '(uniform)' and sc_name in self.datasets:
+            raw_s = self.datasets[sc_name].astype(float)
+            n = min(len(xplot), len(yd), len(raw_s))
+            raw_s = raw_s[:n]
+            mn, mx = np.nanmin(np.abs(raw_s)), np.nanmax(np.abs(raw_s))
+            if mx > mn:
+                sizes = 10 + (np.abs(raw_s) - mn) / (mx - mn) * b_scale
+            else:
+                sizes = np.full(n, b_scale / 2)
+        else:
+            n = min(len(xplot), len(yd))
+            sizes = b_scale / 4
+        mk_color = s.get('marker_color', color)
+        mk = s.get('marker', 'o')
+        mk = 'o' if mk in ('None', 'none', '') else mk
+        b_ec = o.get('bubble_edgecolor', self.bubble_edgecolor.currentText())
+        if b_ec == 'auto': b_ec = mk_color
+        ax.scatter(xplot[:n], yd[:n], s=sizes, alpha=o.get('bubble_alpha', self.bubble_alpha.value()),
+                   color=mk_color, edgecolors=b_ec if b_ec != 'none' else 'none',
+                   marker=mk, label=lbl)
+
+    def _plot_series_waterfall(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
+        """Draw one 'Waterfall' series onto *ax*."""
+        if self._is_categorical(yd): return
+        try:
+            yd_f = np.asarray(yd, dtype=float)
+        except (ValueError, TypeError): return
+        # x can be categorical labels or numeric — always use integer positions
+        # so string labels like "Revenue Start" never cause a float-cast failure
+        is_cat_x = self._is_categorical(xd)
+        if is_cat_x:
+            x_labels = list(xd)
+            xd_f = np.arange(len(x_labels), dtype=float)
+        else:
+            try:
+                xd_f = np.asarray(xd, dtype=float)
+            except (ValueError, TypeError): return
+            x_labels = None
+        n = min(len(xd_f), len(yd_f))
+        xd_f, yd_f = xd_f[:n], yd_f[:n]
+        if x_labels is not None:
+            x_labels = x_labels[:n]
+        w   = _o('waterfall_width', 0.6)
+        al  = _o('waterfall_alpha', 1.0)
+        pos_c = _o('waterfall_pos_color', None) or '#2ecc71'
+        neg_c = _o('waterfall_neg_color', None) or '#e74c3c'
+        running = 0.0
+        prev_top = None
+        for k in range(n):
+            val = float(yd_f[k])
+            fc = pos_c if val >= 0 else neg_c
+            ax.bar(xd_f[k], val, width=w, bottom=running,
+                   color=fc, edgecolor='white', linewidth=0.5, alpha=al,
+                   label=(lbl if k == 0 else '_nolegend_'))
+            top = running + val
+            if _o('waterfall_connector', True) and prev_top is not None:
+                ax.plot([xd_f[k-1]+w/2, xd_f[k]-w/2], [prev_top, prev_top],
+                        color='#555', linewidth=0.8, linestyle='--')
+            prev_top = top
+            running = top
+        # Apply string tick labels for categorical x after all bars are drawn
+        if x_labels is not None:
+            ax.set_xticks(xd_f)
+            ax.set_xticklabels(x_labels, rotation=45, ha='right')
+
+    # Per-series type -> method that draws one series of it (see _plot_on).
+    _SERIES_PLOTTERS = {
+        'Line': '_plot_series_line',
+        'Scatter': '_plot_series_scatter',
+        'Bar': '_plot_series_bar',
+        'Area': '_plot_series_area',
+        'Fill Between': '_plot_series_fill_between',
+        'Errorbar': '_plot_series_errorbar',
+        'Step': '_plot_series_step',
+        'Stem': '_plot_series_stem',
+        'Bubble': '_plot_series_bubble',
+        'Waterfall': '_plot_series_waterfall',
+    }
 
     def _plot_histogram(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
         """Draw a 'Histogram' whole-chart plot onto *ax*."""
