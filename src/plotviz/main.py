@@ -61,7 +61,7 @@ freeze_support()
 
 # ── 6. Application ────────────────────────────────────────────────────────────
 from pathlib import Path
-from PyQt6.QtCore import QEvent, QCoreApplication, Qt
+from PyQt6.QtCore import QEvent
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 from ui.main_window import PlotVizApp
@@ -113,21 +113,6 @@ def _set_win_appusermodel_id() -> None:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('com.pviz.app.plotviz')
     except (AttributeError, OSError):
         logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
-
-
-def _use_native_file_dialogs(platform: str | None = None, environ: dict | None = None) -> bool:
-    """Whether file dialogs should be the operating system's own.
-
-    On macOS 27 the native open/save panel comes up without its Open/Cancel
-    buttons when driven by Qt 6.11, so there the app uses Qt's own dialogs
-    (which always have them). Set PLOTVIZ_NATIVE_DIALOGS=1 to force the native
-    ones, e.g. once the bundled Qt supports the OS.
-    """
-    platform = sys.platform if platform is None else platform
-    environ = os.environ if environ is None else environ
-    if environ.get('PLOTVIZ_NATIVE_DIALOGS') == '1':
-        return True
-    return platform != 'darwin'
 
 
 class PlotVizQApplication(QApplication):
@@ -227,8 +212,6 @@ def main():
     _ensure_user_data(_log_dir)
     # ─────────────────────────────────────────────────────────────────────────
 
-    if not _use_native_file_dialogs():
-        QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True)
     app = PlotVizQApplication(sys.argv)
     app.setApplicationName('plotviz')
     app.setApplicationDisplayName('plotviz')
