@@ -13,6 +13,13 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           src: src
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      # core/ is the Qt-free layer; its mypy settings live in pyproject.toml.
+      - run: uvx --from mypy==2.4.0 mypy
   test:
     runs-on: ${{ matrix.os }}
     strategy:

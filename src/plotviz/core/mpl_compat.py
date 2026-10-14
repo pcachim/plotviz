@@ -14,12 +14,14 @@ No Qt, no ui/ imports.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import matplotlib
 
 _MPL = tuple(matplotlib.__version_info__[:2])
 
 
-def box_kwargs(labels, vertical: bool = True) -> dict:
+def box_kwargs(labels: Sequence[str], vertical: bool = True) -> dict:
     """kwargs for ``Axes.boxplot``: tick labels and orientation."""
     kw = {('tick_labels' if _MPL >= (3, 9) else 'labels'): labels}
     kw.update(_orientation(vertical))

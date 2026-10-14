@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import zipfile
+from collections.abc import Iterable
 
 import numpy as np
 
@@ -60,9 +61,9 @@ def decode_datasets(raw: dict) -> dict:
     return out
 
 
-def write_project_zip(path, settings: dict, series_meta: dict,
+def write_project_zip(path: str | os.PathLike[str], settings: dict, series_meta: dict,
                       datasets_encoded: dict, palette_json: str | None = None,
-                      image_paths=()) -> None:
+                      image_paths: Iterable[str] = ()) -> None:
     """Write a .pviz archive from already-collected pieces.
 
     ``datasets_encoded`` is the output of :func:`encode_datasets`.
@@ -84,7 +85,7 @@ def write_project_zip(path, settings: dict, series_meta: dict,
                     seen.add(bname)
 
 
-def read_project_zip(path) -> dict:
+def read_project_zip(path: str | os.PathLike[str]) -> dict:
     """Parse a .pviz archive into plain Python structures (no Qt, no extraction).
 
     Returns a dict with keys:
