@@ -1042,20 +1042,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from config.settings import datasets_dir
         self._load_data_files('Open Sample Dataset', str(datasets_dir()), remember_dir=False)
 
-    def _open_plots_folder(self):
-        """Reveal the user plots folder in Finder / Explorer."""
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtGui import QDesktopServices
-        from config.settings import plots_dir
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(plots_dir())))
-
-    def _open_datasets_folder(self):
-        """Reveal the user datasets folder in Finder / Explorer."""
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtGui import QDesktopServices
-        from config.settings import datasets_dir
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(datasets_dir())))
-
     def closeEvent(self, event):
         """Persist window state and prefs before closing."""
         geo = self.geometry()
@@ -1298,20 +1284,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         sample_charts_action.triggered.connect(self._open_sample_chart)
         help_menu.addAction(sample_charts_action)
 
-        sample_charts_folder_action = QAction('Show Sample Charts Folder', self)
-        sample_charts_folder_action.setStatusTip('Open the folder containing sample chart files')
-        sample_charts_folder_action.triggered.connect(self._open_plots_folder)
-        help_menu.addAction(sample_charts_folder_action)
-
         sample_datasets_action = QAction('Sample Datasets…', self)
         sample_datasets_action.setStatusTip('Choose one or more sample datasets to load')
         sample_datasets_action.triggered.connect(self._open_sample_dataset)
         help_menu.addAction(sample_datasets_action)
-
-        sample_datasets_folder_action = QAction('Show Sample Datasets Folder', self)
-        sample_datasets_folder_action.setStatusTip('Open the folder containing sample dataset files')
-        sample_datasets_folder_action.triggered.connect(self._open_datasets_folder)
-        help_menu.addAction(sample_datasets_folder_action)
 
         self._help_menu = help_menu
 
