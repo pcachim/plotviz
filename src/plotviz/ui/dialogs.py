@@ -261,6 +261,7 @@ class DataImportDialog(QDialog):
                 wb.close()
             except Exception:
                 try:
+                    import pandas as pd
                     xl = pd.ExcelFile(self.filepath)
                     self._sheet_combo.blockSignals(True)
                     self._sheet_combo.addItems(xl.sheet_names)

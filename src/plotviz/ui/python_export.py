@@ -95,7 +95,7 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
     if chart_name == 'KDE':
         lines += [
             'fig, ax = plt.subplots()',
-            f'sns.kdeplot(',
+            'sns.kdeplot(',
             f"    x=df['{_esc(yn)}'].astype(float), ax=ax,",
             f'    fill={explorer._kde_fill.isChecked()},',
             f'    alpha={explorer._kde_alpha.value()},',
@@ -118,7 +118,7 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
             'sns.regplot(',
             f"    x=df['{_esc(xn)}'].astype(float), y=df['{_esc(yn)}'].astype(float), ax=ax,",
             f'    scatter_kws={{"s": {explorer._reg_size.value()}, "alpha": {explorer._reg_alpha.value()}}},',
-            f'    line_kws={{"linewidth": 1.8}},',
+            '    line_kws={"linewidth": 1.8},',
             f'    ci={repr(ci_val)},',
             f'    order={order}, robust={robust}, lowess={lowess},',
             f'    scatter={explorer._reg_scatter.isChecked()},',

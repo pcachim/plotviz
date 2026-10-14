@@ -4,6 +4,7 @@ ui/plot_types.py  –  plotviz
 PlotTypesMixin: _plot_on() — dispatches all 22 chart types onto a single axes.
 """
 import numpy as np
+import matplotlib.colors
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
