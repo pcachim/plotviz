@@ -221,6 +221,9 @@ jobs:
           name: plotviz ${{ github.ref_name }}
           # Auto-generates release notes from merged PRs / commits since last tag.
           generate_release_notes: true
+          body: |
+            plotviz is free software, licensed under the GNU General Public License v3.0 or later.
+            Source code for this release: https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}  # e.g. v2.6.1-beta → pre-release
           files: |

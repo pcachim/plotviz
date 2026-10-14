@@ -87,6 +87,15 @@ _assets = ROOT_DIR / 'assets'
 if _assets.exists():
     datas += [(str(_assets), 'assets')]
 
+# GPL-3.0-or-later: ship the licence text and a pointer to the source code
+# with every binary distribution.
+_license = ROOT_DIR / 'LICENSE.md'
+if _license.exists():
+    datas += [(str(_license), '.')]
+_source_note = ROOT_DIR / 'SOURCE.md'
+if _source_note.exists():
+    datas += [(str(_source_note), '.')]
+
 # Bundle the bundled data folder (sample plots + datasets) so the app can
 # seed the user data directory on first run.
 _data_dir = ROOT_DIR / 'data'
