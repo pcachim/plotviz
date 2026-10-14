@@ -812,13 +812,7 @@ class PlotEngineMixin:
                                                alpha=alp, rstride=st, cstride=st)
                         # Fix 7: honour heat_colorbar for 3D Surface
                         if _o('heat_colorbar', True):
-                            _cb = self._colorbar(ax, surf, _o('heat_colorbar_shrink', 1.0), subplot_idx)
-                            _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
-                            if _zlbl:
-                                _cb.set_label(_latex_safe(_zlbl),
-                                    fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
-                                    color=getattr(self, 'zlabel_color', '#000000'),
-                                    fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
+                            self._colorbar(ax, surf, _o('heat_colorbar_shrink', 1.0), subplot_idx)
 
     def _plot_hist2d(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
         """Draw a 'Hist2D' whole-chart plot onto *ax*."""
@@ -1075,7 +1069,8 @@ class PlotEngineMixin:
         margin (matplotlib's default aspect would leave an unused gap there, so
         the right margin looked dead).
         """
-        cb = ax.figure.colorbar(mappable, ax=ax, shrink=shrink, fraction=0.04, pad=0.03)
+        cb = ax.figure.colorbar(mappable, ax=ax, shrink=shrink, fraction=0.04,
+                                 pad=0.12 if ax.name == '3d' else 0.03)  # 3D tick labels overhang
         cb.ax.set_box_aspect(None)
         fg = self._fg_color(subplot_idx)
         cb.ax.tick_params(colors=fg)
@@ -1094,7 +1089,9 @@ class PlotEngineMixin:
         plot_bg = c['plot_bg'] if c else getattr(self, 'plot_bg_color', '#ffffff')
         g = getattr(self, 'subplot_grid_opts', {}).get(subplot_idx, None)
         grid_color = g['color'] if g else getattr(self, 'grid_color', '#cccccc')
-        ax.set_facecolor(plot_bg)
+        # The 3D axes rectangle is far larger than the cube drawn in it, so it takes
+        # the page colour (no visible box); only the three panes carry the plot colour.
+        ax.set_facecolor(getattr(self, 'chart_bg_color', '#ffffff'))
         for name in ('x', 'y', 'z'):
             axis = getattr(ax, f'{name}axis', None)
             if axis is None:
@@ -1388,24 +1385,21 @@ class PlotEngineMixin:
             ax.set_ylabel('')
 
         # ── Z label (3D Surface only) ──
-        # When the colorbar is visible it carries the label; ax.set_zlabel is
-        # only used when the colorbar is hidden.
+        # The label sits on the Z axis (the colorbar is unlabelled for 3D).
         if is3d and hasattr(ax, 'set_zlabel'):
-            _colorbar_visible = self._sp_opt(subplot_idx, 'heat_colorbar', True)
-            if not _colorbar_visible:
-                if self.subplot_zlabel_show.get(subplot_idx, True):
-                    _series_label_default = next(iter(yd), '') if yd else ''
-                    zl = self.subplot_zlabels.get(subplot_idx, '') or _series_label_default
-                    ax.set_zlabel(
-                        _latex_safe(zl),
-                        fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
-                        color=getattr(self, 'zlabel_color', '#000000'),
-                        fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif',
-                        rotation=self.subplot_zlabel_rotation.get(subplot_idx, 90),
-                        labelpad=self.subplot_zlabel_labelpad.get(subplot_idx, 4),
-                    )
-                else:
-                    ax.set_zlabel('')
+            if self.subplot_zlabel_show.get(subplot_idx, True):
+                _series_label_default = next(iter(yd), '') if yd else ''
+                zl = self.subplot_zlabels.get(subplot_idx, '') or _series_label_default
+                ax.set_zlabel(
+                    _latex_safe(zl),
+                    fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                    color=getattr(self, 'zlabel_color', '#000000'),
+                    fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif',
+                    rotation=self.subplot_zlabel_rotation.get(subplot_idx, 90),
+                    labelpad=self.subplot_zlabel_labelpad.get(subplot_idx, 4),
+                )
+            else:
+                ax.set_zlabel('')
 
         # ── Secondary Y axis ──
         _y2_active = False

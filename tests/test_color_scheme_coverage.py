@@ -45,6 +45,7 @@ class TestColorSchemeCoverage(unittest.TestCase):
 
     def test_3d_surface_follows_the_scheme(self):
         for ax in self._both("3D Surface", "3D"):
+            self.assertEqual(to_hex(ax.get_facecolor()), "#1e1e2e")     # the page colour
             for name in "xyz":
                 axis = getattr(ax, f"{name}axis")
                 self.assertEqual(to_hex(axis.pane.get_facecolor()), BG)
@@ -53,6 +54,14 @@ class TestColorSchemeCoverage(unittest.TestCase):
                 ticks = [t.get_color() for t in axis.get_ticklabels() if t.get_text()]
                 self.assertTrue(ticks)
                 self.assertTrue(all(to_hex(c) == FG for c in ticks), ticks)
+
+    def test_3d_z_label_is_on_the_axis_not_the_colorbar(self):
+        w = self._window(chart="3D Surface", mode="3D")
+        for fig in (self._export_figure(w), self._script_figure(w)[0]):
+            ax = [a for a in fig.axes if a.name == "3d"][0]
+            cbar = [a for a in fig.axes if a.get_label() == "<colorbar>"][0]
+            self.assertEqual(ax.get_zlabel(), "s")             # the series label
+            self.assertEqual(cbar.get_ylabel(), "")
 
     def test_tricontour_lines_follow_the_foreground(self):
         w = self._themed("Tricontour", "Heatmap / Contour")

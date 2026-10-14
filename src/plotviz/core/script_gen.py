@@ -785,7 +785,18 @@ def _gen_surface3d(settings: Settings, series: list[SeriesDict], datasets: Datas
                 )
                 if show_cb:
                     lines += _colorbar_lines(settings, ax_var, '_ssurf', _first_label(series),
-                                             settings.get('heat_colorbar_shrink', 1.0))
+                                             settings.get('heat_colorbar_shrink', 1.0), cb_pad=0.12,
+                                             labelled=False)
+            # The Z label sits on the Z axis (the colorbar is unlabelled)
+            _zi = settings.get('_subplot_idx', 0)
+            if subplot_get(settings, 'subplot_zlabel_show', _zi, True):
+                _zl = subplot_get(settings, 'subplot_zlabels', _zi, '') or _first_label(series)
+                lines.append(
+                    f"{ax_var}.set_zlabel('{_esc(_zl)}', fontsize={settings.get('zlabel_size', 11)}, "
+                    f"color='{_esc(settings.get('zlabel_color', '#000000'))}', "
+                    f"fontfamily='{_esc(settings.get('zlabel_font', 'sans-serif'))}', "
+                    f"rotation={subplot_get(settings, 'subplot_zlabel_rotation', _zi, 90)}, "
+                    f"labelpad={subplot_get(settings, 'subplot_zlabel_labelpad', _zi, 4)})")
         else:
             lines.append("# 3D Surface: assign X, Y and Z columns in plotviz to render.")
     return lines
@@ -1080,7 +1091,8 @@ def _plain_colorbar_lines(settings: Settings, ax_var: str, mappable: str) -> lis
 
 
 def _colorbar_lines(settings: Settings, ax_var: str, mappable: str, label: str,
-                    shrink: float, guard: str | None = None, extra: str = '') -> list[str]:
+                    shrink: float, guard: str | None = None, extra: str = '',
+                    cb_pad: float = 0.03, labelled: bool = True) -> list[str]:
     """plt.colorbar(...) plus the styled Z label the live chart puts on it.
 
     The label is the per-subplot Z label, else the series label. *guard* is a
@@ -1093,10 +1105,10 @@ def _colorbar_lines(settings: Settings, ax_var: str, mappable: str, label: str,
     out = []
     if guard:
         out.append(f"if {guard}:")
-    out.append(f"{pad}_cb = plt.colorbar({mappable}, ax={ax_var}, shrink={shrink}, fraction=0.04, pad=0.03{extra})")
+    out.append(f"{pad}_cb = plt.colorbar({mappable}, ax={ax_var}, shrink={shrink}, fraction=0.04, pad={cb_pad}{extra})")
     out.append(f"{pad}_cb.ax.set_box_aspect(None)")
     out.append(f"{pad}_cb.ax.tick_params(colors='%s'); _cb.outline.set_edgecolor('%s')" % ((_esc(settings.get('chart_fg_color', '#000000')),) * 2))
-    if zlbl:
+    if zlbl and labelled:
         out.append(
             f"{pad}_cb.set_label('{_esc(zlbl)}', fontsize={settings.get('zlabel_size', 11)}, "
             f"color='{_esc(settings.get('zlabel_color', '#000000'))}', "
@@ -1221,6 +1233,7 @@ def _gen_decoration(settings: Settings, idx: int, ax_var: str, sub_ct: str,
     # ── Axes background ────────────────────────────────────────────────────
     L.append(f"{ax_var}.set_facecolor('{_esc(st.plot_bg)}')")
     if sub_ct == '3D Surface':
+        L.append(f"{ax_var}.set_facecolor('{_esc(settings.get('chart_bg_color', '#ffffff'))}')")
         L.append("for _n in ('x', 'y', 'z'):")
         L.append(f"    _a = getattr({ax_var}, _n + 'axis')")
         L.append(f"    _a.set_pane_color(matplotlib.colors.to_rgba('{_esc(st.plot_bg)}'))")
