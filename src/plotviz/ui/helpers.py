@@ -9,7 +9,6 @@ Kept in a separate file to avoid circular imports.
 File-dialog directory management now delegates to config.settings so the
 last-used directory persists across sessions.
 """
-import logging
 import config.settings as _s
 
 # ── Recent-colour persistence ─────────────────────────────────────────────────
@@ -64,8 +63,8 @@ def _make_recent_widget(dialog, cell_w=_CELL_W, cell_h=_CELL_H):
     Clicking a swatch sets that colour on *dialog*.
     """
     from PyQt6.QtWidgets import QWidget
-    from PyQt6.QtGui import QColor, QPainter, QBrush, QPen
-    from PyQt6.QtCore import Qt, QRect
+    from PyQt6.QtGui import QColor, QPainter
+    from PyQt6.QtCore import Qt
 
     # Exact values measured from a rendered QColorDialog grid
     GAP       = 3            # px gap around each square

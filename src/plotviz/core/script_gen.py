@@ -10,7 +10,7 @@ Public entry points: generate_plot_script, _build_readme, _build_pyproject_toml.
 """
 
 from __future__ import annotations
-import io, json, os, textwrap, zipfile
+import textwrap
 
 from core.constants import (
     _3D_TYPES, _POLAR_TYPES, _NO_X_TYPES,

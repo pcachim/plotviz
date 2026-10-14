@@ -13,7 +13,6 @@ from ui.helpers import _get_dir, _remember_dir
 from core.serialize import (
     encode_datasets, decode_datasets, write_project_zip, read_project_zip,
 )
-import numpy as np
 from PyQt6.QtWidgets import (
     QFileDialog, QMessageBox, QComboBox, QTableWidgetItem, QSpinBox,
 )

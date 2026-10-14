@@ -6,13 +6,12 @@ PaletteColorMixin: the custom-palette editor, active-palette colour resolution,
 and (de)serialisation of custom palettes. Split out of main_window; mixed into
 PlotVizApp so it shares the palette widgets and state via `self`.
 """
-import logging
 import json
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
-    QMessageBox, QPushButton, QVBoxLayout, QWidget,
+    QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
+    QMessageBox, QPushButton, QVBoxLayout,
 )
 from core.constants import _HEATMAP_GROUP_TYPES
 from core.geometry import to_inches, from_inches

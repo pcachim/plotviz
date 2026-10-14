@@ -8,12 +8,11 @@ of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 ui/tab_builders.py  –  plotviz
 Mixin that provides all create_*_tab() methods for PlotVizApp.
 """
-import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
-    QSpinBox, QDoubleSpinBox, QPushButton, QFileDialog, QListWidget,
-    QCheckBox, QScrollArea, QColorDialog, QButtonGroup, QRadioButton,
-    QFrame, QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView,
+    QSpinBox, QDoubleSpinBox, QPushButton, QListWidget,
+    QCheckBox, QScrollArea, QButtonGroup, QRadioButton,
+    QGroupBox, QTableWidget, QHeaderView,
     QTabWidget, QSizePolicy, QPlainTextEdit, QSlider,
 )
 from PyQt6.QtCore import Qt, QObject, QEvent
@@ -46,7 +45,7 @@ WHOLE_CHART_TYPES = {
 
 # Re-exported from the canonical source so existing `from ui.tab_builders
 # import _NO_X_TYPES` call sites keep working.
-from core.constants import _NO_X_TYPES
+from core.constants import _NO_X_TYPES  # noqa: F401
 
 # Master colormap list — sorted alphabetically (case-insensitive).
 _CMAP_LIST = sorted([

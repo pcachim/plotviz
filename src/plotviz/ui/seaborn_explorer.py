@@ -14,8 +14,6 @@ from __future__ import annotations
 import io
 import logging
 import re
-import traceback
-import numpy as np
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,

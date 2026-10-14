@@ -12,7 +12,7 @@ import traceback
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # side-effect: registers the 3D projection
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  side-effect: registers the 3D projection
 from matplotlib.figure import Figure as MplFigure
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QApplication
 from ui.helpers import _get_dir, _remember_dir
@@ -1821,7 +1821,7 @@ class PlotEngineMixin:
             from PyQt6.QtGui import QImage, QPixmap, QClipboard
             from PyQt6.QtWidgets import (QApplication, QDialog, QVBoxLayout,
                                          QHBoxLayout, QLabel, QSpinBox,
-                                         QPushButton, QDialogButtonBox)
+                                         QDialogButtonBox)
 
             if not hasattr(self, 'canvas') or self.canvas.figure is None:
                 return

@@ -8,18 +8,13 @@ mixed into PlotVizApp so its methods share the datasets, series table and
 widgets via `self`.
 """
 import logging
-import os
 import sys
-import csv
-import json
 
-import config.settings as settings
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QMessageBox, QComboBox, QGroupBox, QPushButton, QFormLayout,
     QDialogButtonBox, QDialog, QTableWidgetItem, QSpinBox, QVBoxLayout,
     QHBoxLayout, QLineEdit, QLabel, QFileDialog, QCheckBox, QApplication,
-    QWidget,
 )
 from ui.helpers import _get_dir, _remember_dir
 from ui.dialogs import DataImportDialog
@@ -32,7 +27,6 @@ class DataMixin:
         from PyQt6.QtGui import QDesktopServices
         from PyQt6.QtCore import QUrl
         import config.settings as _cfg
-        from config._version import __version__
 
         dlg = QDialog(self)
         dlg.setWindowTitle('Preferences' if sys.platform == 'darwin' else 'Settings')

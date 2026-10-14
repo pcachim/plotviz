@@ -6,10 +6,8 @@ ChartOptionsMixin: show/hide and populate the per-chart-type option groups as
 the selected chart type changes. Split out of main_window; mixed into
 PlotVizApp so it shares the option widgets and series state via `self`.
 """
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QLineEdit, QScrollArea
 
-from ui.tab_builders import WHOLE_CHART_TYPES, PLOT_MODE_GROUPS, TYPE_TO_PLOT_MODE
+from ui.tab_builders import TYPE_TO_PLOT_MODE
 
 
 class ChartOptionsMixin:

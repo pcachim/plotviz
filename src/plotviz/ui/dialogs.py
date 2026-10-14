@@ -4,7 +4,6 @@ ui/dialogs.py — AnnotationEditDialog and DataImportDialog
 """
 import logging
 import os, csv
-import numpy as np
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit,
     QSpinBox, QDoubleSpinBox, QPushButton, QDialogButtonBox, QComboBox,

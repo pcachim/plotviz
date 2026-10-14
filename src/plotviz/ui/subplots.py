@@ -8,11 +8,6 @@ entry helpers. Split out of main_window; mixed into PlotVizApp so its methods
 share the series table, subplot dicts and widgets via `self`.
 """
 import logging
-from PyQt6.QtWidgets import (
-    QCheckBox, QDialog, QDialogButtonBox, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabWidget,
-    QVBoxLayout, QWidget,
-)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from ui.helpers import _show_color_dialog
@@ -786,8 +781,7 @@ class SubplotMixin:
         """Open a visual subplot layout picker with a custom mosaic editor."""
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
                                      QLabel, QDialogButtonBox, QPushButton, QWidget,
-                                     QCheckBox, QTabWidget, QSpinBox, QSizePolicy,
-                                     QScrollArea, QFrame)
+                                     QCheckBox, QTabWidget, QSpinBox, QScrollArea, QFrame)
 
         # (label, rows, cols, mosaic_or_None)
         LAYOUTS = [

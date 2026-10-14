@@ -257,7 +257,6 @@ class PythonExportMixin:
     def _export_python_bundle(self):
         """Export a .pvizx zip: plot.py + data CSVs + README."""
         import csv as _csv
-        import numpy as np
 
         # ── Collect state ──────────────────────────────────────────────────────
         settings    = self._collect_settings()
@@ -384,7 +383,6 @@ class PythonExportMixin:
         """
         import csv as _csv
         import tempfile
-        import numpy as np
 
         # ── Collect state ──────────────────────────────────────────────────────
         settings    = self._collect_settings()

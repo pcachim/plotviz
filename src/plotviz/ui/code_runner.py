@@ -13,16 +13,15 @@ import io
 import logging
 import traceback
 import textwrap
-import types
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QWidget,
     QPushButton, QLabel, QFileDialog, QMessageBox, QSizePolicy,
     QSpinBox, QPlainTextEdit, QFrame,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import (
-    QFont, QColor, QPalette, QSyntaxHighlighter, QTextCharFormat,
+    QFont, QColor, QSyntaxHighlighter, QTextCharFormat,
     QKeySequence, QShortcut,
 )
 
@@ -462,7 +461,7 @@ class CodeRunnerDialog(QDialog):
         rewrites every df['<col>'] reference to the per-column frame
         _df_<safe>['<col>'] that was already loaded without padding.
         """
-        import os, re, csv as _csv
+        import os, re
 
         data_dir = os.path.join(tmp_dir, 'data')
         if not os.path.isdir(data_dir):

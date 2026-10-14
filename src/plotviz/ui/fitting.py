@@ -9,19 +9,14 @@ PlotVizApp so its methods share the series table, fit state and widgets via
 """
 import csv
 import io
-import math
 
 import numpy as np
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QApplication, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
-    QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
-    QMessageBox, QPushButton, QSizePolicy, QSpinBox, QTableWidget,
-    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QMessageBox, QSpinBox, QTableWidgetItem,
 )
 from data.scientific import CurveFitter
-from styling.presets import ChartPresets
 from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
 
 

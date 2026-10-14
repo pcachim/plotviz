@@ -23,23 +23,15 @@ if _PKG not in sys.path:
     sys.path.insert(0, _PKG)
 # ─────────────────────────────────────────────────────────────────────────────
 
-import csv
-import io
-import json
 import shutil
-import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
-    QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QPushButton, QFileDialog,
-    QMessageBox, QListWidget, QListWidgetItem, QCheckBox, QSplitter, QScrollArea,
-    QButtonGroup, QRadioButton, QFrame, QGroupBox, QDialog,
-    QDialogButtonBox, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView,
+    QPushButton, QMessageBox, QSplitter, QFrame,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence
+from PyQt6.QtGui import QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
 try:
     from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
@@ -56,11 +48,8 @@ class _NavToolbar(NavigationToolbar2QT):
 from ui.canvas import CanvasPlotter
 from ui.tab_builders import (
     TabBuildersMixin, COLOR_PALETTES, get_all_palettes, add_custom_palette,
-    PER_SERIES_TYPES, _CUSTOM_PALETTES,
-    PLOT_MODE_GROUPS, TYPE_TO_PLOT_MODE,
+    _CUSTOM_PALETTES,
 )
-from core.constants import _HEATMAP_GROUP_TYPES
-from core.geometry import to_inches, from_inches
 from ui.plot_engine import PlotEngineMixin
 from ui.serialization import SerializationMixin
 from ui.python_export import PythonExportMixin
@@ -77,11 +66,7 @@ from ui.code_runner import CodeRunnerDialog
 
 
 import config.settings as settings
-from ui.helpers import _get_dir, _remember_dir, _show_color_dialog
-from ui.dialogs import AnnotationEditDialog, DataImportDialog
 
-from data.scientific import CurveFitter
-from styling.presets import ChartPresets
 
 
 # class AnnotationEditDialog(QDialog):
@@ -1144,7 +1129,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.create_advanced_tab()
 
         # ── Menu bar — File ───────────────────────────────────────────────────
-        from PyQt6.QtWidgets import QMenuBar
         from PyQt6.QtGui import QAction
         menubar = self.menuBar()
 
