@@ -93,10 +93,9 @@ class StyleTabMixin:
         tcolor_row.addStretch()
         layout.addLayout(tcolor_row)
 
-        # Chart title X / Y position in physical units (fig_unit).
-        # Defaults assume the standard 20 × 15 cm figure (fig_unit default = 'cm').
-        # _update_title_pos_ranges (wired below, after fig_width/fig_height are built)
-        # corrects both range maxima and step/decimals whenever fig size changes.
+        # Chart title X / Y position, shown in physical units (fig_unit) but stored as
+        # fractions of the figure (self._title_frac). _refresh_geometry_widgets (called
+        # once all the size widgets exist) fills in range, decimals and value.
         _DEFAULT_W_CM, _DEFAULT_H_CM = 20.0, 15.0
         tpos_row = QHBoxLayout()
         tpos_row.setSpacing(4)
@@ -105,9 +104,8 @@ class StyleTabMixin:
         self.title_x.setRange(0.0, _DEFAULT_W_CM)
         self.title_x.setSingleStep(0.1)
         self.title_x.setDecimals(1)
-        self.title_x.setValue(_DEFAULT_W_CM / 2.0)   # centred
         self.title_x.setFixedWidth(66)
-        self.title_x.valueChanged.connect(self.update_preview)
+        self.title_x.valueChanged.connect(lambda v: self._on_title_pos_edited(0, v))
         self.title_x.setToolTip('Horizontal position of title (physical units, 0 = left edge)')
         tpos_row.addWidget(self.title_x)
         tpos_row.addWidget(QLabel('Y:'))
@@ -115,9 +113,8 @@ class StyleTabMixin:
         self.title_y.setRange(0.0, _DEFAULT_H_CM)
         self.title_y.setSingleStep(0.1)
         self.title_y.setDecimals(1)
-        self.title_y.setValue(round(_DEFAULT_H_CM * 0.97, 1))   # near top
         self.title_y.setFixedWidth(66)
-        self.title_y.valueChanged.connect(self.update_preview)
+        self.title_y.valueChanged.connect(lambda v: self._on_title_pos_edited(1, v))
         self.title_y.setToolTip('Vertical position of title (physical units, 0 = bottom edge)')
         tpos_row.addWidget(self.title_y)
         tpos_row.addStretch()
@@ -186,10 +183,6 @@ class StyleTabMixin:
         self.fig_width.setRange(2, 200)
         self.fig_width.setValue(20.0)
         self.fig_width.setSingleStep(0.5)
-        # Fire margin + title scaling FIRST so update_preview (triggered by
-        # _on_figsize_manual_change) always reads the freshly-rescaled values.
-        self.fig_width.valueChanged.connect(self._update_margin_ranges)
-        self.fig_width.valueChanged.connect(self._update_title_pos_ranges)
         self.fig_width.valueChanged.connect(self._on_figsize_manual_change)
         sz_row.addWidget(self.fig_width)
         sz_row.addWidget(QLabel('H:'))
@@ -198,8 +191,6 @@ class StyleTabMixin:
         self.fig_height.setRange(2, 200)
         self.fig_height.setValue(15.0)
         self.fig_height.setSingleStep(0.5)
-        self.fig_height.valueChanged.connect(self._update_margin_ranges)
-        self.fig_height.valueChanged.connect(self._update_title_pos_ranges)
         self.fig_height.valueChanged.connect(self._on_figsize_manual_change)
         sz_row.addWidget(self.fig_height)
         sz_row.addStretch()
@@ -211,32 +202,24 @@ class StyleTabMixin:
         margins_grid.setSpacing(10)
         left_col = QVBoxLayout()
         right_col = QVBoxLayout()
-        # Defaults are in cm (matching the default fig_unit='cm').
-        # fig_width=20 cm, fig_height=15 cm → left=0.10×20=2.0, right=0.95×20=19.0,
-        # bottom=0.10×15=1.5, top=0.95×15=14.25.  _on_fig_unit_changed converts
-        # these spinboxes whenever the user switches units.
-        for attr, label, default_cm, col in [
-            ('fig_left',   'Left',    2.0,  left_col),
-            ('fig_right',  'Right',  19.0,  right_col),
-            ('fig_bottom', 'Bottom',  1.5,  left_col),
-            ('fig_top',    'Top',    14.25, right_col),
-        ]:
+        # Shown in physical units (fig_unit) but stored as fractions of the figure
+        # (self._fig_margins); the defaults are 0.10 / 0.95 / 0.10 / 0.95, i.e.
+        # 2 / 19 / 1.5 / 14.25 cm on the default 20 × 15 cm figure.
+        for idx, (attr, label, col) in enumerate([
+            ('fig_left',   'Left',   left_col),
+            ('fig_right',  'Right',  right_col),
+            ('fig_bottom', 'Bottom', left_col),
+            ('fig_top',    'Top',    right_col),
+        ]):
             mr = QHBoxLayout()
             mr.setSpacing(4)
             lbl = QLabel(label)
             lbl.setFixedWidth(44)
             mr.addWidget(lbl)
             sp = QDoubleSpinBox()
-            # Cap at the corresponding figure dimension so right ≤ fig_width,
-            # top ≤ fig_height.  _update_margin_ranges keeps these maxima live.
-            _sp_max = (self.fig_width.value()  if attr in ('fig_left', 'fig_right')
-                       else self.fig_height.value())
-            sp.setRange(0.0, _sp_max)
-            sp.setSingleStep(0.1)
-            sp.setDecimals(1)
-            sp.setValue(default_cm)
             sp.setFixedWidth(66)
-            sp.valueChanged.connect(self.update_preview)
+            # Range, decimals and value come from _refresh_geometry_widgets below.
+            sp.valueChanged.connect(lambda v, i=idx: self._on_margin_edited(i, v))
             setattr(self, attr, sp)
             mr.addWidget(sp)
             col.addLayout(mr)
@@ -244,6 +227,12 @@ class StyleTabMixin:
         margins_grid.addLayout(right_col)
         margins_grid.addStretch()
         layout.addLayout(margins_grid)
+
+        # All size, margin and title widgets now exist: start from the default
+        # fractions and let them fill in the spinboxes.
+        self._fig_margins = list(self._DEFAULT_MARGINS)
+        self._title_frac = list(self._DEFAULT_TITLE_FRAC)
+        self._refresh_geometry_widgets()
 
         # Subplot spacing (hspace / wspace)
         sp_row = QHBoxLayout()

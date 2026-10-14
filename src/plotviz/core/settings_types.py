@@ -250,6 +250,8 @@ class UiSettings(TypedDict, total=False):
     fig_unit: str
     fig_width: float
     fig_height: float
+    margin_fractions: list[float]
+    title_pos_fractions: list[float]
     fig_left: float
     fig_right: float
     fig_bottom: float

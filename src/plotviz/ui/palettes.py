@@ -268,8 +268,9 @@ class PaletteColorMixin:
         self.fig_height.setValue(h)
         self.fig_width.blockSignals(False)
         self.fig_height.blockSignals(False)
-        self._update_margin_ranges()
-        self._update_title_pos_ranges()
+        # Margins and the title position are fractions of the figure, so they simply
+        # follow the new size: only what the spinboxes display has to be refreshed.
+        self._refresh_geometry_widgets()
         # Reset baseline so the next window resize scales correctly from the
         # newly-applied preset dimensions rather than the stale previous baseline.
         if hasattr(self, 'canvas'):
@@ -287,6 +288,7 @@ class PaletteColorMixin:
         self.fig_preset_combo.blockSignals(True)
         self.fig_preset_combo.setCurrentText('Custom')
         self.fig_preset_combo.blockSignals(False)
+        self._refresh_geometry_widgets()
         # Reset so next window resize scales from the manually-set size.
         # Use canvas dimensions so baseline stays consistent with _apply_resize_and_preview.
         if hasattr(self, 'canvas'):
@@ -294,7 +296,11 @@ class PaletteColorMixin:
         self.update_preview()
 
     def _on_fig_unit_changed(self, unit):
-        """When unit changes, convert current displayed values to the new unit."""
+        """When unit changes, convert the figure W/H to the new unit.
+
+        Margins and the title position need no conversion: they are stored as
+        fractions of the figure and only their displayed values are refreshed.
+        """
         # Read the current size using the *previous* unit (before the combo updated).
         # currentTextChanged fires after the combo already reflects the new value, so
         # we must convert manually from _prev_fig_unit rather than via _fig_size_in_inches().
@@ -334,62 +340,7 @@ class PaletteColorMixin:
             self.fig_height.setValue(round(from_inches(hi, 'pixels', dpi)))
         self.fig_width.blockSignals(False)
         self.fig_height.blockSignals(False)
-
-        # ── Also convert the four margin spinboxes ────────────────────────────
-        # Read current physical values using prev_unit, convert to inches, then
-        # to the new unit — same pattern as fig_width/fig_height above.
-        m_vals_in = []
-        for sp in (self.fig_left, self.fig_right, self.fig_bottom, self.fig_top):
-            v = sp.value()
-            if prev_unit == 'cm':
-                m_vals_in.append(v / 2.54)
-            elif prev_unit == 'pixels':
-                m_vals_in.append(v / self.dpi_spin.value())
-            else:
-                m_vals_in.append(v)
-
-        # Update ranges (caps at new fig dimension) without proportional rescaling —
-        # _on_fig_unit_changed has already done the conversion explicitly above.
-        self._in_scale_figsize = True
-        self._update_margin_ranges()
-        self._in_scale_figsize = False
-        for sp, val_in in zip(
-            (self.fig_left, self.fig_right, self.fig_bottom, self.fig_top),
-            m_vals_in,
-        ):
-            sp.blockSignals(True)
-            if unit == 'cm':
-                sp.setValue(round(val_in * 2.54, 1))
-            elif unit == 'inches':
-                sp.setValue(round(val_in, 2))
-            elif unit == 'pixels':
-                sp.setValue(round(val_in * self.dpi_spin.value()))
-            sp.blockSignals(False)
-
-        # ── Convert title_x / title_y the same way ────────────────────────────
-        if hasattr(self, 'title_x') and hasattr(self, 'title_y'):
-            tx_in = self.title_x.value()
-            ty_in = self.title_y.value()
-            if prev_unit == 'cm':
-                tx_in, ty_in = tx_in / 2.54, ty_in / 2.54
-            elif prev_unit == 'pixels':
-                tx_in = tx_in / self.dpi_spin.value()
-                ty_in = ty_in / self.dpi_spin.value()
-            self._update_title_pos_ranges()
-            self.title_x.blockSignals(True)
-            self.title_y.blockSignals(True)
-            if unit == 'cm':
-                self.title_x.setValue(round(tx_in * 2.54, 1))
-                self.title_y.setValue(round(ty_in * 2.54, 1))
-            elif unit == 'inches':
-                self.title_x.setValue(round(tx_in, 2))
-                self.title_y.setValue(round(ty_in, 2))
-            elif unit == 'pixels':
-                self.title_x.setValue(round(tx_in * self.dpi_spin.value()))
-                self.title_y.setValue(round(ty_in * self.dpi_spin.value()))
-            self.title_x.blockSignals(False)
-            self.title_y.blockSignals(False)
-
+        self._refresh_geometry_widgets()
         self.update_preview()
 
     # Chart types that render a colorbar inside the axes-box area.
@@ -404,26 +355,41 @@ class PaletteColorMixin:
             for ct in self.subplot_chart_types.values()
         )
 
-    def _update_margin_ranges(self):
-        """Keep margin spinbox maxima equal to the current figure dimensions,
-        and proportionally rescale margin values when dimensions change.
+    # ── Figure geometry: margins and title position ──────────────────────────
+    # The margins (left, right, bottom, top) and the title position (x, y) are
+    # stored as FRACTIONS of the figure — self._fig_margins and self._title_frac.
+    # The spinboxes only *display* fraction x figure size in the current unit.
+    # Editing a spinbox changes that one fraction; changing the figure size, the
+    # unit or the preset changes nothing but the displayed numbers. So the layout
+    # never drifts (no rounding accumulation) and needs no rescaling logic.
+    _DEFAULT_MARGINS = (0.10, 0.95, 0.10, 0.95)   # left, right, bottom, top
+    _DEFAULT_TITLE_FRAC = (0.5, 0.97)             # x, y
 
-        right ≤ fig_width and top ≤ fig_height (both in the current fig_unit),
-        except when a colorbar chart type is active — in that case the right
-        margin is uncapped so the colorbar can bleed beyond the figure edge.
-        Called whenever fig_width, fig_height, fig_unit, or chart type changes.
+    def _geom_widgets_ready(self):
+        return all(hasattr(self, a) for a in (
+            'fig_left', 'fig_right', 'fig_bottom', 'fig_top',
+            'title_x', 'title_y', 'fig_width', 'fig_height', 'fig_unit'))
 
-        Proportional rescaling is skipped when called from _scale_figsize
-        (which already rescales in step 4) or from _on_fig_unit_changed
-        (which already converts values to the new unit).  Both callers set
-        _in_scale_figsize = True before calling this method.
+    def _fig_dims(self):
+        """Figure (width, height) as shown in the spinboxes, in the current unit."""
+        return self.fig_width.value(), self.fig_height.value()
+
+    def _refresh_geometry_widgets(self):
+        """Re-derive the margin and title spinboxes from the stored fractions.
+
+        Signals are blocked while writing, so this never feeds back into the
+        fractions. Fractions outside what the spinboxes allow (e.g. a right margin
+        past the figure edge once no colorbar chart is active) are clamped.
         """
-        if not all(hasattr(self, a) for a in
-                   ('fig_left', 'fig_right', 'fig_bottom', 'fig_top',
-                    'fig_width', 'fig_height', 'fig_unit')):
+        if not self._geom_widgets_ready():
             return
-        w    = self.fig_width.value()
-        h    = self.fig_height.value()
+        if not hasattr(self, '_fig_margins'):
+            self._fig_margins = list(self._DEFAULT_MARGINS)
+        if not hasattr(self, '_title_frac'):
+            self._title_frac = list(self._DEFAULT_TITLE_FRAC)
+        w, h = self._fig_dims()
+        if w <= 0 or h <= 0:
+            return
         unit = self.fig_unit.currentText()
         if unit == 'cm':
             dec, step, large = 1, 0.1, 9999.0
@@ -431,98 +397,55 @@ class PaletteColorMixin:
             dec, step, large = 2, 0.05, 9999.0
         else:   # pixels
             dec, step, large = 0, 5.0, 99999.0
+        # Right margin may pass the figure edge when a colorbar chart is active, so
+        # the colorbar can deliberately bleed outside the figure.
         right_cap = large if self._has_colorbar_subplot() else w
-
-        # Proportionally rescale margin values when figure dimensions change
-        # manually (spinbox edit or preset change).  Use fig_left/bottom maximums
-        # as a reliable proxy for the previous fig_width/height — they are always
-        # set to the figure dimension by this very method (never to 'large').
-        # Skip when _scale_figsize or _on_fig_unit_changed is handling it.
-        if not getattr(self, '_in_scale_figsize', False):
-            old_w = self.fig_left.maximum()    # previous fig_width
-            old_h = self.fig_bottom.maximum()  # previous fig_height
-            if old_w > 0 and old_w != w:
-                for sp, new_dim in (
-                    (self.fig_left,  w),
-                    (self.fig_right, w),   # cap applied below; use w for scaling
-                ):
-                    scaled = sp.value() * (w / old_w)
-                    sp.blockSignals(True)
-                    sp.setValue(max(0.0, min(w, scaled)))
-                    sp.blockSignals(False)
-            if old_h > 0 and old_h != h:
-                for sp in (self.fig_bottom, self.fig_top):
-                    scaled = sp.value() * (h / old_h)
-                    sp.blockSignals(True)
-                    sp.setValue(max(0.0, min(h, scaled)))
-                    sp.blockSignals(False)
-
-        for sp, cap in (
-            (self.fig_left,   w),
-            (self.fig_right,  right_cap),
-            (self.fig_bottom, h),
-            (self.fig_top,    h),
-        ):
+        for i, (sp, dim, cap) in enumerate((
+                (self.fig_left,   w, w),
+                (self.fig_right,  w, right_cap),
+                (self.fig_bottom, h, h),
+                (self.fig_top,    h, h))):
+            self._fig_margins[i] = max(0.0, min(cap / dim, self._fig_margins[i]))
+            sp.blockSignals(True)
             sp.setRange(0.0, cap)
             sp.setDecimals(dec)
             sp.setSingleStep(step)
+            sp.setValue(self._fig_margins[i] * dim)
+            sp.blockSignals(False)
+        for i, (sp, dim) in enumerate(((self.title_x, w), (self.title_y, h))):
+            self._title_frac[i] = max(0.0, min(1.0, self._title_frac[i]))
+            sp.blockSignals(True)
+            sp.setRange(0.0, dim)
+            sp.setDecimals(dec)
+            sp.setSingleStep(step)
+            sp.setValue(self._title_frac[i] * dim)
+            sp.blockSignals(False)
 
-    def _update_title_pos_ranges(self):
-        """Keep title_x max = fig_width and title_y max = fig_height (physical units).
+    def _on_margin_edited(self, idx, value):
+        """A margin spinbox was edited: store that one margin as a fraction."""
+        w, h = self._fig_dims()
+        dim = w if idx < 2 else h
+        if dim > 0:
+            self._fig_margins[idx] = value / dim
+        self.update_preview()
 
-        When the figure dimensions change and we are NOT inside _scale_figsize
-        (which already handled proportional scaling), we scale title_x / title_y
-        to maintain their fractional position so the title doesn't jump or
-        disappear when the figure is made smaller.
-        """
-        if not all(hasattr(self, a) for a in
-                   ('title_x', 'title_y', 'fig_width', 'fig_height', 'fig_unit')):
-            return
-        w    = self.fig_width.value()
-        h    = self.fig_height.value()
-        unit = self.fig_unit.currentText()
-        if unit == 'cm':
-            dec, step = 1, 0.1
-        elif unit == 'inches':
-            dec, step = 2, 0.05
-        else:   # pixels
-            dec, step = 0, 5.0
+    def _on_title_pos_edited(self, idx, value):
+        """A title-position spinbox was edited: store it as a fraction."""
+        w, h = self._fig_dims()
+        dim = w if idx == 0 else h
+        if dim > 0:
+            self._title_frac[idx] = value / dim
+        self.update_preview()
 
-        # _scale_figsize has already written the correct proportional values;
-        # don't touch them again — just update the range bounds.
-        if getattr(self, '_in_scale_figsize', False):
-            self.title_x.setRange(0.0, w)
-            self.title_x.setDecimals(dec)
-            self.title_x.setSingleStep(step)
-            self.title_y.setRange(0.0, h)
-            self.title_y.setDecimals(dec)
-            self.title_y.setSingleStep(step)
-            return
+    def _set_margin_fractions(self, left, right, bottom, top):
+        """Set all four margins (fractions) and refresh what the spinboxes show."""
+        self._fig_margins = [float(left), float(right), float(bottom), float(top)]
+        self._refresh_geometry_widgets()
 
-        # Outside _scale_figsize: figure size changed via manual spinbox edit,
-        # preset selection, or unit conversion.  Scale title_x/y proportionally
-        # so they keep the same fractional position within the figure.
-        old_w_max = self.title_x.maximum()   # previous fig_width (range max)
-        old_h_max = self.title_y.maximum()   # previous fig_height (range max)
-
-        for sp, new_max, old_max in (
-            (self.title_x, w, old_w_max),
-            (self.title_y, h, old_h_max),
-        ):
-            if old_max > 0 and old_max != new_max:
-                # Scale the current value to maintain fractional position,
-                # then clamp to the new range.
-                scaled = sp.value() * (new_max / old_max)
-                sp.blockSignals(True)
-                sp.setRange(0.0, new_max)
-                sp.setDecimals(dec)
-                sp.setSingleStep(step)
-                sp.setValue(max(0.0, min(new_max, scaled)))
-                sp.blockSignals(False)
-            else:
-                sp.setRange(0.0, new_max)
-                sp.setDecimals(dec)
-                sp.setSingleStep(step)
+    def _set_title_fractions(self, x, y):
+        """Set the title position (fractions) and refresh what the spinboxes show."""
+        self._title_frac = [float(x), float(y)]
+        self._refresh_geometry_widgets()
 
     def _pick_grid_color(self, which):
         cur = self.grid_color if which == 'major' else self.minor_grid_color

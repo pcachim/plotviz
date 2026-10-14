@@ -888,90 +888,32 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.update_preview()
 
     def _scale_figsize(self, sx: float, sy: float) -> None:
-        """Scale export figure width/height, margins, and title position.
+        """Scale the export figure width/height by the given factors.
 
-        All spinboxes are signal-blocked throughout to prevent cascading
-        redraws.  The order is critical:
-
-          1. Snapshot originals (before any mutation).
-          2. Block all signals.
-          3. Scale fig_width / fig_height.
-          4. Scale margins and title FROM ORIGINALS (not from post-range-clamp
-             values), clamping against the *new* fig dimension.
-          5. Refresh spinbox ranges (setRange / setDecimals) — done last so
-             the range-update cannot silently clamp the values we just wrote.
-          6. Unblock signals.
+        Margins and the title position are stored as fractions of the figure, so
+        they follow the new size by themselves; only what the spinboxes display
+        is refreshed.
 
         Args:
             sx: horizontal scale factor (new_window_width  / old_window_width).
             sy: vertical   scale factor (new_window_height / old_window_height).
         """
-        # ── 1. Snapshot originals ─────────────────────────────────────────────
-        orig_w      = self.fig_width.value()
-        orig_h      = self.fig_height.value()
-        orig_left   = self.fig_left.value()
-        orig_right  = self.fig_right.value()
-        orig_bottom = self.fig_bottom.value()
-        orig_top    = self.fig_top.value()
-
-        title_x_sp  = getattr(self, 'title_x', None)
-        title_y_sp  = getattr(self, 'title_y', None)
-        orig_tx     = title_x_sp.value() if title_x_sp else None
-        orig_ty     = title_y_sp.value() if title_y_sp else None
-
-        # ── 2. Block all signals ──────────────────────────────────────────────
-        all_spins = [self.fig_width, self.fig_height,
-                     self.fig_left, self.fig_right,
-                     self.fig_bottom, self.fig_top]
-        if title_x_sp:
-            all_spins.append(title_x_sp)
-        if title_y_sp:
-            all_spins.append(title_y_sp)
-        for sp in all_spins:
-            sp.blockSignals(True)
-
-        # ── 3. Scale fig_width / fig_height ───────────────────────────────────
-        new_w = max(self.fig_width.minimum(),
-                    min(self.fig_width.maximum(),  orig_w * sx)) if sx != 1.0 else orig_w
-        new_h = max(self.fig_height.minimum(),
-                    min(self.fig_height.maximum(), orig_h * sy)) if sy != 1.0 else orig_h
-        self.fig_width.setValue(new_w)
-        self.fig_height.setValue(new_h)
-
-        # ── 4. Scale margins and title from originals, clamped to new dims ────
-        # Clamp margins to [0, new_w/new_h] so they stay inside the figure.
+        orig_w = self.fig_width.value()
+        orig_h = self.fig_height.value()
+        self.fig_width.blockSignals(True)
+        self.fig_height.blockSignals(True)
         if sx != 1.0:
-            self.fig_left.setValue( max(0.0, min(new_w, orig_left   * sx)))
-            self.fig_right.setValue(max(0.0, min(new_w, orig_right  * sx)))
+            self.fig_width.setValue(max(self.fig_width.minimum(),
+                                        min(self.fig_width.maximum(), orig_w * sx)))
         if sy != 1.0:
-            self.fig_bottom.setValue(max(0.0, min(new_h, orig_bottom * sy)))
-            self.fig_top.setValue(   max(0.0, min(new_h, orig_top    * sy)))
+            self.fig_height.setValue(max(self.fig_height.minimum(),
+                                         min(self.fig_height.maximum(), orig_h * sy)))
+        self.fig_width.blockSignals(False)
+        self.fig_height.blockSignals(False)
+        self._refresh_geometry_widgets()
 
-        if sx != 1.0 and title_x_sp and orig_tx is not None:
-            title_x_sp.setValue(max(0.0, min(new_w, orig_tx * sx)))
-        if sy != 1.0 and title_y_sp and orig_ty is not None:
-            title_y_sp.setValue(max(0.0, min(new_h, orig_ty * sy)))
-
-        # ── 5. Refresh spinbox ranges AFTER writing values ────────────────────
-        # _update_margin_ranges / _update_title_pos_ranges call setRange() which
-        # would silently clamp our freshly-written values if called earlier.
-        # Set _in_scale_figsize so _update_title_pos_ranges skips re-scaling
-        # (we already scaled title_x/y in step 4 above).
-        self._in_scale_figsize = True
-        try:
-            self._update_margin_ranges()
-            if hasattr(self, '_update_title_pos_ranges'):
-                self._update_title_pos_ranges()
-        finally:
-            self._in_scale_figsize = False
-
-        # ── 6. Unblock ────────────────────────────────────────────────────────
-        for sp in all_spins:
-            sp.blockSignals(False)
-
-        # ── 7. Sync preset combo ──────────────────────────────────────────────
-        # Signals were blocked during scaling so _on_figsize_manual_change never
-        # fired.  Explicitly mark the preset as Custom so the combo stays accurate.
+        # Signals were blocked while scaling, so _on_figsize_manual_change never
+        # fired: mark the preset as Custom explicitly so the combo stays accurate.
         if hasattr(self, 'fig_preset_combo'):
             self.fig_preset_combo.blockSignals(True)
             self.fig_preset_combo.setCurrentText('Custom')

@@ -1641,7 +1641,10 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
     # divide by the fig dimension in that same unit to get fractions [0,1].
     _tx_raw = settings.get('title_x', 0.5)
     _ty_raw = settings.get('title_y', 0.98)
-    if settings.get('title_pos_format') == 'physical' and fig_w_raw > 0 and fig_h_raw > 0:
+    _tfrac = settings.get('title_pos_fractions')
+    if _tfrac and len(_tfrac) == 2:
+        title_x, title_y = _tfrac[0], _tfrac[1]       # exact fractions (preferred)
+    elif settings.get('title_pos_format') == 'physical' and fig_w_raw > 0 and fig_h_raw > 0:
         title_x = _tx_raw / fig_w_raw
         title_y = _ty_raw / fig_h_raw
     else:

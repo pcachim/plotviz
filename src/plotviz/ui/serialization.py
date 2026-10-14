@@ -51,8 +51,12 @@ class SerializationMixin:
         s['subplot_title_pad']      = _ser(self.subplot_title_pad)
         s['subplot_title_rotation'] = _ser(self.subplot_title_rotation)
         s['subplot_title_ha']       = _ser(self.subplot_title_ha)
-        s['title_x']         = self.title_x.value() if hasattr(self, 'title_x') else 0.5
-        s['title_y']         = self.title_y.value() if hasattr(self, 'title_y') else 0.97
+        # Title position: the exact fractions are the truth; title_x/y (physical, in
+        # fig_unit) are kept for files read by older versions and by the generator.
+        _tfrac = getattr(self, '_title_frac', self._DEFAULT_TITLE_FRAC)
+        s['title_pos_fractions'] = [float(_tfrac[0]), float(_tfrac[1])]
+        s['title_x']         = round(_tfrac[0] * self.fig_width.value(), 6)
+        s['title_y']         = round(_tfrac[1] * self.fig_height.value(), 6)
         s['title_pos_format'] = 'physical'   # v>=2.5.8: title_x/y in fig_unit, not fractions
         s['sp_hspace']    = self.sp_hspace.value() if hasattr(self, 'sp_hspace') else 0.35
         s['sp_wspace']    = self.sp_wspace.value() if hasattr(self, 'sp_wspace') else 0.35
@@ -144,10 +148,14 @@ class SerializationMixin:
         s['fig_unit']         = self.fig_unit.currentText()
         s['fig_width']        = self.fig_width.value()
         s['fig_height']       = self.fig_height.value()
-        s['fig_left']         = self.fig_left.value()
-        s['fig_right']        = self.fig_right.value()
-        s['fig_bottom']       = self.fig_bottom.value()
-        s['fig_top']          = self.fig_top.value()
+        # Margins: the exact fractions are the truth; fig_left/... (physical, in
+        # fig_unit) are kept for files read by older versions.
+        _mfrac = list(getattr(self, '_fig_margins', self._DEFAULT_MARGINS))
+        s['margin_fractions'] = [float(v) for v in _mfrac]
+        s['fig_left']         = round(_mfrac[0] * self.fig_width.value(), 6)
+        s['fig_right']        = round(_mfrac[1] * self.fig_width.value(), 6)
+        s['fig_bottom']       = round(_mfrac[2] * self.fig_height.value(), 6)
+        s['fig_top']          = round(_mfrac[3] * self.fig_height.value(), 6)
         s['margin_format']    = 'physical'   # v≥2.5.8: margins in fig_unit, not fractions
 
         # Grid
@@ -440,34 +448,21 @@ class SerializationMixin:
             self.fig_preset_combo.setCurrentIndex(i)
             self.fig_preset_combo.blockSignals(False)
 
-        # ── Restore margin spinboxes ──────────────────────────────────────────
-        # Ranges must match the restored unit and figure dimensions.
-        self._update_margin_ranges()
-
-        # Detect old saves (pre-2.5.8) where margins were stored as fractions [0, 1].
-        # In that format fig_left ≤ 1 and fig_right ≤ 1; convert to current physical unit.
-        _raw_l = s.get('fig_left',   0.10)
-        _raw_r = s.get('fig_right',  0.95)
-        _raw_b = s.get('fig_bottom', 0.10)
-        _raw_t = s.get('fig_top',    0.95)
-        if s.get('margin_format') != 'physical':
-            # Old format: values are fractions → convert to physical unit
-            _ru  = self.fig_unit.currentText()
-            _wi, _hi = self._fig_size_in_inches()
-            if _ru == 'cm':
-                _fw, _fh, _dec = _wi * 2.54, _hi * 2.54, 1
-            elif _ru == 'pixels':
-                _fw, _fh, _dec = _wi * self.dpi_spin.value(), _hi * self.dpi_spin.value(), 0
+        # ── Restore the figure margins (stored as fractions) ──────────────────
+        _fw, _fh = self._fig_dims()
+        _frac = s.get('margin_fractions')
+        if isinstance(_frac, (list, tuple)) and len(_frac) == 4:
+            _m = [float(v) for v in _frac]
+        else:
+            # Older files: fig_left/... are physical values in fig_unit (v>=2.5.8)
+            # or already fractions (earlier). Convert to fractions of the figure.
+            _raw = [s.get('fig_left', 0.10), s.get('fig_right', 0.95),
+                    s.get('fig_bottom', 0.10), s.get('fig_top', 0.95)]
+            if s.get('margin_format') == 'physical':
+                _m = [_raw[0] / _fw, _raw[1] / _fw, _raw[2] / _fh, _raw[3] / _fh]
             else:
-                _fw, _fh, _dec = _wi, _hi, 2
-            _raw_l = round(_raw_l * _fw, _dec)
-            _raw_r = round(_raw_r * _fw, _dec)
-            _raw_b = round(_raw_b * _fh, _dec)
-            _raw_t = round(_raw_t * _fh, _dec)
-        self.fig_left.setValue(_raw_l)
-        self.fig_right.setValue(_raw_r)
-        self.fig_bottom.setValue(_raw_b)
-        self.fig_top.setValue(_raw_t)
+                _m = [float(v) for v in _raw]
+        self._set_margin_fractions(*_m)
 
         self.grid_check.setChecked(s.get('grid_on', True))
         self.grid_color = s.get('grid_color','#cccccc')
@@ -579,23 +574,19 @@ class SerializationMixin:
         self.subplot_title_rotation = _di('subplot_title_rotation',{'0': 0})
         self.subplot_title_ha       = _di('subplot_title_ha',      {'0': 'center'})
         if hasattr(self, 'title_x') and hasattr(self, 'title_y'):
-            _raw_tx = float(s.get('title_x', 0.5))
-            _raw_ty = float(s['title_y'] if 'title_y' in s else s.get('title_y_offset', 0.97))
-            if s.get('title_pos_format') != 'physical':
-                # Old format: values are fractions [0,1] — convert to physical units.
-                _wi, _hi = self._fig_size_in_inches()
-                _ru = self.fig_unit.currentText()
-                if _ru == 'cm':
-                    _fw, _fh, _dec = _wi * 2.54, _hi * 2.54, 1
-                elif _ru == 'pixels':
-                    _fw, _fh, _dec = _wi * self.dpi_spin.value(), _hi * self.dpi_spin.value(), 0
+            _tfrac = s.get('title_pos_fractions')
+            if isinstance(_tfrac, (list, tuple)) and len(_tfrac) == 2:
+                _tx, _ty = float(_tfrac[0]), float(_tfrac[1])
+            else:
+                _raw_tx = float(s.get('title_x', 0.5))
+                _raw_ty = float(s['title_y'] if 'title_y' in s else s.get('title_y_offset', 0.97))
+                if s.get('title_pos_format') == 'physical':
+                    # Physical values in fig_unit -> fractions of the figure.
+                    _fw, _fh = self._fig_dims()
+                    _tx, _ty = _raw_tx / _fw, _raw_ty / _fh
                 else:
-                    _fw, _fh, _dec = _wi, _hi, 2
-                _raw_tx = round(_raw_tx * _fw, _dec)
-                _raw_ty = round(_raw_ty * _fh, _dec)
-            self._update_title_pos_ranges()
-            self.title_x.setValue(_raw_tx)
-            self.title_y.setValue(_raw_ty)
+                    _tx, _ty = _raw_tx, _raw_ty      # older files: already fractions
+            self._set_title_fractions(_tx, _ty)
         if hasattr(self, 'sp_hspace'): self.sp_hspace.setValue(s.get('sp_hspace', 0.35))
         if hasattr(self, 'sp_wspace'): self.sp_wspace.setValue(s.get('sp_wspace', 0.35))
         self.subplot_xlabels       = _di('subplot_xlabels', {'0': ''})

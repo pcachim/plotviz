@@ -1459,36 +1459,20 @@ class PlotEngineMixin:
                     y2_step=self.subplot_ytick_step.get(subplot_idx, 0.0))
 
     def _margins_as_fractions(self):
-        """Convert margin spinbox values (physical units) to figure fractions [0, 1].
+        """The figure margins (left, right, bottom, top) as fractions of the figure.
 
-        Divides directly by fig_width / fig_height — both are already in the current
-        unit, so no conversion is needed and there is no floating-point round-trip
-        error (e.g. value/2.54*2.54 != value exactly in IEEE 754).
+        They are stored as fractions (see _refresh_geometry_widgets), so there is
+        nothing to convert. matplotlib needs left < right and bottom < top, so a
+        degenerate pair is nudged apart here instead of crashing the render.
         """
-        w = self.fig_width.value()
-        h = self.fig_height.value()
-        if w <= 0 or h <= 0:
-            return 0.10, 0.95, 0.10, 0.95
-        return (
-            self.fig_left.value()   / w,   # left   fraction
-            self.fig_right.value()  / w,   # right  fraction
-            self.fig_bottom.value() / h,   # bottom fraction
-            self.fig_top.value()    / h,   # top    fraction
-        )
+        left, right, bottom, top = getattr(self, '_fig_margins', self._DEFAULT_MARGINS)
+        right = max(right, left + 0.01)
+        top = max(top, bottom + 0.01)
+        return left, right, bottom, top
 
     def _title_pos_as_fractions(self):
-        """Convert title_x / title_y (physical units) to figure fractions.
-
-        Returns (tx, ty) where each is in [0, 1] (or slightly beyond for right
-        alignment). Divides directly by fig_width / fig_height — same no-round-trip
-        rationale as _margins_as_fractions.
-        """
-        w = self.fig_width.value()
-        h = self.fig_height.value()
-        if w <= 0 or h <= 0:
-            return 0.5, 0.97
-        tx = self.title_x.value() / w if hasattr(self, 'title_x') else 0.5
-        ty = self.title_y.value() / h if hasattr(self, 'title_y') else 0.97
+        """The chart title position (x, y) as fractions of the figure."""
+        tx, ty = getattr(self, '_title_frac', self._DEFAULT_TITLE_FRAC)
         return tx, ty
 
     # ═══════════════════════════════════════════════════════════════════════════
