@@ -439,7 +439,7 @@ class CodeRunnerDialog(QDialog):
                 self._pvizx_tmpdir = tmp
                 zf.extractall(tmp)
                 code = zf.read('plot.py').decode('utf-8')
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.warning(self, 'Open error', str(exc))
             return
 
@@ -585,7 +585,7 @@ class CodeRunnerDialog(QDialog):
             with matplotlib.rc_context({'text.usetex': False}):
                 try:
                     exec(compile(code, '<code_runner>', 'exec'), sandbox)   # noqa: S102
-                except Exception:
+                except Exception:  # noqa: BLE001 - runs arbitrary user code; show the traceback
                     tb = traceback.format_exc()
                     self._show_error(tb)
                     return
@@ -673,7 +673,7 @@ class CodeRunnerDialog(QDialog):
                 self._canvas_fig.savefig(fp, dpi=self._dpi_spin.value(),
                                          format=fmt, bbox_inches='tight')
             QMessageBox.information(self, 'Export', f'Saved to:\n{fp}')
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.warning(self, 'Export error', str(exc))
 
     # ── Window lifecycle ──────────────────────────────────────────────────────

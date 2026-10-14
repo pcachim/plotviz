@@ -83,7 +83,7 @@ class FitPresetMixin:
                 else: stored_y = base
             self.update_lists()
             self.gen_status.setText(f'✓  Created "{stored_x}" and "{stored_y}"  ({n} points)')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             self.gen_status.setText(f'❌  {e}')
 
     # ── Apply function to column ───────────────────────────────────────────────
@@ -198,7 +198,7 @@ class FitPresetMixin:
             self.update_lists()
             mode_str = 'meshgrid ' if meshgrid else ''
             self.fxy_status.setText(f'\u2713  {mode_str}Created x={stored_x}, y={stored_y}, z={stored_z}  ({n} pts)')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             if hasattr(self, 'fxy_status'):
                 self.fxy_status.setText(f'\u274c  {e}')
 
@@ -319,7 +319,7 @@ class FitPresetMixin:
             self.fuv_status.setText(
                 f'\u2713  {mode_str}Created x={stored_x}, y={stored_y}, '
                 f'u={stored_u}, v={stored_v}  ({n} pts)')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             if hasattr(self, 'fuv_status'):
                 self.fuv_status.setText(f'\u274c  {e}')
 
@@ -349,7 +349,7 @@ class FitPresetMixin:
             self.datasets[stored_nm] = result
             self.update_lists()
             self.fn_status.setText(f'✓  Created "{stored_nm}"  ({len(result)} points)')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             self.fn_status.setText(f'❌  {e}')
 
     # ── Inspect loaded series values ───────────────────────────────────────────
@@ -639,7 +639,7 @@ class FitPresetMixin:
             else:
                 self.update_preview()
             self.table_status.setText(f'✓  Loaded: {", ".join(loaded)}')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             self.table_status.setText(f'❌  {e}')
 
     def _on_ci_changed(self):
@@ -775,7 +775,7 @@ class FitPresetMixin:
                     self.curve_select.setCurrentIndex(idx)
             self._load_fit_combos_for(nm)
             self.update_preview()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
     def _refresh_fit_results_panel(self, label=None):

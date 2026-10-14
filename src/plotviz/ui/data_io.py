@@ -421,7 +421,7 @@ class DataMixin:
                         name = f'{base}_{cnt}'
                         cnt += 1
                     self.datasets[name] = arr
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
                 QMessageBox.critical(self, 'Error', f'Failed: {fp}\n{e}')
         self.update_lists()
         if self.series_table.rowCount() == 0:

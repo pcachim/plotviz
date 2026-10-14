@@ -574,7 +574,7 @@ class CanvasPlotter(FigureCanvas):
                                       'zoom':zoom,'artist':ab})
             self.draw_idle()
             self._notify()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - a bad image file only skips that annotation
             print(f'Image annotation error: {e}')
 
     # ─── Annotation management ────────────────────────────────────────────────
@@ -699,7 +699,7 @@ class CanvasPlotter(FigureCanvas):
                                             bboxprops=dict(edgecolor='#aaaaaa', linewidth=1.0),
                                             zorder=50, annotation_clip=False)
                     ax.add_artist(artist)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - a bad image file only skips that annotation
                     print(f'Redraw image error: {e}')
                     continue
             if artist is not None:
@@ -764,6 +764,6 @@ class CanvasPlotter(FigureCanvas):
                                             bboxprops=dict(edgecolor='#aaaaaa', linewidth=1.0),
                                             zorder=50, annotation_clip=False)
                     ax.add_artist(artist)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - a bad image file only skips that annotation
                     print(f'Export image annotation error: {e}')
                     continue

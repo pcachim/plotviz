@@ -90,7 +90,7 @@ class TestDeclaredKeysCoverCoreReads(unittest.TestCase):
 def _have_real_qt():
     try:
         from PyQt6.QtWidgets import QApplication
-    except Exception:
+    except Exception:  # noqa: BLE001 - any import failure means "no usable Qt"
         return False
     return hasattr(QApplication, "instance")
 

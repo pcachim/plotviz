@@ -201,7 +201,7 @@ class ColorSchemeMixin:
                 self._cs_combo.addItem(name)
             self._cs_combo.setCurrentText(name)
             QMessageBox.information(self, 'Saved', f'Color scheme saved:\n{fp}')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_color_scheme(self):
@@ -243,7 +243,7 @@ class ColorSchemeMixin:
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
                 self._apply_color_scheme_dict(scheme)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_color_scheme_from_path(self, fp: str):
@@ -263,5 +263,5 @@ class ColorSchemeMixin:
             self._cs_combo.setCurrentText(name)
             self._refresh_cs_swatches()
             self._apply_color_scheme_dict(scheme)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))

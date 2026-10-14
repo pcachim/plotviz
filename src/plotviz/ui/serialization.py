@@ -1087,7 +1087,7 @@ class SerializationMixin:
             with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr('palette.json', custom_pal_json)
             QMessageBox.information(self, 'Saved', f'Palette bundle saved:\n{fp}')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
     def _import_palette_bundle(self):
@@ -1114,7 +1114,7 @@ class SerializationMixin:
                     return
                 self._load_custom_palettes_json(zf.read('palette.json').decode())
             QMessageBox.information(self, 'Imported', 'Palette bundle imported.')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
     def _save_template(self):
@@ -1131,7 +1131,7 @@ class SerializationMixin:
             with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr('settings.json', json.dumps(settings, indent=2))
             QMessageBox.information(self, 'Saved', f'Template saved:\n{fp}')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_template(self):
@@ -1294,7 +1294,7 @@ class SerializationMixin:
             total_cols = len(self.datasets)
             detail = f'{saved_cols} of {total_cols} column(s)' if used_only else f'all {total_cols} column(s)'
             QMessageBox.information(self, 'Saved', f'Chart saved ({detail}):\n{fp}')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_project_from_path(self, fp: str):
@@ -1329,7 +1329,7 @@ class SerializationMixin:
             finally:
                 self._applying_settings = False
             self.update_preview()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
     def _load_project(self):
@@ -1464,7 +1464,7 @@ class SerializationMixin:
             self._is_dirty = False
             if not silent:
                 QMessageBox.information(self, 'Loaded', 'Chart loaded successfully.')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             if not silent:
                 QMessageBox.critical(self, 'Error', str(e))
 

@@ -664,7 +664,7 @@ class SeabornExplorer(QDialog):
             QMessageBox.information(self, 'Exported',
                 f'Seaborn bundle saved to:\n{fp}\n\n'
                 f'Extract the zip and run:  python plot.py')
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - error boundary: the failure is reported to the user
             import traceback as _tb
             QMessageBox.critical(self, 'Export error',
                 f'{exc}\n\n{_tb.format_exc()}')
@@ -692,7 +692,7 @@ class SeabornExplorer(QDialog):
             with open(tmp_fp, 'wb') as fh:
                 fh.write(data)
             main_win._open_pvizx_in_code_runner(tmp_fp)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - error boundary: the failure is reported to the user
             import traceback as _tb
             QMessageBox.critical(self, 'Code Runner export error',
                 f'{exc}\n\n{_tb.format_exc()}')

@@ -57,8 +57,10 @@ python_files = ["test_*.py"]
 target-version = "py310"
 
 [tool.ruff.lint]
-# Correctness only: syntax errors, unused imports, undefined names, placeholder-less f-strings.
-select = ["E9", "F401", "F821", "F541"]
+# Correctness only: syntax errors, unused imports, undefined names, placeholder-less
+# f-strings and blind `except Exception` (mark deliberate error boundaries with
+# `# noqa: BLE001 - reason`).
+select = ["E9", "F401", "F821", "F541", "BLE001"]
 
 [tool.mypy]
 # Fully typed, UI-free layer only (core/ never imports Qt or ui/). Run:  mypy

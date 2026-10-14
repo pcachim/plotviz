@@ -259,7 +259,7 @@ class DataImportDialog(QDialog):
                 self._sheet_combo.addItems(wb.sheetnames)
                 self._sheet_combo.blockSignals(False)
                 wb.close()
-            except Exception:
+            except Exception:  # noqa: BLE001 - any workbook-reader failure: fall back to pandas
                 try:
                     import pandas as pd
                     xl = pd.ExcelFile(self.filepath)
@@ -417,7 +417,7 @@ class DataImportDialog(QDialog):
                 self._rebuild_col_picker(self._raw_df)
                 self._shape_lbl.setText(
                     f'{len(self._raw_df):,} rows × {len(self._raw_df.columns):,} columns')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             self._status_lbl.setText(f'Parse error: {e}')
             self._preview_table.setRowCount(0)
             self._preview_table.setColumnCount(0)
