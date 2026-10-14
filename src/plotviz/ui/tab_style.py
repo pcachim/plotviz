@@ -227,6 +227,13 @@ class StyleTabMixin:
         margins_grid.addLayout(right_col)
         margins_grid.addStretch()
         layout.addLayout(margins_grid)
+        self.margin_mask_btn = QPushButton('Show margin mask')
+        self.margin_mask_btn.setCheckable(True)
+        self.margin_mask_btn.setToolTip(
+            'Shade the margins on the preview so you can see which area they control.\n'
+            'Preview only: it is never part of an exported file.')
+        self.margin_mask_btn.toggled.connect(self.update_preview)
+        layout.addWidget(self.margin_mask_btn)
 
         # All size, margin and title widgets now exist: start from the default
         # fractions and let them fill in the spinboxes.

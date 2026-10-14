@@ -333,7 +333,8 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
             st_mkc = curve.get('marker_color', st['color'])
             lines.append(
                 f"markerline, stemlines, baseline = {ax_var}.stem({xexpr}, {yexpr}, linefmt='-', "
-                f"markerfmt='{_esc(st_mk)}', basefmt='k-', label='{lbl}', bottom={settings.get('stem_baseline', 0.0)})")
+                f"markerfmt='{_esc(st_mk)}', basefmt='-', label='{lbl}', bottom={settings.get('stem_baseline', 0.0)})")
+            lines.append(f"plt.setp(baseline, color='{_esc(settings.get('chart_fg_color', '#000000'))}')")
             lines.append(
                 f"plt.setp(stemlines, color={col}, linewidth={curve.get('linewidth', 1.2)}); "
                 f"plt.setp(markerline, color='{_esc(st_mkc)}', markersize={curve.get('markersize', 8)})")
@@ -436,7 +437,7 @@ def _gen_boxplot(settings: Settings, series: list[SeriesDict], datasets: Dataset
     if not cols:
         return []
     vert = settings.get('box_vert', True)
-    median = ("dict(color='black', linewidth=2)" if settings.get('box_show_medians', True)
+    median = (f"dict(color='{_esc(settings.get('chart_fg_color', '#000000'))}', linewidth=2)" if settings.get('box_show_medians', True)
               else "dict(linewidth=0)")
     colors = [palette[j % len(palette)] for j in range(len(cols))]
     # Orientation: `vert=` is only emitted when horizontal (the non-default case);
@@ -450,6 +451,12 @@ def _gen_boxplot(settings: Settings, series: list[SeriesDict], datasets: Dataset
         f"for _bp, _bc in zip(_bx['boxes'], {colors!r}):",
         "    _bp.set_facecolor(_bc)",
         f"    _bp.set_alpha({settings.get('box_alpha', 0.7)})",
+        "for _bp in _bx['boxes']:",
+        f"    _bp.set_edgecolor('{_esc(settings.get('chart_fg_color', '#000000'))}')",
+        "for _ln in _bx['whiskers'] + _bx['caps']:",
+        f"    _ln.set_color('{_esc(settings.get('chart_fg_color', '#000000'))}')",
+        "for _ln in _bx['fliers']:",
+        f"    _ln.set_markeredgecolor('{_esc(settings.get('chart_fg_color', '#000000'))}')",
         f"{ax_var}.set_{'x' if vert else 'y'}ticklabels({[_esc(l) for _, l in cols]!r})",
     ]
     return lines
@@ -633,6 +640,8 @@ def _gen_contour(settings: Settings, series: list[SeriesDict], datasets: Dataset
             show_cb = settings.get('heat_colorbar', True)
             # Fix 5: contour line colour/width
             line_color = settings.get('contour_line_color', '#000000')
+            if str(line_color).lower() == '#000000':  # default black → scheme foreground
+                line_color = settings.get('chart_fg_color', '#000000')
             line_width = settings.get('contour_line_width', 0.5)
             # Fix 4: vmin/vmax
             pin_range = settings.get('heat_vminmax_enable', False)
@@ -716,12 +725,12 @@ def _gen_tricontour(settings: Settings, series: list[SeriesDict], datasets: Data
             if tri_lines:
                 lines.append(
                     f"_tcs = {ax_var}.tricontour(_tx, _ty, _tz, levels={lvl}, "
-                    f"colors='k', linewidths=0.5, alpha=0.5)"
+                    f"colors='{_esc(settings.get('chart_fg_color', '#000000'))}', linewidths=0.5, alpha=0.5)"
                 )
                 lines.append("_last_tm = _last_tm if _last_tm is not None else _tcs")
             if triplot:
                 lines.append(
-                    f"{ax_var}.triplot(_tx, _ty, color='k', linewidth=0.4, alpha=0.5)"
+                    f"{ax_var}.triplot(_tx, _ty, color='{_esc(settings.get('chart_fg_color', '#000000'))}', linewidth=0.4, alpha=0.5)"
                 )
             if show_cb:
                 lines += _colorbar_lines(settings, ax_var, '_last_tm', _first_label(series),
@@ -826,7 +835,7 @@ def _gen_hist2d_hexbin(settings: Settings, series: list[SeriesDict], datasets: D
                     f"gridsize={gridsize}, cmap='{_esc(cmap)}', alpha={alpha})"
                 )
                 if show_cb:
-                    lines.append(f"plt.colorbar(_hb, ax={ax_var})")
+                    lines += _plain_colorbar_lines(settings, ax_var, '_hb')
             else:  # Hist2D
                 bins_x  = settings.get('hist2d_bins_x', 20)
                 bins_y  = settings.get('hist2d_bins_y', 20)
@@ -841,7 +850,7 @@ def _gen_hist2d_hexbin(settings: Settings, series: list[SeriesDict], datasets: D
                     f"bins=[{bins_x}, {bins_y}], cmap='{_esc(cmap)}', alpha={alpha}{norm_arg})",
                 ]
                 if show_cb:
-                    lines.append(f"plt.colorbar(_h2img, ax={ax_var})")
+                    lines += _plain_colorbar_lines(settings, ax_var, '_h2img')
     return lines
 
 
@@ -1060,6 +1069,16 @@ def _legend_call(settings: Settings, idx: int | str, ax_var: str, combined: bool
         return f"{ax_var}.legend({handles}loc='{_esc(real_loc)}', bbox_to_anchor=({lx}, {ly}), {common})"
 
 
+def _plain_colorbar_lines(settings: Settings, ax_var: str, mappable: str) -> list[str]:
+    """A colorbar without a label (Hexbin / Hist2D), laid out like the live chart's."""
+    fg = _esc(settings.get('chart_fg_color', '#000000'))
+    return [
+        f"_cb = plt.colorbar({mappable}, ax={ax_var}, fraction=0.04, pad=0.03)",
+        "_cb.ax.set_box_aspect(None)",
+        f"_cb.ax.tick_params(colors='{fg}'); _cb.outline.set_edgecolor('{fg}')",
+    ]
+
+
 def _colorbar_lines(settings: Settings, ax_var: str, mappable: str, label: str,
                     shrink: float, guard: str | None = None, extra: str = '') -> list[str]:
     """plt.colorbar(...) plus the styled Z label the live chart puts on it.
@@ -1074,7 +1093,9 @@ def _colorbar_lines(settings: Settings, ax_var: str, mappable: str, label: str,
     out = []
     if guard:
         out.append(f"if {guard}:")
-    out.append(f"{pad}_cb = plt.colorbar({mappable}, ax={ax_var}, shrink={shrink}{extra})")
+    out.append(f"{pad}_cb = plt.colorbar({mappable}, ax={ax_var}, shrink={shrink}, fraction=0.04, pad=0.03{extra})")
+    out.append(f"{pad}_cb.ax.set_box_aspect(None)")
+    out.append(f"{pad}_cb.ax.tick_params(colors='%s'); _cb.outline.set_edgecolor('%s')" % ((_esc(settings.get('chart_fg_color', '#000000')),) * 2))
     if zlbl:
         out.append(
             f"{pad}_cb.set_label('{_esc(zlbl)}', fontsize={settings.get('zlabel_size', 11)}, "
@@ -1199,6 +1220,13 @@ def _gen_decoration(settings: Settings, idx: int, ax_var: str, sub_ct: str,
 
     # ── Axes background ────────────────────────────────────────────────────
     L.append(f"{ax_var}.set_facecolor('{_esc(st.plot_bg)}')")
+    if sub_ct == '3D Surface':
+        L.append("for _n in ('x', 'y', 'z'):")
+        L.append(f"    _a = getattr({ax_var}, _n + 'axis')")
+        L.append(f"    _a.set_pane_color(matplotlib.colors.to_rgba('{_esc(st.plot_bg)}'))")
+        L.append(f"    _a.line.set_color('{_esc(fg)}')")
+        L.append(f"    {ax_var}.tick_params(axis=_n, colors='{_esc(fg)}')")
+        L.append(f"    _a._axinfo['grid']['color'] = '{_esc(st.grid_color)}'")
 
     # ── Axis labels (styled) ───────────────────────────────────────────────
     if st.xlabel_show:
@@ -1695,6 +1723,22 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
     ] + suptitle_lines + [
         f"fig.subplots_adjust(left={m_left!r}, right={m_right!r}, "
         f"bottom={m_bottom!r}, top={m_top!r}, hspace={hspace}, wspace={wspace})",
+        "# Keep tick labels, axis titles and colorbar labels on the page (as the live chart does)",
+        "_rend = fig.canvas.get_renderer()",
+        "_tb = [(_a.bbox, _a.get_tightbbox(_rend)) for _a in fig.axes",
+        "       if _a.name != '3d' and _a.get_visible()]",
+        "_tb = [(_b, _t) for _b, _t in _tb if _t is not None and _t.width > 0]",
+        "if _tb:",
+        "    _pad = fig.dpi / 72.0",
+        "    _fw, _fh = fig.get_figwidth() * fig.dpi, fig.get_figheight() * fig.dpi",
+        "    _ext = [min(max((_n + _pad) / _d, 0.0), 0.45) for _n, _d in (",
+        "        (min(_b.x0 for _b, _ in _tb) - min(_t.x0 for _, _t in _tb), _fw),",
+        "        (max(_t.x1 for _, _t in _tb) - max(_b.x1 for _b, _ in _tb), _fw),",
+        "        (min(_b.y0 for _b, _ in _tb) - min(_t.y0 for _, _t in _tb), _fh),",
+        "        (max(_t.y1 for _, _t in _tb) - max(_b.y1 for _b, _ in _tb), _fh))]",
+        f"    _l, _r = max({m_left!r}, _ext[0]), min({m_right!r}, 1.0 - _ext[1])",
+        f"    _b, _t = max({m_bottom!r}, _ext[2]), min({m_top!r}, 1.0 - _ext[3])",
+        "    fig.subplots_adjust(left=_l, right=max(_r, _l + 0.01), bottom=_b, top=max(_t, _b + 0.01))",
         "plt.show()",
         "",
     ]

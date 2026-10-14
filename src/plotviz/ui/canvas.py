@@ -48,6 +48,8 @@ class CanvasPlotter(FigureCanvas):
 
         # Border rect artist (page boundary indicator)
         self._border_rect = None
+        # Margin mask (preview-only overlay; never part of an export)
+        self._mask_artists = []
 
         self.ann_style = {
             'fontsize':   10,
@@ -89,6 +91,39 @@ class CanvasPlotter(FigureCanvas):
         )
         self.figure.add_artist(rect)
         self._border_rect = rect
+
+    # ─── Margin mask ──────────────────────────────────────────────────────────
+    def draw_margin_mask(self, page, inner, color='#d6336c'):
+        """Overlay the area the margins reserve, to show what they control.
+
+        *page* and *inner* are (left, bottom, width, height) in figure fractions:
+        the export page, and the rectangle the axes are laid out in. The margins
+        are the shaded band between them; a solid outline marks the inner edge.
+        Preview only: exports build their own figure and never see this.
+        """
+        self.clear_margin_mask()
+        pl, pb, pw, ph = page
+        il, ib, iw, ih = inner
+        kw = dict(transform=self.figure.transFigure, clip_on=False, zorder=290,
+                  linewidth=0, facecolor=color, alpha=0.13)
+        strips = [(pl, pb, il - pl, ph),                              # left
+                  (il + iw, pb, pl + pw - il - iw, ph),               # right
+                  (il, pb, iw, ib - pb),                              # bottom
+                  (il, ib + ih, iw, pb + ph - ib - ih)]               # top
+        for x, y, w, h in strips:
+            if w > 0 and h > 0:
+                self._mask_artists.append(self.figure.add_artist(mpatches.Rectangle((x, y), w, h, **kw)))
+        self._mask_artists.append(self.figure.add_artist(mpatches.Rectangle(
+            (il, ib), iw, ih, transform=self.figure.transFigure, clip_on=False, zorder=291,
+            facecolor='none', edgecolor=color, linewidth=1.2)))
+
+    def clear_margin_mask(self):
+        for art in self._mask_artists:
+            try:
+                art.remove()
+            except (ValueError, NotImplementedError, AttributeError):
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+        self._mask_artists = []
 
     # ─── Mouse events ─────────────────────────────────────────────────────────
     def on_mouse_move(self, event):

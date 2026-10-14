@@ -376,10 +376,12 @@ class PaletteColorMixin:
         w, h = self._fig_dims()
         g = self._MARGIN_GAP
         left, right, bottom, top = self._fig_margins
-        for sp, lo, hi in ((self.fig_left,   0.0,            (right - g) * w),
-                           (self.fig_right,  (left + g) * w, w),
-                           (self.fig_bottom, 0.0,            (top - g) * h),
-                           (self.fig_top,    (bottom + g) * h, h)):
+        ext_l, ext_r, ext_b, ext_t = getattr(self, '_margin_minimums', (0.0, 0.0, 0.0, 0.0))
+        max_r, max_t = 1.0 - ext_r, 1.0 - ext_t
+        for sp, lo, hi in ((self.fig_left,   min(ext_l, right - g) * w, (right - g) * w),
+                           (self.fig_right,  (left + g) * w,            max(max_r, left + g) * w),
+                           (self.fig_bottom, min(ext_b, top - g) * h,   (top - g) * h),
+                           (self.fig_top,    (bottom + g) * h,          max(max_t, bottom + g) * h)):
             sp.blockSignals(True)
             sp.setRange(lo, hi)
             sp.blockSignals(False)

@@ -149,6 +149,51 @@ class TestFractionModel(unittest.TestCase):
         self.assertAlmostEqual(y0, 0.15, places=6)
         self.assertAlmostEqual(y0 + height, 0.85, places=6)
 
+    # ── labels and ticks never leave the page ────────────────────────────────
+    def _decoration_outside(self, w):
+        """How far (in pixels) the export figure's decorations reach past the page."""
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        fig = w._build_export_figure(*w._fig_size_in_inches(), 100)
+        renderer = FigureCanvasAgg(fig).get_renderer()
+        tights = [a.get_tightbbox(renderer) for a in fig.axes]
+        return -min(t.x0 for t in tights), -min(t.y0 for t in tights)
+
+    def test_labels_and_ticks_stay_on_the_page(self):
+        w = self._win()
+        w.ylabel_size.setValue(28)
+        w.xlabel_size.setValue(28)
+        w.ytick_size.setValue(20)
+        w.xtick_size.setValue(20)
+        w._set_margin_fractions(0.0, 0.95, 0.0, 0.95)    # the user asks for nothing
+        w.update_preview()
+        left, bottom = self._decoration_outside(w)
+        self.assertLessEqual(left, 0.5)
+        self.assertLessEqual(bottom, 0.5)
+
+    def test_the_stored_margin_is_not_overwritten(self):
+        # The minimum is applied when drawing; the user's value comes back as soon
+        # as the text gets smaller again (no ratchet).
+        w = self._win()
+        w._set_margin_fractions(0.0, 0.95, 0.0, 0.95)
+        w.ylabel_size.setValue(28)
+        w.update_preview()
+        self.assertGreater(w._margins_as_fractions()[0], 0.0)
+        self.assertEqual(w._fig_margins[0], 0.0)
+        w.ylabel_size.setValue(6)
+        w.ytick_size.setValue(6)
+        w.update_preview()
+        self.assertLess(w._margins_as_fractions()[0], 0.12)
+
+    def test_margin_spinboxes_cannot_go_below_the_minimum(self):
+        w = self._win()
+        w.ylabel_size.setValue(28)
+        w.update_preview()
+        min_left = w._margin_minimums[0] * w._fig_dims()[0]
+        self.assertGreater(min_left, 0.0)
+        self.assertAlmostEqual(w.fig_left.minimum(), min_left, delta=0.051)   # spinbox rounds
+        w.fig_left.setValue(0.0)
+        self.assertGreaterEqual(w.fig_left.value(), min_left - 0.051)
+
     # ── files ─────────────────────────────────────────────────────────────────
     def _apply(self, w, settings):
         w._applying_settings = True
@@ -166,7 +211,11 @@ class TestFractionModel(unittest.TestCase):
         self.assertEqual(saved["title_pos_fractions"], [0.3333, 0.8765])
         w2 = self._win()
         self._apply(w2, saved)
-        self.assertLayout(w2, (0.1234, 0.9876, 0.0567, 0.9012), (0.3333, 0.8765))
+        # What is stored is exact; what is drawn may be pulled in to keep text on the page.
+        for got, want in zip(w2._fig_margins, (0.1234, 0.9876, 0.0567, 0.9012)):
+            self.assertAlmostEqual(got, want, places=9)
+        for got, want in zip(w2._title_pos_as_fractions(), (0.3333, 0.8765)):
+            self.assertAlmostEqual(got, want, places=9)
 
     def test_legacy_fields_still_written_for_older_readers(self):
         w = self._win()
@@ -279,7 +328,40 @@ class TestMarginLimits(unittest.TestCase):
         self.assertWithinFigure(w, "heatmap loaded")
         w.fig_width.setValue(25.0)
         self.assertWithinFigure(w, "heatmap, wider")
-        self.assertAlmostEqual(w.fig_right.maximum(), 25.0, places=6)
+        # the colorbar label hangs outside the axes, so the right margin stops short
+        self.assertLessEqual(w.fig_right.maximum(), 25.0)
+        self.assertGreater(w.fig_right.maximum(), 0.85 * 25.0)
+
+    def test_colorbar_sits_on_the_right_margin(self):
+        # Regression: the colorbar stopped well short of the right margin, so that
+        # margin seemed not to move the scale.
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        w = self._heatmap_window()
+        w._set_margin_fractions(0.1, 0.85, 0.1, 0.9)
+        w.update_preview()
+        for right in (0.85, 0.75):
+            w._set_margin_fractions(0.1, right, 0.1, 0.9)
+            w.update_preview()
+            fig = w._build_export_figure(*w._fig_size_in_inches(), 100)
+            FigureCanvasAgg(fig)
+            fig.canvas.draw()          # apply the aspect: the drawn position, not the cell
+            cbar = [a for a in fig.axes if a.get_label() == "<colorbar>"][0]
+            self.assertAlmostEqual(cbar.get_position().x1, w._margins_as_fractions()[1], places=3)
+
+    def test_margin_mask_is_a_preview_only_overlay(self):
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        w = self._win()
+        w.update_preview()
+        self.assertEqual(w.canvas._mask_artists, [])
+        w.margin_mask_btn.setChecked(True)
+        self.assertTrue(w.canvas._mask_artists)
+        n_with = len(w.canvas.figure.artists)
+        fig = w._build_export_figure(*w._fig_size_in_inches(), 100)
+        FigureCanvasAgg(fig)
+        self.assertEqual(len(fig.artists), 0)                  # never exported
+        w.margin_mask_btn.setChecked(False)
+        self.assertEqual(w.canvas._mask_artists, [])
+        self.assertLess(len(w.canvas.figure.artists), n_with)
 
     def test_left_stays_left_of_right_and_bottom_below_top(self):
         w = self._win()                      # 20 x 15 cm: right = 19, left = 2

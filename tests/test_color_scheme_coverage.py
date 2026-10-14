@@ -1,0 +1,98 @@
+"""A colour scheme reaches every chart type, in the live chart and in the script.
+
+Elements that used to be hard-coded black (3D panes and ticks, tricontour lines,
+boxplot lines, stem baseline) must follow the scheme's foreground colour, and the
+generated script must paint them the same way.
+
+Runs only where a real PyQt6 is installed; skipped otherwise.
+"""
+import os
+import sys
+import unittest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("MPLBACKEND", "Agg")
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+for _p in (os.path.join(os.path.dirname(_HERE), "src", "plotviz"), _HERE):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+from matplotlib.colors import to_hex  # noqa: E402
+
+import test_script_layout as tsl  # noqa: E402
+
+FG, BG, GRID = "#cdd6f4", "#181825", "#45475a"      # 'Dark (charcoal)'
+
+
+@unittest.skipUnless(tsl.HAVE_QT, "real PyQt6 not available")
+class TestColorSchemeCoverage(unittest.TestCase):
+    setUpClass = classmethod(tsl.TestScriptLayoutMatchesExport.setUpClass.__func__)
+    tearDownClass = classmethod(tsl.TestScriptLayoutMatchesExport.tearDownClass.__func__)
+    _window = tsl.TestScriptLayoutMatchesExport._window
+    _export_figure = tsl.TestScriptLayoutMatchesExport._export_figure
+    _script_figure = tsl.TestScriptLayoutMatchesExport._script_figure
+
+    def _themed(self, chart, mode):
+        w = self._window(chart=chart, mode=mode)
+        w._apply_color_scheme_dict(dict(self.PlotVizApp._BUILTIN_COLOR_SCHEMES["Dark (charcoal)"]))
+        self._app.processEvents()
+        return w
+
+    def _both(self, chart, mode):
+        w = self._themed(chart, mode)
+        return self._export_figure(w).axes[0], self._script_figure(w)[0].axes[0]
+
+    def test_3d_surface_follows_the_scheme(self):
+        for ax in self._both("3D Surface", "3D"):
+            for name in "xyz":
+                axis = getattr(ax, f"{name}axis")
+                self.assertEqual(to_hex(axis.pane.get_facecolor()), BG)
+                self.assertEqual(to_hex(axis.line.get_color()), FG)
+                self.assertEqual(to_hex(axis._axinfo["grid"]["color"]), GRID)
+                ticks = [t.get_color() for t in axis.get_ticklabels() if t.get_text()]
+                self.assertTrue(ticks)
+                self.assertTrue(all(to_hex(c) == FG for c in ticks), ticks)
+
+    def test_tricontour_lines_follow_the_foreground(self):
+        w = self._themed("Tricontour", "Heatmap / Contour")
+        w.tri_triplot.setChecked(True)
+        for fig in (self._export_figure(w), self._script_figure(w)[0]):
+            ax = fig.axes[0]
+            lines = [c for c in ax.collections if c.get_linewidth()[0] > 0 and c.get_alpha() == 0.5]
+            self.assertTrue(lines)
+            self.assertTrue(all(to_hex(c.get_edgecolor()[0]) == FG for c in lines))
+
+    def test_boxplot_lines_follow_the_foreground(self):
+        for ax in self._both("Boxplot", "Statistical"):
+            for ln in ax.lines:
+                if ln.get_marker() == "o":                    # outliers: the marker edge
+                    self.assertEqual(to_hex(ln.get_markeredgecolor()), FG)
+                else:                                         # whiskers, caps, medians
+                    self.assertEqual(to_hex(ln.get_color()), FG)
+
+    def test_stem_baseline_follows_the_foreground(self):
+        for ax in self._both("Stem", "Standard"):
+            base = [ln for ln in ax.lines if len(set(ln.get_ydata())) == 1
+                    and len(ln.get_xdata()) == 2]
+            self.assertTrue(base)
+            self.assertEqual(to_hex(base[0].get_color()), FG)
+
+    def test_default_black_contour_lines_follow_the_foreground(self):
+        w = self._themed("Contour", "Heatmap / Contour")
+        w.heat_contour_lines.setChecked(True)
+        for fig in (self._export_figure(w), self._script_figure(w)[0]):
+            ax = fig.axes[0]
+            edges = [to_hex(c.get_edgecolor()[0]) for c in ax.collections
+                     if len(c.get_edgecolor()) and c.get_linewidth()[0] > 0]
+            self.assertIn(FG, edges)
+
+    def test_zlabel_colour_is_part_of_a_scheme(self):
+        w = self._window(chart="3D Surface", mode="3D")
+        self.assertIn("zlabel_color", w._COLOR_SCHEME_KEYS)
+        w._apply_color_scheme_dict(dict(self.PlotVizApp._BUILTIN_COLOR_SCHEMES["Dark (charcoal)"]))
+        self.assertEqual(w.zlabel_color, "#a6adc8")        # follows the y-label colour
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -184,7 +184,7 @@ class PlotEngineMixin:
             bar_elw=bar_elw, bar_al=bar_al, bar_cat=bar_cat, cat_pos=cat_pos,
             bar_bottoms_cat=bar_bottoms_cat, bar_bottoms_num=None,
             bar_offs=bar_offs, n_bar=n_bar, bar_idx_counter=0,
-            _bar_ymin_col=_bar_ymin_col,
+            _bar_ymin_col=_bar_ymin_col, fg=self._fg_color(subplot_idx),
         )
 
         for i, (xd, yd, lbl, sct) in enumerate(series):
@@ -435,7 +435,8 @@ class PlotEngineMixin:
         ms = s.get('markersize', 8)
         markerline, stemlines, baseline_line = ax.stem(
             xplot, yd, linefmt='-', markerfmt=mk,
-            basefmt='k-', label=lbl, bottom=baseline)
+            basefmt='-', label=lbl, bottom=baseline)
+        plt.setp(baseline_line, color=st.fg)
         plt.setp(stemlines, color=color, linewidth=lw)
         plt.setp(markerline, color=mk_color, markersize=ms)
 
@@ -559,11 +560,18 @@ class PlotEngineMixin:
                 showmeans=_o('box_show_means', False),
                 showfliers=_o('box_showfliers', True),
                 whis=_o('box_whis', 1.5),
-                medianprops=dict(color='black', linewidth=2) if _o('box_show_medians', True) else dict(linewidth=0),
+                medianprops=dict(color=self._fg_color(subplot_idx), linewidth=2) if _o('box_show_medians', True) else dict(linewidth=0),
             )
             for patch, c in zip(bp['boxes'], C):
                 patch.set_facecolor(c)
                 patch.set_alpha(_o('box_alpha', 0.7))
+            _fg = self._fg_color(subplot_idx)
+            for patch in bp['boxes']:
+                patch.set_edgecolor(_fg)
+            for ln in bp['whiskers'] + bp['caps']:
+                ln.set_color(_fg)
+            for ln in bp['fliers']:
+                ln.set_markeredgecolor(_fg)
 
     def _plot_violin(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
         """Draw a 'Violin' whole-chart plot onto *ax*."""
@@ -662,8 +670,7 @@ class PlotEngineMixin:
                                interpolation=_o('heat_interpolation', 'nearest'),
                                **extent_kw, **_vm_kw)
                 if _o('heat_colorbar', True):
-                    _cb = ax.figure.colorbar(im, ax=ax,
-                        shrink=_o('heat_colorbar_shrink', 1.0))
+                    _cb = self._colorbar(ax, im, _o('heat_colorbar_shrink', 1.0), subplot_idx)
                     _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
                     if _zlbl:
                         _cb.set_label(_latex_safe(_zlbl),
@@ -710,6 +717,8 @@ class PlotEngineMixin:
                         _vm_kw = {'vmin': self.heat_vmin.value(), 'vmax': self.heat_vmax.value()}
                     # Fix 5: contour line colour/width from settings
                     _lc = _o('contour_line_color', '#000000')
+                    if str(_lc).lower() == '#000000':  # default black → scheme foreground
+                        _lc = self._fg_color(subplot_idx)
                     _lw = _o('contour_line_width', 0.5)
                     # Bug 3: track last mappable so colorbar is drawn regardless of
                     # which combination of filled/line contour is active.
@@ -721,8 +730,7 @@ class PlotEngineMixin:
                         cs = ax.contour(X, Y, Z, levels=lvl, colors=_lc, linewidths=_lw, alpha=0.5)
                         if _last_contour_m is None: _last_contour_m = cs
                     if _last_contour_m is not None and _o('heat_colorbar', True):
-                        _cb = ax.figure.colorbar(_last_contour_m, ax=ax,
-                            shrink=_o('heat_colorbar_shrink', 1.0))
+                        _cb = self._colorbar(ax, _last_contour_m, _o('heat_colorbar_shrink', 1.0), subplot_idx)
                         _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
                         if _zlbl:
                             _cb.set_label(_latex_safe(_zlbl),
@@ -759,13 +767,12 @@ class PlotEngineMixin:
                 if _o('tri_lines', True):
                     # Bug 4: assign to last_mappable so colorbar works when
                     # fill style is None and only contour lines are drawn.
-                    tl = ax.tricontour(x, y, z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
+                    tl = ax.tricontour(x, y, z, levels=lvl, colors=self._fg_color(subplot_idx), linewidths=0.5, alpha=0.5)
                     if last_mappable is None: last_mappable = tl
                 if _o('tri_triplot', False):
-                    ax.triplot(x, y, color='k', linewidth=0.4, alpha=0.5)
+                    ax.triplot(x, y, color=self._fg_color(subplot_idx), linewidth=0.4, alpha=0.5)
                 if last_mappable is not None and _o('tri_colorbar', True):
-                    _cb = ax.figure.colorbar(last_mappable, ax=ax,
-                        shrink=_o('tri_colorbar_shrink', 1.0))
+                    _cb = self._colorbar(ax, last_mappable, _o('tri_colorbar_shrink', 1.0), subplot_idx)
                     _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
                     if _zlbl:
                         _cb.set_label(_latex_safe(_zlbl),
@@ -805,8 +812,7 @@ class PlotEngineMixin:
                                                alpha=alp, rstride=st, cstride=st)
                         # Fix 7: honour heat_colorbar for 3D Surface
                         if _o('heat_colorbar', True):
-                            _cb = ax.figure.colorbar(surf, ax=ax,
-                                shrink=_o('heat_colorbar_shrink', 1.0))
+                            _cb = self._colorbar(ax, surf, _o('heat_colorbar_shrink', 1.0), subplot_idx)
                             _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
                             if _zlbl:
                                 _cb.set_label(_latex_safe(_zlbl),
@@ -825,7 +831,7 @@ class PlotEngineMixin:
                     bins=[_o('hist2d_bins_x', 20), _o('hist2d_bins_y', 20)],
                     cmap=_cmap('hist2d_cmap_combo', 'hist2d_cmap'), alpha=_o('hist2d_alpha', 1.0), norm=norm)
                 if _o('hist2d_colorbar', True):
-                    ax.figure.colorbar(img, ax=ax)
+                    self._colorbar(ax, img, 1.0, subplot_idx)
 
     def _plot_hexbin(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
         """Draw a 'Hexbin' whole-chart plot onto *ax*."""
@@ -837,7 +843,7 @@ class PlotEngineMixin:
                                bins='log' if _o('hexbin_log', False) else None,
                                alpha=_o('hexbin_alpha', 1.0))
                 if _o('hexbin_colorbar', True):
-                    ax.figure.colorbar(hb, ax=ax)
+                    self._colorbar(ax, hb, 1.0, subplot_idx)
 
     def _plot_polar(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
         """Draw a 'Polar' whole-chart plot onto *ax*."""
@@ -1060,6 +1066,45 @@ class PlotEngineMixin:
             ax.grid(False, which='minor')
             try: ax.minorticks_off()
             except (AttributeError, NotImplementedError, ValueError):
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+
+    def _colorbar(self, ax, mappable, shrink=1.0, subplot_idx=0):
+        """Add a colorbar that fills the strip beside *ax* and takes the scheme colours.
+
+        A slim fixed-fraction strip whose outer edge sits on the figure's right
+        margin (matplotlib's default aspect would leave an unused gap there, so
+        the right margin looked dead).
+        """
+        cb = ax.figure.colorbar(mappable, ax=ax, shrink=shrink, fraction=0.04, pad=0.03)
+        cb.ax.set_box_aspect(None)
+        fg = self._fg_color(subplot_idx)
+        cb.ax.tick_params(colors=fg)
+        cb.outline.set_edgecolor(fg)
+        return cb
+
+    def _fg_color(self, subplot_idx=0):
+        """Scheme foreground colour for a subplot (axes lines, ticks, outlines)."""
+        c = getattr(self, 'subplot_canvas_opts', {}).get(subplot_idx, None)
+        return c['fg'] if c else getattr(self, 'chart_fg_color', '#000000')
+
+    def _apply_3d_style(self, ax, subplot_idx=0):
+        """Colour a 3D axes (panes, axis lines, ticks, grid) from the scheme."""
+        c = getattr(self, 'subplot_canvas_opts', {}).get(subplot_idx, None)
+        fg = self._fg_color(subplot_idx)
+        plot_bg = c['plot_bg'] if c else getattr(self, 'plot_bg_color', '#ffffff')
+        g = getattr(self, 'subplot_grid_opts', {}).get(subplot_idx, None)
+        grid_color = g['color'] if g else getattr(self, 'grid_color', '#cccccc')
+        ax.set_facecolor(plot_bg)
+        for name in ('x', 'y', 'z'):
+            axis = getattr(ax, f'{name}axis', None)
+            if axis is None:
+                continue
+            axis.set_pane_color(matplotlib.colors.to_rgba(plot_bg))
+            axis.line.set_color(fg)
+            ax.tick_params(axis=name, colors=fg)
+            try:
+                axis._axinfo['grid']['color'] = grid_color
+            except (AttributeError, KeyError, TypeError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     def _apply_canvas_style(self, ax, subplot_idx=0):
@@ -1449,7 +1494,9 @@ class PlotEngineMixin:
         if not _y2_active and self.subplot_legends.get(subplot_idx, True) and yd \
                 and ct not in _legend_auto_types:
             ax.legend(**self._legend_kwargs(subplot_idx))
-        if not is3d:
+        if is3d:
+            self._apply_3d_style(ax, subplot_idx)
+        else:
             self._apply_canvas_style(ax, subplot_idx)
             if ct not in _DECOR_NO_SCALE:
                 self._apply_grid(ax, subplot_idx)
@@ -1495,9 +1542,52 @@ class PlotEngineMixin:
         degenerate pair is nudged apart here instead of crashing the render.
         """
         left, right, bottom, top = getattr(self, '_fig_margins', self._DEFAULT_MARGINS)
+        # Never let tick labels, axis titles or colorbar labels fall off the page
+        # (the stored margin stays as the user set it; this is only what is drawn).
+        ext_l, ext_r, ext_b, ext_t = getattr(self, '_margin_minimums', (0.0, 0.0, 0.0, 0.0))
+        left = max(left, ext_l)
+        right = min(right, 1.0 - ext_r)
+        bottom = max(bottom, ext_b)
+        top = min(top, 1.0 - ext_t)
         right = max(right, left + 0.01)
         top = max(top, bottom + 0.01)
         return left, right, bottom, top
+
+    def _outer_margin_minimums(self, fig, box_w, box_h):
+        """How far the axes decorations reach beyond the axes, as page fractions.
+
+        Returns (left, right, bottom, top): the room that tick labels, axis titles,
+        axes titles and colorbar labels need outside the axes (an amount in points
+        that does not depend on the margins). The margins must leave at least this
+        much room on each side, or the text falls off the page. *box_w* / *box_h*
+        are the page's share of the figure. Call after the axes have been laid out;
+        3D axes are not measured.
+        """
+        zero = (0.0, 0.0, 0.0, 0.0)
+        axes = [a for a in fig.axes if getattr(a, 'name', '') != '3d' and a.get_visible()]
+        if not axes:
+            return zero
+        try:
+            if not hasattr(fig.canvas, 'get_renderer'):   # export figures have a bare canvas
+                from matplotlib.backends.backend_agg import FigureCanvasAgg
+                FigureCanvasAgg(fig)
+            renderer = fig.canvas.get_renderer()
+            tights = [(a.bbox, a.get_tightbbox(renderer)) for a in axes]
+        except (AttributeError, ValueError, RuntimeError):
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+            return zero
+        tights = [(b, t) for b, t in tights if t is not None and t.width > 0]
+        fw = fig.get_figwidth() * fig.dpi * box_w
+        fh = fig.get_figheight() * fig.dpi * box_h
+        if not tights or fw <= 0 or fh <= 0:
+            return zero
+        pad = fig.dpi / 72.0          # one point of breathing room
+        need = (min(b.x0 for b, _ in tights) - min(t.x0 for _, t in tights),
+                max(t.x1 for _, t in tights) - max(b.x1 for b, _ in tights),
+                min(b.y0 for b, _ in tights) - min(t.y0 for _, t in tights),
+                max(t.y1 for _, t in tights) - max(b.y1 for b, _ in tights))
+        out = [min(max((n + pad) / d, 0.0), 0.45) for n, d in zip(need, (fw, fw, fh, fh))]
+        return out[0], out[1], out[2], out[3]
 
     def _title_pos_as_fractions(self):
         """The chart title position (x, y) as fractions of the figure."""
@@ -1761,7 +1851,9 @@ class PlotEngineMixin:
         """Canvas-style / grid / twinx-tick alignment for multi-subplot layouts."""
         for _ax_i, _ax in enumerate(axes_list):
             _ax_ct = self.subplot_chart_types.get(_ax_i, 'Line')
-            if _ax_ct not in _3D_TYPES:
+            if _ax_ct in _3D_TYPES:
+                self._apply_3d_style(_ax, _ax_i)
+            else:
                 self._apply_canvas_style(_ax, _ax_i)
                 if _ax_ct not in _DECOR_NO_SCALE: self._apply_grid(_ax, _ax_i)
         for _ax_i, _ax2 in ax2_map.items():
@@ -1814,6 +1906,7 @@ class PlotEngineMixin:
             with matplotlib.rc_context({'font.family': chart_font, 'text.usetex': False}):
                 self.canvas.figure.clear()
                 self.canvas._border_rect = None   # figure.clear() removes all artists
+                self.canvas._mask_artists = []
                 self.canvas.figure.patch.set_facecolor(self.chart_bg_color)
 
                 # Fit the export page into the canvas at its true scale BEFORE drawing,
@@ -1875,6 +1968,18 @@ class PlotEngineMixin:
                     bottom=adj_bottom, top=adj_top,
                     hspace=_hspace, wspace=_wspace,
                 )
+                # Tick labels and axis titles must stay on the page: raise the left /
+                # bottom margins to the minimum that fits them, then lay out again.
+                self._margin_minimums = list(self._outer_margin_minimums(
+                    self.canvas.figure, box_w, box_h))
+                _eff = self._margins_as_fractions()
+                if any(abs(a - b) > 1e-9 for a, b in zip(_eff, (ul, ur, ub, ut))):
+                    ul, ur, ub, ut = _eff
+                    self.canvas.figure.subplots_adjust(
+                        left=box_left + ul * box_w, right=box_left + ur * box_w,
+                        bottom=box_bottom + ub * box_h, top=box_bottom + ut * box_h)
+                if hasattr(self, '_refresh_geometry_widgets'):
+                    self._refresh_geometry_widgets()
 
                 # Draw the page-boundary rectangle (always a 1-pixel line, whatever the
                 # preview scale: 72 points per inch / dpi pixels per inch)
@@ -1883,6 +1988,13 @@ class PlotEngineMixin:
                     color=self.chart_fg_color,
                     linewidth=72.0 / self.canvas.figure.dpi,
                 )
+
+                if getattr(self, 'margin_mask_btn', None) is not None \
+                        and self.margin_mask_btn.isChecked():
+                    self.canvas.draw_margin_mask(
+                        (box_left, box_bottom, box_w, box_h),
+                        (box_left + ul * box_w, box_bottom + ub * box_h,
+                         (ur - ul) * box_w, (ut - ub) * box_h))
 
                 # Redraw annotations AFTER layout is finalised so axes limits are set
                 if not is3d:
@@ -2148,6 +2260,14 @@ class PlotEngineMixin:
             hspace=_hspace_exp,
             wspace=_wspace_exp,
         )
+        _ext = self._outer_margin_minimums(exp_fig, 1.0, 1.0)
+        _l = max(_ml, _ext[0])
+        _r = min(_mr, 1.0 - _ext[1])
+        _b = max(_mb, _ext[2])
+        _t = min(_mt, 1.0 - _ext[3])
+        if (_l, _r, _b, _t) != (_ml, _mr, _mb, _mt):
+            _r, _t = max(_r, _l + 0.01), max(_t, _b + 0.01)
+            exp_fig.subplots_adjust(left=_l, right=_r, bottom=_b, top=_t)
 
         # Replay annotations (text / arrow / image) onto the export axes.
         # The export figure is built fresh, so annotations drawn on the

@@ -19,7 +19,7 @@ class ColorSchemeMixin:
         'grid_color', 'grid_on', 'grid_linestyle', 'grid_linewidth', 'grid_alpha',
         'minor_grid_color', 'minor_grid_on',
         'minor_grid_linestyle', 'minor_grid_linewidth', 'minor_grid_alpha',
-        'title_color', 'xlabel_color', 'ylabel_color', 'y2label_color',
+        'title_color', 'xlabel_color', 'ylabel_color', 'y2label_color', 'zlabel_color',
         'title_font', 'xlabel_font', 'ylabel_font',
         'title_size', 'xlabel_size', 'ylabel_size',
         'border_top', 'border_bottom', 'border_left', 'border_right',
@@ -148,6 +148,8 @@ class ColorSchemeMixin:
         # Build a full settings dict from current state, overwrite scheme keys only
         full = self._collect_settings()
         full.update(scheme)
+        if 'zlabel_color' not in scheme and 'ylabel_color' in scheme:
+            full['zlabel_color'] = scheme['ylabel_color']  # 3D z-label follows y-label
         self._applying_settings = True
         try:
             self._apply_settings(full)
