@@ -271,7 +271,10 @@ def _gen_boxplot(settings, series, datasets, palette, ax_var):
         return []
     return [
         f"_bx_data = [{', '.join(exprs)}]",
-        f"{ax_var}.boxplot(_bx_data, labels={[_esc(l) for l in lbls]!r})",
+        # Set tick labels afterwards: boxplot's `labels` kwarg was renamed
+        # `tick_labels` in Matplotlib 3.9, and this form works on every version.
+        f"{ax_var}.boxplot(_bx_data)",
+        f"{ax_var}.set_xticklabels({[_esc(l) for l in lbls]!r})",
     ]
 
 

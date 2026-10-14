@@ -50,6 +50,7 @@ def _latex_safe(text: str) -> str:
     return text.translate(_LATEX_SPECIAL)
 
 
+from core.mpl_compat import box_kwargs, violin_kwargs
 from core.constants import (
     _3D_TYPES, _NO_LEGEND_TYPES, _DECOR_NO_SCALE, _DECOR_NO_LIMITS,
     _AXSCALE_SKIP_TYPES, _HEATMAP_GROUP_TYPES,
@@ -138,9 +139,9 @@ class PlotEngineMixin:
                 num_series = [(k, v) for k, v in yd_dict.items() if not self._is_categorical(v)]
                 if num_series:
                     bp = ax.boxplot(
-                        [v for _, v in num_series], labels=[k for k, _ in num_series],
+                        [v for _, v in num_series],
                         patch_artist=True, notch=_o('box_notch', False),
-                        vert=_o('box_vert', True),
+                        **box_kwargs([k for k, _ in num_series], _o('box_vert', True)),
                         showmeans=_o('box_show_means', False),
                         showfliers=_o('box_showfliers', True),
                         whis=_o('box_whis', 1.5),
@@ -160,7 +161,7 @@ class PlotEngineMixin:
                         showextrema=_o('violin_show_extrema', False),
                         bw_method=_o('violin_bw', 'scott'),
                         points=int(_o('violin_points', '100')),
-                        vert=_o('violin_vert', True),
+                        **violin_kwargs(_o('violin_vert', True)),
                     )
                     for pc, c in zip(parts['bodies'], C):
                         pc.set_facecolor(c)
@@ -244,7 +245,7 @@ class PlotEngineMixin:
                                        interpolation=_o('heat_interpolation', 'nearest'),
                                        **extent_kw, **_vm_kw)
                         if _o('heat_colorbar', True):
-                            _cb = self.canvas.figure.colorbar(im, ax=ax,
+                            _cb = ax.figure.colorbar(im, ax=ax,
                                 shrink=_o('heat_colorbar_shrink', 1.0))
                             _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
                             if _zlbl:
@@ -301,7 +302,7 @@ class PlotEngineMixin:
                                 cs = ax.contour(X, Y, Z, levels=lvl, colors=_lc, linewidths=_lw, alpha=0.5)
                                 if _last_contour_m is None: _last_contour_m = cs
                             if _last_contour_m is not None and _o('heat_colorbar', True):
-                                _cb = self.canvas.figure.colorbar(_last_contour_m, ax=ax,
+                                _cb = ax.figure.colorbar(_last_contour_m, ax=ax,
                                     shrink=_o('heat_colorbar_shrink', 1.0))
                                 _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
                                 if _zlbl:
@@ -342,7 +343,7 @@ class PlotEngineMixin:
                         if _o('tri_triplot', False):
                             ax.triplot(x, y, color='k', linewidth=0.4, alpha=0.5)
                         if last_mappable is not None and _o('tri_colorbar', True):
-                            _cb = self.canvas.figure.colorbar(last_mappable, ax=ax,
+                            _cb = ax.figure.colorbar(last_mappable, ax=ax,
                                 shrink=_o('tri_colorbar_shrink', 1.0))
                             _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
                             if _zlbl:
@@ -382,7 +383,7 @@ class PlotEngineMixin:
                                                        alpha=alp, rstride=st, cstride=st)
                                 # Fix 7: honour heat_colorbar for 3D Surface
                                 if _o('heat_colorbar', True):
-                                    _cb = self.canvas.figure.colorbar(surf, ax=ax,
+                                    _cb = ax.figure.colorbar(surf, ax=ax,
                                         shrink=_o('heat_colorbar_shrink', 1.0))
                                     _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
                                     if _zlbl:
@@ -402,7 +403,7 @@ class PlotEngineMixin:
                             bins=[_o('hist2d_bins_x', 20), _o('hist2d_bins_y', 20)],
                             cmap=_cmap('hist2d_cmap_combo', 'hist2d_cmap'), alpha=_o('hist2d_alpha', 1.0), norm=norm)
                         if _o('hist2d_colorbar', True):
-                            self.canvas.figure.colorbar(img, ax=ax)
+                            ax.figure.colorbar(img, ax=ax)
 
             elif ct == 'Hexbin':
                 if series:
@@ -413,7 +414,7 @@ class PlotEngineMixin:
                                        bins='log' if _o('hexbin_log', False) else None,
                                        alpha=_o('hexbin_alpha', 1.0))
                         if _o('hexbin_colorbar', True):
-                            self.canvas.figure.colorbar(hb, ax=ax)
+                            ax.figure.colorbar(hb, ax=ax)
 
             elif ct == 'Polar':
                 for i, (xd, yd, lbl, _) in enumerate(series):
@@ -571,18 +572,6 @@ class PlotEngineMixin:
         bar_ec   = _o('bar_edgecolor', 'none')
         bar_elw  = _o('bar_edge_lw', 0.5)
         bar_al   = _o('bar_alpha', 1.0)
-
-        def _bar(ax, positions, values, width, bottom=None, **kw):
-            ec_kw = {'edgecolor': bar_ec if bar_ec != 'none' else 'none',
-                     'linewidth': bar_elw if bar_ec != 'none' else 0}
-            kw.update(ec_kw)
-            if bar_horiz:
-                ax.barh(positions, values, height=width,
-                        left=bottom if bottom is not None else 0, **kw)
-            else:
-                kw2 = dict(kw)
-                if bottom is not None: kw2['bottom'] = bottom
-                ax.bar(positions, values, width=width, **kw2)
 
         any_cat_x = any(self._is_categorical(xd) for xd, yd, lbl, sct in series)
         if any_cat_x:
@@ -976,7 +965,8 @@ class PlotEngineMixin:
         else:
             ax.grid(False, which='minor')
             try: ax.minorticks_off()
-            except Exception: pass
+            except Exception:
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     def _apply_canvas_style(self, ax, subplot_idx=0):
         """Apply background color, tick styling and border visibility to an axes.
@@ -1096,7 +1086,8 @@ class PlotEngineMixin:
                 axis_obj.set_major_formatter(PercentFormatter(xmax=1.0))
             elif '{x' in fmt_str:
                 try: axis_obj.set_major_formatter(StrMethodFormatter(fmt_str))
-                except Exception: pass
+                except Exception:
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         _apply_fmt(ax.xaxis, x_fmt)
         _apply_fmt(ax.yaxis, y_fmt)
 
@@ -1357,7 +1348,8 @@ class PlotEngineMixin:
                 if not _protect_y and ys == 'inverted': ax.invert_yaxis()
             if self.subplot_equal_aspect.get(subplot_idx, False) and ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-                except Exception: pass
+                except Exception:
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         # ── Legend (no Y2) ──
         # Pie is in _NO_LEGEND_TYPES to suppress auto-legend, but if the user
         # explicitly enables "Show legend" we honour it via ax.legend().
@@ -1533,7 +1525,8 @@ class PlotEngineMixin:
                         if ys == 'inverted': ax.invert_yaxis()
                     if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                         try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-                        except Exception: pass
+                        except Exception:
+                            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
                     self._apply_canvas_style(ax, idx)
                     if sub_ct not in _DECOR_NO_SCALE: self._apply_grid(ax, idx)
                     self._apply_cat_ticks(ax, cat_info)
@@ -1657,7 +1650,8 @@ class PlotEngineMixin:
                         if not _protect_y and ys == 'inverted': ax.invert_yaxis()
                     if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                         try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-                        except Exception: pass
+                        except Exception:
+                            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
                     self._apply_cat_ticks(ax, cat_info)
                     show_leg = self.subplot_legends.get(idx, True)
                     if show_leg and sub_ct not in (_NO_LEGEND_TYPES - {'Pie'}):
@@ -1718,10 +1712,9 @@ class PlotEngineMixin:
                 _layout_sp = self.layout_sp_active.currentIndex()
                 if _layout_sp >= 0:
                     self._save_canvas_grid_opts(_layout_sp)
-            series = self._get_series(primary_only=True)
             ct = self.chart_type_combo.currentText()
             is3d = ct in _3D_TYPES
-            rows, cols, n = self.subplot_rows, self.subplot_cols, self.subplot_rows*self.subplot_cols
+            n = self.subplot_rows * self.subplot_cols
             # Use title_font as the global chart font (applies to tick labels too)
             chart_font = self.title_font.currentText()
 
@@ -1815,7 +1808,7 @@ class PlotEngineMixin:
                 QApplication.processEvents()
                 self.refresh_annotation_list()
 
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -2108,7 +2101,8 @@ class PlotEngineMixin:
             QMessageBox.information(self, 'Success', f'Exported to {fp}')
         except Exception as e:
             try: matplotlib.rcParams['font.family'] = _old_font
-            except Exception: pass
+            except Exception:
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             QMessageBox.critical(self, 'Error', str(e))
 
     # ═══════════════════════════════════════════════════════════════════════════
