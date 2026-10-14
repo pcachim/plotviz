@@ -33,10 +33,9 @@ from matplotlib.figure import Figure
 
 try:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
 except ImportError:
     from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+from ui.nav_toolbar import SafeNavigationToolbar
 
 log = logging.getLogger('plotviz')
 
@@ -345,7 +344,7 @@ class CodeRunnerDialog(QDialog):
         self._canvas_fig = Figure(figsize=(8, 6), dpi=100)
         self._canvas = FigureCanvas(self._canvas_fig)
         self._canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._nav = NavigationToolbar2QT(self._canvas, right)
+        self._nav = SafeNavigationToolbar(self._canvas, right)
 
         rl.addWidget(self._nav)
         rl.addWidget(self._canvas)

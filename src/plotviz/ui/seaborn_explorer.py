@@ -29,10 +29,9 @@ from matplotlib.figure import Figure
 
 try:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
 except ImportError:
     from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+from ui.nav_toolbar import SafeNavigationToolbar
 
 try:
     import seaborn as sns
@@ -170,7 +169,7 @@ class SeabornExplorer(QDialog):
         self._canvas_fig = Figure(figsize=(8, 6), dpi=100)
         self._canvas = FigureCanvas(self._canvas_fig)
         self._canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._toolbar = NavigationToolbar2QT(self._canvas, right)
+        self._toolbar = SafeNavigationToolbar(self._canvas, right)
         rl.addWidget(self._toolbar)
         rl.addWidget(self._canvas)
 
