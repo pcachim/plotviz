@@ -14,10 +14,11 @@ unit-testable without a display.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Any
 
 
-def subplot_get(settings: dict, dict_key: str, idx: int | str, default: Any) -> Any:
+def subplot_get(settings: Mapping[str, Any], dict_key: str, idx: int | str, default: Any) -> Any:
     """Read a per-subplot value from ``settings[dict_key]``.
 
     The per-subplot dicts are keyed by stringified index after serialization
@@ -100,7 +101,7 @@ class SubplotStyle:
     border_right: bool = True
 
     @classmethod
-    def from_settings(cls, settings: dict, idx: int | str) -> "SubplotStyle":
+    def from_settings(cls, settings: Mapping[str, Any], idx: int | str) -> "SubplotStyle":
         """Resolve the styling for subplot *idx* from the loose settings dict."""
         def sp(key: str, default: Any) -> Any:
             return subplot_get(settings, key, idx, default)

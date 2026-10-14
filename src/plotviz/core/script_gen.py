@@ -11,19 +11,20 @@ Public entry points: generate_plot_script, _build_readme, _build_pyproject_toml.
 
 from __future__ import annotations
 import textwrap
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Any, cast
 
 from core.constants import (
     _3D_TYPES, _POLAR_TYPES, _NO_X_TYPES,
     _DECOR_NO_SCALE, _DECOR_NO_LIMITS, _DECOR_NO_TICKS,
 )
 from core.settings_schema import SubplotStyle, subplot_get
+from core.settings_types import PlotSettings, SeriesEntry, SeriesMeta
 from core.geometry import to_inches
 
 # Shapes of the loose, JSON-like data the generators consume.
-Settings = dict[str, Any]
-SeriesDict = dict[str, Any]       # one entry of series_meta['series']
+Settings = PlotSettings
+SeriesDict = SeriesEntry          # one entry of series_meta['series']
 Datasets = dict[str, Any]         # column name -> array/list
 Palette = list[str]
 Generator = Callable[[Settings, list[SeriesDict], Datasets, Palette, str], list[str]]
@@ -31,6 +32,19 @@ Generator = Callable[[Settings, list[SeriesDict], Datasets, Palette, str], list[
 # ── Chart-type → code-generation function ─────────────────────────────────────
 # Each generator receives (settings, series_list, datasets, palette, ax_var) and
 # returns a list of code-line strings that go inside the axes setup block.
+
+
+def _as_loose(d: Mapping[str, Any]) -> dict[str, Any]:
+    """View a TypedDict as a plain dict, for the few places that copy keys by a
+    computed name (mypy only allows literal keys on a TypedDict)."""
+    return cast(dict[str, Any], d)
+
+
+def _merge_defaults(settings: Settings, extra: Mapping[str, Any]) -> None:
+    """setdefault every chart option of *extra* (dynamic names) into *settings*."""
+    loose = _as_loose(settings)
+    for k, v in extra.items():
+        loose.setdefault(k, v)
 
 
 def _esc(s: object) -> str:
@@ -436,6 +450,7 @@ def _gen_contour(settings: Settings, series: list[SeriesDict], datasets: Dataset
         if xc and yc and zc:
             # Fix 6: explicit levels list overrides integer count
             lvl_explicit = settings.get('contour_levels_explicit', '').strip()
+            lvl: list[float] | int
             if lvl_explicit:
                 try:
                     lvl = [float(v) for v in lvl_explicit.split(',') if v.strip()]
@@ -1064,7 +1079,7 @@ def _gen_annotations(settings: Settings, n_subplots: int) -> list[str]:
     return lines
 
 
-def generate_plot_script(settings: dict, series_meta: dict,
+def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
                          datasets: dict, palette: list[str],
                          chart_title: str) -> str:
     """
@@ -1080,7 +1095,7 @@ def generate_plot_script(settings: dict, series_meta: dict,
     bg_color    = settings.get('chart_bg_color', '#ffffff')
 
     # Inject top-level z/err columns so generators can access them via settings
-    settings = dict(settings)
+    settings = settings.copy()
     settings['_z_col']       = series_meta.get('z_col', '')
     settings['_err_col']     = series_meta.get('err_col', '')
     settings['_fill_y2_col'] = series_meta.get('fill_y2_col', '')
@@ -1098,7 +1113,7 @@ def generate_plot_script(settings: dict, series_meta: dict,
                     'barbs_u_col',  'barbs_v_col',
                     'stream_u_col', 'stream_v_col'):
         if _uv_key in series_meta:
-            settings[_uv_key] = series_meta[_uv_key]
+            _as_loose(settings)[_uv_key] = _as_loose(series_meta)[_uv_key]
     # Per-subplot chart opts (bar_stacked, bar_horizontal, bar_width, bar_alpha,
     # bar_edgecolor, etc.) are stored in series_meta['subplot_chart_opts'].
     # For single-subplot charts, flatten subplot 0's opts into settings so
@@ -1107,8 +1122,7 @@ def generate_plot_script(settings: dict, series_meta: dict,
     _all_sp_chart_opts = series_meta.get('subplot_chart_opts', {})
     if n_subplots == 1:
         _sp0 = _all_sp_chart_opts.get('0', _all_sp_chart_opts.get(0, {}))
-        for _k, _v in _sp0.items():
-            settings.setdefault(_k, _v)
+        _merge_defaults(settings, _sp0)
 
     # ── Collect dataset filenames ──────────────────────────────────────────────
     used_cols = {s.get('x_col') for s in series_list} | {s.get('y_col') for s in series_list}
@@ -1237,13 +1251,12 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 sub_z      = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
                 if not sub_z:
                     sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Tricontour', '3D Surface', 'Hist2D', 'Hexbin') else ''
-                sub_settings = dict(settings)
+                sub_settings = settings.copy()
                 sub_settings['chart_type'] = sub_ct
                 sub_settings['_z_col']     = sub_z
                 # Merge per-subplot chart opts (bar_stacked, bar_horizontal, etc.)
                 _sp_opts = _all_sp_chart_opts.get(str(idx), _all_sp_chart_opts.get(idx, {}))
-                for _k, _v in _sp_opts.items():
-                    sub_settings.setdefault(_k, _v)
+                _merge_defaults(sub_settings, _sp_opts)
                 lines.append(f"# Subplot {idx+1} ({seen_order[idx]}): {sub_ct}")
                 gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
                 for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
@@ -1276,13 +1289,12 @@ def generate_plot_script(settings: dict, series_meta: dict,
                 sub_z       = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
                 if not sub_z:
                     sub_z = settings.get('_z_col', '') if sub_ct in ('Contour', 'Tricontour', '3D Surface', 'Hist2D', 'Hexbin') else ''
-                sub_settings = dict(settings)
+                sub_settings = settings.copy()
                 sub_settings['chart_type'] = sub_ct
                 sub_settings['_z_col']     = sub_z
                 # Merge per-subplot chart opts (bar_stacked, bar_horizontal, etc.)
                 _sp_opts = _all_sp_chart_opts.get(str(idx), _all_sp_chart_opts.get(idx, {}))
-                for _k, _v in _sp_opts.items():
-                    sub_settings.setdefault(_k, _v)
+                _merge_defaults(sub_settings, _sp_opts)
                 lines.append(f"# Subplot {idx+1}: {sub_ct}")
                 gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
                 for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
