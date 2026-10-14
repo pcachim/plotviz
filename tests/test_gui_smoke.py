@@ -132,6 +132,34 @@ class TestGuiSmoke(unittest.TestCase):
             w._load_project_inner(fp, silent=True)
             self.assertEqual(len(w.canvas.axes_list), 2)
 
+    def test_sample_charts_menu_opens_a_dialog_in_the_samples_folder(self):
+        # Help > Sample Charts used to only reveal the folder in Finder; it now
+        # asks for a chart in an Open dialog that starts in that folder.
+        from unittest import mock
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        w = self._make_window()
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("config.settings.plots_dir", return_value=d):
+            fp = os.path.join(d, "sample.pviz")
+            _write_pviz(fp)
+            # Stub the "Chart loaded" message box (modal) and the user-settings writes.
+            with mock.patch.object(QFileDialog, "getOpenFileName",
+                                   return_value=(fp, "")) as dlg, \
+                    mock.patch.object(QMessageBox, "information"), \
+                    mock.patch("config.settings.add_recent_file"), \
+                    mock.patch("config.settings.remember_dir"):
+                w._open_sample_chart()
+            self.assertEqual(dlg.call_args.args[2], d)         # starts in the samples folder
+            self.assertIn("x", w.datasets)                     # ... and the chart was loaded
+
+    def test_sample_charts_dialog_cancel_loads_nothing(self):
+        from unittest import mock
+        from PyQt6.QtWidgets import QFileDialog
+        w = self._make_window()
+        with mock.patch.object(QFileDialog, "getOpenFileName", return_value=("", "")):
+            w._open_sample_chart()
+        self.assertEqual(w.datasets, {})
+
     def test_annotations_render(self):
         w = self._make_window()
         with tempfile.TemporaryDirectory() as d:

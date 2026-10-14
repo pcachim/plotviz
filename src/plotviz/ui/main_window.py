@@ -29,18 +29,15 @@ import matplotlib.pyplot as plt
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
-    QPushButton, QMessageBox, QSplitter, QFrame,
+    QPushButton, QMessageBox, QSplitter, QFrame, QFileDialog,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
-try:
-    from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
-except ImportError:
-    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+from ui.nav_toolbar import NavigationToolbar2QT, SafeNavigationToolbar
 
 
-class _NavToolbar(NavigationToolbar2QT):
+class _NavToolbar(SafeNavigationToolbar):
     """Standard matplotlib toolbar with the Save button removed.
     The app has its own export workflow that controls DPI and format."""
     toolitems = [t for t in NavigationToolbar2QT.toolitems
@@ -1031,6 +1028,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from PyQt6.QtGui import QDesktopServices
         QDesktopServices.openUrl(QUrl('https://pcachim.github.io/plotviz/'))
 
+    def _open_sample_chart(self):
+        """Pick a sample chart in an Open dialog that starts in the samples folder."""
+        from config.settings import plots_dir
+        fp, _ = QFileDialog.getOpenFileName(
+            self, 'Open Sample Chart', str(plots_dir()),
+            'plotviz File (*.pviz);;zip File (*.zip);;All Files (*)')
+        if fp:
+            self._load_project_from_path(fp)
+
     def _open_plots_folder(self):
         """Reveal the user plots folder in Finder / Explorer."""
         from PyQt6.QtCore import QUrl
@@ -1282,10 +1288,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         help_menu.addSeparator()
 
-        sample_charts_action = QAction('Sample Charts', self)
-        sample_charts_action.setStatusTip('Open the folder containing sample chart files')
-        sample_charts_action.triggered.connect(self._open_plots_folder)
+        sample_charts_action = QAction('Sample Charts…', self)
+        sample_charts_action.setStatusTip('Choose one of the sample charts to open')
+        sample_charts_action.triggered.connect(self._open_sample_chart)
         help_menu.addAction(sample_charts_action)
+
+        sample_charts_folder_action = QAction('Show Sample Charts Folder', self)
+        sample_charts_folder_action.setStatusTip('Open the folder containing sample chart files')
+        sample_charts_folder_action.triggered.connect(self._open_plots_folder)
+        help_menu.addAction(sample_charts_folder_action)
 
         sample_datasets_action = QAction('Sample Datasets', self)
         sample_datasets_action.setStatusTip('Open the folder containing sample dataset files')
