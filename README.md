@@ -77,7 +77,7 @@ Dependencies are installed automatically via pip:
 
 ## License
 
-MIT — see [LICENSE.md](LICENSE.md).
+GPL-3.0-or-later — see [LICENSE.md](LICENSE.md).
 
 ---
 

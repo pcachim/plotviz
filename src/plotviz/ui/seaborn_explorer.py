@@ -1,6 +1,6 @@
 """
 Copyright (c) 2026 Paulo Cachim
-This file is part of this project and is licensed under the MIT License.
+This file is part of this project and is licensed under the GNU General Public License v3.0 or later.
 
 ui/seaborn_explorer.py  –  plotviz
 Seaborn Explorer: a self-contained QDialog that hosts all Seaborn chart types

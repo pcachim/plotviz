@@ -1,8 +1,8 @@
 """
 Copyright (c) 2026 Paulo Cachim
-This file is part of this project and is licensed under the MIT License.
+This file is part of this project and is licensed under the GNU General Public License v3.0 or later.
 You may obtain a copy of the License in the LICENSE.md file in the root
-of this repository or at https://opensource.org/licenses/MIT.
+of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 
 ui/canvas.py – Matplotlib canvas
 • Fixed-size Qt widget (never resized); border rect shows the export page

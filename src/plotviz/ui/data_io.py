@@ -177,7 +177,7 @@ class DataMixin:
             f'<h2>plotviz&nbsp;{__version__}</h2>'
             '<p>Publication-quality chart generator.</p>'
             '<p>Copyright &copy; 2026 Paulo Cachim<br>'
-            'Licensed under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>'
+            'Licensed under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU GPL v3 or later</a>.</p>'
         )
         dlg.setIconPixmap(QApplication.windowIcon().pixmap(64, 64))
         dlg.exec()
