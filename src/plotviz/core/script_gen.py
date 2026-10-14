@@ -1100,6 +1100,27 @@ def _cat_tick_lines(settings: Settings, ax_var: str, ct: str, series: list[Serie
     return [f"plt.setp({ax_var}.get_xticklabels(), rotation=45, ha='right')"]
 
 
+def _margin_fractions(settings: Settings, fig_w_raw: float,
+                      fig_h_raw: float) -> tuple[float, float, float, float]:
+    """Figure margins (left, right, bottom, top) as fractions of the figure.
+
+    Preferred source is the exact ``margin_fractions``. Older files hold either
+    physical values in fig_unit (margin_format == 'physical') or plain fractions.
+    Like the live chart, a degenerate pair is nudged apart (matplotlib needs
+    left < right and bottom < top).
+    """
+    frac = settings.get('margin_fractions')
+    if frac and len(frac) == 4:
+        left, right, bottom, top = (float(v) for v in frac)
+    else:
+        left, right = settings.get('fig_left', 0.10), settings.get('fig_right', 0.95)
+        bottom, top = settings.get('fig_bottom', 0.10), settings.get('fig_top', 0.95)
+        if settings.get('margin_format') == 'physical' and fig_w_raw > 0 and fig_h_raw > 0:
+            left, right = left / fig_w_raw, right / fig_w_raw
+            bottom, top = bottom / fig_h_raw, top / fig_h_raw
+    return left, max(right, left + 0.01), bottom, max(top, bottom + 0.01)
+
+
 def _legend_lines(settings: Settings, idx: int | str, ax_var: str, ct: str,
                   has_series: bool, ax2_var: str | None = None) -> list[str]:
     """The ax.legend(...) call, only when the live chart would show a legend.
@@ -1383,7 +1404,9 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
     if n_subplots == 1:
         # The live single-axes chart draws only the primary series (no Y2 axis).
         series_list = [s for s in series_list if not s.get('y2')]
-    title_text  = settings.get('title_text', chart_title) or chart_title
+    # The live chart shows the field's placeholder ('Main title') when a single-axes
+    # chart has no title text, so the script does too.
+    title_text  = (settings.get('title_text') or '').strip() or ('Main title' if n_subplots == 1 else '')
     bg_color    = settings.get('chart_bg_color', '#ffffff')
 
     # Inject top-level z/err columns so generators can access them via settings
@@ -1487,13 +1510,13 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
     _dpi = settings.get('dpi', 300)   # always read; only emitted for pixel-unit figures
     fig_w = to_inches(fig_w_raw, fig_unit, _dpi)
     fig_h = to_inches(fig_h_raw, fig_unit, _dpi)
-    fig_w = round(max(fig_w, 4.0), 2)
-    fig_h = round(max(fig_h, 3.0), 2)
+    fig_w = round(fig_w, 6)       # exact: the live chart exports at precisely this size
+    fig_h = round(fig_h, 6)
     # For pixel-unit figures emit dpi= so the rendered pixel dimensions match the app.
     _figsize_dpi = f', dpi={_dpi}' if fig_unit == 'pixels' else ''
     lines += [
         "# ── Figure ───────────────────────────────────────────────────────────",
-        f"fig = plt.figure(figsize=({fig_w:.1f}, {fig_h:.1f}){_figsize_dpi})",
+        f"fig = plt.figure(figsize=({fig_w!r}, {fig_h!r}){_figsize_dpi})",
         f"fig.patch.set_facecolor('{_esc(bg_color)}')",
         "",
     ]
@@ -1651,28 +1674,27 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
         title_x, title_y = _tx_raw, _ty_raw   # old save: already fractions
     suptitle_lines = []
     if title_show and title_text:
+        # Same arguments as the live chart: alignment and rotation as set in the
+        # Style tab, anchored by its top edge at the title position.
         suptitle_lines = [
             f"fig.suptitle('{_esc(title_text)}', "
             f"fontsize={title_size}, "
             f"fontfamily='{_esc(title_font)}', "
             f"color='{_esc(title_color)}', "
-            f"x={title_x:.4f}, y={title_y:.4f})",
+            f"x={title_x!r}, y={title_y!r}, "
+            f"ha='{_esc(settings.get('title_ha', 'center'))}', "
+            f"rotation={settings.get('title_rotation', 0)}, "
+            f"va='top')",
         ]
-    # When there is a suptitle, reserve space at the top for it so that
-    # tight_layout() does not push subplot content over the title.
-    # We derive the top rect from title_y — subtract a small font-height margin.
-    if title_show and title_text:
-        font_frac = (title_size / 72) / fig_h * 1.8   # approx line height as fig fraction
-        tight_top = min(title_y - font_frac, 0.96)
-        tight_layout_line = f"plt.tight_layout(rect=[0, 0, 1, {tight_top:.3f}])"
-    else:
-        tight_layout_line = "plt.tight_layout()"
+    # Figure margins and subplot spacing: the very same numbers the live chart
+    # uses, so the axes occupy the same part of the page (tight_layout would not).
+    m_left, m_right, m_bottom, m_top = _margin_fractions(settings, fig_w_raw, fig_h_raw)
     lines += [
         "",
         "# ── Layout ───────────────────────────────────────────────────────────",
     ] + suptitle_lines + [
-        f"fig.subplots_adjust(hspace={hspace}, wspace={wspace})",
-        tight_layout_line,
+        f"fig.subplots_adjust(left={m_left!r}, right={m_right!r}, "
+        f"bottom={m_bottom!r}, top={m_top!r}, hspace={hspace}, wspace={wspace})",
         "plt.show()",
         "",
     ]
