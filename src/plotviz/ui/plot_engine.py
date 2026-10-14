@@ -112,454 +112,9 @@ class PlotEngineMixin:
 
         # ── Whole-chart types (all series treated the same way) ──────────────
         if ct in WHOLE_CHART_TYPES:
-            if ct == 'Histogram':
-                for i, (xd, yd, lbl, _) in enumerate(series):
-                    s = self.curve_styles.get(lbl, {})
-                    o = s.get('opts', {})
-                    ec_val = o.get('hist_edgecolor', _o('hist_edgecolor', 'white'))
-                    if ec_val == 'auto': ec_val = s.get('color', C[i])
-                    h_alpha = o.get('hist_alpha', _o('hist_alpha', 0.7))
-                    if self._is_categorical(yd):
-                        vals, counts = np.unique(yd, return_counts=True)
-                        ax.bar(vals, counts, label=lbl, color=s.get('color', C[i]),
-                               alpha=h_alpha,
-                               edgecolor=ec_val if ec_val != 'none' else None)
-                        ax.tick_params(axis='x', rotation=45)
-                    else:
-                        ax.hist(yd, bins=_o('hist_bins', 20),
-                                density=_o('hist_density', False),
-                                cumulative=_o('hist_cumulative', False),
-                                histtype=_o('hist_histtype', 'bar'),
-                                orientation=_o('hist_orientation', 'vertical'),
-                                alpha=h_alpha,
-                                edgecolor=ec_val if ec_val != 'none' else None,
-                                label=lbl, color=s.get('color', C[i]))
-
-            elif ct == 'Boxplot':
-                num_series = [(k, v) for k, v in yd_dict.items() if not self._is_categorical(v)]
-                if num_series:
-                    bp = ax.boxplot(
-                        [v for _, v in num_series],
-                        patch_artist=True, notch=_o('box_notch', False),
-                        **box_kwargs([k for k, _ in num_series], _o('box_vert', True)),
-                        showmeans=_o('box_show_means', False),
-                        showfliers=_o('box_showfliers', True),
-                        whis=_o('box_whis', 1.5),
-                        medianprops=dict(color='black', linewidth=2) if _o('box_show_medians', True) else dict(linewidth=0),
-                    )
-                    for patch, c in zip(bp['boxes'], C):
-                        patch.set_facecolor(c)
-                        patch.set_alpha(_o('box_alpha', 0.7))
-
-            elif ct == 'Violin':
-                num_series = [(k, v) for k, v in yd_dict.items() if not self._is_categorical(v)]
-                if num_series:
-                    parts = ax.violinplot(
-                        [v for _, v in num_series],
-                        showmeans=_o('violin_show_means', True),
-                        showmedians=_o('violin_show_medians', True),
-                        showextrema=_o('violin_show_extrema', False),
-                        bw_method=_o('violin_bw', 'scott'),
-                        points=int(_o('violin_points', '100')),
-                        **violin_kwargs(_o('violin_vert', True)),
-                    )
-                    for pc, c in zip(parts['bodies'], C):
-                        pc.set_facecolor(c)
-                        pc.set_alpha(0.7)
-                    if _o('violin_vert', True):
-                        ax.set_xticks(range(1, len(num_series)+1))
-                        ax.set_xticklabels([k for k, _ in num_series])
-                    else:
-                        ax.set_yticks(range(1, len(num_series)+1))
-                        ax.set_yticklabels([k for k, _ in num_series])
-
-            elif ct == 'Pie':
-                if series:
-                    xd, yd, lbl, _ = series[0]
-                    labels = list(xd) if self._is_categorical(xd) else [f'{v:.4g}' for v in xd]
-                    explode = [0.08] + [0.0]*(len(yd)-1) if _o('pie_explode_first', False) else None
-                    wedge_kw = {'width': 0.5} if _o('pie_donut', False) else {}
-                    # Per-wedge colors: use curve_styles[segment] if present (set by the
-                    # palette system or user edits), otherwise assign from palette and store
-                    # so future palette changes have an entry to update.
-                    palette_colors = self._tab10(len(yd))
-                    wedge_colors = []
-                    for i, seg in enumerate(labels):
-                        key = str(seg)
-                        s = self.curve_styles.get(key, {})
-                        if s.get('color'):
-                            # Entry exists (from file, palette change, or prior render) — use it
-                            wedge_colors.append(s['color'])
-                        else:
-                            # No entry yet: seed from palette and store for future updates
-                            c = palette_colors[i]
-                            s['color'] = c
-                            s['marker_color'] = c
-                            self.curve_styles[key] = s
-                            wedge_colors.append(c)
-                    ax.pie(np.abs(yd), labels=labels,
-                           autopct='%1.1f%%' if _o('pie_autopct', True) else None,
-                           shadow=_o('pie_shadow', False),
-                           startangle=_o('pie_startangle', 90.0),
-                           labeldistance=_o('pie_labeldistance', 1.1),
-                           pctdistance=_o('pie_pctdistance', 0.6),
-                           explode=explode, wedgeprops=wedge_kw,
-                           colors=wedge_colors)
-                    ax.set_aspect('equal')
-
-            elif ct == 'Heatmap':
-                zc = self.combo_z.currentText()
-                if zc != '(none)' and zc in self.datasets:
-                    z = self.datasets[zc]
-                    if series and len(series) > 0:
-                        # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
-                        from scipy.interpolate import griddata as _griddata
-                        xd, yd, lbl, _ = series[0]
-                        xf = xd.astype(float)
-                        yf = yd.astype(float)
-                        zf = np.array(z, dtype=float)
-                        _mn = min(len(xf), len(yf), len(zf))
-                        xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
-                        n = max(2, int(np.ceil(np.sqrt(_mn))))
-                        xi = np.linspace(np.min(xf), np.max(xf), n)
-                        yi = np.linspace(np.min(yf), np.max(yf), n)
-                        XI, YI = np.meshgrid(xi, yi)
-                        Z = _griddata((xf, yf), zf, (XI, YI), method='linear')
-                        Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
-                        # Bug 18: pass extent so axis ticks show data values, not pixel indices
-                        extent_kw = {'extent': [float(np.min(xf)), float(np.max(xf)),
-                                                float(np.min(yf)), float(np.max(yf))]}
-                    else:
-                        n = int(np.ceil(np.sqrt(len(z))))
-                        if n < 2: n = 2
-                        Z = np.full((n, n), np.nan)
-                        for k in range(len(z)): Z[k//n, k%n] = z[k]
-                        extent_kw = {}
-                    if n >= 2:
-                        # Fix 4: optional vmin/vmax
-                        _vm_kw = {}
-                        if hasattr(self, 'heat_vminmax_enable') and self.heat_vminmax_enable.isChecked():
-                            _vm_kw = {'vmin': self.heat_vmin.value(), 'vmax': self.heat_vmax.value()}
-                        im = ax.imshow(Z, aspect='auto', cmap=_cmap('cmap_combo', 'cmap'), origin='lower',
-                                       alpha=_o('heat_alpha', 1.0),
-                                       interpolation=_o('heat_interpolation', 'nearest'),
-                                       **extent_kw, **_vm_kw)
-                        if _o('heat_colorbar', True):
-                            _cb = ax.figure.colorbar(im, ax=ax,
-                                shrink=_o('heat_colorbar_shrink', 1.0))
-                            _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
-                            if _zlbl:
-                                _cb.set_label(_latex_safe(_zlbl),
-                                    fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
-                                    color=getattr(self, 'zlabel_color', '#000000'),
-                                    fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
-            elif ct == 'Contour':
-                zc = self.combo_z.currentText()
-                if zc != '(none)' and zc in self.datasets and series:
-                    xd, yd, lbl, _ = series[0]
-                    z = self.datasets[zc]
-                    if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
-                        from scipy.interpolate import griddata as _griddata
-                        xf = xd.astype(float)
-                        yf = yd.astype(float)
-                        zf = np.array(z, dtype=float)
-                        _mn = min(len(xf), len(yf), len(zf))
-                        xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
-                        n = max(2, int(np.ceil(np.sqrt(_mn))))
-                        xi = np.linspace(np.min(xf), np.max(xf), n)
-                        yi = np.linspace(np.min(yf), np.max(yf), n)
-                        X, Y = np.meshgrid(xi, yi)
-                        Z = _griddata((xf, yf), zf, (X, Y), method='linear')
-                        Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
-                        if n >= 2:
-                            # Fix 6: explicit levels list overrides integer count
-                            _lvl_raw = ''
-                            if hasattr(self, 'contour_levels_explicit'):
-                                _lvl_raw = self.contour_levels_explicit.text().strip()
-                            if _lvl_raw:
-                                try:
-                                    lvl = [float(v) for v in _lvl_raw.split(',') if v.strip()]
-                                except ValueError:
-                                    lvl = _o('contour_levels', 10)
-                            else:
-                                lvl = _o('contour_levels', 10)
-                            alp = _o('heat_alpha', 1.0)
-                            # Fix 4: optional vmin/vmax
-                            _vm_kw = {}
-                            if hasattr(self, 'heat_vminmax_enable') and self.heat_vminmax_enable.isChecked():
-                                _vm_kw = {'vmin': self.heat_vmin.value(), 'vmax': self.heat_vmax.value()}
-                            # Fix 5: contour line colour/width from settings
-                            _lc = _o('contour_line_color', '#000000')
-                            _lw = _o('contour_line_width', 0.5)
-                            # Bug 3: track last mappable so colorbar is drawn regardless of
-                            # which combination of filled/line contour is active.
-                            _last_contour_m = None
-                            if _o('heat_filled_contour', True):
-                                cf = ax.contourf(X, Y, Z, levels=lvl, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp, **_vm_kw)
-                                _last_contour_m = cf
-                            if _o('heat_contour_lines', True):
-                                cs = ax.contour(X, Y, Z, levels=lvl, colors=_lc, linewidths=_lw, alpha=0.5)
-                                if _last_contour_m is None: _last_contour_m = cs
-                            if _last_contour_m is not None and _o('heat_colorbar', True):
-                                _cb = ax.figure.colorbar(_last_contour_m, ax=ax,
-                                    shrink=_o('heat_colorbar_shrink', 1.0))
-                                _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
-                                if _zlbl:
-                                    _cb.set_label(_latex_safe(_zlbl),
-                                        fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
-                                        color=getattr(self, 'zlabel_color', '#000000'),
-                                        fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
-            elif ct == 'Tricontour':
-                zc = self.combo_z.currentText()
-                if zc != '(none)' and zc in self.datasets and series:
-                    xd, yd, lbl, _ = series[0]
-                    z = self.datasets[zc]
-                    if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        x = xd.astype(float)
-                        y = yd.astype(float)
-                        z = np.array(z, dtype=float)
-                        n = min(len(x), len(y), len(z))
-                        x, y, z = x[:n], y[:n], z[:n]
-                        lvl  = _o('tri_levels', 10)
-                        alp  = _o('tri_alpha', 1.0)
-                        cmap = _cmap('tri_cmap_combo', 'tri_cmap')
-                        last_mappable = None
-                        _fill_mode = _o('tri_fill_mode', 'Filled contour')
-                        # Backward compat: old saves may have boolean tri_filled/tri_tripcolor
-                        if _fill_mode not in ('Filled contour', 'Face colours', 'None'):
-                            _fill_mode = 'Filled contour'
-                        if _fill_mode == 'Face colours':
-                            tc = ax.tripcolor(x, y, z, cmap=cmap, alpha=alp)
-                            last_mappable = tc
-                        elif _fill_mode == 'Filled contour':
-                            cf = ax.tricontourf(x, y, z, levels=lvl, cmap=cmap, alpha=alp)
-                            last_mappable = cf
-                        if _o('tri_lines', True):
-                            # Bug 4: assign to last_mappable so colorbar works when
-                            # fill style is None and only contour lines are drawn.
-                            tl = ax.tricontour(x, y, z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
-                            if last_mappable is None: last_mappable = tl
-                        if _o('tri_triplot', False):
-                            ax.triplot(x, y, color='k', linewidth=0.4, alpha=0.5)
-                        if last_mappable is not None and _o('tri_colorbar', True):
-                            _cb = ax.figure.colorbar(last_mappable, ax=ax,
-                                shrink=_o('tri_colorbar_shrink', 1.0))
-                            _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
-                            if _zlbl:
-                                _cb.set_label(_latex_safe(_zlbl),
-                                    fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
-                                    color=getattr(self, 'zlabel_color', '#000000'),
-                                    fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
-
-            elif ct == '3D Surface':
-                # Bug 1: this block was previously stranded inside the Tricontour elif,
-                # causing 3D Surface to never render and Tricontour to crash on 2D axes.
-                zc = self.combo_z.currentText()
-                if zc != '(none)' and zc in self.datasets and series:
-                    xd, yd, lbl, _ = series[0]
-                    z = self.datasets[zc]
-                    if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
-                        from scipy.interpolate import griddata as _griddata
-                        xf = xd.astype(float)
-                        yf = yd.astype(float)
-                        zf = np.array(z, dtype=float)
-                        _mn = min(len(xf), len(yf), len(zf))
-                        xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
-                        n = max(2, int(np.ceil(np.sqrt(_mn))))
-                        xi = np.linspace(np.min(xf), np.max(xf), n)
-                        yi = np.linspace(np.min(yf), np.max(yf), n)
-                        X, Y = np.meshgrid(xi, yi)
-                        Z = _griddata((xf, yf), zf, (X, Y), method='linear')
-                        Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
-                        if n >= 2:  # Bug 19: guard against empty Z
-                            st = _o('surf_stride', 1)
-                            alp = _o('heat_alpha', 1.0)
-                            if _o('surf_wireframe', False):
-                                ax.plot_wireframe(X, Y, Z, rstride=st, cstride=st, alpha=alp)
-                            else:
-                                surf = ax.plot_surface(X, Y, Z, cmap=_cmap('cmap_combo', 'cmap'),
-                                                       alpha=alp, rstride=st, cstride=st)
-                                # Fix 7: honour heat_colorbar for 3D Surface
-                                if _o('heat_colorbar', True):
-                                    _cb = ax.figure.colorbar(surf, ax=ax,
-                                        shrink=_o('heat_colorbar_shrink', 1.0))
-                                    _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
-                                    if _zlbl:
-                                        _cb.set_label(_latex_safe(_zlbl),
-                                            fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
-                                            color=getattr(self, 'zlabel_color', '#000000'),
-                                            fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
-
-
-            elif ct == 'Hist2D':
-                if series:
-                    xd, yd, lbl, _ = series[0]
-                    if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        norm = matplotlib.colors.LogNorm() if _o('hist2d_log', False) else None
-                        _, _, _, img = ax.hist2d(
-                            xd.astype(float), yd.astype(float),
-                            bins=[_o('hist2d_bins_x', 20), _o('hist2d_bins_y', 20)],
-                            cmap=_cmap('hist2d_cmap_combo', 'hist2d_cmap'), alpha=_o('hist2d_alpha', 1.0), norm=norm)
-                        if _o('hist2d_colorbar', True):
-                            ax.figure.colorbar(img, ax=ax)
-
-            elif ct == 'Hexbin':
-                if series:
-                    xd, yd, lbl, _ = series[0]
-                    if not self._is_categorical(xd) and not self._is_categorical(yd):
-                        hb = ax.hexbin(xd.astype(float), yd.astype(float),
-                                       gridsize=_o('hexbin_gridsize', 20), cmap=_cmap('hexbin_cmap_combo', 'hexbin_cmap'),
-                                       bins='log' if _o('hexbin_log', False) else None,
-                                       alpha=_o('hexbin_alpha', 1.0))
-                        if _o('hexbin_colorbar', True):
-                            ax.figure.colorbar(hb, ax=ax)
-
-            elif ct == 'Polar':
-                for i, (xd, yd, lbl, _) in enumerate(series):
-                    if self._is_categorical(xd): continue
-                    s = self.curve_styles.get(lbl, {})
-                    o = s.get('opts', {})
-                    color = s.get('color', C[i])
-                    ls = s.get('linestyle', '-') or '-'
-                    mk = s.get('marker', 'None')
-                    mk = None if mk in ('None', 'none', '') else mk
-                    theta = xd.astype(float)
-                    r = yd.astype(float)
-                    if ls != 'none':
-                        ax.plot(theta, r, linestyle=ls, color=color,
-                                linewidth=s.get('linewidth', 1.5), marker=mk, label=lbl)
-                    if o.get('pol_fill', self.polar_fill.isChecked()):
-                        ax.fill(theta, r, alpha=o.get('pol_fill_alpha', self.polar_fill_alpha.value()), color=color)
-
-            elif ct == 'Radar':
-                if series:
-                    xd, yd, lbl, _ = series[0]
-                    n_cat = len(yd)
-                    if n_cat >= 3:
-                        angles = np.linspace(0, 2*np.pi, n_cat, endpoint=False).tolist() + [0]
-                        labels = list(xd) if self._is_categorical(xd) else [str(round(v,3)) for v in xd]
-                        ax.set_theta_offset(np.pi/2)
-                        ax.set_theta_direction(-1)
-                        ax.set_xticks(angles[:-1])
-                        ax.set_xticklabels(labels, size=8)
-                        all_vals = np.concatenate([s[1].astype(float) for s in series])
-                        vmax = np.nanmax(np.abs(all_vals)) if len(all_vals) else 1
-                        ax.set_ylim(0, vmax*1.1)
-                        ax.set_yticks(np.linspace(0, vmax, _o('radar_gridlevels', 5)+1)[1:])
-                        for i, (xd_s, yd_s, lbl_s, _) in enumerate(series):
-                            s = self.curve_styles.get(lbl_s, {})
-                            o_s = s.get('opts', {})
-                            color = s.get('color', C[i])
-                            vals = list(yd_s.astype(float)) + [float(yd_s[0])]
-                            ax.plot(angles, vals, color=color, linewidth=s.get('linewidth', 1.8), label=lbl_s)
-                            if o_s.get('rad_fill', _o('rad_fill', True)):
-                                ax.fill(angles, vals, color=color, alpha=o_s.get('rad_fill_alpha', _o('rad_fill_alpha', 0.25)))
-
-            elif ct == 'ECDF':
-                for i, (xd, yd, lbl, _) in enumerate(series):
-                    if self._is_categorical(yd): continue
-                    s = self.curve_styles.get(lbl, {})
-                    o = s.get('opts', {})
-                    color = s.get('color', C[i])
-                    sorted_d = np.sort(yd.astype(float))
-                    ecdf = np.arange(1, len(sorted_d)+1) / len(sorted_d)
-                    if _o('ecdf_complementary', False): ecdf = 1.0 - ecdf
-                    ax.step(sorted_d, ecdf, color=color,
-                            linewidth=s.get('linewidth', 1.8),
-                            alpha=o.get('ecdf_alpha', _o('ecdf_alpha', 1.0)),
-                            label=lbl, where='post')
-                    if o.get('ecdf_markers', _o('ecdf_markers', False)):
-                        ax.scatter(sorted_d, ecdf, color=color, s=12, zorder=4)
-                ax.set_ylim(-0.02, 1.02)
-                ax.set_ylabel('F(x)')
-
-            elif ct == 'Quiver':
-                if series:
-                    xd, yd, lbl, _ = series[0]
-                    uc = self.quiver_u_combo.currentText()
-                    vc = self.quiver_v_combo.currentText()
-                    if uc != '(none)' and vc != '(none)' and uc in self.datasets and vc in self.datasets:
-                        U = self.datasets[uc].astype(float)
-                        V = self.datasets[vc].astype(float)
-                        n = min(len(xd), len(yd), len(U), len(V))
-                        sc = _o('quiver_scale', 1.0)
-                        _x, _y = xd[:n].astype(float), yd[:n].astype(float)
-                        _U, _V = U[:n].astype(float), V[:n].astype(float)
-                        _kw = dict(scale=sc if sc != 1.0 else None,
-                                   scale_units='xy' if sc != 1.0 else None,
-                                   width=_o('quiver_width', 0.005), alpha=0.85)
-                        if _o('quiver_color_by_mag', False):
-                            ax.quiver(_x, _y, _U, _V, np.hypot(_U, _V),
-                                      cmap=_cmap('quiver_cmap_combo', 'quiver_cmap'), **_kw)
-                        else:
-                            ax.quiver(_x, _y, _U, _V, **_kw)
-
-            elif ct == 'Barbs':
-                if series:
-                    xd, yd, lbl, _ = series[0]
-                    uc = self.barbs_u_combo.currentText()
-                    vc = self.barbs_v_combo.currentText()
-                    if uc != '(none)' and vc != '(none)' and uc in self.datasets and vc in self.datasets:
-                        U = self.datasets[uc].astype(float)
-                        V = self.datasets[vc].astype(float)
-                        n = min(len(xd), len(yd), len(U), len(V))
-                        _x, _y = xd[:n].astype(float), yd[:n].astype(float)
-                        _U, _V = U[:n].astype(float), V[:n].astype(float)
-                        _kw = dict(
-                            length=_o('barbs_length', 7.0),
-                            pivot=_o('barbs_pivot', 'tip'),
-                            alpha=_o('barbs_alpha', 0.85),
-                        )
-                        if _o('barbs_color_by_mag', False):
-                            mag = np.hypot(_U, _V)
-                            ax.barbs(_x, _y, _U, _V, mag,
-                                     cmap=_cmap('barbs_cmap_combo', 'barbs_cmap'), **_kw)
-                        else:
-                            ax.barbs(_x, _y, _U, _V, **_kw)
-
-            elif ct == 'Streamplot':
-                if series:
-                    xd, yd, lbl, _ = series[0]
-                    uc = self.stream_u_combo.currentText()
-                    vc = self.stream_v_combo.currentText()
-                    if uc != '(none)' and vc != '(none)' and uc in self.datasets and vc in self.datasets:
-                        try:
-                            U_flat = self.datasets[uc].astype(float)
-                            V_flat = self.datasets[vc].astype(float)
-                            _xf = xd.astype(float)
-                            _yf = yd.astype(float)
-                            n = min(len(_xf), len(_yf), len(U_flat), len(V_flat))
-                            _xf = _xf[:n]
-                            _yf = _yf[:n]
-                            U_flat = U_flat[:n]
-                            V_flat = V_flat[:n]
-                            # Build a regular 2-D grid from the flat point columns.
-                            xs_u = np.unique(_xf)
-                            ys_u = np.unique(_yf)
-                            nx, ny = len(xs_u), len(ys_u)
-                            xi = np.searchsorted(xs_u, _xf)
-                            yi = np.searchsorted(ys_u, _yf)
-                            U_grid = np.zeros((ny, nx))
-                            V_grid = np.zeros((ny, nx))
-                            for k in range(n):
-                                if xi[k] < nx and yi[k] < ny:
-                                    U_grid[yi[k], xi[k]] = U_flat[k]
-                                    V_grid[yi[k], xi[k]] = V_flat[k]
-                            _kw = dict(
-                                density=_o('stream_density', 1.0),
-                                arrowsize=_o('stream_arrowsize', 1.0),
-                                linewidth=_o('stream_linewidth', 1.5),
-                            )
-                            if _o('stream_color_by_mag', False):
-                                speed = np.sqrt(U_grid**2 + V_grid**2)
-                                _kw['color'] = speed
-                                _kw['cmap'] = _cmap('stream_cmap_combo', 'stream_cmap')
-                                del _kw['linewidth']  # can't combine with color array
-                            ax.streamplot(xs_u, ys_u, U_grid, V_grid, **_kw)
-                        except Exception:
-                            pass  # silently skip if data is not grid-compatible
+            plot_whole = self._WHOLE_CHART_PLOTTERS.get(ct)
+            if plot_whole:
+                getattr(self, plot_whole)(ax, series, yd_dict, C, _o, _cmap, subplot_idx)
 
             return
 
@@ -915,6 +470,492 @@ class PlotEngineMixin:
         if any_cat_x and all_x_cats:
             return (all_x_cats, bar_horiz)
         return None
+
+    def _plot_histogram(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Histogram' whole-chart plot onto *ax*."""
+        for i, (xd, yd, lbl, _) in enumerate(series):
+            s = self.curve_styles.get(lbl, {})
+            o = s.get('opts', {})
+            ec_val = o.get('hist_edgecolor', _o('hist_edgecolor', 'white'))
+            if ec_val == 'auto': ec_val = s.get('color', C[i])
+            h_alpha = o.get('hist_alpha', _o('hist_alpha', 0.7))
+            if self._is_categorical(yd):
+                vals, counts = np.unique(yd, return_counts=True)
+                ax.bar(vals, counts, label=lbl, color=s.get('color', C[i]),
+                       alpha=h_alpha,
+                       edgecolor=ec_val if ec_val != 'none' else None)
+                ax.tick_params(axis='x', rotation=45)
+            else:
+                ax.hist(yd, bins=_o('hist_bins', 20),
+                        density=_o('hist_density', False),
+                        cumulative=_o('hist_cumulative', False),
+                        histtype=_o('hist_histtype', 'bar'),
+                        orientation=_o('hist_orientation', 'vertical'),
+                        alpha=h_alpha,
+                        edgecolor=ec_val if ec_val != 'none' else None,
+                        label=lbl, color=s.get('color', C[i]))
+
+    def _plot_boxplot(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Boxplot' whole-chart plot onto *ax*."""
+        num_series = [(k, v) for k, v in yd_dict.items() if not self._is_categorical(v)]
+        if num_series:
+            bp = ax.boxplot(
+                [v for _, v in num_series],
+                patch_artist=True, notch=_o('box_notch', False),
+                **box_kwargs([k for k, _ in num_series], _o('box_vert', True)),
+                showmeans=_o('box_show_means', False),
+                showfliers=_o('box_showfliers', True),
+                whis=_o('box_whis', 1.5),
+                medianprops=dict(color='black', linewidth=2) if _o('box_show_medians', True) else dict(linewidth=0),
+            )
+            for patch, c in zip(bp['boxes'], C):
+                patch.set_facecolor(c)
+                patch.set_alpha(_o('box_alpha', 0.7))
+
+    def _plot_violin(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Violin' whole-chart plot onto *ax*."""
+        num_series = [(k, v) for k, v in yd_dict.items() if not self._is_categorical(v)]
+        if num_series:
+            parts = ax.violinplot(
+                [v for _, v in num_series],
+                showmeans=_o('violin_show_means', True),
+                showmedians=_o('violin_show_medians', True),
+                showextrema=_o('violin_show_extrema', False),
+                bw_method=_o('violin_bw', 'scott'),
+                points=int(_o('violin_points', '100')),
+                **violin_kwargs(_o('violin_vert', True)),
+            )
+            for pc, c in zip(parts['bodies'], C):
+                pc.set_facecolor(c)
+                pc.set_alpha(0.7)
+            if _o('violin_vert', True):
+                ax.set_xticks(range(1, len(num_series)+1))
+                ax.set_xticklabels([k for k, _ in num_series])
+            else:
+                ax.set_yticks(range(1, len(num_series)+1))
+                ax.set_yticklabels([k for k, _ in num_series])
+
+    def _plot_pie(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Pie' whole-chart plot onto *ax*."""
+        if series:
+            xd, yd, lbl, _ = series[0]
+            labels = list(xd) if self._is_categorical(xd) else [f'{v:.4g}' for v in xd]
+            explode = [0.08] + [0.0]*(len(yd)-1) if _o('pie_explode_first', False) else None
+            wedge_kw = {'width': 0.5} if _o('pie_donut', False) else {}
+            # Per-wedge colors: use curve_styles[segment] if present (set by the
+            # palette system or user edits), otherwise assign from palette and store
+            # so future palette changes have an entry to update.
+            palette_colors = self._tab10(len(yd))
+            wedge_colors = []
+            for i, seg in enumerate(labels):
+                key = str(seg)
+                s = self.curve_styles.get(key, {})
+                if s.get('color'):
+                    # Entry exists (from file, palette change, or prior render) — use it
+                    wedge_colors.append(s['color'])
+                else:
+                    # No entry yet: seed from palette and store for future updates
+                    c = palette_colors[i]
+                    s['color'] = c
+                    s['marker_color'] = c
+                    self.curve_styles[key] = s
+                    wedge_colors.append(c)
+            ax.pie(np.abs(yd), labels=labels,
+                   autopct='%1.1f%%' if _o('pie_autopct', True) else None,
+                   shadow=_o('pie_shadow', False),
+                   startangle=_o('pie_startangle', 90.0),
+                   labeldistance=_o('pie_labeldistance', 1.1),
+                   pctdistance=_o('pie_pctdistance', 0.6),
+                   explode=explode, wedgeprops=wedge_kw,
+                   colors=wedge_colors)
+            ax.set_aspect('equal')
+
+    def _plot_heatmap(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Heatmap' whole-chart plot onto *ax*."""
+        zc = self.combo_z.currentText()
+        if zc != '(none)' and zc in self.datasets:
+            z = self.datasets[zc]
+            if series and len(series) > 0:
+                # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
+                from scipy.interpolate import griddata as _griddata
+                xd, yd, lbl, _ = series[0]
+                xf = xd.astype(float)
+                yf = yd.astype(float)
+                zf = np.array(z, dtype=float)
+                _mn = min(len(xf), len(yf), len(zf))
+                xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                n = max(2, int(np.ceil(np.sqrt(_mn))))
+                xi = np.linspace(np.min(xf), np.max(xf), n)
+                yi = np.linspace(np.min(yf), np.max(yf), n)
+                XI, YI = np.meshgrid(xi, yi)
+                Z = _griddata((xf, yf), zf, (XI, YI), method='linear')
+                Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
+                # Bug 18: pass extent so axis ticks show data values, not pixel indices
+                extent_kw = {'extent': [float(np.min(xf)), float(np.max(xf)),
+                                        float(np.min(yf)), float(np.max(yf))]}
+            else:
+                n = int(np.ceil(np.sqrt(len(z))))
+                if n < 2: n = 2
+                Z = np.full((n, n), np.nan)
+                for k in range(len(z)): Z[k//n, k%n] = z[k]
+                extent_kw = {}
+            if n >= 2:
+                # Fix 4: optional vmin/vmax
+                _vm_kw = {}
+                if hasattr(self, 'heat_vminmax_enable') and self.heat_vminmax_enable.isChecked():
+                    _vm_kw = {'vmin': self.heat_vmin.value(), 'vmax': self.heat_vmax.value()}
+                im = ax.imshow(Z, aspect='auto', cmap=_cmap('cmap_combo', 'cmap'), origin='lower',
+                               alpha=_o('heat_alpha', 1.0),
+                               interpolation=_o('heat_interpolation', 'nearest'),
+                               **extent_kw, **_vm_kw)
+                if _o('heat_colorbar', True):
+                    _cb = ax.figure.colorbar(im, ax=ax,
+                        shrink=_o('heat_colorbar_shrink', 1.0))
+                    _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
+                    if _zlbl:
+                        _cb.set_label(_latex_safe(_zlbl),
+                            fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                            color=getattr(self, 'zlabel_color', '#000000'),
+                            fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
+
+    def _plot_contour(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Contour' whole-chart plot onto *ax*."""
+        zc = self.combo_z.currentText()
+        if zc != '(none)' and zc in self.datasets and series:
+            xd, yd, lbl, _ = series[0]
+            z = self.datasets[zc]
+            if not self._is_categorical(xd) and not self._is_categorical(yd):
+                # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
+                from scipy.interpolate import griddata as _griddata
+                xf = xd.astype(float)
+                yf = yd.astype(float)
+                zf = np.array(z, dtype=float)
+                _mn = min(len(xf), len(yf), len(zf))
+                xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                n = max(2, int(np.ceil(np.sqrt(_mn))))
+                xi = np.linspace(np.min(xf), np.max(xf), n)
+                yi = np.linspace(np.min(yf), np.max(yf), n)
+                X, Y = np.meshgrid(xi, yi)
+                Z = _griddata((xf, yf), zf, (X, Y), method='linear')
+                Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
+                if n >= 2:
+                    # Fix 6: explicit levels list overrides integer count
+                    _lvl_raw = ''
+                    if hasattr(self, 'contour_levels_explicit'):
+                        _lvl_raw = self.contour_levels_explicit.text().strip()
+                    if _lvl_raw:
+                        try:
+                            lvl = [float(v) for v in _lvl_raw.split(',') if v.strip()]
+                        except ValueError:
+                            lvl = _o('contour_levels', 10)
+                    else:
+                        lvl = _o('contour_levels', 10)
+                    alp = _o('heat_alpha', 1.0)
+                    # Fix 4: optional vmin/vmax
+                    _vm_kw = {}
+                    if hasattr(self, 'heat_vminmax_enable') and self.heat_vminmax_enable.isChecked():
+                        _vm_kw = {'vmin': self.heat_vmin.value(), 'vmax': self.heat_vmax.value()}
+                    # Fix 5: contour line colour/width from settings
+                    _lc = _o('contour_line_color', '#000000')
+                    _lw = _o('contour_line_width', 0.5)
+                    # Bug 3: track last mappable so colorbar is drawn regardless of
+                    # which combination of filled/line contour is active.
+                    _last_contour_m = None
+                    if _o('heat_filled_contour', True):
+                        cf = ax.contourf(X, Y, Z, levels=lvl, cmap=_cmap('cmap_combo', 'cmap'), alpha=alp, **_vm_kw)
+                        _last_contour_m = cf
+                    if _o('heat_contour_lines', True):
+                        cs = ax.contour(X, Y, Z, levels=lvl, colors=_lc, linewidths=_lw, alpha=0.5)
+                        if _last_contour_m is None: _last_contour_m = cs
+                    if _last_contour_m is not None and _o('heat_colorbar', True):
+                        _cb = ax.figure.colorbar(_last_contour_m, ax=ax,
+                            shrink=_o('heat_colorbar_shrink', 1.0))
+                        _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
+                        if _zlbl:
+                            _cb.set_label(_latex_safe(_zlbl),
+                                fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                                color=getattr(self, 'zlabel_color', '#000000'),
+                                fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
+
+    def _plot_tricontour(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Tricontour' whole-chart plot onto *ax*."""
+        zc = self.combo_z.currentText()
+        if zc != '(none)' and zc in self.datasets and series:
+            xd, yd, lbl, _ = series[0]
+            z = self.datasets[zc]
+            if not self._is_categorical(xd) and not self._is_categorical(yd):
+                x = xd.astype(float)
+                y = yd.astype(float)
+                z = np.array(z, dtype=float)
+                n = min(len(x), len(y), len(z))
+                x, y, z = x[:n], y[:n], z[:n]
+                lvl  = _o('tri_levels', 10)
+                alp  = _o('tri_alpha', 1.0)
+                cmap = _cmap('tri_cmap_combo', 'tri_cmap')
+                last_mappable = None
+                _fill_mode = _o('tri_fill_mode', 'Filled contour')
+                # Backward compat: old saves may have boolean tri_filled/tri_tripcolor
+                if _fill_mode not in ('Filled contour', 'Face colours', 'None'):
+                    _fill_mode = 'Filled contour'
+                if _fill_mode == 'Face colours':
+                    tc = ax.tripcolor(x, y, z, cmap=cmap, alpha=alp)
+                    last_mappable = tc
+                elif _fill_mode == 'Filled contour':
+                    cf = ax.tricontourf(x, y, z, levels=lvl, cmap=cmap, alpha=alp)
+                    last_mappable = cf
+                if _o('tri_lines', True):
+                    # Bug 4: assign to last_mappable so colorbar works when
+                    # fill style is None and only contour lines are drawn.
+                    tl = ax.tricontour(x, y, z, levels=lvl, colors='k', linewidths=0.5, alpha=0.5)
+                    if last_mappable is None: last_mappable = tl
+                if _o('tri_triplot', False):
+                    ax.triplot(x, y, color='k', linewidth=0.4, alpha=0.5)
+                if last_mappable is not None and _o('tri_colorbar', True):
+                    _cb = ax.figure.colorbar(last_mappable, ax=ax,
+                        shrink=_o('tri_colorbar_shrink', 1.0))
+                    _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
+                    if _zlbl:
+                        _cb.set_label(_latex_safe(_zlbl),
+                            fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                            color=getattr(self, 'zlabel_color', '#000000'),
+                            fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
+
+    def _plot_3d_surface(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a '3D Surface' whole-chart plot onto *ax*."""
+        # Bug 1: this block was previously stranded inside the Tricontour elif,
+        # causing 3D Surface to never render and Tricontour to crash on 2D axes.
+        zc = self.combo_z.currentText()
+        if zc != '(none)' and zc in self.datasets and series:
+            xd, yd, lbl, _ = series[0]
+            z = self.datasets[zc]
+            if not self._is_categorical(xd) and not self._is_categorical(yd):
+                # Fix 1: use griddata onto a regular mesh instead of naive row-major reshape
+                from scipy.interpolate import griddata as _griddata
+                xf = xd.astype(float)
+                yf = yd.astype(float)
+                zf = np.array(z, dtype=float)
+                _mn = min(len(xf), len(yf), len(zf))
+                xf, yf, zf = xf[:_mn], yf[:_mn], zf[:_mn]
+                n = max(2, int(np.ceil(np.sqrt(_mn))))
+                xi = np.linspace(np.min(xf), np.max(xf), n)
+                yi = np.linspace(np.min(yf), np.max(yf), n)
+                X, Y = np.meshgrid(xi, yi)
+                Z = _griddata((xf, yf), zf, (X, Y), method='linear')
+                Z = np.where(np.isnan(Z), np.nanmean(zf), Z)
+                if n >= 2:  # Bug 19: guard against empty Z
+                    st = _o('surf_stride', 1)
+                    alp = _o('heat_alpha', 1.0)
+                    if _o('surf_wireframe', False):
+                        ax.plot_wireframe(X, Y, Z, rstride=st, cstride=st, alpha=alp)
+                    else:
+                        surf = ax.plot_surface(X, Y, Z, cmap=_cmap('cmap_combo', 'cmap'),
+                                               alpha=alp, rstride=st, cstride=st)
+                        # Fix 7: honour heat_colorbar for 3D Surface
+                        if _o('heat_colorbar', True):
+                            _cb = ax.figure.colorbar(surf, ax=ax,
+                                shrink=_o('heat_colorbar_shrink', 1.0))
+                            _zlbl = self.subplot_zlabels.get(subplot_idx, '') or lbl
+                            if _zlbl:
+                                _cb.set_label(_latex_safe(_zlbl),
+                                    fontsize=self.zlabel_size.value() if hasattr(self, 'zlabel_size') else 11,
+                                    color=getattr(self, 'zlabel_color', '#000000'),
+                                    fontfamily=self.zlabel_font.currentText() if hasattr(self, 'zlabel_font') else 'sans-serif')
+
+    def _plot_hist2d(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Hist2D' whole-chart plot onto *ax*."""
+        if series:
+            xd, yd, lbl, _ = series[0]
+            if not self._is_categorical(xd) and not self._is_categorical(yd):
+                norm = matplotlib.colors.LogNorm() if _o('hist2d_log', False) else None
+                _, _, _, img = ax.hist2d(
+                    xd.astype(float), yd.astype(float),
+                    bins=[_o('hist2d_bins_x', 20), _o('hist2d_bins_y', 20)],
+                    cmap=_cmap('hist2d_cmap_combo', 'hist2d_cmap'), alpha=_o('hist2d_alpha', 1.0), norm=norm)
+                if _o('hist2d_colorbar', True):
+                    ax.figure.colorbar(img, ax=ax)
+
+    def _plot_hexbin(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Hexbin' whole-chart plot onto *ax*."""
+        if series:
+            xd, yd, lbl, _ = series[0]
+            if not self._is_categorical(xd) and not self._is_categorical(yd):
+                hb = ax.hexbin(xd.astype(float), yd.astype(float),
+                               gridsize=_o('hexbin_gridsize', 20), cmap=_cmap('hexbin_cmap_combo', 'hexbin_cmap'),
+                               bins='log' if _o('hexbin_log', False) else None,
+                               alpha=_o('hexbin_alpha', 1.0))
+                if _o('hexbin_colorbar', True):
+                    ax.figure.colorbar(hb, ax=ax)
+
+    def _plot_polar(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Polar' whole-chart plot onto *ax*."""
+        for i, (xd, yd, lbl, _) in enumerate(series):
+            if self._is_categorical(xd): continue
+            s = self.curve_styles.get(lbl, {})
+            o = s.get('opts', {})
+            color = s.get('color', C[i])
+            ls = s.get('linestyle', '-') or '-'
+            mk = s.get('marker', 'None')
+            mk = None if mk in ('None', 'none', '') else mk
+            theta = xd.astype(float)
+            r = yd.astype(float)
+            if ls != 'none':
+                ax.plot(theta, r, linestyle=ls, color=color,
+                        linewidth=s.get('linewidth', 1.5), marker=mk, label=lbl)
+            if o.get('pol_fill', self.polar_fill.isChecked()):
+                ax.fill(theta, r, alpha=o.get('pol_fill_alpha', self.polar_fill_alpha.value()), color=color)
+
+    def _plot_radar(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Radar' whole-chart plot onto *ax*."""
+        if series:
+            xd, yd, lbl, _ = series[0]
+            n_cat = len(yd)
+            if n_cat >= 3:
+                angles = np.linspace(0, 2*np.pi, n_cat, endpoint=False).tolist() + [0]
+                labels = list(xd) if self._is_categorical(xd) else [str(round(v,3)) for v in xd]
+                ax.set_theta_offset(np.pi/2)
+                ax.set_theta_direction(-1)
+                ax.set_xticks(angles[:-1])
+                ax.set_xticklabels(labels, size=8)
+                all_vals = np.concatenate([s[1].astype(float) for s in series])
+                vmax = np.nanmax(np.abs(all_vals)) if len(all_vals) else 1
+                ax.set_ylim(0, vmax*1.1)
+                ax.set_yticks(np.linspace(0, vmax, _o('radar_gridlevels', 5)+1)[1:])
+                for i, (xd_s, yd_s, lbl_s, _) in enumerate(series):
+                    s = self.curve_styles.get(lbl_s, {})
+                    o_s = s.get('opts', {})
+                    color = s.get('color', C[i])
+                    vals = list(yd_s.astype(float)) + [float(yd_s[0])]
+                    ax.plot(angles, vals, color=color, linewidth=s.get('linewidth', 1.8), label=lbl_s)
+                    if o_s.get('rad_fill', _o('rad_fill', True)):
+                        ax.fill(angles, vals, color=color, alpha=o_s.get('rad_fill_alpha', _o('rad_fill_alpha', 0.25)))
+
+    def _plot_ecdf(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'ECDF' whole-chart plot onto *ax*."""
+        for i, (xd, yd, lbl, _) in enumerate(series):
+            if self._is_categorical(yd): continue
+            s = self.curve_styles.get(lbl, {})
+            o = s.get('opts', {})
+            color = s.get('color', C[i])
+            sorted_d = np.sort(yd.astype(float))
+            ecdf = np.arange(1, len(sorted_d)+1) / len(sorted_d)
+            if _o('ecdf_complementary', False): ecdf = 1.0 - ecdf
+            ax.step(sorted_d, ecdf, color=color,
+                    linewidth=s.get('linewidth', 1.8),
+                    alpha=o.get('ecdf_alpha', _o('ecdf_alpha', 1.0)),
+                    label=lbl, where='post')
+            if o.get('ecdf_markers', _o('ecdf_markers', False)):
+                ax.scatter(sorted_d, ecdf, color=color, s=12, zorder=4)
+        ax.set_ylim(-0.02, 1.02)
+        ax.set_ylabel('F(x)')
+
+    def _plot_quiver(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Quiver' whole-chart plot onto *ax*."""
+        if series:
+            xd, yd, lbl, _ = series[0]
+            uc = self.quiver_u_combo.currentText()
+            vc = self.quiver_v_combo.currentText()
+            if uc != '(none)' and vc != '(none)' and uc in self.datasets and vc in self.datasets:
+                U = self.datasets[uc].astype(float)
+                V = self.datasets[vc].astype(float)
+                n = min(len(xd), len(yd), len(U), len(V))
+                sc = _o('quiver_scale', 1.0)
+                _x, _y = xd[:n].astype(float), yd[:n].astype(float)
+                _U, _V = U[:n].astype(float), V[:n].astype(float)
+                _kw = dict(scale=sc if sc != 1.0 else None,
+                           scale_units='xy' if sc != 1.0 else None,
+                           width=_o('quiver_width', 0.005), alpha=0.85)
+                if _o('quiver_color_by_mag', False):
+                    ax.quiver(_x, _y, _U, _V, np.hypot(_U, _V),
+                              cmap=_cmap('quiver_cmap_combo', 'quiver_cmap'), **_kw)
+                else:
+                    ax.quiver(_x, _y, _U, _V, **_kw)
+
+    def _plot_barbs(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Barbs' whole-chart plot onto *ax*."""
+        if series:
+            xd, yd, lbl, _ = series[0]
+            uc = self.barbs_u_combo.currentText()
+            vc = self.barbs_v_combo.currentText()
+            if uc != '(none)' and vc != '(none)' and uc in self.datasets and vc in self.datasets:
+                U = self.datasets[uc].astype(float)
+                V = self.datasets[vc].astype(float)
+                n = min(len(xd), len(yd), len(U), len(V))
+                _x, _y = xd[:n].astype(float), yd[:n].astype(float)
+                _U, _V = U[:n].astype(float), V[:n].astype(float)
+                _kw = dict(
+                    length=_o('barbs_length', 7.0),
+                    pivot=_o('barbs_pivot', 'tip'),
+                    alpha=_o('barbs_alpha', 0.85),
+                )
+                if _o('barbs_color_by_mag', False):
+                    mag = np.hypot(_U, _V)
+                    ax.barbs(_x, _y, _U, _V, mag,
+                             cmap=_cmap('barbs_cmap_combo', 'barbs_cmap'), **_kw)
+                else:
+                    ax.barbs(_x, _y, _U, _V, **_kw)
+
+    def _plot_streamplot(self, ax, series, yd_dict, C, _o, _cmap, subplot_idx):
+        """Draw a 'Streamplot' whole-chart plot onto *ax*."""
+        if series:
+            xd, yd, lbl, _ = series[0]
+            uc = self.stream_u_combo.currentText()
+            vc = self.stream_v_combo.currentText()
+            if uc != '(none)' and vc != '(none)' and uc in self.datasets and vc in self.datasets:
+                try:
+                    U_flat = self.datasets[uc].astype(float)
+                    V_flat = self.datasets[vc].astype(float)
+                    _xf = xd.astype(float)
+                    _yf = yd.astype(float)
+                    n = min(len(_xf), len(_yf), len(U_flat), len(V_flat))
+                    _xf = _xf[:n]
+                    _yf = _yf[:n]
+                    U_flat = U_flat[:n]
+                    V_flat = V_flat[:n]
+                    # Build a regular 2-D grid from the flat point columns.
+                    xs_u = np.unique(_xf)
+                    ys_u = np.unique(_yf)
+                    nx, ny = len(xs_u), len(ys_u)
+                    xi = np.searchsorted(xs_u, _xf)
+                    yi = np.searchsorted(ys_u, _yf)
+                    U_grid = np.zeros((ny, nx))
+                    V_grid = np.zeros((ny, nx))
+                    for k in range(n):
+                        if xi[k] < nx and yi[k] < ny:
+                            U_grid[yi[k], xi[k]] = U_flat[k]
+                            V_grid[yi[k], xi[k]] = V_flat[k]
+                    _kw = dict(
+                        density=_o('stream_density', 1.0),
+                        arrowsize=_o('stream_arrowsize', 1.0),
+                        linewidth=_o('stream_linewidth', 1.5),
+                    )
+                    if _o('stream_color_by_mag', False):
+                        speed = np.sqrt(U_grid**2 + V_grid**2)
+                        _kw['color'] = speed
+                        _kw['cmap'] = _cmap('stream_cmap_combo', 'stream_cmap')
+                        del _kw['linewidth']  # can't combine with color array
+                    ax.streamplot(xs_u, ys_u, U_grid, V_grid, **_kw)
+                except Exception:
+                    pass  # silently skip if data is not grid-compatible
+
+    # Whole-chart type -> method that draws it (see _plot_on).
+    _WHOLE_CHART_PLOTTERS = {
+        'Histogram': '_plot_histogram',
+        'Boxplot': '_plot_boxplot',
+        'Violin': '_plot_violin',
+        'Pie': '_plot_pie',
+        'Heatmap': '_plot_heatmap',
+        'Contour': '_plot_contour',
+        'Tricontour': '_plot_tricontour',
+        '3D Surface': '_plot_3d_surface',
+        'Hist2D': '_plot_hist2d',
+        'Hexbin': '_plot_hexbin',
+        'Polar': '_plot_polar',
+        'Radar': '_plot_radar',
+        'ECDF': '_plot_ecdf',
+        'Quiver': '_plot_quiver',
+        'Barbs': '_plot_barbs',
+        'Streamplot': '_plot_streamplot',
+    }
 
     @staticmethod
     def _apply_cat_ticks(ax, cat_info):
