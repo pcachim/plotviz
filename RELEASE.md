@@ -24,6 +24,16 @@ push tag  →  build-macos  ──┐
 
 ---
 
+## Quick way: `publish_release.sh`
+
+```bash
+./publish_release.sh 2026.06.3
+```
+
+The script updates `__version__`, commits the version file, pushes `main`, then creates and pushes the `v2026.06.3` tag. The version scheme is `YYYY.MM.n`. The manual steps below do the same thing by hand.
+
+---
+
 ## Step-by-step: publishing a new release
 
 ### 1. Bump the version
@@ -37,7 +47,7 @@ src/plotviz/config/_version.py
 Change `__version__` to the new version:
 
 ```python
-__version__ = "2.7.0"
+__version__ = "2026.06.3"
 ```
 
 `pyproject.toml` reads this file automatically via hatchling, so no other file needs to change.
@@ -46,7 +56,7 @@ __version__ = "2.7.0"
 
 ```bash
 git add src/plotviz/config/_version.py
-git commit -m "chore: bump version to 2.7.0"
+git commit -m "chore: bump version to 2026.06.3"
 git push
 ```
 
@@ -55,8 +65,8 @@ git push
 The tag must start with `v` to trigger the workflow:
 
 ```bash
-git tag v2026.06.2
-git push origin v2026.06.2
+git tag v2026.06.3
+git push origin v2026.06.3
 ```
 
 That's it. The workflow fires immediately.
@@ -69,11 +79,11 @@ If either job fails, click into it to read the logs. The most common cause is a 
 
 ### 5. Check the release
 
-Once the `release` job completes, go to the **Releases** section of your repository. You will find a new release named **plotviz v2.7.0** with:
+Once the `release` job completes, go to the **Releases** section of your repository. You will find a new release named **plotviz v2026.06.3** with:
 
 - Auto-generated changelog
-- `plotviz-2.7.0-macos.dmg` — macOS installer (Apple Silicon)
-- `plotviz-2.7.0-windows.zip` — Windows portable build
+- `plotviz-2026.06.3-macos.dmg` — macOS installer (Apple Silicon)
+- `plotviz-2026.06.3-windows.zip` — Windows portable build
 
 ---
 
@@ -82,8 +92,8 @@ Once the `release` job completes, go to the **Releases** section of your reposit
 Any tag that contains a hyphen is automatically marked as a pre-release on GitHub. For example:
 
 ```bash
-git tag v2.7.0-beta
-git push origin v2.7.0-beta
+git tag v2026.06.3-beta
+git push origin v2026.06.3-beta
 ```
 
 This is useful for testing the pipeline or sharing a preview build without it appearing as the latest stable release.
