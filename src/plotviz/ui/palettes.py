@@ -271,28 +271,14 @@ class PaletteColorMixin:
         # Margins and the title position are fractions of the figure, so they simply
         # follow the new size: only what the spinboxes display has to be refreshed.
         self._refresh_geometry_widgets()
-        # Reset baseline so the next window resize scales correctly from the
-        # newly-applied preset dimensions rather than the stale previous baseline.
-        if hasattr(self, 'canvas'):
-            self._window_size_baseline = (self.canvas.width(), self.canvas.height())
         self.update_preview()
 
     def _on_figsize_manual_change(self):
-        """When user edits W/H manually, switch preset combo to 'Custom'.
-
-        Also resets _window_size_baseline to the current window size so that
-        the next window-resize event computes its scale factor relative to the
-        moment the user last touched the spinboxes — not relative to whenever
-        the previous auto-resize fired.
-        """
+        """When user edits W/H manually, switch preset combo to 'Custom'."""
         self.fig_preset_combo.blockSignals(True)
         self.fig_preset_combo.setCurrentText('Custom')
         self.fig_preset_combo.blockSignals(False)
         self._refresh_geometry_widgets()
-        # Reset so next window resize scales from the manually-set size.
-        # Use canvas dimensions so baseline stays consistent with _apply_resize_and_preview.
-        if hasattr(self, 'canvas'):
-            self._window_size_baseline = (self.canvas.width(), self.canvas.height())
         self.update_preview()
 
     def _on_fig_unit_changed(self, unit):

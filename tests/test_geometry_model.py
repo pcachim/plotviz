@@ -222,5 +222,78 @@ class TestFractionModel(unittest.TestCase):
         self.assertAlmostEqual(w2.fig_width.value(), 23.7, places=1)
 
 
+@unittest.skipUnless(HAVE_QT, "real PyQt6 not available")
+class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
+    """Resizing the window used to rescale the export figure (and drift)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from PyQt6.QtWidgets import QApplication
+        from ui.main_window import PlotVizApp
+        cls._app = QApplication.instance() or QApplication([])
+        cls._orig = PlotVizApp._load_on_startup
+        PlotVizApp._load_on_startup = lambda self: None
+        cls.PlotVizApp = PlotVizApp
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.PlotVizApp._load_on_startup = cls._orig
+
+    def _shown_window(self):
+        from PyQt6.QtTest import QTest
+        w = self.PlotVizApp()
+        w.setGeometry(50, 50, 1400, 900)
+        w.show()
+        QTest.qWait(300)
+        return w
+
+    def _chart_state(self, w):
+        return (w.fig_width.value(), w.fig_height.value(), w.fig_unit.currentText(),
+                w.fig_preset_combo.currentText(), w._margins_as_fractions(),
+                w._title_pos_as_fractions())
+
+    def test_resizing_the_window_never_changes_the_figure(self):
+        from PyQt6.QtTest import QTest
+        w = self._shown_window()
+        before = self._chart_state(w)
+        for size in ((1800, 950), (1100, 700), (1500, 1000), (900, 650), (1400, 900)):
+            w.resize(*size)
+            QTest.qWait(250)          # longer than the 80 ms resize debounce
+            self.assertEqual(self._chart_state(w), before, size)
+
+    def test_moving_the_splitter_never_changes_the_figure(self):
+        from PyQt6.QtTest import QTest
+        w = self._shown_window()
+        before = self._chart_state(w)
+        from PyQt6.QtWidgets import QSplitter
+        splitter = w.findChildren(QSplitter)[0]
+        splitter.setSizes([300, 1100])
+        QTest.qWait(250)
+        splitter.setSizes([700, 700])
+        QTest.qWait(250)
+        self.assertEqual(self._chart_state(w), before)
+
+    def test_resizing_does_not_mark_the_chart_as_modified(self):
+        from PyQt6.QtTest import QTest
+        w = self._shown_window()
+        w._is_dirty = False
+        w.resize(1700, 950)
+        QTest.qWait(250)
+        self.assertFalse(w._is_dirty)
+
+    def test_the_preview_page_keeps_the_figure_aspect_after_a_resize(self):
+        from PyQt6.QtTest import QTest
+        w = self._shown_window()
+        w.fig_width.setValue(24.0)
+        w.fig_height.setValue(10.0)
+        for size in ((1700, 950), (1000, 700)):
+            w.resize(*size)
+            QTest.qWait(250)
+            rect = w.canvas._border_rect
+            fw, fh = w.canvas.figure.get_size_inches()
+            page_aspect = (rect.get_width() * fw) / (rect.get_height() * fh)
+            self.assertAlmostEqual(page_aspect, 24.0 / 10.0, places=2, msg=size)
+
+
 if __name__ == "__main__":
     unittest.main()

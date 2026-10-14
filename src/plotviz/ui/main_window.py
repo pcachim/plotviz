@@ -830,94 +830,31 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._on_canvas_resized()
 
     def _on_canvas_resized(self):
-        """Debounced handler for window resize / splitter moves.
+        """Debounced handler for window resize / splitter moves: redraw the preview.
 
-        Just (re)starts the debounce timer.  All size-tracking logic lives in
-        _apply_resize_and_preview so that the baseline is established from the
-        settled window size — not from intermediate layout passes during startup.
+        The figure's own size (width, height, margins, title position) belongs to
+        the chart and is never changed by the window size; only the preview is
+        re-laid out so the page stays centred in the new canvas.
         """
         if not hasattr(self, '_resize_timer'):
             from PyQt6.QtCore import QTimer
             self._resize_timer = QTimer(self)
             self._resize_timer.setSingleShot(True)
-            self._resize_timer.timeout.connect(self._apply_resize_and_preview)
+            self._resize_timer.timeout.connect(self._redraw_after_resize)
         self._resize_timer.start(80)   # 80 ms debounce
 
-    def _apply_resize_and_preview(self):
-        """Scale export figure size / margins per resize_mode, then redraw.
-
-        Called once per debounced resize burst.  Uses the *window* size
-        (self.width / self.height) as the reference — the matplotlib canvas
-        widget is fixed at its figure's pixel size and does not track the
-        window size reliably.
-
-        On the very first call the baseline is recorded and no scaling is
-        applied, so startup resize events never corrupt the initial layout.
-        """
+    def _redraw_after_resize(self):
+        """Redraw the preview for the new canvas size, without touching the chart."""
         if not hasattr(self, 'canvas'):
             return
-
-        # Use the *canvas widget* dimensions, not self.width()/self.height().
-        # The main window includes fixed-height chrome (toolbar, menu bar) and
-        # a fixed-width left panel (~520 px).  Those non-chart areas don't scale
-        # with the chart, so using the full window produces the wrong ratio --
-        # especially on Y where the toolbar is a larger fraction of total height.
-        new_w, new_h = self.canvas.width(), self.canvas.height()
-
-        # Guard against zero-size canvas during early startup layout passes.
-        if new_w <= 0 or new_h <= 0:
-            return
-
-        # First call: establish the baseline without scaling.
-        if not hasattr(self, '_window_size_baseline'):
-            self._window_size_baseline = (new_w, new_h)
-            self.update_preview()
-            return
-
-        prev_w, prev_h = self._window_size_baseline
-
-        if (prev_w > 0 and prev_h > 0
-                and (new_w != prev_w or new_h != prev_h)):
-            scale_x = new_w / prev_w
-            scale_y = new_h / prev_h
-            if scale_x != 1.0 or scale_y != 1.0:
-                self._scale_figsize(scale_x, scale_y)
-
-        # Always update baseline so the next burst computes the correct delta.
-        self._window_size_baseline = (new_w, new_h)
+        if self.canvas.width() <= 0 or self.canvas.height() <= 0:
+            return   # early startup layout passes
+        # Resizing the window is not an edit: keep the "unsaved changes" flag as it was.
+        had_flag = hasattr(self, '_is_dirty')
+        dirty = getattr(self, '_is_dirty', False)
         self.update_preview()
-
-    def _scale_figsize(self, sx: float, sy: float) -> None:
-        """Scale the export figure width/height by the given factors.
-
-        Margins and the title position are stored as fractions of the figure, so
-        they follow the new size by themselves; only what the spinboxes display
-        is refreshed.
-
-        Args:
-            sx: horizontal scale factor (new_window_width  / old_window_width).
-            sy: vertical   scale factor (new_window_height / old_window_height).
-        """
-        orig_w = self.fig_width.value()
-        orig_h = self.fig_height.value()
-        self.fig_width.blockSignals(True)
-        self.fig_height.blockSignals(True)
-        if sx != 1.0:
-            self.fig_width.setValue(max(self.fig_width.minimum(),
-                                        min(self.fig_width.maximum(), orig_w * sx)))
-        if sy != 1.0:
-            self.fig_height.setValue(max(self.fig_height.minimum(),
-                                         min(self.fig_height.maximum(), orig_h * sy)))
-        self.fig_width.blockSignals(False)
-        self.fig_height.blockSignals(False)
-        self._refresh_geometry_widgets()
-
-        # Signals were blocked while scaling, so _on_figsize_manual_change never
-        # fired: mark the preset as Custom explicitly so the combo stays accurate.
-        if hasattr(self, 'fig_preset_combo'):
-            self.fig_preset_combo.blockSignals(True)
-            self.fig_preset_combo.setCurrentText('Custom')
-            self.fig_preset_combo.blockSignals(False)
+        if had_flag:
+            self._is_dirty = dirty
 
     # ── Seaborn Explorer ──────────────────────────────────────────────────────
     def _open_seaborn_explorer(self):
