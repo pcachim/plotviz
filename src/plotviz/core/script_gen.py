@@ -11,6 +11,8 @@ Public entry points: generate_plot_script, _build_readme, _build_pyproject_toml.
 
 from __future__ import annotations
 import textwrap
+from collections.abc import Callable
+from typing import Any
 
 from core.constants import (
     _3D_TYPES, _POLAR_TYPES, _NO_X_TYPES,
@@ -19,12 +21,19 @@ from core.constants import (
 from core.settings_schema import SubplotStyle, subplot_get
 from core.geometry import to_inches
 
+# Shapes of the loose, JSON-like data the generators consume.
+Settings = dict[str, Any]
+SeriesDict = dict[str, Any]       # one entry of series_meta['series']
+Datasets = dict[str, Any]         # column name -> array/list
+Palette = list[str]
+Generator = Callable[[Settings, list[SeriesDict], Datasets, Palette, str], list[str]]
+
 # ── Chart-type → code-generation function ─────────────────────────────────────
 # Each generator receives (settings, series_list, datasets, palette, ax_var) and
 # returns a list of code-line strings that go inside the axes setup block.
 
 
-def _esc(s):
+def _esc(s: object) -> str:
     """Escape a string for embedding in a Python string literal."""
     return str(s).replace('\\', '\\\\').replace("'", "\\'")
 
@@ -35,7 +44,8 @@ def _esc(s):
 _USE_COMBINED: bool = True
 
 
-def _col_ref(col, use_combined=None, datasets=None):
+def _col_ref(col: str, use_combined: bool | None = None,
+             datasets: Datasets | None = None) -> str:
     """Return a Python expression to reference a dataset column.
 
     When all columns share the same length (use_combined=True) they are read
@@ -50,11 +60,12 @@ def _col_ref(col, use_combined=None, datasets=None):
     return f"_df_{safe}['{_esc(col)}']"
 
 
-def _color(palette, i):
+def _color(palette: Palette, i: int) -> str:
     return f"'{palette[i % len(palette)]}'"
 
 
-def _series_style(settings, series, i, palette):
+def _series_style(settings: Settings, series: SeriesDict, i: int,
+                  palette: Palette) -> dict[str, Any]:
     """Return resolved style properties for one series.
 
     Prefers curve_styles[label] stored in settings; falls back to palette index.
@@ -75,7 +86,8 @@ def _series_style(settings, series, i, palette):
 
 
 
-def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palette, ax_var):
+def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                                              palette: Palette, ax_var: str) -> list[str]:
     lines = []
     chart_type = settings.get('chart_type', 'Line')
 
@@ -242,7 +254,8 @@ def _gen_line_scatter_step_stem_area_errorbar(settings, series, datasets, palett
     return lines
 
 
-def _gen_histogram(settings, series, datasets, palette, ax_var):
+def _gen_histogram(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                   palette: Palette, ax_var: str) -> list[str]:
     lines = []
     bins      = settings.get('hist_bins', 20)
     histtype  = settings.get('hist_histtype', 'bar')
@@ -263,7 +276,8 @@ def _gen_histogram(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_boxplot(settings, series, datasets, palette, ax_var):
+def _gen_boxplot(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                 palette: Palette, ax_var: str) -> list[str]:
     cols  = [s.get('y_col','') for s in series if s.get('y_col','')]
     lbls  = [s.get('label', c) for s, c in zip(series, cols)]
     exprs = [_col_ref(c) + '.dropna()' for c in cols]
@@ -278,7 +292,8 @@ def _gen_boxplot(settings, series, datasets, palette, ax_var):
     ]
 
 
-def _gen_violin(settings, series, datasets, palette, ax_var):
+def _gen_violin(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                palette: Palette, ax_var: str) -> list[str]:
     cols  = [s.get('y_col','') for s in series if s.get('y_col','')]
     lbls  = [s.get('label', c) for s, c in zip(series, cols)]
     exprs = [_col_ref(c) + '.dropna()' for c in cols]
@@ -291,7 +306,8 @@ def _gen_violin(settings, series, datasets, palette, ax_var):
     ]
 
 
-def _gen_pie(settings, series, datasets, palette, ax_var):
+def _gen_pie(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+             palette: Palette, ax_var: str) -> list[str]:
     lines = []
     if series:
         s   = series[0]
@@ -333,7 +349,8 @@ def _gen_pie(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_polar(settings, series, datasets, palette, ax_var):
+def _gen_polar(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+               palette: Palette, ax_var: str) -> list[str]:
     lines = ["# Note: polar axes require projection='polar' — see fig.add_subplot below"]
     for i, s in enumerate(series):
         xc = s.get('x_col', '')
@@ -348,7 +365,8 @@ def _gen_polar(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_heatmap(settings, series, datasets, palette, ax_var):
+def _gen_heatmap(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                 palette: Palette, ax_var: str) -> list[str]:
     # Bug 6: the old implementation generated a df.corr() correlation heatmap, which is
     # completely different from what plot_engine renders (Z column on a regular grid via imshow).
     # Fix 1: use scipy.interpolate.griddata for correct scatter-point reconstruction.
@@ -404,7 +422,8 @@ def _gen_heatmap(settings, series, datasets, palette, ax_var):
     if show_cb:
         lines.append(f"plt.colorbar(_him, ax={ax_var})")
     return lines
-def _gen_contour(settings, series, datasets, palette, ax_var):
+def _gen_contour(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                 palette: Palette, ax_var: str) -> list[str]:
     # Bug 7: was hardcoding levels=15, cmap='coolwarm' and ignoring all user settings.
     # Fix 1: use griddata for correct scatter reconstruction (dead import removed).
     # Fix 4: vmin/vmax support. Fix 5: line colour/width. Fix 6: explicit levels list.
@@ -469,7 +488,8 @@ def _gen_contour(settings, series, datasets, palette, ax_var):
         else:
             lines.append("# Contour: assign X, Y and Z columns in plotviz to render.")
     return lines
-def _gen_tricontour(settings, series, datasets, palette, ax_var):
+def _gen_tricontour(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                    palette: Palette, ax_var: str) -> list[str]:
     # Bug 7: was hardcoding levels=10, cmap='rainbow' and ignoring all user settings.
     lines = []
     if series:
@@ -529,7 +549,8 @@ def _gen_tricontour(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_surface3d(settings, series, datasets, palette, ax_var):
+def _gen_surface3d(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                   palette: Palette, ax_var: str) -> list[str]:
     # Fix 3: was hardcoding cmap='viridis', alpha=0.9 and ignoring surf_stride / surf_wireframe.
     # Fix 1: now uses griddata (matching the live renderer) instead of a different approach.
     # Fix 7: honours heat_colorbar.
@@ -575,7 +596,8 @@ def _gen_surface3d(settings, series, datasets, palette, ax_var):
         else:
             lines.append("# 3D Surface: assign X, Y and Z columns in plotviz to render.")
     return lines
-def _gen_ecdf(settings, series, datasets, palette, ax_var):
+def _gen_ecdf(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+              palette: Palette, ax_var: str) -> list[str]:
     lines = []
     for i, s in enumerate(series):
         yc  = s.get('y_col', '')
@@ -592,7 +614,8 @@ def _gen_ecdf(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_hist2d_hexbin(settings, series, datasets, palette, ax_var):
+def _gen_hist2d_hexbin(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                       palette: Palette, ax_var: str) -> list[str]:
     # Bug 20: was hardcoding gridsize=30, bins=30, cmap='viridis' and always adding a colorbar.
     lines = []
     ct = settings.get('chart_type', 'Hist2D')
@@ -629,7 +652,8 @@ def _gen_hist2d_hexbin(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_quiver(settings, series, datasets, palette, ax_var):
+def _gen_quiver(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                palette: Palette, ax_var: str) -> list[str]:
     lines = []
     if series:
         s = series[0]
@@ -662,7 +686,8 @@ def _gen_quiver(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_barbs(settings, series, datasets, palette, ax_var):
+def _gen_barbs(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+               palette: Palette, ax_var: str) -> list[str]:
     lines = []
     if series:
         s = series[0]
@@ -695,7 +720,8 @@ def _gen_barbs(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_streamplot(settings, series, datasets, palette, ax_var):
+def _gen_streamplot(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+                    palette: Palette, ax_var: str) -> list[str]:
     lines = []
     if series:
         s = series[0]
@@ -740,7 +766,8 @@ def _gen_streamplot(settings, series, datasets, palette, ax_var):
     return lines
 
 
-def _gen_radar(settings, series, datasets, palette, ax_var):
+def _gen_radar(settings: Settings, series: list[SeriesDict], datasets: Datasets,
+               palette: Palette, ax_var: str) -> list[str]:
     lines = [
         "import numpy as np",
         "_rad_cols = [c for c in df.columns if df[c].dtype.kind in 'iuf'][:8]",
@@ -765,7 +792,7 @@ def _gen_radar(settings, series, datasets, palette, ax_var):
     return lines
 
 
-_GENERATORS = {
+_GENERATORS: dict[str, Generator] = {
     'Line':       _gen_line_scatter_step_stem_area_errorbar,
     'Scatter':    _gen_line_scatter_step_stem_area_errorbar,
     'Bar':        _gen_line_scatter_step_stem_area_errorbar,
@@ -795,7 +822,7 @@ _GENERATORS = {
 
 
 
-def _legend_call(settings, idx, ax_var):
+def _legend_call(settings: Settings, idx: int | str, ax_var: str) -> str:
     """Return a fully-qualified ax.legend(...) line for subplot `idx`,
     mirroring exactly what plot_engine._legend_kwargs() produces."""
     # idx can be int or str key — normalise to str for settings dicts
@@ -822,7 +849,7 @@ def _legend_call(settings, idx, ax_var):
         return f"{ax_var}.legend(loc='{_esc(real_loc)}', bbox_to_anchor=({lx}, {ly}), {common})"
 
 
-def _projection_for(ct):
+def _projection_for(ct: str) -> str:
     if ct in _3D_TYPES:    return "'3d'"
     if ct in _POLAR_TYPES: return "'polar'"
     return 'None'
@@ -830,7 +857,8 @@ def _projection_for(ct):
 
 
 
-def _gen_decoration(settings, idx, ax_var, sub_ct, xl, yl, sp_title):
+def _gen_decoration(settings: Settings, idx: int, ax_var: str, sub_ct: str,
+                    xl: str, yl: str, sp_title: str | None) -> list[str]:
     """Emit decoration for one subplot that matches the live canvas.
 
     Reproduces the styling applied by plot_engine._decorate / _apply_grid /
@@ -954,7 +982,7 @@ def _gen_decoration(settings, idx, ax_var, sub_ct, xl, yl, sp_title):
     return L
 
 
-def _gen_annotations(settings, n_subplots):
+def _gen_annotations(settings: Settings, n_subplots: int) -> list[str]:
     """Emit code that reproduces text / arrow / image annotations.
 
     Mirrors canvas.redraw_annotations(). Honours the per-subplot visibility
@@ -965,10 +993,10 @@ def _gen_annotations(settings, n_subplots):
     if not anns:
         return []
 
-    def _visible(idx):
+    def _visible(idx: int) -> Any:
         return subplot_get(settings, 'subplot_ann_visible', idx, True)
 
-    def _ax_name(idx):
+    def _ax_name(idx: int) -> str:
         return 'ax' if n_subplots == 1 else f'ax{idx}'
 
     lines = ["", "# ── Annotations ──────────────────────────────────────────────────"]
