@@ -671,7 +671,7 @@ class SerializationMixin:
                     xd=xd, yd=yd, xc=fr.get('xc',''), yc=fr.get('yc',''), lbl=fr.get('lbl',''),
                     eq_str=fr.get('eq_str',''), r2=fr.get('r2'), stats=fr.get('stats',{}),
                     ci_idx=fr.get('ci_idx',0), pi_idx=fr.get('pi_idx',0))
-            except Exception:
+            except (KeyError, ValueError, TypeError, IndexError, AttributeError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         for _nm in list(self._fits):
             if hasattr(self, '_update_confidence_band_for'):

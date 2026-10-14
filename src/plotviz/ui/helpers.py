@@ -196,7 +196,7 @@ def _show_color_dialog(initial=None, parent=None, palette_colors=None):
 
             left_vbox.insertWidget(custom_idx, recent_widget)
             left_vbox.insertWidget(custom_idx, lbl)
-    except Exception:
+    except (AttributeError, IndexError, TypeError):
         pass   # If layout introspection fails, just show the dialog normally
 
     if dlg.exec():

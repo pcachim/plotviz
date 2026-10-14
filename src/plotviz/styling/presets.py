@@ -65,7 +65,7 @@ class ChartPresets:
         for key, value in preset.items():
             try:
                 plt.rcParams[key] = value
-            except Exception as e:
+            except (KeyError, ValueError) as e:
                 print(f"Warning: Could not set {key}: {e}")
 
         return True

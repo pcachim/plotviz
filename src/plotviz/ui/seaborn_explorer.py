@@ -488,7 +488,7 @@ class SeabornExplorer(QDialog):
     def _is_cat(arr):
         try:
             return arr is not None and hasattr(arr, 'dtype') and arr.dtype.kind in ('U', 'S', 'O')
-        except Exception:
+        except (AttributeError, TypeError):
             return False
 
     def _get_col(self, combo):
@@ -519,7 +519,7 @@ class SeabornExplorer(QDialog):
             import seaborn as _sns
             pal = _sns.color_palette(theme, n)
             return [f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}' for r,g,b in pal]
-        except Exception:
+        except (ImportError, ValueError, TypeError):
             return self.palette[:n] if len(self.palette) >= n else self.palette
 
     def _sns_palette_name(self):

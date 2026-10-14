@@ -512,7 +512,7 @@ class CodeRunnerDialog(QDialog):
         try:
             with open(path, 'r', encoding='utf-8') as fh:
                 self._editor.setPlainText(fh.read())
-        except Exception as exc:
+        except (OSError, UnicodeError) as exc:
             QMessageBox.warning(self, 'Open error', str(exc))
 
     def _save_file(self):
@@ -524,7 +524,7 @@ class CodeRunnerDialog(QDialog):
         try:
             with open(path, 'w', encoding='utf-8') as fh:
                 fh.write(self._editor.toPlainText())
-        except Exception as exc:
+        except (OSError, UnicodeError) as exc:
             QMessageBox.warning(self, 'Save error', str(exc))
 
     # ── Code execution ────────────────────────────────────────────────────────

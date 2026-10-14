@@ -11,6 +11,7 @@ Tab building, plot engine and serialization live in their own mixin modules.
 
 import logging
 import os
+import zipfile
 import sys
 
 # ── Path bootstrap ────────────────────────────────────────────────────────────
@@ -691,7 +692,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             try:
                 plt.rcParams['text.usetex'] = True
                 plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}\usepackage{amssymb}'
-            except Exception:
+            except (KeyError, ValueError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
         # ── Load last chart (or sample) once the event loop is running ─────────
@@ -740,7 +741,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 self._current_filepath = fp
                 self._update_window_title()
                 return
-            except Exception:
+            except (OSError, ValueError, KeyError, zipfile.BadZipFile):
                 pass  # File unreadable — fall through to sample
 
         self._load_sample_chart()

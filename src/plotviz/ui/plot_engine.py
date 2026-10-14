@@ -1041,7 +1041,7 @@ class PlotEngineMixin:
         else:
             ax.grid(False, which='minor')
             try: ax.minorticks_off()
-            except Exception:
+            except (AttributeError, NotImplementedError, ValueError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     def _apply_canvas_style(self, ax, subplot_idx=0):
@@ -1162,7 +1162,7 @@ class PlotEngineMixin:
                 axis_obj.set_major_formatter(PercentFormatter(xmax=1.0))
             elif '{x' in fmt_str:
                 try: axis_obj.set_major_formatter(StrMethodFormatter(fmt_str))
-                except Exception:
+                except (TypeError, ValueError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         _apply_fmt(ax.xaxis, x_fmt)
         _apply_fmt(ax.yaxis, y_fmt)
@@ -1407,10 +1407,10 @@ class PlotEngineMixin:
             if ct not in _NO_SCALE_TYPES:
                 if not _x_is_cat:  # never call set_xscale on categorical axes
                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                    except Exception: ax.set_xscale('linear')
+                    except ValueError: ax.set_xscale('linear')
                 if not _protect_y:
                     try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                    except Exception: ax.set_yscale('linear')
+                    except ValueError: ax.set_yscale('linear')
             xlim = self.subplot_xlims.get(subplot_idx)
             if xlim and ct not in _NO_LIMITS_TYPES and not _x_is_cat:
                 ax.set_xlim(xlim[0], xlim[1])
@@ -1424,7 +1424,7 @@ class PlotEngineMixin:
                 if not _protect_y and ys == 'inverted': ax.invert_yaxis()
             if self.subplot_equal_aspect.get(subplot_idx, False) and ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
                 try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-                except Exception:
+                except (ValueError, NotImplementedError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         # ── Legend (no Y2) ──
         # Pie is in _NO_LEGEND_TYPES to suppress auto-legend, but if the user
@@ -1604,7 +1604,7 @@ class PlotEngineMixin:
     def _apply_equal_aspect(self, ax, idx, sub_ct, xlim, ylim):
         if self.subplot_equal_aspect.get(idx, False) and sub_ct not in ('Pie', 'Polar', 'Radar', '3D Surface'):
             try: ax.set_aspect('equal', adjustable='box' if (xlim or ylim) else 'datalim')
-            except Exception:
+            except (ValueError, NotImplementedError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     def _apply_subplot_legend(self, ax, ax2, idx, sub_ct, sub_series, sub_y2_series):
@@ -1648,9 +1648,9 @@ class PlotEngineMixin:
             if sub_ct not in _mosaic_no_scale:
                 if cat_info is None:  # don't set_xscale for categorical axes
                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                    except Exception: ax.set_xscale('linear')
+                    except ValueError: ax.set_xscale('linear')
                 try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                except Exception: ax.set_yscale('linear')
+                except ValueError: ax.set_yscale('linear')
             xlim = self.subplot_xlims.get(idx)
             ylim = self.subplot_ylims.get(idx)
             if sub_ct not in _mosaic_no_limits:
@@ -1708,13 +1708,13 @@ class PlotEngineMixin:
                 ys = self.subplot_yscales.get(idx, 'linear')
                 if cat_info is None:  # skip set_xscale for categorical
                     try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                    except Exception: ax.set_xscale('linear')
+                    except ValueError: ax.set_xscale('linear')
                 _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
                 _sub_x_is_cat = cat_info is not None
                 _protect_y = _sub_x_is_cat and _sub_horiz
                 if not _protect_y:
                     try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                    except Exception: ax.set_yscale('linear')
+                    except ValueError: ax.set_yscale('linear')
             else:
                 xs = self.subplot_xscales.get(idx, 'linear')
                 ys = self.subplot_yscales.get(idx, 'linear')
@@ -2194,7 +2194,7 @@ class PlotEngineMixin:
             QMessageBox.information(self, 'Success', f'Exported to {fp}')
         except Exception as e:
             try: matplotlib.rcParams['font.family'] = _old_font
-            except Exception:
+            except (NameError, KeyError, ValueError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             QMessageBox.critical(self, 'Error', str(e))
 

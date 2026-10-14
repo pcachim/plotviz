@@ -73,7 +73,7 @@ class CanvasPlotter(FigureCanvas):
         if self._border_rect is not None:
             try:
                 self._border_rect.remove()
-            except Exception:
+            except (ValueError, NotImplementedError, AttributeError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self._border_rect = None
 
@@ -107,7 +107,7 @@ class CanvasPlotter(FigureCanvas):
                 try:
                     ann['artist'].set_position((nx, ny))
                     ann['artist'].xy = (nx, ny)   # arrow tip (same position for pure text)
-                except Exception:
+                except (AttributeError, KeyError, TypeError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             elif ann['type'] == 'arrow':
                 if self._drag_part == 'tip':
@@ -137,7 +137,7 @@ class CanvasPlotter(FigureCanvas):
                 try:
                     ann['artist'].xybox = (nx, ny)
                     ann['artist'].xy    = (nx, ny)
-                except Exception:
+                except (AttributeError, KeyError, TypeError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.draw_idle()
 
@@ -161,7 +161,7 @@ class CanvasPlotter(FigureCanvas):
             mw.tabs.setCurrentIndex(outer)
             if inner is not None and hasattr(mw, 'plots_inner_tabs'):
                 mw.plots_inner_tabs.setCurrentIndex(inner)
-        except Exception:
+        except (AttributeError, TypeError, RuntimeError):
             logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     def _select_subplot(self, ax_idx: int) -> None:
@@ -204,7 +204,7 @@ class CanvasPlotter(FigureCanvas):
 
         try:
             renderer = self.figure.canvas.get_renderer()
-        except Exception:
+        except (AttributeError, RuntimeError):
             renderer = None
 
         for ax in self.axes_list:
@@ -215,7 +215,7 @@ class CanvasPlotter(FigureCanvas):
             # Check tightbbox for the decoration band (below/beside inner box)
             try:
                 tb = ax.get_tightbbox(renderer) if renderer else None
-            except Exception:
+            except (AttributeError, ValueError, RuntimeError, TypeError):
                 tb = None
             if tb is None:
                 # Fallback: generous fixed expansion of inner box
@@ -452,7 +452,7 @@ class CanvasPlotter(FigureCanvas):
                     min_d = float(np.nanmin(px_dists))
                     if min_d < px_threshold and min_d < best_px:
                         best_px, best_label = min_d, lbl
-                except Exception:
+                except (ValueError, TypeError, AttributeError, IndexError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
             # --- PathCollection (scatter / bubble) --------------------------
@@ -467,7 +467,7 @@ class CanvasPlotter(FigureCanvas):
                             d = float(np.hypot(pt[0] - ex, pt[1] - ey))
                             if d < best_px:
                                 best_px, best_label = d, lbl
-                except Exception:
+                except (ValueError, TypeError, AttributeError, IndexError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
                 try:
                     offsets = np.asarray(artist.get_offsets())
@@ -477,7 +477,7 @@ class CanvasPlotter(FigureCanvas):
                         min_d = float(np.nanmin(px_dists))
                         if min_d < px_threshold and min_d < best_px:
                             best_px, best_label = min_d, lbl
-                except Exception:
+                except (ValueError, TypeError, AttributeError, IndexError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
             # --- Rectangle (bar / barh) -------------------------------------
@@ -490,7 +490,7 @@ class CanvasPlotter(FigureCanvas):
                         d = float(np.hypot(pt[0] - ex, pt[1] - ey))
                         if d < best_px:
                             best_px, best_label = d, lbl
-                except Exception:
+                except (ValueError, TypeError, AttributeError, IndexError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
         return best_label
@@ -506,7 +506,7 @@ class CanvasPlotter(FigureCanvas):
                 # Toggle off zoom/pan if active
                 if hasattr(tb, 'mode') and tb.mode:
                     tb.pan()  # calling pan() again toggles it off if active
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError):
             logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     # ─── Annotation placement ─────────────────────────────────────────────────
@@ -581,7 +581,7 @@ class CanvasPlotter(FigureCanvas):
     def remove_last_annotation(self):
         if self.annotations:
             try: self.annotations.pop()['artist'].remove()
-            except Exception:
+            except (ValueError, NotImplementedError, KeyError, AttributeError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.draw_idle()
             self._notify()
@@ -589,7 +589,7 @@ class CanvasPlotter(FigureCanvas):
     def remove_annotation_at(self, idx):
         if 0 <= idx < len(self.annotations):
             try: self.annotations[idx]['artist'].remove()
-            except Exception:
+            except (ValueError, NotImplementedError, KeyError, AttributeError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.annotations.pop(idx)
             self.draw_idle()
@@ -598,7 +598,7 @@ class CanvasPlotter(FigureCanvas):
     def clear_annotations(self):
         for ann in self.annotations:
             try: ann['artist'].remove()
-            except Exception:
+            except (ValueError, NotImplementedError, KeyError, AttributeError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         self.annotations.clear()
         self.draw_idle()
@@ -618,7 +618,7 @@ class CanvasPlotter(FigureCanvas):
             return
         try:
             mw.statusBar().showMessage(msg, timeout)
-        except Exception:
+        except (AttributeError, RuntimeError):
             logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     @staticmethod
@@ -629,7 +629,7 @@ class CanvasPlotter(FigureCanvas):
             if f == 0:
                 return '0'
             return f'{f:.4g}'
-        except Exception:
+        except (TypeError, ValueError):
             return str(v)
 
     def _subplot_label(self, ax) -> str:
@@ -639,7 +639,7 @@ class CanvasPlotter(FigureCanvas):
         title = ''
         try:
             title = ax.get_title().strip()
-        except Exception:
+        except (AttributeError, TypeError):
             logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         if title:
             return title

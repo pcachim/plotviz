@@ -52,7 +52,7 @@ if getattr(sys, 'frozen', False):
     try:
         import matplotlib.font_manager as _fm
         _fm._load_fontmanager(try_read_cache=False)
-    except Exception:
+    except (AttributeError, TypeError, OSError):
         logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
 # ── 5. multiprocessing (required on macOS with spawn start method) ────────────
@@ -111,7 +111,7 @@ def _set_win_appusermodel_id() -> None:
     try:
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('com.pviz.app.plotviz')
-    except Exception:
+    except (AttributeError, OSError):
         logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
 
@@ -173,7 +173,7 @@ def _ensure_user_data(log_dir: 'Path') -> None:
         if src.is_dir():
             try:
                 shutil.copytree(src, dest)
-            except Exception:
+            except OSError:
                 dest.mkdir(parents=True, exist_ok=True)
         else:
             dest.mkdir(parents=True, exist_ok=True)

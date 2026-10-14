@@ -337,7 +337,7 @@ class PythonExportMixin:
                     if _src and os.path.isfile(_src):
                         try:
                             zf.write(_src, 'images/' + os.path.basename(_src))
-                        except Exception:
+                        except (OSError, ValueError):
                             logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
                 if use_combined:
@@ -458,7 +458,7 @@ class PythonExportMixin:
                     if _src and os.path.isfile(_src):
                         try:
                             zf.write(_src, 'images/' + os.path.basename(_src))
-                        except Exception:
+                        except (OSError, ValueError):
                             logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
                 if use_combined:

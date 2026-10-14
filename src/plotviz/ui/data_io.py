@@ -850,7 +850,7 @@ class DataMixin:
                 for w in (xcb, ycb):
                     if w is not None:
                         try: w.currentIndexChanged.disconnect()
-                        except Exception:
+                        except (TypeError, RuntimeError):
                             logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.series_table.blockSignals(True)
             for r in rows_to_remove:

@@ -1114,7 +1114,7 @@ class FitPresetMixin:
                 fh.write('\n'.join(all_lines))
             if hasattr(self, 'statusBar'):
                 self.statusBar().showMessage(f'Fit results saved to {path}', 4000)
-        except Exception as e:
+        except (OSError, UnicodeError) as e:
             QMessageBox.critical(self, 'Export Failed', str(e))
 
         # ═══════════════════════════════════════════════════════════════════════════
@@ -1125,5 +1125,5 @@ class FitPresetMixin:
         """Return True if arr is a string/object array (categorical)."""
         try:
             return arr is not None and hasattr(arr, 'dtype') and arr.dtype.kind in ('U', 'S', 'O')
-        except Exception:
+        except (AttributeError, TypeError):
             return False

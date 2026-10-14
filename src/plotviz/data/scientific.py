@@ -78,12 +78,12 @@ class CurveFitter:
             tmpl = CurveFitter.EQ_TEMPLATES.get(model, 'y = f(x)')
             try:
                 eq_str = tmpl.format(*popt)
-            except Exception:
+            except (IndexError, KeyError, ValueError, TypeError):
                 eq_str = f'{model} fit'
 
             return popt, pcov, func, eq_str, r2
 
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError, ArithmeticError) as e:
             print(f'Fitting error: {e}')
             return None, None, None, '', None
 
@@ -115,7 +115,7 @@ class CurveFitter:
         try:
             f_stat = ((sst - sse) / (p - 1)) / mse if (p > 1 and mse and not np.isnan(mse)) else np.nan
             f_pvalue = float(1 - scipy_stats.f.cdf(f_stat, p - 1, dof)) if not np.isnan(f_stat) else np.nan
-        except Exception:
+        except (ArithmeticError, ValueError, TypeError):
             f_stat, f_pvalue = np.nan, np.nan
 
         # Information criteria
@@ -123,7 +123,7 @@ class CurveFitter:
             ll = -n / 2 * np.log(2 * np.pi * mse) - sse / (2 * mse)
             aic = 2 * p - 2 * ll
             bic = p * np.log(n) - 2 * ll
-        except Exception:
+        except (ArithmeticError, ValueError):
             aic = bic = np.nan
 
         # Per-parameter stats
@@ -177,7 +177,7 @@ class CurveFitter:
         try:
             var_y = np.einsum('ni,ij,nj->n', J, pcov, J)
             sigma_y = np.sqrt(np.abs(var_y))
-        except Exception:
+        except (ValueError, TypeError):
             sigma_y = np.zeros_like(y0)
         return y0 + n_sigma * sigma_y, y0 - n_sigma * sigma_y
 
@@ -203,7 +203,7 @@ class CurveFitter:
         try:
             var_ci = np.einsum('ni,ij,nj->n', J, pcov, J)
             var_ci = np.abs(var_ci)
-        except Exception:
+        except (ValueError, TypeError):
             var_ci = np.zeros(len(x))
 
         var_pred = var_ci + mse   # total prediction variance

@@ -457,7 +457,7 @@ class DataImportDialog(QDialog):
                 with open(self.filepath, newline='') as f:
                     dialect = csv.Sniffer().sniff(f.read(4096))
                 sep = dialect.delimiter
-            except Exception:
+            except (csv.Error, OSError, UnicodeError):
                 sep = ','
         kw = dict(header=hdr, skiprows=skip or None)
         if sep == r'\s+':
