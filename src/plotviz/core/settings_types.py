@@ -290,6 +290,8 @@ class DerivedSettings(TypedDict, total=False):
     """Keys that core/ or the exporters add to the settings before generating a script
     (copied in from series.json, which is where the UI stores them)."""
     _err_col: str
+    _xerr_col: str
+    _subplot_idx: int
     quiver_u_col: str
     quiver_v_col: str
     barbs_u_col: str

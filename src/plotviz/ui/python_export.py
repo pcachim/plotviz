@@ -273,7 +273,7 @@ class PythonExportMixin:
                 c = s.get(k, '')
                 if c and c in self.datasets:
                     used_cols.add(c)
-        for attr in ('combo_z', 'combo_err', 'combo_bar_ymin'):
+        for attr in ('combo_z', 'combo_err', 'combo_bar_ymin', 'combo_fill_y2', 'err_xerr_combo'):
             cb = getattr(self, attr, None)
             if cb:
                 txt = cb.currentText()
@@ -370,7 +370,7 @@ class PythonExportMixin:
                 f'Python bundle saved to:\n{fp}\n\n'
                 f'Extract the zip and run: python plot.py')
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             import traceback as _tb
             QMessageBox.critical(self, 'Export error', f'{e}\n\n{_tb.format_exc()}')
 
@@ -399,7 +399,7 @@ class PythonExportMixin:
                 c = s.get(k, '')
                 if c and c in self.datasets:
                     used_cols.add(c)
-        for attr in ('combo_z', 'combo_err', 'combo_bar_ymin'):
+        for attr in ('combo_z', 'combo_err', 'combo_bar_ymin', 'combo_fill_y2', 'err_xerr_combo'):
             cb = getattr(self, attr, None)
             if cb:
                 txt = cb.currentText()
@@ -487,6 +487,6 @@ class PythonExportMixin:
             # ── Hand off to Code Runner ────────────────────────────────────────
             self._open_pvizx_in_code_runner(tmp_fp)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             import traceback as _tb
             QMessageBox.critical(self, 'Code Runner export error', f'{e}\n\n{_tb.format_exc()}')

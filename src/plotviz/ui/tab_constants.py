@@ -26,13 +26,7 @@ ALL_CHART_TYPES = [
 PER_SERIES_TYPES = ALL_CHART_TYPES
 
 # Types that take over the whole chart (no per-series mixing)
-WHOLE_CHART_TYPES = {
-    'Histogram', 'Hist2D', 'Hexbin',
-    'Boxplot', 'Violin',
-    'Pie', 'Polar', 'Radar',
-    'Heatmap', 'Contour', 'Tricontour', '3D Surface',
-    'ECDF', 'Quiver', 'Barbs', 'Streamplot',
-}
+from core.constants import WHOLE_CHART_TYPES  # noqa: F401  (re-exported; single source of truth)
 
 # Re-exported from the canonical source so existing `from ui.tab_builders
 # import _NO_X_TYPES` call sites keep working.

@@ -59,6 +59,23 @@ from core.constants import (
 
 
 class PlotEngineMixin:
+    @staticmethod
+    def _safe_set_scale(ax, axis, name, chart_type=None):
+        """Apply an axis scale ('log', 'symlog', ...); 'inverted' is handled separately.
+
+        For box/violin plots the default 'linear' scale is left untouched:
+        set_*scale('linear') would replace their group tick labels (the series
+        names) with numbers.
+        """
+        if name == 'inverted':
+            name = 'linear'
+        if name == 'linear' and chart_type in ('Boxplot', 'Violin'):
+            return
+        try:
+            getattr(ax, f'set_{axis}scale')(name)
+        except ValueError:
+            getattr(ax, f'set_{axis}scale')('linear')
+
     def _sp_opt(self, subplot_idx, key, fallback=None):
         """Return a per-subplot chart option, falling back to *fallback* when absent."""
         opts = getattr(self, 'subplot_chart_opts', {}).get(subplot_idx, {})
@@ -969,7 +986,7 @@ class PlotEngineMixin:
                         _kw['cmap'] = _cmap('stream_cmap_combo', 'stream_cmap')
                         del _kw['linewidth']  # can't combine with color array
                     ax.streamplot(xs_u, ys_u, U_grid, V_grid, **_kw)
-                except Exception:
+                except Exception:  # noqa: BLE001 - optional overlay: skip if the data is not grid-compatible
                     pass  # silently skip if data is not grid-compatible
 
     # Whole-chart type -> method that draws it (see _plot_on).
@@ -1239,7 +1256,7 @@ class PlotEngineMixin:
             # Only constrain the secondary; leave the primary untouched
             ax2.yaxis.set_major_locator(MaxNLocator(nbins=n_intervals,
                                                     steps=[1, 2, 2.5, 5, 10]))
-        except Exception:
+        except Exception:  # noqa: BLE001 - render safety net: never crash the UI
             pass  # never crash the render path
 
     def _legend_kwargs(self, subplot_idx: int) -> dict:
@@ -1406,11 +1423,9 @@ class PlotEngineMixin:
             ys = self.subplot_yscales.get(subplot_idx, 'linear')
             if ct not in _NO_SCALE_TYPES:
                 if not _x_is_cat:  # never call set_xscale on categorical axes
-                    try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                    except ValueError: ax.set_xscale('linear')
+                    self._safe_set_scale(ax, 'x', xs, ct)
                 if not _protect_y:
-                    try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                    except ValueError: ax.set_yscale('linear')
+                    self._safe_set_scale(ax, 'y', ys, ct)
             xlim = self.subplot_xlims.get(subplot_idx)
             if xlim and ct not in _NO_LIMITS_TYPES and not _x_is_cat:
                 ax.set_xlim(xlim[0], xlim[1])
@@ -1647,10 +1662,8 @@ class PlotEngineMixin:
             _mosaic_no_limits = _DECOR_NO_LIMITS
             if sub_ct not in _mosaic_no_scale:
                 if cat_info is None:  # don't set_xscale for categorical axes
-                    try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                    except ValueError: ax.set_xscale('linear')
-                try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                except ValueError: ax.set_yscale('linear')
+                    self._safe_set_scale(ax, 'x', xs, sub_ct)
+                self._safe_set_scale(ax, 'y', ys, sub_ct)
             xlim = self.subplot_xlims.get(idx)
             ylim = self.subplot_ylims.get(idx)
             if sub_ct not in _mosaic_no_limits:
@@ -1707,14 +1720,12 @@ class PlotEngineMixin:
                 xs = self.subplot_xscales.get(idx, 'linear')
                 ys = self.subplot_yscales.get(idx, 'linear')
                 if cat_info is None:  # skip set_xscale for categorical
-                    try: ax.set_xscale(xs if xs != 'inverted' else 'linear')
-                    except ValueError: ax.set_xscale('linear')
+                    self._safe_set_scale(ax, 'x', xs, sub_ct)
                 _sub_horiz = sub_ct == 'Bar' and self._sp_opt(idx, 'bar_horizontal', False)
                 _sub_x_is_cat = cat_info is not None
                 _protect_y = _sub_x_is_cat and _sub_horiz
                 if not _protect_y:
-                    try: ax.set_yscale(ys if ys != 'inverted' else 'linear')
-                    except ValueError: ax.set_yscale('linear')
+                    self._safe_set_scale(ax, 'y', ys, sub_ct)
             else:
                 xs = self.subplot_xscales.get(idx, 'linear')
                 ys = self.subplot_yscales.get(idx, 'linear')
@@ -1877,7 +1888,7 @@ class PlotEngineMixin:
                 QApplication.processEvents()
                 self.refresh_annotation_list()
 
-        except Exception:
+        except Exception:  # noqa: BLE001 - render safety net: never crash the UI
             traceback.print_exc()
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -1967,7 +1978,7 @@ class PlotEngineMixin:
                 px_h = int(fh * chosen_dpi)
                 self.statusBar().showMessage(
                     f'Image copied to clipboard  ({px_w}×{px_h} px, {chosen_dpi} dpi).', 4000)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - clipboard failure is logged, not fatal
             import logging
             logging.getLogger('plotviz').warning('Copy to clipboard failed: %s', e)
 
@@ -2134,7 +2145,7 @@ class PlotEngineMixin:
         if not is3d:
             try:
                 self.canvas.draw_annotations_on(axes_list)
-            except Exception:
+            except Exception:  # noqa: BLE001 - render safety net: never crash the UI
                 traceback.print_exc()
 
         return exp_fig
@@ -2192,7 +2203,7 @@ class PlotEngineMixin:
 
             _remember_dir(fp)
             QMessageBox.information(self, 'Success', f'Exported to {fp}')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             try: matplotlib.rcParams['font.family'] = _old_font
             except (NameError, KeyError, ValueError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)

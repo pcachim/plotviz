@@ -18,6 +18,15 @@ THREE_D_TYPES = {"3D Surface"}
 #: Chart types rendered on a polar projection.
 POLAR_TYPES = {"Polar", "Radar"}
 
+#: Chart types drawn as one whole (all series together) rather than series by series.
+WHOLE_CHART_TYPES = {
+    "Histogram", "Hist2D", "Hexbin",
+    "Boxplot", "Violin",
+    "Pie", "Polar", "Radar",
+    "Heatmap", "Contour", "Tricontour", "3D Surface",
+    "ECDF", "Quiver", "Barbs", "Streamplot",
+}
+
 #: Chart types that have no meaningful x column (x label/scale suppressed).
 NO_X_TYPES = {"Histogram", "Boxplot", "Violin", "Pie", "ECDF"}
 

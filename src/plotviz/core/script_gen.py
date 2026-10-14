@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping
 from typing import Any, cast
 
 from core.constants import (
-    _3D_TYPES, _POLAR_TYPES, _NO_X_TYPES,
+    _3D_TYPES, _POLAR_TYPES, _NO_X_TYPES, _NO_LEGEND_TYPES, WHOLE_CHART_TYPES,
     _DECOR_NO_SCALE, _DECOR_NO_LIMITS, _DECOR_NO_TICKS,
 )
 from core.settings_schema import SubplotStyle, subplot_get
@@ -40,11 +40,14 @@ def _as_loose(d: Mapping[str, Any]) -> dict[str, Any]:
     return cast(dict[str, Any], d)
 
 
-def _merge_defaults(settings: Settings, extra: Mapping[str, Any]) -> None:
-    """setdefault every chart option of *extra* (dynamic names) into *settings*."""
-    loose = _as_loose(settings)
-    for k, v in extra.items():
-        loose.setdefault(k, v)
+def _apply_chart_opts(settings: Settings, extra: Mapping[str, Any]) -> None:
+    """Make the chart options of one subplot (dynamic names) win in *settings*.
+
+    The settings dict already holds the active subplot's widget values as global
+    keys; each subplot's own saved options must override them, or every subplot
+    would be drawn with the active one's options.
+    """
+    _as_loose(settings).update(extra)
 
 
 def _esc(s: object) -> str:
@@ -74,6 +77,21 @@ def _col_ref(col: str, use_combined: bool | None = None,
     return f"_df_{safe}['{_esc(col)}']"
 
 
+def _first_label(series: list[SeriesDict]) -> str:
+    """Label of the first series (the live chart titles colorbars with it)."""
+    return str(series[0].get('label', '')) if series else ''
+
+
+def _is_cat_data(arr: Any) -> bool:
+    """True for string/object columns (categorical), mirroring the engine."""
+    if arr is None:
+        return False
+    if hasattr(arr, 'dtype'):
+        return bool(arr.dtype.kind in ('U', 'S', 'O'))
+    # Plain lists/tuples (the app itself passes arrays): look at the first value.
+    return isinstance(arr, (list, tuple)) and bool(arr) and isinstance(arr[0], str)
+
+
 def _color(palette: Palette, i: int) -> str:
     return f"'{palette[i % len(palette)]}'"
 
@@ -101,6 +119,8 @@ def _series_style(settings: Settings, series: SeriesDict, i: int,
         "scatter_alpha": opts.get("sc_alpha", 0.7),
         "area_alpha":    opts.get("area_alpha", 0.4),
         "bubble_alpha":  opts.get("bubble_alpha", 0.6),
+        "curve":         curve,   # the raw curve_styles entry (for per-type defaults)
+        "opts":          opts,    # the series' own per-type options
     }
 
 
@@ -117,8 +137,21 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
 
     # Emit stacking state initialisation once, before the per-series loop,
     # so every bar series in this subplot can share the running-bottom vars.
-    bar_any = any(s.get('series_type', chart_type) == 'Bar' for s in series)
+    bar_series = [s for s in series if s.get('series_type', chart_type) == 'Bar']
+    bar_any = bool(bar_series)
+    n_bar = len(bar_series)
+    bar_idx = 0   # running index among the Bar series (for the grouped offsets)
     _range_mode = bool(bar_ymin_col and bar_ymin_col in datasets)
+    # Grouped (side-by-side) bars: the live chart splits the bar width between the
+    # Bar series of a subplot and shifts each by a fixed offset.
+    _grouped = n_bar > 1 and not bar_stacked and not _range_mode
+    _bar_cat_cols = [s.get('x_col', '') for s in bar_series
+                     if s.get('x_col') and _is_cat_data(datasets.get(s.get('x_col', '')))]
+    if _grouped and _bar_cat_cols:
+        lines.append(
+            "_bar_cats = list(dict.fromkeys(str(v) for _c in ("
+            + ", ".join(_col_ref(c) for c in dict.fromkeys(_bar_cat_cols))
+            + ",) for v in _c))")
     if bar_stacked and bar_any and not _range_mode:
         lines += [
             "_bar_cat_bots = {}   # accumulated bottom per category (stacked bars)",
@@ -145,10 +178,21 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
         yexpr = _col_ref(yc)
 
         mk_arg  = f", marker='{mk}', markersize={ms}, markerfacecolor={mkc}" if mk not in ('None', '', None) else ''
+        curve = st['curve']
+        copts = st['opts']
         if ct == 'Line':
-            lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, label='{lbl}', color={col}, linestyle='{ls}', linewidth={lw}{mk_arg})")
+            ds_arg = '' if copts.get('line_drawstyle', 'default') == 'default' else f", drawstyle='{_esc(copts['line_drawstyle'])}'"
+            lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, label='{lbl}', color={col}, linestyle='{ls}', linewidth={lw}{mk_arg}{ds_arg})")
         elif ct == 'Scatter':
-            lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={sal}, s={ms**2})")
+            sc_mk = curve.get('marker', 'o')
+            sc_mk = 'o' if sc_mk in ('None', 'none', '') else sc_mk
+            sc_ec = copts.get('sc_edgecolor', 'none')
+            if sc_ec == 'auto':
+                sc_ec = st['marker_color']
+            lines.append(
+                f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={mkc}, alpha={sal}, "
+                f"s={copts.get('sc_size', 20)}, marker='{_esc(sc_mk)}', edgecolors='{_esc(sc_ec)}', "
+                f"linewidths={copts.get('sc_lw', 0.5)})")
         elif ct == 'Bar':
             # Resolve per-series bar opts (the series' own opts, else the defaults)
             curve_opts = ((settings.get('curve_styles') or {}).get(s.get('label', '')) or {}).get('opts', {})
@@ -157,7 +201,9 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
             b_ec = curve_opts.get('bar_edgecolor', 'none')
             b_hor = curve_opts.get('bar_horizontal', bar_horiz)
             b_stk = curve_opts.get('bar_stacked',  bar_stacked)
-            ec_kw = f", edgecolor='{_esc(b_ec)}'" if b_ec != 'none' else ''
+            bi, bar_idx = bar_idx, bar_idx + 1
+            ec_kw = (f", edgecolor='{_esc(b_ec)}', linewidth={curve_opts.get('bar_edge_lw', 0.5)}"
+                     if b_ec != 'none' else ', linewidth=0')
 
             if _range_mode:
                 # ── Range-bar mode: each bar spans ymin_col (bottom) → y_col (top) ──
@@ -210,6 +256,25 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
                         f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
                 lines.append("    _bar_num_bots[:len(_bs_yf)] += _bs_yf")
 
+            elif _grouped and not b_stk:
+                # ── Grouped bars: shared width, one offset per Bar series ──
+                off = (bi - (n_bar - 1) / 2) * (0.8 / n_bar)
+                gw = b_w / n_bar
+                x_is_cat = _is_cat_data(datasets.get(xc))
+                if x_is_cat and _bar_cat_cols:
+                    pos = f"np.array([_bar_cats.index(str(v)) for v in {xexpr}], dtype=float) + {off!r}"
+                else:
+                    pos = f"np.asarray({xexpr}, dtype=float) + {off!r}"
+                fn = 'barh' if b_hor else 'bar'
+                size_kw = 'height' if b_hor else 'width'
+                lines.append(
+                    f"{ax_var}.{fn}({pos}, {yexpr}, {size_kw}={gw!r}, "
+                    f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
+                if x_is_cat and _bar_cat_cols and bi == n_bar - 1:
+                    tick = 'y' if b_hor else 'x'
+                    rot = '' if b_hor else ", rotation=45, ha='right'"
+                    lines.append(f"{ax_var}.set_{tick}ticks(range(len(_bar_cats)))")
+                    lines.append(f"{ax_var}.set_{tick}ticklabels(_bar_cats{rot})")
             elif b_hor:
                 # ── Horizontal bars ──
                 lines.append(
@@ -221,7 +286,24 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
                     f"{ax_var}.bar({xexpr}, {yexpr}, width={b_w}, "
                     f"label='{lbl}', color={col}, alpha={b_al}{ec_kw})")
         elif ct == 'Area':
-            lines.append(f"{ax_var}.fill_between({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={aal})")
+            a_lw   = copts.get('area_lw', 0.8)
+            a_line = copts.get('area_showline', True)
+            a_base = settings.get('area_baseline', 0.0)
+            if settings.get('area_stacked', False):
+                # Stacked: each series sits on the running top of the previous ones.
+                nm = f"_area_base_{ax_var}"
+                lines.append(f"_ay = np.asarray({yexpr}, dtype=float)")
+                lines.append(
+                    f"_ab = {nm} if '{nm}' in globals() and len({nm}) == len(_ay) "
+                    f"else np.full(len(_ay), {a_base})")
+                lines.append(f"{ax_var}.fill_between({xexpr}, _ab, _ab + _ay, label='{lbl}', color={col}, alpha={aal})")
+                if a_line:
+                    lines.append(f"{ax_var}.plot({xexpr}, _ab + _ay, color={col}, lw={a_lw})")
+                lines.append(f"{nm} = _ab + _ay")
+            else:
+                lines.append(f"{ax_var}.fill_between({xexpr}, {a_base}, {yexpr}, label='{lbl}', color={col}, alpha={aal})")
+                if a_line:
+                    lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, color={col}, lw={a_lw})")
         elif ct == 'Fill Between':
             curve_opts  = ((settings.get('curve_styles') or {}).get(s.get('label', '')) or {}).get('opts', {})
             fb_al       = curve_opts.get('fill_between_alpha',   0.4)
@@ -241,19 +323,46 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
                 if fb_showline:
                     lines.append(f"{ax_var}.plot({xexpr}, {yexpr}, color={col}, lw={fb_lw}, alpha=0.8)")
         elif ct == 'Step':
-            lines.append(f"{ax_var}.step({xexpr}, {yexpr}, label='{lbl}', color={col}, linewidth={lw}, where='mid')")
+            where = settings.get('step_where', 'pre')
+            lines.append(f"{ax_var}.step({xexpr}, {yexpr}, where='{_esc(where)}', label='{lbl}', color={col}, linewidth={lw})")
+            if copts.get('step_fill', False):
+                sf_al = copts.get('step_fill_alpha', 0.2)
+                lines.append(f"{ax_var}.fill_between({xexpr}, {yexpr}, step='{_esc(where)}', alpha={sf_al}, color={col})")
         elif ct == 'Stem':
-            lines.append(f"markerline, stemlines, baseline = {ax_var}.stem({xexpr}, {yexpr}, label='{lbl}')")
-            lines.append(f"plt.setp(stemlines, color={col}, linewidth={lw}); plt.setp(markerline, color={col})")
+            st_mk = curve.get('marker', 'o')
+            st_mkc = curve.get('marker_color', st['color'])
+            lines.append(
+                f"markerline, stemlines, baseline = {ax_var}.stem({xexpr}, {yexpr}, linefmt='-', "
+                f"markerfmt='{_esc(st_mk)}', basefmt='k-', label='{lbl}', bottom={settings.get('stem_baseline', 0.0)})")
+            lines.append(
+                f"plt.setp(stemlines, color={col}, linewidth={curve.get('linewidth', 1.2)}); "
+                f"plt.setp(markerline, color='{_esc(st_mkc)}', markersize={curve.get('markersize', 8)})")
         elif ct == 'Errorbar':
-            lines.append(f"{ax_var}.errorbar({xexpr}, {yexpr}, fmt='o', label='{lbl}', color={col}, linewidth={lw})")
+            er_mk = curve.get('marker', 'o')
+            er_mk = 'o' if er_mk in ('None', 'none', '') else er_mk
+            ycol = settings.get('_err_col', '')
+            xcol = settings.get('_xerr_col', '')
+            yerr = _col_ref(ycol) if ycol and ycol != '(none)' and ycol in datasets else 'None'
+            xerr = _col_ref(xcol) if xcol and xcol != '(none)' and xcol in datasets else 'None'
+            lines.append(
+                f"{ax_var}.errorbar({xexpr}, {yexpr}, yerr={yerr}, xerr={xerr}, label='{lbl}', "
+                f"capsize={copts.get('err_capsize', 4)}, capthick={copts.get('err_capthick', 1.5)}, "
+                f"elinewidth={copts.get('err_elinewidth', 1.5)}, barsabove={copts.get('err_barsabove', False)}, "
+                f"fmt='{_esc(er_mk)}', color={col}, linewidth={curve.get('linewidth', 1.5)})")
         elif ct == 'Bubble':
-            lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={bal})")
+            bu_mk = curve.get('marker', 'o')
+            bu_mk = 'o' if bu_mk in ('None', 'none', '') else bu_mk
+            bu_ec = copts.get('bubble_edgecolor', 'none')
+            if bu_ec == 'auto':
+                bu_ec = st['marker_color']
+            lines.append(
+                f"{ax_var}.scatter({xexpr}, {yexpr}, s={copts.get('bubble_scale', 200.0) / 4}, alpha={bal}, "
+                f"color={mkc}, edgecolors='{_esc(bu_ec)}', marker='{_esc(bu_mk)}', label='{lbl}')")
         elif ct == 'Waterfall':
             pos_c = settings.get('waterfall_pos_color', '#2ecc71')
             neg_c = settings.get('waterfall_neg_color', '#e74c3c')
-            wf_w  = settings.get('waterfall_width', 0.8)
-            wf_al = settings.get('waterfall_alpha', 0.85)
+            wf_w  = settings.get('waterfall_width', 0.6)
+            wf_al = settings.get('waterfall_alpha', 1.0)
             lines.append(f"# Waterfall: '{lbl}'")
             lines.append(f"_wf_x = list({xexpr})")
             lines.append(f"_wf_y = list({yexpr})")
@@ -261,11 +370,17 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
             lines.append("_wf_x, _wf_y = _wf_x[:_wf_n], _wf_y[:_wf_n]")
             lines.append("_wf_is_cat = isinstance(_wf_x[0], str) if _wf_x else False")
             lines.append("_running = 0.0")
+            lines.append("_prev_top, _prev_x = None, None")
             lines.append("for _wi, _wv in enumerate(_wf_y):")
             lines.append(f"    _fc = {repr(pos_c)} if _wv >= 0 else {repr(neg_c)}")
             lines.append("    _xi = _wi if _wf_is_cat else _wf_x[_wi]")
             lines.append(f"    {ax_var}.bar(_xi, _wv, bottom=_running, width={wf_w}, color=_fc, edgecolor='white', linewidth=0.5, alpha={wf_al}, label=('{lbl}' if _wi == 0 else '_nolegend_'))")
-            lines.append("    _running += _wv")
+            lines.append("    _top = _running + _wv")
+            if settings.get('waterfall_connector', True):
+                lines.append("    if _prev_top is not None:")
+                lines.append(f"        {ax_var}.plot([_prev_x + {wf_w} / 2, _xi - {wf_w} / 2], [_prev_top, _prev_top], color='#555', linewidth=0.8, linestyle='--')")
+            lines.append("    _prev_top, _prev_x = _top, _xi")
+            lines.append("    _running = _top")
             lines.append("if _wf_is_cat:")
             lines.append(f"    {ax_var}.set_xticks(range(len(_wf_x)))")
             lines.append(f"    {ax_var}.set_xticklabels(_wf_x, rotation=45, ha='right')")
@@ -280,7 +395,8 @@ def _gen_histogram(settings: Settings, series: list[SeriesDict], datasets: Datas
     bins      = settings.get('hist_bins', 20)
     histtype  = settings.get('hist_histtype', 'bar')
     orient    = settings.get('hist_orientation', 'vertical')
-    alpha     = settings.get('heat_alpha', 0.7)
+    density   = settings.get('hist_density', False)
+    cumulative = settings.get('hist_cumulative', False)
     for i, s in enumerate(series):
         yc  = s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
@@ -289,6 +405,7 @@ def _gen_histogram(settings: Settings, series: list[SeriesDict], datasets: Datas
         # Edge colour is a per-series option ('auto' = the series colour,
         # 'none' = no edge), exactly as the live chart resolves it.
         curve_opts = ((settings.get('curve_styles') or {}).get(s.get('label', '')) or {}).get('opts', {})
+        alpha = curve_opts.get('hist_alpha', 0.7)
         ec = curve_opts.get('hist_edgecolor', 'white')
         if ec == 'auto':
             ec = st['color']
@@ -297,39 +414,69 @@ def _gen_histogram(settings: Settings, series: list[SeriesDict], datasets: Datas
             lines.append(
                 f"{ax_var}.hist({_col_ref(yc)}.dropna(), bins={bins}, label='{lbl}', "
                 f"color={col}, alpha={alpha}, histtype='{_esc(histtype)}', "
-                f"orientation='{_esc(orient)}', edgecolor={edge_arg})"
+                f"orientation='{_esc(orient)}', density={density}, "
+                f"cumulative={cumulative}, edgecolor={edge_arg})"
             )
     return lines
 
 
+def _numeric_columns(series: list[SeriesDict], datasets: Datasets) -> list[tuple[str, str]]:
+    """(column, label) of every series whose Y data is numeric (the engine skips the rest)."""
+    out = []
+    for s in series:
+        c = s.get('y_col', '')
+        if c and not _is_cat_data(datasets.get(c)):
+            out.append((c, s.get('label', c)))
+    return out
+
+
 def _gen_boxplot(settings: Settings, series: list[SeriesDict], datasets: Datasets,
                  palette: Palette, ax_var: str) -> list[str]:
-    cols  = [s.get('y_col','') for s in series if s.get('y_col','')]
-    lbls  = [s.get('label', c) for s, c in zip(series, cols)]
-    exprs = [_col_ref(c) + '.dropna()' for c in cols]
-    if not exprs:
+    cols = _numeric_columns(series, datasets)
+    if not cols:
         return []
-    return [
-        f"_bx_data = [{', '.join(exprs)}]",
-        # Set tick labels afterwards: boxplot's `labels` kwarg was renamed
-        # `tick_labels` in Matplotlib 3.9, and this form works on every version.
-        f"{ax_var}.boxplot(_bx_data)",
-        f"{ax_var}.set_xticklabels({[_esc(l) for l in lbls]!r})",
+    vert = settings.get('box_vert', True)
+    median = ("dict(color='black', linewidth=2)" if settings.get('box_show_medians', True)
+              else "dict(linewidth=0)")
+    colors = [palette[j % len(palette)] for j in range(len(cols))]
+    # Orientation: `vert=` is only emitted when horizontal (the non-default case);
+    # tick labels are set afterwards because boxplot's `labels` kwarg was renamed
+    # `tick_labels` in Matplotlib 3.9 and this form works on every version.
+    lines = [
+        f"_bx_data = [{', '.join(_col_ref(c) + '.dropna()' for c, _ in cols)}]",
+        f"_bx = {ax_var}.boxplot(_bx_data, patch_artist=True, notch={settings.get('box_notch', False)}, "
+        f"showmeans={settings.get('box_show_means', False)}, showfliers={settings.get('box_showfliers', True)}, "
+        f"whis={settings.get('box_whis', 1.5)}, medianprops={median}{'' if vert else ', vert=False'})",
+        f"for _bp, _bc in zip(_bx['boxes'], {colors!r}):",
+        "    _bp.set_facecolor(_bc)",
+        f"    _bp.set_alpha({settings.get('box_alpha', 0.7)})",
+        f"{ax_var}.set_{'x' if vert else 'y'}ticklabels({[_esc(l) for _, l in cols]!r})",
     ]
+    return lines
 
 
 def _gen_violin(settings: Settings, series: list[SeriesDict], datasets: Datasets,
                 palette: Palette, ax_var: str) -> list[str]:
-    cols  = [s.get('y_col','') for s in series if s.get('y_col','')]
-    lbls  = [s.get('label', c) for s, c in zip(series, cols)]
-    exprs = [_col_ref(c) + '.dropna()' for c in cols]
-    if not exprs:
+    cols = _numeric_columns(series, datasets)
+    if not cols:
         return []
-    return [
-        f"_vl_data = [{', '.join(exprs)}]",
-        f"_vl = {ax_var}.violinplot(_vl_data, showmeans=True, showmedians=True)",
-        f"{ax_var}.set_xticks(range(1, len({lbls!r}) + 1)); {ax_var}.set_xticklabels({[_esc(l) for l in lbls]!r})",
+    vert = settings.get('violin_vert', True)
+    colors = [palette[j % len(palette)] for j in range(len(cols))]
+    axis = 'x' if vert else 'y'
+    lines = [
+        f"_vl_data = [{', '.join(_col_ref(c) + '.dropna()' for c, _ in cols)}]",
+        f"_vl = {ax_var}.violinplot(_vl_data, showmeans={settings.get('violin_show_means', True)}, "
+        f"showmedians={settings.get('violin_show_medians', True)}, "
+        f"showextrema={settings.get('violin_show_extrema', False)}, "
+        f"bw_method={settings.get('violin_bw', 'scott')!r}, points={int(settings.get('violin_points', '100'))}"
+        f"{'' if vert else ', vert=False'})",
+        f"for _vb, _vc in zip(_vl['bodies'], {colors!r}):",
+        "    _vb.set_facecolor(_vc)",
+        "    _vb.set_alpha(0.7)",
+        f"{ax_var}.set_{axis}ticks(range(1, {len(cols)} + 1))",
+        f"{ax_var}.set_{axis}ticklabels({[_esc(l) for _, l in cols]!r})",
     ]
+    return lines
 
 
 def _gen_pie(settings: Settings, series: list[SeriesDict], datasets: Datasets,
@@ -340,7 +487,8 @@ def _gen_pie(settings: Settings, series: list[SeriesDict], datasets: Datasets,
         xc  = s.get('x_col', '')
         yc  = s.get('y_col', '')
         if yc:
-            lblexpr      = f"{_col_ref(xc)}.astype(str)" if xc else 'None'
+            # Numeric X labels use the engine's 4-significant-figure format.
+            lblexpr      = (f"[v if isinstance(v, str) else f'{{v:.4g}}' for v in {_col_ref(xc)}]" if xc else 'None')
             autopct      = "'%1.1f%%'" if settings.get('pie_autopct', True) else 'None'
             shadow       = settings.get('pie_shadow', False)
             startangle   = settings.get('pie_startangle', 90.0)
@@ -353,8 +501,9 @@ def _gen_pie(settings: Settings, series: list[SeriesDict], datasets: Datasets,
             curve_styles = settings.get('curve_styles', {})
             x_vals = list(datasets.get(xc, [])) if xc and datasets else []
             if x_vals:
-                colors = [curve_styles.get(str(v), {}).get('color') or palette[i % len(palette)]
-                          for i, v in enumerate(x_vals)]
+                labels_py = [v if isinstance(v, str) else f'{v:.4g}' for v in x_vals]
+                colors = [curve_styles.get(str(k), {}).get('color') or palette[i % len(palette)]
+                          for i, k in enumerate(labels_py)]
                 colors_arg = f", colors={colors!r}"
             else:
                 colors_arg = ''
@@ -366,12 +515,12 @@ def _gen_pie(settings: Settings, series: list[SeriesDict], datasets: Datasets,
             else:
                 explode_arg = ''
             lines.append(
-                f"{ax_var}.pie({_col_ref(yc)}, labels={lblexpr}, autopct={autopct}, "
+                f"{ax_var}.pie(np.abs({_col_ref(yc)}), labels={lblexpr}, autopct={autopct}, "
                 f"shadow={shadow}, startangle={startangle}, "
                 f"labeldistance={labeldist}, pctdistance={pctdist}"
                 f"{colors_arg}{explode_arg}{wedge_arg})"
             )
-            lines.append(f"{ax_var}.axis('equal')")
+            lines.append(f"{ax_var}.set_aspect('equal')")
     return lines
 
 
@@ -386,8 +535,14 @@ def _gen_polar(settings: Settings, series: list[SeriesDict], datasets: Datasets,
         col = f"'{st['color']}'"
         lw  = st['linewidth']
         ls  = st['linestyle']
-        if xc and yc:
-            lines.append(f"{ax_var}.plot({_col_ref(xc)}, {_col_ref(yc)}, label='{lbl}', color={col}, linestyle='{ls}', linewidth={lw})")
+        if xc and yc and not _is_cat_data(datasets.get(xc)):
+            mk = st['curve'].get('marker', 'None')
+            mk_arg = '' if mk in ('None', 'none', '') else f", marker='{_esc(mk)}'"
+            if ls != 'none':
+                lines.append(f"{ax_var}.plot({_col_ref(xc)}, {_col_ref(yc)}, label='{lbl}', color={col}, linestyle='{ls}', linewidth={lw}{mk_arg})")
+            copts = st['opts']
+            if copts.get('pol_fill', False):
+                lines.append(f"{ax_var}.fill({_col_ref(xc)}, {_col_ref(yc)}, alpha={copts.get('pol_fill_alpha', 0.2)}, color={col})")
     return lines
 
 
@@ -446,7 +601,8 @@ def _gen_heatmap(settings: Settings, series: list[SeriesDict], datasets: Dataset
                 f"origin='lower', alpha={alpha}, interpolation='{_esc(interp)}'{vm_str})"
             )
     if show_cb:
-        lines.append(f"plt.colorbar(_him, ax={ax_var})")
+        lines += _colorbar_lines(settings, ax_var, '_him', _first_label(series),
+                                 settings.get('heat_colorbar_shrink', 1.0))
     return lines
 def _gen_contour(settings: Settings, series: list[SeriesDict], datasets: Datasets,
                  palette: Palette, ax_var: str) -> list[str]:
@@ -511,7 +667,9 @@ def _gen_contour(settings: Settings, series: list[SeriesDict], datasets: Dataset
                 )
                 lines.append("_last_cm = _last_cm if _last_cm is not None else _cs")
             if show_cb:
-                lines.append(f"if _last_cm is not None: plt.colorbar(_last_cm, ax={ax_var})")
+                lines += _colorbar_lines(settings, ax_var, '_last_cm', _first_label(series),
+                                         settings.get('heat_colorbar_shrink', 1.0),
+                                         guard='_last_cm is not None')
         else:
             lines.append("# Contour: assign X, Y and Z columns in plotviz to render.")
     return lines
@@ -566,7 +724,9 @@ def _gen_tricontour(settings: Settings, series: list[SeriesDict], datasets: Data
                     f"{ax_var}.triplot(_tx, _ty, color='k', linewidth=0.4, alpha=0.5)"
                 )
             if show_cb:
-                lines.append(f"if _last_tm is not None: plt.colorbar(_last_tm, ax={ax_var})")
+                lines += _colorbar_lines(settings, ax_var, '_last_tm', _first_label(series),
+                                         settings.get('tri_colorbar_shrink', 1.0),
+                                         guard='_last_tm is not None')
         else:
             lines.append("# Tricontour: assign X, Y and Z columns in plotviz to render.")
     return lines
@@ -615,7 +775,8 @@ def _gen_surface3d(settings: Settings, series: list[SeriesDict], datasets: Datas
                     f"alpha={alpha}, rstride={stride}, cstride={stride})"
                 )
                 if show_cb:
-                    lines.append(f"plt.colorbar(_ssurf, ax={ax_var}, shrink=0.5, aspect=10)")
+                    lines += _colorbar_lines(settings, ax_var, '_ssurf', _first_label(series),
+                                             settings.get('heat_colorbar_shrink', 1.0))
         else:
             lines.append("# 3D Surface: assign X, Y and Z columns in plotviz to render.")
     return lines
@@ -627,13 +788,22 @@ def _gen_ecdf(settings: Settings, series: list[SeriesDict], datasets: Datasets,
         lbl = _esc(s.get('label', f'Series {i+1}'))
         st  = _series_style(settings, s, i, palette)
         col = f"'{st['color']}'"
-        lw  = st['linewidth']
-        if yc:
+        lw  = st['curve'].get('linewidth', 1.8)
+        copts = st['opts']
+        if yc and not _is_cat_data(datasets.get(yc)):
             lines += [
                 f"_ecdf_d = np.sort({_col_ref(yc)}.dropna())",
                 "_ecdf_y = np.arange(1, len(_ecdf_d)+1) / len(_ecdf_d)",
-                f"{ax_var}.plot(_ecdf_d, _ecdf_y, label='{lbl}', color={col}, linewidth={lw})",
             ]
+            if settings.get('ecdf_complementary', False):
+                lines.append("_ecdf_y = 1.0 - _ecdf_y")
+            lines.append(
+                f"{ax_var}.step(_ecdf_d, _ecdf_y, where='post', label='{lbl}', color={col}, "
+                f"linewidth={lw}, alpha={copts.get('ecdf_alpha', 1.0)})")
+            if copts.get('ecdf_markers', False):
+                lines.append(f"{ax_var}.scatter(_ecdf_d, _ecdf_y, color={col}, s=12, zorder=4)")
+    if lines:
+        lines.append(f"{ax_var}.set_ylim(-0.02, 1.02)")
     return lines
 
 
@@ -791,27 +961,43 @@ def _gen_streamplot(settings: Settings, series: list[SeriesDict], datasets: Data
 
 def _gen_radar(settings: Settings, series: list[SeriesDict], datasets: Datasets,
                palette: Palette, ax_var: str) -> list[str]:
+    """Radar chart as the engine draws it: the first series' X values are the
+    spokes, every series' Y values are a polygon around them."""
+    cols = [s for s in series if s.get('y_col')]
+    first = cols[0] if cols else None
+    if first is None:
+        return []
+    xc = first.get('x_col', '')
+    yc0 = first['y_col']
+    labels = (f"[v if isinstance(v, str) else str(round(v, 3)) for v in {_col_ref(xc)}]"
+              if xc else f"[str(i) for i in range(len({_col_ref(yc0)}))]")
+    levels = settings.get('radar_gridlevels', 5)
     lines = [
-        "import numpy as np",
-        "_rad_cols = [c for c in df.columns if df[c].dtype.kind in 'iuf'][:8]",
-        "_rad_N = len(_rad_cols)",
-        "_rad_angles = np.linspace(0, 2*np.pi, _rad_N, endpoint=False).tolist()",
-        "_rad_angles += _rad_angles[:1]",
+        f"_rad_n = len({_col_ref(yc0)})",
+        "if _rad_n >= 3:",
+        "    _rad_angles = np.linspace(0, 2*np.pi, _rad_n, endpoint=False).tolist() + [0]",
+        f"    {ax_var}.set_theta_offset(np.pi/2)",
+        f"    {ax_var}.set_theta_direction(-1)",
+        f"    {ax_var}.set_xticks(_rad_angles[:-1])",
+        f"    {ax_var}.set_xticklabels({labels}, size=8)",
+        "    _rad_all = np.concatenate([" + ", ".join(
+            f"np.asarray({_col_ref(s['y_col'])}, dtype=float)" for s in cols) + "])",
+        "    _rad_max = np.nanmax(np.abs(_rad_all)) if len(_rad_all) else 1",
+        f"    {ax_var}.set_ylim(0, _rad_max * 1.1)",
+        f"    {ax_var}.set_yticks(np.linspace(0, _rad_max, {levels} + 1)[1:])",
     ]
-    for i, s in enumerate(series):
+    for i, s in enumerate(cols):
         lbl = _esc(s.get('label', f'Series {i+1}'))
         st  = _series_style(settings, s, i, palette)
         col = f"'{st['color']}'"
+        copts = st['opts']
+        lw = st['curve'].get('linewidth', 1.8)
         lines += [
-            f"_rad_vals_{i} = df[_rad_cols].iloc[{i}].tolist() if {i} < len(df) else [0]*_rad_N",
-            f"_rad_vals_{i} += _rad_vals_{i}[:1]",
-            f"{ax_var}.plot(_rad_angles, _rad_vals_{i}, color={col}, label='{lbl}')",
-            f"{ax_var}.fill(_rad_angles, _rad_vals_{i}, alpha=0.1, color={col})",
+            f"    _rad_vals_{i} = list(np.asarray({_col_ref(s['y_col'])}, dtype=float)) + [float({_col_ref(s['y_col'])}.iloc[0])]",
+            f"    {ax_var}.plot(_rad_angles, _rad_vals_{i}, color={col}, linewidth={lw}, label='{lbl}')",
         ]
-    lines += [
-        f"{ax_var}.set_xticks(_rad_angles[:-1])",
-        f"{ax_var}.set_xticklabels(_rad_cols)",
-    ]
+        if copts.get('rad_fill', True):
+            lines.append(f"    {ax_var}.fill(_rad_angles, _rad_vals_{i}, color={col}, alpha={copts.get('rad_fill_alpha', 0.25)})")
     return lines
 
 
@@ -845,7 +1031,7 @@ _GENERATORS: dict[str, Generator] = {
 
 
 
-def _legend_call(settings: Settings, idx: int | str, ax_var: str) -> str:
+def _legend_call(settings: Settings, idx: int | str, ax_var: str, combined: bool = False) -> str:
     """Return a fully-qualified ax.legend(...) line for subplot `idx`,
     mirroring exactly what plot_engine._legend_kwargs() produces."""
     # idx can be int or str key — normalise to str for settings dicts
@@ -865,11 +1051,102 @@ def _legend_call(settings: Settings, idx: int | str, ax_var: str) -> str:
               f"facecolor='{_esc(facecolor)}', edgecolor='{_esc(edgecolor)}', "
               f"framealpha={framealpha}, labelcolor='{_esc(labelcolor)}'")
 
+    # With a secondary Y axis the legend lists the handles of both axes.
+    handles = "_h1 + _h2, _l1 + _l2, " if combined else ""
     if loc == 'best':
-        return f"{ax_var}.legend(loc='best', {common})"
+        return f"{ax_var}.legend({handles}loc='best', {common})"
     else:
         real_loc = 'upper left' if loc == 'manual' else loc
-        return f"{ax_var}.legend(loc='{_esc(real_loc)}', bbox_to_anchor=({lx}, {ly}), {common})"
+        return f"{ax_var}.legend({handles}loc='{_esc(real_loc)}', bbox_to_anchor=({lx}, {ly}), {common})"
+
+
+def _colorbar_lines(settings: Settings, ax_var: str, mappable: str, label: str,
+                    shrink: float, guard: str | None = None, extra: str = '') -> list[str]:
+    """plt.colorbar(...) plus the styled Z label the live chart puts on it.
+
+    The label is the per-subplot Z label, else the series label. *guard* is a
+    Python condition the generated code must test first (e.g. a mappable that
+    may be None); *extra* are additional colorbar kwargs.
+    """
+    idx = settings.get('_subplot_idx', 0)
+    zlbl = subplot_get(settings, 'subplot_zlabels', idx, '') or label
+    pad = '    ' if guard else ''
+    out = []
+    if guard:
+        out.append(f"if {guard}:")
+    out.append(f"{pad}_cb = plt.colorbar({mappable}, ax={ax_var}, shrink={shrink}{extra})")
+    if zlbl:
+        out.append(
+            f"{pad}_cb.set_label('{_esc(zlbl)}', fontsize={settings.get('zlabel_size', 11)}, "
+            f"color='{_esc(settings.get('zlabel_color', '#000000'))}', "
+            f"fontfamily='{_esc(settings.get('zlabel_font', 'sans-serif'))}')")
+    return out
+
+
+def _cat_tick_lines(settings: Settings, ax_var: str, ct: str, series: list[SeriesDict],
+                    datasets: Datasets) -> list[str]:
+    """Rotate categorical X labels 45 degrees, as the live single-axes chart does.
+
+    (In multi-subplot layouts the live chart's late styling pass resets the rotation
+    to 0, so the generator only calls this for single-axes charts.)
+
+    Only per-series chart types draw categories; a horizontal bar chart has its
+    categories on Y, where the live chart leaves the labels unrotated.
+    """
+    if ct in WHOLE_CHART_TYPES or (ct == 'Bar' and settings.get('bar_horizontal', False)):
+        return []
+    if not any(_is_cat_data(datasets.get(s.get('x_col', ''))) for s in series):
+        return []
+    return [f"plt.setp({ax_var}.get_xticklabels(), rotation=45, ha='right')"]
+
+
+def _legend_lines(settings: Settings, idx: int | str, ax_var: str, ct: str,
+                  has_series: bool, ax2_var: str | None = None) -> list[str]:
+    """The ax.legend(...) call, only when the live chart would show a legend.
+
+    Mirrors the engine: honours the per-subplot "Show legend" toggle, skips the
+    chart types that have no legend (Pie excepted, which shows one on request)
+    and subplots without series (an empty legend would draw an empty frame).
+    """
+    if not subplot_get(settings, 'subplot_legends', idx, True):
+        return []
+    if ct in _NO_LEGEND_TYPES - {'Pie'} or not has_series:
+        return []
+    if ax2_var:
+        return [f"_h1, _l1 = {ax_var}.get_legend_handles_labels()",
+                f"_h2, _l2 = {ax2_var}.get_legend_handles_labels()",
+                _legend_call(settings, idx, ax_var, combined=True)]
+    return [_legend_call(settings, idx, ax_var)]
+
+
+def _y2_axis_lines(settings: Settings, idx: int, ax_var: str, ax2_var: str, sub_ct: str,
+                   sub_settings: Settings, y2_series: list[SeriesDict], datasets: Datasets,
+                   palette: Palette) -> list[str]:
+    """Twin Y axis for the series flagged "Y2" in a multi-subplot layout.
+
+    Mirrors the live chart: the Y2 series are drawn on ax.twinx(), labelled with
+    the per-subplot Y2 label (default: their column names) and limited by the
+    per-subplot Y2 limits. (The live chart's extra tick styling / alignment of
+    the twin axis is not reproduced.)
+    """
+    lines = [f"{ax2_var} = {ax_var}.twinx()"]
+    gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
+    lines += gen(sub_settings, y2_series, datasets, palette, ax2_var)
+    if subplot_get(settings, 'subplot_y2label_show', idx, True):
+        y2l = (subplot_get(settings, 'subplot_y2labels', idx, '')
+               or ', '.join(dict.fromkeys(s.get('y_col', '') for s in y2_series if s.get('y_col'))))
+        if y2l:
+            lines.append(
+                f"{ax2_var}.set_ylabel('{_esc(y2l)}', fontsize={settings.get('y2label_size', 11)}, "
+                f"color='{_esc(settings.get('y2label_color', '#000000'))}', "
+                f"fontfamily='{_esc(settings.get('y2label_font', 'sans-serif'))}', "
+                f"rotation={settings.get('y2label_rotation', 90)}, labelpad={settings.get('y2label_labelpad', 4)}, "
+                f"loc='{_esc(settings.get('y2label_loc', 'center'))}')")
+            lines.append(f"{ax2_var}.yaxis.label.set_ha('{_esc(settings.get('y2label_ha', 'center'))}')")
+    y2lim = subplot_get(settings, 'subplot_y2lims', idx, None)
+    if y2lim:
+        lines.append(f"{ax2_var}.set_ylim({y2lim[0]!r}, {y2lim[1]!r})")
+    return lines
 
 
 def _projection_for(ct: str) -> str:
@@ -936,8 +1213,12 @@ def _gen_decoration(settings: Settings, idx: int, ax_var: str, sub_ct: str,
     # ── Scales / limits / inversion / aspect ───────────────────────────────
     xs, ys, xlim, ylim = st.xscale, st.yscale, st.xlim, st.ylim
     if sub_ct not in _DECOR_NO_SCALE:
-        L.append(f"{ax_var}.set_xscale('{xs if xs != 'inverted' else 'linear'}')")
-        L.append(f"{ax_var}.set_yscale('{ys if ys != 'inverted' else 'linear'}')")
+        # A linear scale is matplotlib's default, and calling set_*scale on an axis
+        # holding categorical (string) data would turn its labels into numbers.
+        if xs not in ('linear', 'inverted'):
+            L.append(f"{ax_var}.set_xscale('{xs}')")
+        if ys not in ('linear', 'inverted'):
+            L.append(f"{ax_var}.set_yscale('{ys}')")
     if sub_ct not in _DECOR_NO_LIMITS:
         if xlim: L.append(f"{ax_var}.set_xlim({xlim[0]!r}, {xlim[1]!r})")
         if ylim: L.append(f"{ax_var}.set_ylim({ylim[0]!r}, {ylim[1]!r})")
@@ -1099,6 +1380,9 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
     rows        = settings.get('subplot_rows', 1)
     cols_       = settings.get('subplot_cols', 1)
     n_subplots  = rows * cols_
+    if n_subplots == 1:
+        # The live single-axes chart draws only the primary series (no Y2 axis).
+        series_list = [s for s in series_list if not s.get('y2')]
     title_text  = settings.get('title_text', chart_title) or chart_title
     bg_color    = settings.get('chart_bg_color', '#ffffff')
 
@@ -1106,6 +1390,7 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
     settings = settings.copy()
     settings['_z_col']       = series_meta.get('z_col', '')
     settings['_err_col']     = series_meta.get('err_col', '')
+    settings['_xerr_col']    = series_meta.get('err_xerr_col', '')
     settings['_fill_y2_col'] = series_meta.get('fill_y2_col', '')
     settings['_bar_ymin_col'] = series_meta.get('bar_ymin_col', '')
     # subplot_chart_types lives in series_meta, not settings — merge it in
@@ -1130,7 +1415,7 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
     _all_sp_chart_opts = series_meta.get('subplot_chart_opts', {})
     if n_subplots == 1:
         _sp0 = _all_sp_chart_opts.get('0', _all_sp_chart_opts.get(0, {}))
-        _merge_defaults(settings, _sp0)
+        _apply_chart_opts(settings, _sp0)
 
     # ── Collect dataset filenames ──────────────────────────────────────────────
     used_cols = {s.get('x_col') for s in series_list} | {s.get('y_col') for s in series_list}
@@ -1222,6 +1507,7 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
             "",
             "# ── Plot ──────────────────────────────────────────────────────────",
         ]
+        settings['_subplot_idx'] = 0
         gen = _GENERATORS.get(ct, _gen_line_scatter_step_stem_area_errorbar)
         plot_lines = gen(settings, series_list, datasets, palette, 'ax')
         lines += plot_lines
@@ -1231,12 +1517,18 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
         ]
         # Default label text from the series columns (matches the canvas).
         _xc0 = series_list[0].get('x_col', '') if series_list else ''
-        _yc0 = ', '.join(dict.fromkeys(s.get('y_col', '') for s in series_list if s.get('y_col')))
+        # The live chart titles the Y axis with the series labels, except the
+        # grid-type charts, which use the Y column name.
+        if ct in ('Heatmap', 'Contour', 'Tricontour', '3D Surface'):
+            _yc0 = series_list[0].get('y_col', '') if series_list else ''
+        else:
+            _yc0 = ', '.join(dict.fromkeys(s.get('label', s.get('y_col', '')) for s in series_list if s.get('y_col')))
         xl = settings.get('subplot_xlabels', {}).get('0', '') or ('' if ct in _NO_X_TYPES else _xc0)
         yl = settings.get('subplot_ylabels', {}).get('0', '') or ('' if ct in _NO_X_TYPES else _yc0)
         # Single-subplot title is rendered via suptitle below, not ax.set_title.
         lines += _gen_decoration(settings, 0, 'ax', ct, xl, yl, None)
-        lines.append(_legend_call(settings, 0, 'ax'))
+        lines += _cat_tick_lines(settings, 'ax', ct, series_list, datasets)
+        lines += _legend_lines(settings, 0, 'ax', ct, bool(series_list))
     else:
         subplot_types = settings.get('subplot_chart_types') or {}
         mosaic = settings.get('subplot_mosaic')
@@ -1254,7 +1546,9 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
             lines.append("# ── Per-subplot plotting ─────────────────────────────────")
             for idx in range(n_mosaic):
                 sub_ct     = subplot_types.get(str(idx), ct)
-                sub_series = [s for s in series_list if s.get('plot_num', 1) == idx + 1]
+                sub_all    = [s for s in series_list if s.get('plot_num', 1) == idx + 1]
+                sub_series = [s for s in sub_all if not s.get('y2')]
+                sub_y2     = [s for s in sub_all if s.get('y2')] if sub_ct not in _NO_LEGEND_TYPES else []
                 ax_var     = f"ax{idx}"
                 sub_z      = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
                 if not sub_z:
@@ -1262,13 +1556,18 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
                 sub_settings = settings.copy()
                 sub_settings['chart_type'] = sub_ct
                 sub_settings['_z_col']     = sub_z
+                sub_settings['_subplot_idx'] = idx
                 # Merge per-subplot chart opts (bar_stacked, bar_horizontal, etc.)
                 _sp_opts = _all_sp_chart_opts.get(str(idx), _all_sp_chart_opts.get(idx, {}))
-                _merge_defaults(sub_settings, _sp_opts)
+                _apply_chart_opts(sub_settings, _sp_opts)
                 lines.append(f"# Subplot {idx+1} ({seen_order[idx]}): {sub_ct}")
                 gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
                 for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
                     lines.append(l)
+                ax2_var = f"{ax_var}_y2" if sub_y2 else None
+                if ax2_var:
+                    lines += _y2_axis_lines(settings, idx, ax_var, ax2_var, sub_ct, sub_settings,
+                                            sub_y2, datasets, palette)
                 _show_t = (settings.get('subplot_title_show') or {}).get(str(idx), True)
                 sp_title = (settings.get('sp_titles', {}).get(str(idx), '') or f'Subplot {idx+1}') if _show_t else ''
                 _sx = ', '.join(dict.fromkeys(s.get('x_col', '') for s in sub_series if s.get('x_col')))
@@ -1276,7 +1575,7 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
                 xl = settings.get('subplot_xlabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _sx)
                 yl = settings.get('subplot_ylabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _sy)
                 lines += _gen_decoration(sub_settings, idx, ax_var, sub_ct, xl, yl, sp_title)
-                lines.append(_legend_call(settings, idx, ax_var))
+                lines += _legend_lines(settings, idx, ax_var, sub_ct, bool(sub_series or sub_y2), ax2_var)
                 lines.append("")
         else:
             # ── Regular grid layout ───────────────────────────────────────────
@@ -1292,7 +1591,9 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
             lines.append("# ── Per-subplot plotting ─────────────────────────────────")
             for idx in range(n_subplots):
                 sub_ct      = subplot_types.get(str(idx), ct)
-                sub_series  = [s for s in series_list if s.get('plot_num', 1) == idx + 1]
+                sub_all     = [s for s in series_list if s.get('plot_num', 1) == idx + 1]
+                sub_series  = [s for s in sub_all if not s.get('y2')]
+                sub_y2      = [s for s in sub_all if s.get('y2')] if sub_ct not in _NO_LEGEND_TYPES else []
                 ax_var      = f"ax{idx}"
                 sub_z       = (settings.get('subplot_z_cols') or {}).get(str(idx), '')
                 if not sub_z:
@@ -1300,13 +1601,18 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
                 sub_settings = settings.copy()
                 sub_settings['chart_type'] = sub_ct
                 sub_settings['_z_col']     = sub_z
+                sub_settings['_subplot_idx'] = idx
                 # Merge per-subplot chart opts (bar_stacked, bar_horizontal, etc.)
                 _sp_opts = _all_sp_chart_opts.get(str(idx), _all_sp_chart_opts.get(idx, {}))
-                _merge_defaults(sub_settings, _sp_opts)
+                _apply_chart_opts(sub_settings, _sp_opts)
                 lines.append(f"# Subplot {idx+1}: {sub_ct}")
                 gen = _GENERATORS.get(sub_ct, _gen_line_scatter_step_stem_area_errorbar)
                 for l in gen(sub_settings, sub_series, datasets, palette, ax_var):
                     lines.append(l)
+                ax2_var = f"{ax_var}_y2" if sub_y2 else None
+                if ax2_var:
+                    lines += _y2_axis_lines(settings, idx, ax_var, ax2_var, sub_ct, sub_settings,
+                                            sub_y2, datasets, palette)
                 _show_t = (settings.get('subplot_title_show') or {}).get(str(idx), True)
                 sp_title = (settings.get('sp_titles', {}).get(str(idx), '') or f'Subplot {idx+1}') if _show_t else ''
                 _sx = ', '.join(dict.fromkeys(s.get('x_col', '') for s in sub_series if s.get('x_col')))
@@ -1317,7 +1623,7 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
                 xl = settings.get('subplot_xlabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _def_xl)
                 yl = settings.get('subplot_ylabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _def_yl)
                 lines += _gen_decoration(sub_settings, idx, ax_var, sub_ct, xl, yl, sp_title)
-                lines.append(_legend_call(settings, idx, ax_var))
+                lines += _legend_lines(settings, idx, ax_var, sub_ct, bool(sub_series or sub_y2), ax2_var)
                 lines.append("")
 
     # ── Annotations (text / arrow / image) ─────────────────────────────────────
