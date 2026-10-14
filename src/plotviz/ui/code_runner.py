@@ -687,15 +687,6 @@ class CodeRunnerDialog(QDialog):
         self.hide()
         event.ignore()
 
-    def _cleanup_pvizx_tmp(self):
-        """Remove the temp dir extracted from the last .pvizx bundle."""
-        tmp = getattr(self, '_pvizx_tmpdir', None)
-        if tmp:
-            import shutil
-            shutil.rmtree(tmp, ignore_errors=True)
-            self._pvizx_tmpdir = None
-            self._pvizx_script_path = None
-
     def refresh_datasets(self, datasets: dict):
         """Called by main window when datasets change."""
         self.datasets = datasets

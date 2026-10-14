@@ -69,8 +69,3 @@ class ChartPresets:
                 print(f"Warning: Could not set {key}: {e}")
 
         return True
-
-    @staticmethod
-    def get_names():
-        """Get list of preset names"""
-        return list(ChartPresets.PRESETS.keys())

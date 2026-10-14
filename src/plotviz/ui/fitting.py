@@ -26,9 +26,6 @@ from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
 
 
 class FitPresetMixin:
-    def apply_preset(self, name):
-        ChartPresets.apply(name)
-        self.update_preview()
 
     def _rename_table_col(self, col_idx):
         from PyQt6.QtWidgets import QInputDialog
@@ -361,56 +358,6 @@ class FitPresetMixin:
             self.fn_status.setText(f'❌  {e}')
 
     # ── Inspect loaded series values ───────────────────────────────────────────
-    def _show_new_series_info(self, series_name, n_points, source='', x_col='', y_col=''):
-        """Show an editable info popup after a new series is created from the Advanced tab.
-        Returns (label, subplot, chart_type) on OK, or None on Cancel.
-        Caller must use the returned values to set series properties after insertion."""
-        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout,
-                                     QDialogButtonBox, QLabel, QLineEdit,
-                                     QSpinBox, QComboBox)
-        dlg = QDialog(self)
-        dlg.setWindowTitle('New Series Created')
-        dlg.setFixedWidth(370)
-        vlay = QVBoxLayout(dlg)
-
-        info = QLabel(f'<b>{n_points}</b> points   ·   source: <i>{source}</i>')
-        info.setStyleSheet('font-size:12px; padding:3px 0;')
-        vlay.addWidget(info)
-
-        form = QFormLayout()
-        form.setSpacing(7)
-        form.addRow('X column:', QLabel(f'<tt>{x_col}</tt>'))
-        form.addRow('Y column:', QLabel(f'<tt>{y_col}</tt>'))
-
-        le_label = QLineEdit(series_name)
-        form.addRow('Series label:', le_label)
-
-        sp_subplot = QSpinBox()
-        sp_subplot.setRange(1, max(1, self.subplot_rows * self.subplot_cols))
-        sp_subplot.setValue(1)
-        form.addRow('Subplot:', sp_subplot)
-
-        cb_type = QComboBox()
-        from ui.tab_builders import PLOT_MODE_GROUPS
-        _mode = self.plot_mode_combo.currentText() if hasattr(self, 'plot_mode_combo') else 'Standard'
-        cb_type.addItems(PLOT_MODE_GROUPS.get(_mode, list(PLOT_MODE_GROUPS['Standard'])))
-        form.addRow('Series type:', cb_type)
-        vlay.addLayout(form)
-
-        note = QLabel('Customise the series before it is added to the chart.')
-        note.setStyleSheet('color:#666; font-size:11px;')
-        note.setWordWrap(True)
-        vlay.addWidget(note)
-
-        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                                QDialogButtonBox.StandardButton.Cancel)
-        btns.accepted.connect(dlg.accept)
-        btns.rejected.connect(dlg.reject)
-        vlay.addWidget(btns)
-
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return None
-        return le_label.text().strip() or series_name, sp_subplot.value(), cb_type.currentText()
 
     def _inspect_series(self):
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
@@ -891,11 +838,6 @@ class FitPresetMixin:
             lines.append(f'    t      = {tv_str}    p = {pv_str}')
             lines.append(f'    CI     = [{lo_str}, {hi_str}]')
         self.fit_results_text.setPlainText('\n'.join(lines))
-
-    def _update_confidence_band(self):
-        """Legacy shim — delegates to the per-series implementation."""
-        label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
-        self._update_confidence_band_for(label)
 
     def _update_confidence_band_for(self, label):
         """Recompute CI/PI band datasets for one fit-curve label."""

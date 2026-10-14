@@ -8,7 +8,6 @@ of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 data package - Data loading and scientific computing
 """
 
-from .loader import DataLoader
 from .scientific import CurveFitter
 
-__all__ = ['DataLoader', 'CurveFitter']
+__all__ = ['CurveFitter']

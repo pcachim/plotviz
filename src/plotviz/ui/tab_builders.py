@@ -952,25 +952,6 @@ class TabBuildersMixin:
         w.currentTextChanged.connect(self.update_preview)
         return w
 
-    def _make_linestyle_combo(self, attr, default='-'):
-        w = QComboBox()
-        w.addItems(['-', '--', '-.', ':', 'none'])
-        idx = w.findText(default)
-        w.setCurrentIndex(max(idx, 0))
-        setattr(self, attr, w)
-        w.currentTextChanged.connect(self.update_preview)
-        return w
-
-    def _make_marker_combo(self, attr, default='None'):
-        items = ['None','o','s','^','v','<','>','D','P','X','*','+','x','|','_','h','H','1','2','3','4']
-        w = QComboBox()
-        w.addItems(items)
-        idx = w.findText(default)
-        w.setCurrentIndex(max(idx, 0))
-        setattr(self, attr, w)
-        w.currentTextChanged.connect(self.update_preview)
-        return w
-
     def _make_edgecolor_combo(self, attr, default='none'):
         items = ['none','black','white','gray','auto']
         w = QComboBox()

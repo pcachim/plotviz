@@ -856,7 +856,8 @@ class DataMixin:
                 for w in (xcb, ycb):
                     if w is not None:
                         try: w.currentIndexChanged.disconnect()
-                        except Exception: pass
+                        except Exception:
+                            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.series_table.blockSignals(True)
             for r in rows_to_remove:
                 self.series_table.removeRow(r)

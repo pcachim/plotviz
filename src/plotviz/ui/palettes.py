@@ -138,7 +138,7 @@ class PaletteColorMixin:
                 if name not in existing:
                     self.palette_combo.addItem(name)
             self.palette_combo.blockSignals(False)
-        except Exception as e:
+        except Exception:
             pass  # silently ignore corrupt palette data
 
     def _unlock_curve_color(self):
@@ -554,12 +554,6 @@ class PaletteColorMixin:
         sw = getattr(self, attr + '_sw', None)
         if sw: sw.setStyleSheet(f'background-color:{hx};border:1px solid #888;border-radius:2px;')
         self._sync_ann_style()
-
-    def _pick_ann_color(self, target):
-        """Legacy shim — routes to the generic attr picker."""
-        mapping = {'font': 'ann_fontcolor', 'bg': 'ann_bgcolor', 'edge': 'ann_edgecolor'}
-        if target in mapping:
-            self._pick_ann_color_attr(mapping[target])
 
     def _place_at_override(self):
         try: x,y = float(self.ann_x_override.text()), float(self.ann_y_override.text())

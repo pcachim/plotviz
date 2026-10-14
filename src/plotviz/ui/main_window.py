@@ -1498,16 +1498,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             b.setChecked(b.property('scale_value') == value)
             b.blockSignals(False)
 
-    def _apply_scale(self, ax, xs, ys):
-        for scale, inv_fn, set_fn in [(xs, ax.invert_xaxis, ax.set_xscale),
-                                       (ys, ax.invert_yaxis, ax.set_yscale)]:
-            if scale == 'inverted':
-                set_fn('linear')
-                inv_fn()
-            else:
-                try: set_fn(scale)
-                except Exception: set_fn('linear')
-
     def _tab10(self, n):
         """Legacy shim — returns n colors from the active palette (cycling if needed)."""
         return [self._palette_color(i) for i in range(n)]

@@ -573,12 +573,6 @@ class SubplotMixin:
         self.update_preview()
 
     # Legacy aliases kept so existing signal connections don't need changes
-    def _on_sp_chart_type_changed(self, ct):
-        idx = self.sp_active.currentIndex()
-        if idx < 0: idx = 0
-        self.subplot_chart_types[idx] = ct
-        self._update_margin_ranges()
-        self.update_preview()
 
     def _pick_sp_title_color(self):
         cur = getattr(self, 'sp_title_color', '#000000')
@@ -1018,8 +1012,6 @@ class SubplotMixin:
                 preview_grid_lay.removeWidget(lbl)
                 lbl.deleteLater()
             preview_cells.clear()
-            rows = custom_state['rows']
-            cols = custom_state['cols']
             grid = custom_state['grid']
             # Compute spans by finding each letter's bounding box
             spans = {}

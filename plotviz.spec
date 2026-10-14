@@ -61,7 +61,7 @@ hidden_imports = [
     # App packages
     'ui', 'ui.main_window', 'ui.tab_builders', 'ui.plot_engine',
     'ui.serialization', 'ui.canvas', 'ui.python_export', 'ui.seaborn_explorer',
-    'data', 'data.loader', 'data.scientific',
+    'data', 'data.scientific',
     'styling', 'styling.presets',
     'config', 'config.settings', 'config._version',
     # statsmodels (bundled so Robust fit / LOWESS work in .app)

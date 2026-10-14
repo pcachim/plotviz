@@ -486,18 +486,6 @@ class SeabornExplorer(QDialog):
             return None, ''
         return self.datasets[name], name
 
-    def _get_size(self):
-        name = self._size_combo.currentText()
-        if name == '(none)' or name not in self.datasets:
-            return None, ''
-        return self.datasets[name], name
-
-    def _get_style(self):
-        name = self._style_combo.currentText()
-        if name == '(none)' or name not in self.datasets:
-            return None, ''
-        return self.datasets[name], name
-
     @staticmethod
     def _is_cat(arr):
         try:

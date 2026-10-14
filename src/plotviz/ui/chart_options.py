@@ -95,25 +95,6 @@ class ChartOptionsMixin:
         if hasattr(self, '_combo_fill_y2_widget'):
             self._combo_fill_y2_widget.setVisible(ct == 'Fill Between')
 
-    def _on_chart_type_changed(self, ct):
-        """Hidden chart_type_combo changed — update subplot_chart_types and option groups.
-        No longer pushes to series table rows; that is now _on_plot_mode_changed's job.
-        """
-        from ui.tab_builders import WHOLE_CHART_TYPES
-        if hasattr(self, 'series_sp_active'):
-            n = self.subplot_rows * self.subplot_cols
-            active_sp = (self.series_sp_active.currentIndex() + 1) if n > 1 else 1
-            active_idx = active_sp - 1
-            if ct in WHOLE_CHART_TYPES:
-                self.subplot_chart_types[active_idx] = ct
-            else:
-                if self.subplot_chart_types.get(active_idx) in WHOLE_CHART_TYPES:
-                    self.subplot_chart_types[active_idx] = ct
-        self._update_option_group_visibility(ct)
-        self._update_margin_ranges()
-        if hasattr(self, 'datasets'):
-            self.update_preview()
-
     def _on_plot_mode_changed(self, mode):
         """Plot Mode combo changed — repopulate type cells in the active subplot's rows
         to only contain the types that belong to this mode, then update option groups.
@@ -611,11 +592,6 @@ class ChartOptionsMixin:
                     w.blockSignals(False)
         finally:
             self._loading_series_options = False
-
-    def _load_series_options(self, row):
-        """Row-based wrapper — resolves label from the series table then delegates."""
-        label = self._series_opts_key(row)
-        self._load_series_options_by_label(label)
 
     def _connect_series_option_signals(self):
         """Connect every option-group widget to _save_series_options so that any

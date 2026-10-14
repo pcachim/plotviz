@@ -8,7 +8,6 @@ ui/canvas.py – Matplotlib canvas
 • Fixed-size Qt widget (never resized); border rect shows the export page
 • Cursor placed above the axes in figure-space
 • Text / arrow / image annotations with drag-to-move
-• hide_cursor / show_cursor for clean export
 """
 import logging
 import matplotlib.image as mpimg
@@ -33,7 +32,6 @@ class CanvasPlotter(FigureCanvas):
         super().__init__(self.figure)
         self.setParent(parent)
 
-        self.cursor_label    = None   # kept for hide_cursor used by export
         self.annotation_mode = None   # None | 'text' | 'arrow' | 'image'
         self.annotations     = []
         self._arrow_start    = None
@@ -41,7 +39,6 @@ class CanvasPlotter(FigureCanvas):
         self.ann_image_zoom  = 0.15
         self.axes_list       = [self.axes]
         self.main_window     = None
-        self._cursor_hidden  = False
 
         # Drag state
         self._drag_ann  = None
@@ -92,31 +89,6 @@ class CanvasPlotter(FigureCanvas):
         )
         self.figure.add_artist(rect)
         self._border_rect = rect
-
-    def clear_border_rect(self):
-        if self._border_rect is not None:
-            try:
-                self._border_rect.remove()
-            except Exception:
-                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
-            self._border_rect = None
-
-    # ─── Cursor helpers ───────────────────────────────────────────────────────
-    def _remove_cursor(self):
-        if self.cursor_label is not None:
-            try:
-                self.cursor_label.remove()
-            except Exception:
-                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
-            self.cursor_label = None
-
-    def hide_cursor(self):
-        self._cursor_hidden = True
-        self._remove_cursor()
-        self.draw()
-
-    def show_cursor(self):
-        self._cursor_hidden = False
 
     # ─── Mouse events ─────────────────────────────────────────────────────────
     def on_mouse_move(self, event):
@@ -609,14 +581,16 @@ class CanvasPlotter(FigureCanvas):
     def remove_last_annotation(self):
         if self.annotations:
             try: self.annotations.pop()['artist'].remove()
-            except Exception: pass
+            except Exception:
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.draw_idle()
             self._notify()
 
     def remove_annotation_at(self, idx):
         if 0 <= idx < len(self.annotations):
             try: self.annotations[idx]['artist'].remove()
-            except Exception: pass
+            except Exception:
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.annotations.pop(idx)
             self.draw_idle()
             self._notify()
@@ -624,7 +598,8 @@ class CanvasPlotter(FigureCanvas):
     def clear_annotations(self):
         for ann in self.annotations:
             try: ann['artist'].remove()
-            except Exception: pass
+            except Exception:
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         self.annotations.clear()
         self.draw_idle()
         self._notify()
@@ -632,7 +607,8 @@ class CanvasPlotter(FigureCanvas):
     def _notify(self):
         if self.main_window:
             try: self.main_window.refresh_annotation_list()
-            except Exception: pass
+            except Exception:
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     # ─── Status bar helper ────────────────────────────────────────────────────
     def _show_status(self, msg: str, timeout: int = 4000) -> None:

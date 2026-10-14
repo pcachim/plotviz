@@ -25,11 +25,6 @@ class SerializationMixin:
         """Gather all UI settings into a JSON-serialisable dict.
         Series, column assignments and dataset references are NOT stored here —
         they live in series.json / data.json inside the project archive."""
-        def _rb_val(group):
-            for btn in group.buttons():
-                if btn.isChecked():
-                    return btn.property('scale_value')
-            return 'linear'
 
         s = {}
         # Format header
@@ -363,11 +358,6 @@ class SerializationMixin:
 
     def _apply_settings(self, s):
         """Restore all UI settings from a dict."""
-        def _set_rb(group, value):
-            for btn in group.buttons():
-                if btn.property('scale_value') == value:
-                    btn.setChecked(True)
-                    return
 
         self.combo_x.blockSignals(True)
         self.y_list.blockSignals(True)
@@ -570,7 +560,7 @@ class SerializationMixin:
             self.on_subplot_layout_changed(n_override=n_cells)
         else:
             self.on_subplot_layout_changed()
-        def _di(key, default={}): return {int(k): v for k, v in s.get(key, default).items()}
+        def _di(key, default=None): return {int(k): v for k, v in s.get(key, {} if default is None else default).items()}
         def _dlim(key):
             return {int(k): (tuple(v) if v else None) for k, v in s.get(key, {}).items()}
         self.subplot_xlabel_rotation = _di('subplot_xlabel_rotation', {'0': 0})
@@ -682,7 +672,8 @@ class SerializationMixin:
                     xd=xd, yd=yd, xc=fr.get('xc',''), yc=fr.get('yc',''), lbl=fr.get('lbl',''),
                     eq_str=fr.get('eq_str',''), r2=fr.get('r2'), stats=fr.get('stats',{}),
                     ci_idx=fr.get('ci_idx',0), pi_idx=fr.get('pi_idx',0))
-            except Exception: pass
+            except Exception:
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         for _nm in list(self._fits):
             if hasattr(self, '_update_confidence_band_for'):
                 self._update_confidence_band_for(_nm)
