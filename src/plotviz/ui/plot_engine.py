@@ -186,6 +186,24 @@ class PlotEngineMixin:
             return (all_x_cats, bar_horiz)
         return None
 
+    def _plot_fit_bands(self, ax, xd, lbl, color, is_cat):
+        """Shade the confidence / prediction bands the curve fitter stored for *lbl*.
+
+        The fitter saves them as the datasets '<lbl> CI upper/lower' and
+        '<lbl> PI upper/lower'. Not drawn for categorical X.
+        """
+        upper_key = lbl + ' CI upper'
+        lower_key = lbl + ' CI lower'
+        if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
+            ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
+                            alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
+        pi_upper_key = lbl + ' PI upper'
+        pi_lower_key = lbl + ' PI lower'
+        if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
+            ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
+                            alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
+                            label=f'{lbl} PI')
+
     def _plot_series_line(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
         """Draw one 'Line' series onto *ax*."""
         ls = s.get('linestyle', '-') or '-'
@@ -205,17 +223,7 @@ class PlotEngineMixin:
             plot_kw['markeredgecolor'] = mk_color
         _lines = ax.plot(xplot, yd, **plot_kw)
         for _l in _lines: _l.set_pickradius(6)
-        upper_key = lbl + ' CI upper'
-        lower_key = lbl + ' CI lower'
-        if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
-            ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
-                            alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-        pi_upper_key = lbl + ' PI upper'
-        pi_lower_key = lbl + ' PI lower'
-        if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
-            ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
-                            alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
-                            label=f'{lbl} PI')
+        self._plot_fit_bands(ax, xd, lbl, color, is_cat)
 
     def _plot_series_scatter(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
         """Draw one 'Scatter' series onto *ax*."""
@@ -244,17 +252,7 @@ class PlotEngineMixin:
                    edgecolors=sc_ec,
                    linewidths=o.get('sc_lw', self.scatter_lw.value()))
         _sc.set_picker(True)
-        upper_key = lbl + ' CI upper'
-        lower_key = lbl + ' CI lower'
-        if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
-            ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
-                            alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-        pi_upper_key = lbl + ' PI upper'
-        pi_lower_key = lbl + ' PI lower'
-        if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
-            ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
-                            alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
-                            label=f'{lbl} PI')
+        self._plot_fit_bands(ax, xd, lbl, color, is_cat)
 
     def _plot_series_bar(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
         """Draw one 'Bar' series onto *ax*."""
