@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
     QMessageBox, QPushButton, QVBoxLayout,
 )
-from core.constants import _HEATMAP_GROUP_TYPES
 from core.geometry import to_inches, from_inches
 from ui.helpers import _show_color_dialog
 from ui.tab_builders import (
@@ -329,18 +328,6 @@ class PaletteColorMixin:
         self._refresh_geometry_widgets()
         self.update_preview()
 
-    # Chart types that render a colorbar inside the axes-box area.
-    # For these the right margin is allowed to exceed fig_width so the
-    # user can deliberately push the colorbar outside the figure boundary.
-    _COLORBAR_TYPES = _HEATMAP_GROUP_TYPES
-
-    def _has_colorbar_subplot(self):
-        """Return True if any active subplot uses a colorbar chart type."""
-        return any(
-            ct in self._COLORBAR_TYPES
-            for ct in self.subplot_chart_types.values()
-        )
-
     # ── Figure geometry: margins and title position ──────────────────────────
     # The margins (left, right, bottom, top) and the title position (x, y) are
     # stored as FRACTIONS of the figure — self._fig_margins and self._title_frac.
@@ -360,12 +347,50 @@ class PaletteColorMixin:
         """Figure (width, height) as shown in the spinboxes, in the current unit."""
         return self.fig_width.value(), self.fig_height.value()
 
+    # Minimum distance between left and right (and between bottom and top), as a
+    # fraction of the figure: the margins may never cross or touch.
+    _MARGIN_GAP = 0.01
+
+    def _ordered_margins(self):
+        """The stored margins forced inside the figure and in order.
+
+        Every margin is within [0, 1] of the figure, left < right and bottom < top
+        (by at least _MARGIN_GAP). Returns the list; also writes it back.
+        """
+        g = self._MARGIN_GAP
+        left, right, bottom, top = (min(max(v, 0.0), 1.0) for v in self._fig_margins)
+        left = min(left, 1.0 - g)
+        right = max(right, left + g)
+        bottom = min(bottom, 1.0 - g)
+        top = max(top, bottom + g)
+        self._fig_margins = [left, right, bottom, top]
+        return self._fig_margins
+
+    def _update_margin_bounds(self):
+        """Set each margin spinbox's range from the figure size and its neighbour.
+
+        Left may go up to just below right, right down to just above left, and the
+        same for bottom/top; everything stays inside [0, figure size]. Only ranges
+        change here, never values, so it is safe while the user is typing.
+        """
+        w, h = self._fig_dims()
+        g = self._MARGIN_GAP
+        left, right, bottom, top = self._fig_margins
+        for sp, lo, hi in ((self.fig_left,   0.0,            (right - g) * w),
+                           (self.fig_right,  (left + g) * w, w),
+                           (self.fig_bottom, 0.0,            (top - g) * h),
+                           (self.fig_top,    (bottom + g) * h, h)):
+            sp.blockSignals(True)
+            sp.setRange(lo, hi)
+            sp.blockSignals(False)
+
     def _refresh_geometry_widgets(self):
         """Re-derive the margin and title spinboxes from the stored fractions.
 
         Signals are blocked while writing, so this never feeds back into the
-        fractions. Fractions outside what the spinboxes allow (e.g. a right margin
-        past the figure edge once no colorbar chart is active) are clamped.
+        fractions. Fractions that do not fit (outside the figure, or margins that
+        cross) are corrected first, so the spinboxes can never show a value past
+        their maximum.
         """
         if not self._geom_widgets_ready():
             return
@@ -378,25 +403,22 @@ class PaletteColorMixin:
             return
         unit = self.fig_unit.currentText()
         if unit == 'cm':
-            dec, step, large = 1, 0.1, 9999.0
+            dec, step = 1, 0.1
         elif unit == 'inches':
-            dec, step, large = 2, 0.05, 9999.0
+            dec, step = 2, 0.05
         else:   # pixels
-            dec, step, large = 0, 5.0, 99999.0
-        # Right margin may pass the figure edge when a colorbar chart is active, so
-        # the colorbar can deliberately bleed outside the figure.
-        right_cap = large if self._has_colorbar_subplot() else w
-        for i, (sp, dim, cap) in enumerate((
-                (self.fig_left,   w, w),
-                (self.fig_right,  w, right_cap),
-                (self.fig_bottom, h, h),
-                (self.fig_top,    h, h))):
-            self._fig_margins[i] = max(0.0, min(cap / dim, self._fig_margins[i]))
+            dec, step = 0, 5.0
+        margins = self._ordered_margins()
+        for sp in (self.fig_left, self.fig_right, self.fig_bottom, self.fig_top):
             sp.blockSignals(True)
-            sp.setRange(0.0, cap)
             sp.setDecimals(dec)
             sp.setSingleStep(step)
-            sp.setValue(self._fig_margins[i] * dim)
+            sp.blockSignals(False)
+        self._update_margin_bounds()
+        for i, (sp, dim) in enumerate(((self.fig_left, w), (self.fig_right, w),
+                                       (self.fig_bottom, h), (self.fig_top, h))):
+            sp.blockSignals(True)
+            sp.setValue(margins[i] * dim)
             sp.blockSignals(False)
         for i, (sp, dim) in enumerate(((self.title_x, w), (self.title_y, h))):
             self._title_frac[i] = max(0.0, min(1.0, self._title_frac[i]))
@@ -408,11 +430,17 @@ class PaletteColorMixin:
             sp.blockSignals(False)
 
     def _on_margin_edited(self, idx, value):
-        """A margin spinbox was edited: store that one margin as a fraction."""
+        """A margin spinbox was edited: store that one margin as a fraction.
+
+        The edited spinbox is not rewritten (that would fight the user's typing);
+        only its neighbours' ranges follow, so left/right and bottom/top can never
+        cross.
+        """
         w, h = self._fig_dims()
         dim = w if idx < 2 else h
         if dim > 0:
             self._fig_margins[idx] = value / dim
+            self._update_margin_bounds()
         self.update_preview()
 
     def _on_title_pos_edited(self, idx, value):

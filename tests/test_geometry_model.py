@@ -223,6 +223,125 @@ class TestFractionModel(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_QT, "real PyQt6 not available")
+class TestMarginLimits(unittest.TestCase):
+    """The margin spinboxes never offer or hold a value past the figure."""
+
+    @classmethod
+    def setUpClass(cls):
+        from PyQt6.QtWidgets import QApplication
+        from ui.main_window import PlotVizApp
+        cls._app = QApplication.instance() or QApplication([])
+        cls._orig = PlotVizApp._load_on_startup
+        PlotVizApp._load_on_startup = lambda self: None
+        cls.PlotVizApp = PlotVizApp
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.PlotVizApp._load_on_startup = cls._orig
+
+    def _win(self):
+        w = self.PlotVizApp()
+        self._app.processEvents()
+        return w
+
+    def _heatmap_window(self):
+        import test_chart_types as tc
+        w = self._win()
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "p.pviz")
+            tc._write_pviz(fp, "Heatmap", "Heatmap & Contour")
+            w._load_project_inner(fp, silent=True)
+        return w
+
+    def assertWithinFigure(self, w, what=""):
+        fw, fh = w.fig_width.value(), w.fig_height.value()
+        for sp, dim in ((w.fig_left, fw), (w.fig_right, fw), (w.fig_bottom, fh), (w.fig_top, fh),
+                        (w.title_x, fw), (w.title_y, fh)):
+            self.assertGreaterEqual(sp.minimum(), 0.0, what)
+            self.assertLessEqual(sp.maximum(), dim + 1e-9, what)       # never 9999
+            self.assertGreaterEqual(sp.value(), sp.minimum() - 1e-9, what)
+            self.assertLessEqual(sp.value(), sp.maximum() + 1e-9, what)
+
+    def test_ranges_follow_the_figure_size_and_unit(self):
+        w = self._win()
+        self.assertWithinFigure(w, "default")
+        for width, height in ((30.0, 11.0), (8.0, 20.0), (20.0, 15.0)):
+            w.fig_width.setValue(width)
+            w.fig_height.setValue(height)
+            self.assertWithinFigure(w, f"{width}x{height}")
+        for unit in ("inches", "pixels", "cm"):
+            w.fig_unit.setCurrentText(unit)
+            self.assertWithinFigure(w, unit)
+
+    def test_colorbar_charts_are_limited_to_the_figure_too(self):
+        # Regression: with a Heatmap/Contour the right margin's maximum became 9999.
+        w = self._heatmap_window()
+        self.assertWithinFigure(w, "heatmap loaded")
+        w.fig_width.setValue(25.0)
+        self.assertWithinFigure(w, "heatmap, wider")
+        self.assertAlmostEqual(w.fig_right.maximum(), 25.0, places=6)
+
+    def test_left_stays_left_of_right_and_bottom_below_top(self):
+        w = self._win()                      # 20 x 15 cm: right = 19, left = 2
+        w.fig_left.setValue(30.0)            # more than the figure and than "right"
+        self.assertLess(w.fig_left.value(), w.fig_right.value())
+        w.fig_right.setValue(0.0)
+        self.assertGreater(w.fig_right.value(), w.fig_left.value())
+        w.fig_bottom.setValue(99.0)
+        self.assertLess(w.fig_bottom.value(), w.fig_top.value())
+        w.fig_top.setValue(0.0)
+        self.assertGreater(w.fig_top.value(), w.fig_bottom.value())
+        left, right, bottom, top = w._margins_as_fractions()
+        self.assertLess(left, right)
+        self.assertLess(bottom, top)
+        self.assertWithinFigure(w, "after edits")
+
+    def test_neighbours_bounds_move_with_the_edited_margin(self):
+        w = self._win()
+        w.fig_left.setValue(10.0)
+        self.assertAlmostEqual(w.fig_right.minimum(), 10.0 + 0.01 * 20.0, places=6)
+        w.fig_right.setValue(15.0)
+        self.assertAlmostEqual(w.fig_left.maximum(), 15.0 - 0.01 * 20.0, places=6)
+
+    def test_editing_a_margin_does_not_rewrite_the_edited_box(self):
+        # The edited spinbox is left alone (rewriting it would fight the typing).
+        w = self._win()
+        w.fig_width.setValue(17.3)
+        w.fig_left.setValue(3.0)
+        self.assertEqual(w.fig_left.value(), 3.0)
+
+    def test_margins_from_a_file_are_forced_inside_the_figure(self):
+        w = self._win()
+        s = w._collect_settings()
+        s["margin_fractions"] = [1.4, 0.2, -0.3, 3.0]       # outside and crossed
+        w._applying_settings = True
+        try:
+            w._apply_settings(s)
+        finally:
+            w._applying_settings = False
+        left, right, bottom, top = w._margins_as_fractions()
+        for value in (left, right, bottom, top):
+            self.assertTrue(0.0 <= value <= 1.0)
+        self.assertLess(left, right)
+        self.assertLess(bottom, top)
+        self.assertWithinFigure(w, "from file")
+
+    def test_old_physical_margins_past_the_figure_are_clamped_on_load(self):
+        w = self._win()
+        s = w._collect_settings()
+        s.pop("margin_fractions")
+        s.update(fig_unit="cm", fig_width=20.0, fig_height=15.0, margin_format="physical",
+                 fig_left=2.0, fig_right=35.0, fig_bottom=1.5, fig_top=14.25)   # right > width
+        w._applying_settings = True
+        try:
+            w._apply_settings(s)
+        finally:
+            w._applying_settings = False
+        self.assertLessEqual(w.fig_right.value(), 20.0)
+        self.assertWithinFigure(w, "old file")
+
+
+@unittest.skipUnless(HAVE_QT, "real PyQt6 not available")
 class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
     """Resizing the window used to rescale the export figure (and drift)."""
 
