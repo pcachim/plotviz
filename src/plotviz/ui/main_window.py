@@ -1037,6 +1037,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         if fp:
             self._load_project_from_path(fp)
 
+    def _open_sample_dataset(self):
+        """Pick sample dataset files in an Open dialog that starts in the samples folder."""
+        from config.settings import datasets_dir
+        self._load_data_files('Open Sample Dataset', str(datasets_dir()), remember_dir=False)
+
     def _open_plots_folder(self):
         """Reveal the user plots folder in Finder / Explorer."""
         from PyQt6.QtCore import QUrl
@@ -1298,10 +1303,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         sample_charts_folder_action.triggered.connect(self._open_plots_folder)
         help_menu.addAction(sample_charts_folder_action)
 
-        sample_datasets_action = QAction('Sample Datasets', self)
-        sample_datasets_action.setStatusTip('Open the folder containing sample dataset files')
-        sample_datasets_action.triggered.connect(self._open_datasets_folder)
+        sample_datasets_action = QAction('Sample Datasets…', self)
+        sample_datasets_action.setStatusTip('Choose one or more sample datasets to load')
+        sample_datasets_action.triggered.connect(self._open_sample_dataset)
         help_menu.addAction(sample_datasets_action)
+
+        sample_datasets_folder_action = QAction('Show Sample Datasets Folder', self)
+        sample_datasets_folder_action.setStatusTip('Open the folder containing sample dataset files')
+        sample_datasets_folder_action.triggered.connect(self._open_datasets_folder)
+        help_menu.addAction(sample_datasets_folder_action)
 
         self._help_menu = help_menu
 

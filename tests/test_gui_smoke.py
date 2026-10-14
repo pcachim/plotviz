@@ -152,6 +152,19 @@ class TestGuiSmoke(unittest.TestCase):
             self.assertEqual(dlg.call_args.args[2], d)         # starts in the samples folder
             self.assertIn("x", w.datasets)                     # ... and the chart was loaded
 
+    def test_sample_datasets_menu_opens_a_dialog_in_the_samples_folder(self):
+        from unittest import mock
+        from PyQt6.QtWidgets import QFileDialog
+        w = self._make_window()
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("config.settings.datasets_dir", return_value=d), \
+                mock.patch("ui.data_io._remember_dir") as remember:
+            with mock.patch.object(QFileDialog, "getOpenFileNames",
+                                   return_value=([], "")) as dlg:
+                w._open_sample_dataset()
+            self.assertEqual(dlg.call_args.args[2], d)         # starts in the samples folder
+            remember.assert_not_called()                       # samples don't change the "last folder"
+
     def test_sample_charts_dialog_cancel_loads_nothing(self):
         from unittest import mock
         from PyQt6.QtWidgets import QFileDialog

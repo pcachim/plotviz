@@ -405,11 +405,20 @@ class DataMixin:
         self._notify_sns_explorer()
 
     def load_data(self):
+        self._load_data_files('Load Files', _get_dir())
+
+    def _load_data_files(self, title, start_dir, remember_dir=True):
+        """Ask for one or more data files (starting in *start_dir*) and import them.
+
+        Kept separate from load_data() because that one is connected to a button's
+        clicked(bool) signal and so must take no parameters.
+        """
         files, _ = QFileDialog.getOpenFileNames(
-            self, 'Load Files', _get_dir(), 'Data Files (*.csv *.xlsx *.xls *.json *.txt);;All (*)')
+            self, title, start_dir, 'Data Files (*.csv *.xlsx *.xls *.json *.txt);;All (*)')
         if not files:
             return
-        _remember_dir(files[0])
+        if remember_dir:
+            _remember_dir(files[0])
         for fp in files:
             try:
                 dlg = DataImportDialog(fp, self)
