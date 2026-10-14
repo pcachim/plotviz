@@ -14,6 +14,7 @@ All reads and writes go through get() / set() / save().
 The module-level `settings` dict is the live in-memory state.
 """
 from __future__ import annotations
+import logging
 
 import json
 import os
@@ -97,7 +98,7 @@ def load() -> dict:
             stored = json.loads(CFG_FILE.read_text(encoding='utf-8'))
             return {**DEFAULTS, **stored}
         except (json.JSONDecodeError, OSError):
-            pass
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
     return DEFAULTS.copy()
 
 

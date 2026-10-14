@@ -7,6 +7,7 @@ undo/redo snapshots, and series-table data plumbing. Split out of main_window;
 mixed into PlotVizApp so its methods share the datasets, series table and
 widgets via `self`.
 """
+import logging
 import os
 import sys
 import csv

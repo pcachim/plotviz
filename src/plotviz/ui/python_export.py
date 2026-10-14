@@ -15,6 +15,7 @@ explorer and is therefore UI-coupled.
 """
 
 from __future__ import annotations
+import logging
 import io, os, zipfile
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
@@ -338,7 +339,7 @@ class PythonExportMixin:
                         try:
                             zf.write(_src, 'images/' + os.path.basename(_src))
                         except Exception:
-                            pass
+                            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
                 if use_combined:
                     # Single CSV with all columns
@@ -460,7 +461,7 @@ class PythonExportMixin:
                         try:
                             zf.write(_src, 'images/' + os.path.basename(_src))
                         except Exception:
-                            pass
+                            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
                 if use_combined:
                     buf = io.StringIO()

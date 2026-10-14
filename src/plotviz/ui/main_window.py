@@ -9,6 +9,7 @@ Core application class. Tab UI, helpers, and event handlers.
 Tab building, plot engine and serialization live in their own mixin modules.
 """
 
+import logging
 import os
 import sys
 
@@ -706,7 +707,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 plt.rcParams['text.usetex'] = True
                 plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}\usepackage{amssymb}'
             except Exception:
-                pass
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
         # ── Load last chart (or sample) once the event loop is running ─────────
         # Connect per-series option widgets AFTER all tab builders have run so

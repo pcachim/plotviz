@@ -2,6 +2,7 @@
 Copyright (c) 2026 Paulo Cachim
 ui/dialogs.py — AnnotationEditDialog and DataImportDialog
 """
+import logging
 import os, csv
 import numpy as np
 from PyQt6.QtWidgets import (
@@ -267,7 +268,7 @@ class DataImportDialog(QDialog):
                     self._sheet_combo.addItems(xl.sheet_names)
                     self._sheet_combo.blockSignals(False)
                 except Exception:
-                    pass
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
         # Separator (CSV / TXT only)
         self._sep_label = QLabel('Separator:')

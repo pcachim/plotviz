@@ -7,6 +7,7 @@ of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 ui/plot_engine.py  –  plotviz
 Mixin providing all matplotlib plotting, decorating, preview and export methods.
 """
+import logging
 import traceback
 import numpy as np
 import matplotlib

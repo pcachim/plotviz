@@ -9,6 +9,7 @@ Kept in a separate file to avoid circular imports.
 File-dialog directory management now delegates to config.settings so the
 last-used directory persists across sessions.
 """
+import logging
 import config.settings as _s
 
 # ── Recent-colour persistence ─────────────────────────────────────────────────

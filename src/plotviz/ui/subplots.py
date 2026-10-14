@@ -7,6 +7,7 @@ column resolution, the subplot configuration UI, and the manual/function data
 entry helpers. Split out of main_window; mixed into PlotVizApp so its methods
 share the series table, subplot dicts and widgets via `self`.
 """
+import logging
 from PyQt6.QtWidgets import (
     QCheckBox, QDialog, QDialogButtonBox, QFrame, QGridLayout, QHBoxLayout,
     QLabel, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabWidget,
@@ -648,7 +649,7 @@ class SubplotMixin:
                 self.x_max.setValue(hi)
                 self.x_max.blockSignals(False)
             except Exception:
-                pass
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         self.x_min.setEnabled(x_manual)
         self.x_max.setEnabled(x_manual)
 
@@ -665,7 +666,7 @@ class SubplotMixin:
                 self.y_max.setValue(hi)
                 self.y_max.blockSignals(False)
             except Exception:
-                pass
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         self.y_min.setEnabled(y_manual)
         self.y_max.setEnabled(y_manual)
 
@@ -683,7 +684,7 @@ class SubplotMixin:
                 self.y2_max.setValue(hi)
                 self.y2_max.blockSignals(False)
             except Exception:
-                pass
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         self.y2_min.setEnabled(y2_manual)
         self.y2_max.setEnabled(y2_manual)
 

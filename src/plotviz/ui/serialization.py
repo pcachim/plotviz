@@ -7,6 +7,7 @@ of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 ui/serialization.py  –  plotviz
 Mixin providing settings collection/apply, series meta, and project save/load.
 """
+import logging
 import json, zipfile, os, tempfile
 from ui.helpers import _get_dir, _remember_dir
 from core.serialize import (

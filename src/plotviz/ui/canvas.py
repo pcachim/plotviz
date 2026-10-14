@@ -10,6 +10,7 @@ ui/canvas.py – Matplotlib canvas
 • Text / arrow / image annotations with drag-to-move
 • hide_cursor / show_cursor for clean export
 """
+import logging
 import matplotlib.image as mpimg
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 try:
@@ -76,7 +77,7 @@ class CanvasPlotter(FigureCanvas):
             try:
                 self._border_rect.remove()
             except Exception:
-                pass
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self._border_rect = None
 
         rect = mpatches.Rectangle(
@@ -97,7 +98,7 @@ class CanvasPlotter(FigureCanvas):
             try:
                 self._border_rect.remove()
             except Exception:
-                pass
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self._border_rect = None
 
     # ─── Cursor helpers ───────────────────────────────────────────────────────
@@ -106,7 +107,7 @@ class CanvasPlotter(FigureCanvas):
             try:
                 self.cursor_label.remove()
             except Exception:
-                pass
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.cursor_label = None
 
     def hide_cursor(self):
@@ -135,7 +136,7 @@ class CanvasPlotter(FigureCanvas):
                     ann['artist'].set_position((nx, ny))
                     ann['artist'].xy = (nx, ny)   # arrow tip (same position for pure text)
                 except Exception:
-                    pass
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             elif ann['type'] == 'arrow':
                 if self._drag_part == 'tip':
                     # Move only the tip (re-aim the arrow); tail stays put.
@@ -165,7 +166,7 @@ class CanvasPlotter(FigureCanvas):
                     ann['artist'].xybox = (nx, ny)
                     ann['artist'].xy    = (nx, ny)
                 except Exception:
-                    pass
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.draw_idle()
 
     # ── Tab-navigation constants ──────────────────────────────────────────────
@@ -189,7 +190,7 @@ class CanvasPlotter(FigureCanvas):
             if inner is not None and hasattr(mw, 'plots_inner_tabs'):
                 mw.plots_inner_tabs.setCurrentIndex(inner)
         except Exception:
-            pass
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     def _select_subplot(self, ax_idx: int) -> None:
         """Switch every subplot selector to *ax_idx* and refresh tab state.
@@ -206,7 +207,7 @@ class CanvasPlotter(FigureCanvas):
         try:
             mw._on_global_sp_changed(ax_idx)
         except Exception:
-            pass
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     def _nav_zone(self, event):
         """Classify a left-click for tab navigation.
@@ -480,7 +481,7 @@ class CanvasPlotter(FigureCanvas):
                     if min_d < px_threshold and min_d < best_px:
                         best_px, best_label = min_d, lbl
                 except Exception:
-                    pass
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
             # --- PathCollection (scatter / bubble) --------------------------
             elif isinstance(artist, PathCollection):
@@ -495,7 +496,7 @@ class CanvasPlotter(FigureCanvas):
                             if d < best_px:
                                 best_px, best_label = d, lbl
                 except Exception:
-                    pass
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
                 try:
                     offsets = np.asarray(artist.get_offsets())
                     if len(offsets):
@@ -505,7 +506,7 @@ class CanvasPlotter(FigureCanvas):
                         if min_d < px_threshold and min_d < best_px:
                             best_px, best_label = min_d, lbl
                 except Exception:
-                    pass
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
             # --- Rectangle (bar / barh) -------------------------------------
             elif isinstance(artist, Rectangle):
@@ -518,7 +519,7 @@ class CanvasPlotter(FigureCanvas):
                         if d < best_px:
                             best_px, best_label = d, lbl
                 except Exception:
-                    pass
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
         return best_label
 
@@ -534,7 +535,7 @@ class CanvasPlotter(FigureCanvas):
                 if hasattr(tb, 'mode') and tb.mode:
                     tb.pan()  # calling pan() again toggles it off if active
         except Exception:
-            pass
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     # ─── Annotation placement ─────────────────────────────────────────────────
     def _place_text_annotation(self, ax, ax_idx, x, y, label=None, style=None):
@@ -642,7 +643,7 @@ class CanvasPlotter(FigureCanvas):
         try:
             mw.statusBar().showMessage(msg, timeout)
         except Exception:
-            pass
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     @staticmethod
     def _fmt(v) -> str:
@@ -663,7 +664,7 @@ class CanvasPlotter(FigureCanvas):
         try:
             title = ax.get_title().strip()
         except Exception:
-            pass
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         if title:
             return title
         if len(self.axes_list) > 1:

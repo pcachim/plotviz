@@ -22,3 +22,6 @@ todo.md
 DISTRIBUTION.md
 site
 tests/fixtures/*.pviz
+
+# FUSE temp files
+.fuse_hidden*

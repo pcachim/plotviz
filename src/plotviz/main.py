@@ -12,6 +12,7 @@ Run from source:
     cd ~/plotviz && uv run python src/plotviz/main.py
 """
 
+import logging
 import sys
 import os
 
@@ -52,7 +53,7 @@ if getattr(sys, 'frozen', False):
         import matplotlib.font_manager as _fm
         _fm._load_fontmanager(try_read_cache=False)
     except Exception:
-        pass
+        logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
 # ── 5. multiprocessing (required on macOS with spawn start method) ────────────
 from multiprocessing import freeze_support
@@ -111,7 +112,7 @@ def _set_win_appusermodel_id() -> None:
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('com.pviz.app.plotviz')
     except Exception:
-        pass
+        logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
 
 class PlotVizQApplication(QApplication):

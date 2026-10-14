@@ -6,6 +6,7 @@ PaletteColorMixin: the custom-palette editor, active-palette colour resolution,
 and (de)serialisation of custom palettes. Split out of main_window; mixed into
 PlotVizApp so it shares the palette widgets and state via `self`.
 """
+import logging
 import json
 
 from PyQt6.QtGui import QColor
