@@ -83,9 +83,13 @@ def _series_style(settings: Settings, series: SeriesDict, i: int,
     """Return resolved style properties for one series.
 
     Prefers curve_styles[label] stored in settings; falls back to palette index.
+    The alphas come from the series' own options, with the same defaults the
+    live chart uses (scatter 0.7, area 0.4, bubble 0.6) so the script matches the
+    preview.
     """
     lbl   = series.get("label", f"Series {i+1}")
     curve = (settings.get("curve_styles") or {}).get(lbl, {})
+    opts  = curve.get("opts") or {}
     color = curve.get("color") or palette[i % len(palette)]
     return {
         "color":         color,
@@ -94,8 +98,9 @@ def _series_style(settings: Settings, series: SeriesDict, i: int,
         "marker":        curve.get("marker",      "None"),
         "markersize":    curve.get("markersize",   6),
         "marker_color":  curve.get("marker_color") or color,
-        "scatter_alpha": 0.6,
-        "area_alpha":    0.35,
+        "scatter_alpha": opts.get("sc_alpha", 0.7),
+        "area_alpha":    opts.get("area_alpha", 0.4),
+        "bubble_alpha":  opts.get("bubble_alpha", 0.6),
     }
 
 
@@ -135,6 +140,7 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
         mkc = f"'{st['marker_color']}'"
         sal = st['scatter_alpha']
         aal = st['area_alpha']
+        bal = st['bubble_alpha']
         xexpr = _col_ref(xc) if xc else f'range(len({_col_ref(yc)}))'
         yexpr = _col_ref(yc)
 
@@ -242,7 +248,7 @@ def _gen_line_scatter_step_stem_area_errorbar(settings: Settings, series: list[S
         elif ct == 'Errorbar':
             lines.append(f"{ax_var}.errorbar({xexpr}, {yexpr}, fmt='o', label='{lbl}', color={col}, linewidth={lw})")
         elif ct == 'Bubble':
-            lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={sal})")
+            lines.append(f"{ax_var}.scatter({xexpr}, {yexpr}, label='{lbl}', color={col}, alpha={bal})")
         elif ct == 'Waterfall':
             pos_c = settings.get('waterfall_pos_color', '#2ecc71')
             neg_c = settings.get('waterfall_neg_color', '#e74c3c')
@@ -275,17 +281,23 @@ def _gen_histogram(settings: Settings, series: list[SeriesDict], datasets: Datas
     histtype  = settings.get('hist_histtype', 'bar')
     orient    = settings.get('hist_orientation', 'vertical')
     alpha     = settings.get('heat_alpha', 0.7)
-    edgecolor = 'white'
     for i, s in enumerate(series):
         yc  = s.get('y_col', '')
         lbl = _esc(s.get('label', f'Series {i+1}'))
         st  = _series_style(settings, s, i, palette)
         col = f"'{st['color']}'"
+        # Edge colour is a per-series option ('auto' = the series colour,
+        # 'none' = no edge), exactly as the live chart resolves it.
+        curve_opts = ((settings.get('curve_styles') or {}).get(s.get('label', '')) or {}).get('opts', {})
+        ec = curve_opts.get('hist_edgecolor', 'white')
+        if ec == 'auto':
+            ec = st['color']
+        edge_arg = 'None' if ec == 'none' else f"'{_esc(ec)}'"
         if yc:
             lines.append(
                 f"{ax_var}.hist({_col_ref(yc)}.dropna(), bins={bins}, label='{lbl}', "
                 f"color={col}, alpha={alpha}, histtype='{_esc(histtype)}', "
-                f"orientation='{_esc(orient)}', edgecolor='{_esc(edgecolor)}')"
+                f"orientation='{_esc(orient)}', edgecolor={edge_arg})"
             )
     return lines
 

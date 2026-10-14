@@ -115,6 +115,74 @@ class TestGeneratorEmission(unittest.TestCase):
             compile(script, "<gen>", "exec")  # raises SyntaxError on bad output
 
 
+def _one_series(series_type, label="s", **styles):
+    """Single-subplot project whose only series is of *series_type*.
+
+    *styles* become the series' per-series ``opts`` (curve_styles[label]['opts']).
+    """
+    settings, meta, datasets = _single_line()
+    settings["chart_type"] = series_type
+    if styles:
+        settings["curve_styles"] = {label: {"opts": styles}}
+    meta = {"series": [{"x_col": "x", "y_col": "y", "label": label,
+                        "series_type": series_type, "plot_num": 1}]}
+    return settings, meta, datasets
+
+
+def _gen(settings, meta, datasets):
+    return pe.generate_plot_script(settings, meta, datasets, PALETTE, "c")
+
+
+class TestMatchesLiveChart(unittest.TestCase):
+    """The script must resolve per-series options the way the live chart does."""
+
+    def test_scatter_alpha_default_matches_preview(self):
+        # The live scatter alpha default is 0.7 (the Series-tab spinbox).
+        script = _gen(*_one_series("Scatter"))
+        self.assertIn("alpha=0.7", script)
+
+    def test_scatter_alpha_uses_series_option(self):
+        script = _gen(*_one_series("Scatter", sc_alpha=0.3))
+        self.assertIn("alpha=0.3", script)
+        self.assertNotIn("alpha=0.7", script)
+
+    def test_area_alpha_default_matches_preview(self):
+        script = _gen(*_one_series("Area"))
+        self.assertIn("alpha=0.4", script)
+
+    def test_area_alpha_uses_series_option(self):
+        script = _gen(*_one_series("Area", area_alpha=0.9))
+        self.assertIn("alpha=0.9", script)
+
+    def test_bubble_alpha_keeps_its_own_default(self):
+        # Bubble has its own alpha (default 0.6), distinct from scatter's 0.7.
+        script = _gen(*_one_series("Bubble"))
+        self.assertIn("alpha=0.6", script)
+        script = _gen(*_one_series("Bubble", bubble_alpha=0.25))
+        self.assertIn("alpha=0.25", script)
+
+    def test_histogram_edge_colour_default_is_white(self):
+        script = _gen(*_one_series("Histogram"))
+        self.assertIn("edgecolor='white'", script)
+
+    def test_histogram_edge_colour_uses_series_option(self):
+        script = _gen(*_one_series("Histogram", hist_edgecolor="red"))
+        self.assertIn("edgecolor='red'", script)
+        self.assertNotIn("edgecolor='white'", script)
+
+    def test_histogram_edge_colour_auto_is_the_series_colour(self):
+        script = _gen(*_one_series("Histogram", hist_edgecolor="auto"))
+        self.assertIn("edgecolor='#1f77b4'", script)   # palette[0]
+
+    def test_histogram_edge_colour_none_means_no_edge(self):
+        settings, meta, datasets = _one_series("Histogram", hist_edgecolor="none")
+        script = _gen(settings, meta, datasets)
+        self.assertIn("edgecolor=None", script)
+        with tempfile.TemporaryDirectory() as d:
+            out, res = _run_script(script, datasets, d)
+            self.assertEqual(res.returncode, 0, res.stderr)
+
+
 class TestSmokeRun(unittest.TestCase):
     def test_single_line_runs(self):
         settings, meta, datasets = _single_line()
