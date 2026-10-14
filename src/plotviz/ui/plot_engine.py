@@ -1458,6 +1458,34 @@ class PlotEngineMixin:
                     y_step=self.subplot_ytick_step.get(subplot_idx, 0.0),
                     y2_step=self.subplot_ytick_step.get(subplot_idx, 0.0))
 
+    def _fit_preview_page(self, fig):
+        """Fit the export page into the preview canvas *fig* at its true scale.
+
+        The page keeps the export aspect ratio and fills 90% of the canvas. The
+        figure's dpi is then set so that the page is exactly as many pixels wide
+        as the export is inches wide x dpi: a title that is 14 pt on a 12 cm export
+        is drawn at the same fraction of the page here as in the file. (A fixed dpi
+        made text look the same size on a 8.5 cm figure and on a 30 cm one.)
+
+        The canvas size in pixels is left unchanged; only dpi and the figure's size
+        in inches change, inversely. Returns (left, bottom, width, height) of the
+        page as fractions of the canvas.
+        """
+        wi, hi = self._fig_size_in_inches()
+        aspect = wi / hi
+        px_w = fig.get_figwidth() * fig.dpi
+        px_h = fig.get_figheight() * fig.dpi
+        if px_w / px_h > aspect:
+            box_h = 0.90
+            box_w = box_h * aspect * px_h / px_w
+        else:
+            box_w = 0.90
+            box_h = box_w / aspect * px_w / px_h
+        dpi = box_w * px_w / wi                   # page pixels per export inch
+        fig.set_dpi(dpi)
+        fig.set_size_inches(px_w / dpi, px_h / dpi, forward=False)
+        return (1.0 - box_w) / 2.0, (1.0 - box_h) / 2.0, box_w, box_h
+
     def _margins_as_fractions(self):
         """The figure margins (left, right, bottom, top) as fractions of the figure.
 
@@ -1787,27 +1815,17 @@ class PlotEngineMixin:
                 self.canvas._border_rect = None   # figure.clear() removes all artists
                 self.canvas.figure.patch.set_facecolor(self.chart_bg_color)
 
+                # Fit the export page into the canvas at its true scale BEFORE drawing,
+                # so every size in points (text, line widths, markers) is drawn at the
+                # same proportion of the page as in the exported file.
+                box_left, box_bottom, box_w, box_h = self._fit_preview_page(self.canvas.figure)
+
                 axes_list, ax2_map, is3d, n = self._render_axes(self.canvas.figure)
 
                 self.canvas.axes_list = axes_list
                 if axes_list: self.canvas.axes = axes_list[0]
 
-                # ── Margins / centering ────────────────────────────────────────────
-                wi, hi = self._fig_size_in_inches()   # export size in inches
-                screen_w = self.canvas.figure.get_figwidth()
-                screen_h = self.canvas.figure.get_figheight()
-                aspect = wi / hi   # export aspect ratio
-
-                if screen_w / screen_h > aspect:
-                    box_h = 0.90
-                    box_w = box_h * aspect * screen_h / screen_w
-                else:
-                    box_w = 0.90
-                    box_h = box_w / aspect * screen_w / screen_h
-
-                box_left   = (1.0 - box_w) / 2.0
-                box_bottom = (1.0 - box_h) / 2.0
-
+                # ── Margins (the page box was fitted above) ───────────────────────
                 ul, ur, ub, ut = self._margins_as_fractions()
 
                 adj_left   = box_left   + ul * box_w
@@ -1857,10 +1875,12 @@ class PlotEngineMixin:
                     hspace=_hspace, wspace=_wspace,
                 )
 
-                # Draw the page-boundary rectangle
+                # Draw the page-boundary rectangle (always a 1-pixel line, whatever the
+                # preview scale: 72 points per inch / dpi pixels per inch)
                 self.canvas.draw_border_rect(
                     box_left, box_bottom, box_w, box_h,
-                    color=self.chart_fg_color, linewidth=1.0,
+                    color=self.chart_fg_color,
+                    linewidth=72.0 / self.canvas.figure.dpi,
                 )
 
                 # Redraw annotations AFTER layout is finalised so axes limits are set
@@ -1881,7 +1901,6 @@ class PlotEngineMixin:
     def _copy_image_to_clipboard(self):
         """Show a small DPI picker then copy the chart as PNG to the system clipboard."""
         try:
-            import io
             from PyQt6.QtGui import QImage, QPixmap, QClipboard
             from PyQt6.QtWidgets import (QApplication, QDialog, QVBoxLayout,
                                          QHBoxLayout, QLabel, QSpinBox,
@@ -1890,7 +1909,8 @@ class PlotEngineMixin:
             if not hasattr(self, 'canvas') or self.canvas.figure is None:
                 return
 
-            fig_dpi = int(self.canvas.figure.get_dpi())
+            wi, hi = self._fig_size_in_inches()     # what is copied: the export figure
+            default_dpi = int(self.dpi_spin.value())
 
             # ── DPI picker dialog ─────────────────────────────────────────────
             dlg = QDialog(self)
@@ -1903,7 +1923,7 @@ class PlotEngineMixin:
             row.addWidget(QLabel('Resolution (DPI):'))
             dpi_spin = QSpinBox()
             dpi_spin.setRange(36, 600)
-            dpi_spin.setValue(getattr(self, '_clipboard_dpi', fig_dpi))
+            dpi_spin.setValue(getattr(self, '_clipboard_dpi', default_dpi))
             dpi_spin.setSuffix(' dpi')
             dpi_spin.setFixedWidth(90)
             row.addWidget(dpi_spin)
@@ -1913,11 +1933,7 @@ class PlotEngineMixin:
             # Live pixel-size hint
             def _update_hint():
                 d = dpi_spin.value()
-                fw = self.canvas.figure.get_figwidth()
-                fh = self.canvas.figure.get_figheight()
-                px_w = int(fw * d)
-                px_h = int(fh * d)
-                hint_lbl.setText(f'Output size: {px_w} × {px_h} px')
+                hint_lbl.setText(f'Output size: {round(wi * d)} × {round(hi * d)} px')
             hint_lbl = QLabel()
             hint_lbl.setStyleSheet('color:#666; font-size:11px;')
             vlay.addWidget(hint_lbl)
@@ -1937,34 +1953,36 @@ class PlotEngineMixin:
             chosen_dpi = dpi_spin.value()
             self._clipboard_dpi = chosen_dpi   # remember for next time
 
-            # ── Render and copy (hide page-boundary indicator temporarily) ───
-            border_rect = getattr(self.canvas, '_border_rect', None)
-            if border_rect is not None:
-                border_rect.set_visible(False)
-            try:
-                buf = io.BytesIO()
-                self.canvas.figure.savefig(buf, format='png', dpi=chosen_dpi,
-                                           bbox_inches='tight')
-                buf.seek(0)
-            finally:
-                if border_rect is not None:
-                    border_rect.set_visible(True)
-            img = QImage.fromData(buf.read())
+            # ── Render the export figure (same path as File > Export) and copy ─
+            img = QImage.fromData(self._render_export_bytes('png', chosen_dpi))
             if img.isNull():
                 return
             QApplication.clipboard().setPixmap(
                 QPixmap.fromImage(img), QClipboard.Mode.Clipboard)
 
             if hasattr(self, 'statusBar'):
-                fw = self.canvas.figure.get_figwidth()
-                fh = self.canvas.figure.get_figheight()
-                px_w = int(fw * chosen_dpi)
-                px_h = int(fh * chosen_dpi)
+                px_w = round(wi * chosen_dpi)
+                px_h = round(hi * chosen_dpi)
                 self.statusBar().showMessage(
                     f'Image copied to clipboard  ({px_w}×{px_h} px, {chosen_dpi} dpi).', 4000)
         except Exception as e:  # noqa: BLE001 - clipboard failure is logged, not fatal
             import logging
             logging.getLogger('plotviz').warning('Copy to clipboard failed: %s', e)
+
+    def _render_export_bytes(self, fmt, dpi):
+        """Render the export figure to bytes in *fmt* at *dpi* (as File > Export does)."""
+        import io
+        wi, hi = self._fig_size_in_inches()
+        old_font = matplotlib.rcParams.get('font.family', ['sans-serif'])
+        matplotlib.rcParams['font.family'] = self.title_font.currentText()
+        try:
+            fig = self._build_export_figure(wi, hi, dpi)
+            buf = io.BytesIO()
+            fig.savefig(buf, format=fmt, dpi=dpi, bbox_inches=None)
+            plt.close(fig)
+        finally:
+            matplotlib.rcParams['font.family'] = old_font
+        return buf.getvalue()
 
     def _ask_export_options(self, wi, hi, fmt=None):
         """Ask for the export format and DPI.

@@ -295,5 +295,116 @@ class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
             self.assertAlmostEqual(page_aspect, 24.0 / 10.0, places=2, msg=size)
 
 
+@unittest.skipUnless(HAVE_QT, "real PyQt6 not available")
+class TestPreviewIsWhatYouExport(unittest.TestCase):
+    """The preview draws the page at its true scale (text, lines and markers keep
+    the same proportion of the page as in the exported file)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import matplotlib
+        from PyQt6.QtWidgets import QApplication
+        from ui.main_window import PlotVizApp
+        cls._app = QApplication.instance() or QApplication([])
+        cls._orig = PlotVizApp._load_on_startup
+        PlotVizApp._load_on_startup = lambda self: None
+        cls.PlotVizApp = PlotVizApp
+        cls._matplotlib = matplotlib
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.PlotVizApp._load_on_startup = cls._orig
+
+    def _win(self, width_cm, height_cm):
+        # No LaTeX, as in the packaged app: with it the export would typeset the
+        # title in Computer Modern while the preview never does.
+        w = self.PlotVizApp()
+        self._matplotlib.rcParams["text.usetex"] = False
+        w.setGeometry(50, 50, 1400, 900)
+        w.show()
+        w.fig_width.setValue(width_cm)
+        w.fig_height.setValue(height_cm)
+        w.title_input.setText("Chart title")
+        w.update_preview()
+        self._app.processEvents()
+        return w
+
+    def _export_figure(self, w, dpi=100):
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        fig = w._build_export_figure(*w._fig_size_in_inches(), dpi)
+        FigureCanvasAgg(fig).draw()
+        return fig
+
+    def test_the_page_is_as_wide_as_the_export_in_inches(self):
+        for width_cm, height_cm in ((20, 15), (30, 20), (12, 9), (8.5, 6)):
+            w = self._win(width_cm, height_cm)
+            fig = w.canvas.figure
+            fig.canvas.draw()
+            page = w.canvas._border_rect.get_window_extent(fig.canvas.get_renderer())
+            wi, hi = w._fig_size_in_inches()
+            self.assertAlmostEqual(page.width / fig.dpi, wi, places=2)
+            self.assertAlmostEqual(page.height / fig.dpi, hi, places=2)
+
+    def test_title_has_the_same_proportion_of_the_page_in_preview_and_export(self):
+        # Regression: the preview used a fixed dpi, so the title was 4.5% of the page
+        # on every figure while the export gave 10% (20 cm) ... 24% (8.5 cm).
+        for width_cm, height_cm in ((20, 15), (30, 20), (12, 9), (8.5, 6)):
+            w = self._win(width_cm, height_cm)
+            fig = w.canvas.figure
+            fig.canvas.draw()
+            renderer = fig.canvas.get_renderer()
+            preview = (fig._suptitle.get_window_extent(renderer).width
+                       / w.canvas._border_rect.get_window_extent(renderer).width)
+            export_fig = self._export_figure(w)
+            export = (export_fig._suptitle.get_window_extent().width
+                      / (export_fig.get_figwidth() * export_fig.dpi))
+            self.assertAlmostEqual(preview / export, 1.0, delta=0.02,
+                                   msg=f"{width_cm}x{height_cm} cm")
+
+    def test_canvas_pixel_size_is_unchanged_and_dpi_is_stable(self):
+        w = self._win(20, 15)
+        fig = w.canvas.figure
+        pixels = (fig.get_figwidth() * fig.dpi, fig.get_figheight() * fig.dpi)
+        dpi = fig.dpi
+        for _ in range(5):
+            w.update_preview()
+        self.assertAlmostEqual(fig.get_figwidth() * fig.dpi, pixels[0], places=3)
+        self.assertAlmostEqual(fig.get_figheight() * fig.dpi, pixels[1], places=3)
+        self.assertAlmostEqual(fig.dpi, dpi, places=6)
+
+    def test_page_border_stays_one_pixel_thick(self):
+        for width_cm in (8.5, 30):
+            w = self._win(width_cm, 10)
+            rect = w.canvas._border_rect
+            self.assertAlmostEqual(rect.get_linewidth() * w.canvas.figure.dpi / 72.0, 1.0,
+                                   places=6)
+
+    def test_exports_do_not_depend_on_the_preview_scale(self):
+        w = self._win(20, 15)
+        a = self._export_figure(w)
+        w.fig_width.setValue(9.0)
+        w.fig_width.setValue(20.0)          # visit another preview scale and come back
+        b = self._export_figure(w)
+        self.assertEqual(a._suptitle.get_window_extent().width,
+                         b._suptitle.get_window_extent().width)
+        self.assertEqual(a.get_size_inches().tolist(), b.get_size_inches().tolist())
+
+    # ── clipboard: copies what would be exported ──────────────────────────────
+    def test_clipboard_copy_is_the_export_figure_at_the_chosen_dpi(self):
+        from unittest import mock
+        from PyQt6.QtGui import QImage
+        from PyQt6.QtWidgets import QApplication, QDialog
+        w = self._win(12, 9)
+        wi, hi = w._fig_size_in_inches()
+        image = QImage.fromData(w._render_export_bytes("png", 72))
+        self.assertEqual((image.width(), image.height()), (round(wi * 72), round(hi * 72)))
+        w.dpi_spin.setValue(72)
+        QApplication.clipboard().clear()
+        with mock.patch.object(QDialog, "exec", return_value=QDialog.DialogCode.Accepted):
+            w._copy_image_to_clipboard()
+        copied = QApplication.clipboard().pixmap()
+        self.assertEqual((copied.width(), copied.height()), (round(wi * 72), round(hi * 72)))
+
+
 if __name__ == "__main__":
     unittest.main()
