@@ -69,17 +69,26 @@ class TestMenus(unittest.TestCase):
         self.assertIn("Ctrl+Shift+Z", [s.toString() for s in redo.shortcuts()])
 
     def test_undo_and_redo_follow_the_history(self):
+        # Fake history entries: put the real (empty) stacks back afterwards, or the
+        # debounced snapshot timer would later trip over them inside a Qt slot
+        # (an unhandled exception there aborts the whole test run).
         w = self.win
-        w._undo_stack = [{}]
-        w._redo_stack = []
-        w._update_undo_buttons()
-        self.assertFalse(self._action("Undo").isEnabled())
-        self.assertFalse(self._action("Redo").isEnabled())
-        w._undo_stack = [{}, {}]
-        w._redo_stack = [{}]
-        w._update_undo_buttons()
-        self.assertTrue(self._action("Undo").isEnabled())
-        self.assertTrue(self._action("Redo").isEnabled())
+        timer = getattr(w, "_snapshot_timer", None)
+        if timer is not None:
+            timer.stop()
+        saved = (w._undo_stack, w._redo_stack)
+        try:
+            w._undo_stack, w._redo_stack = [{}], []
+            w._update_undo_buttons()
+            self.assertFalse(self._action("Undo").isEnabled())
+            self.assertFalse(self._action("Redo").isEnabled())
+            w._undo_stack, w._redo_stack = [{}, {}], [{}]
+            w._update_undo_buttons()
+            self.assertTrue(self._action("Undo").isEnabled())
+            self.assertTrue(self._action("Redo").isEnabled())
+        finally:
+            w._undo_stack, w._redo_stack = saved
+            w._update_undo_buttons()
 
     def test_every_entry_has_a_status_tip(self):
         missing = [a.text() for a in self._actions()

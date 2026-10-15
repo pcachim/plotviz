@@ -9,21 +9,23 @@ LayoutTabMixin: create_layout_tab() and create_plots_tab(): figure size, subplot
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QSpinBox, QDoubleSpinBox, QPushButton, QCheckBox, QScrollArea, QGroupBox, QTabWidget, QSlider,
+    QSpinBox, QDoubleSpinBox, QPushButton, QCheckBox, QGroupBox, QTabWidget, QSlider,
 )
 from PyQt6.QtCore import Qt
 
 
 class LayoutTabMixin:
-    # ─── Layout tab (per-subplot canvas + grid) ───────────────────────────────
+    # ─── Canvas + grid panel (per subplot; shown inside the Axes tab) ─────────
     def create_layout_tab(self):
-        widget = QWidget()
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        """Build the per-subplot canvas, border, grid and 3D-viewpoint controls.
+
+        They are not a tab of their own: the panel is kept in
+        ``self._canvas_grid_panel`` and create_axes_tab() adds it to the Axes tab.
+        """
         content = QWidget()
         layout = QVBoxLayout(content)
         layout.setSpacing(4)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         # ── Subplot selector (shown only when n > 1) ──────────────────────────
         sp_sel_row = QHBoxLayout()
@@ -212,11 +214,7 @@ class LayoutTabMixin:
         self._layout_3d_view_widget.setVisible(False)
         layout.addWidget(self._layout_3d_view_widget)
 
-        layout.addStretch()
-        scroll.setWidget(content)
-        mlay = QVBoxLayout(widget)
-        mlay.addWidget(scroll)
-        self.plots_inner_tabs.addTab(widget, 'Layout')
+        self._canvas_grid_panel = content
 
     # ─── Plots tab (container for subplot selector + inner tabs) ──────────────
     def create_plots_tab(self):
@@ -230,16 +228,16 @@ class LayoutTabMixin:
         _gsp_lay = QHBoxLayout(self._global_sp_container)
         _gsp_lay.setContentsMargins(4, 2, 4, 2)
         _gsp_lay.setSpacing(4)
-        _gsp_lay.addWidget(QLabel('Active Subplot:'))
+        _gsp_lay.addWidget(QLabel('Editing:'))
         self.global_sp_active = QComboBox()
         self.global_sp_active.addItem('Subplot 1')
         self.global_sp_active.setMinimumWidth(110)
         self.global_sp_active.setToolTip(
-            'Active subplot — affects Data, Axes, Series and Annotation tabs')
+            'The subplot that the Data, Series, Axes and Annotations tabs edit')
         self.global_sp_active.currentIndexChanged.connect(self._on_global_sp_changed)
         _gsp_lay.addWidget(self.global_sp_active)
         _gsp_lay.addStretch()
-        self._global_sp_container.setVisible(False)
+        self.global_sp_active.setEnabled(False)       # one subplot: nothing to choose
         outer_lay.addWidget(self._global_sp_container)
 
         # ── Inner tab widget ──────────────────────────────────────────────────

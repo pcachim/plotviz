@@ -1,6 +1,6 @@
 # Style & Appearance
 
-## The Style tab
+## The Figure tab
 
 The **Style** tab controls the figure-level appearance: size, margins, background colors, borders, and the grid.
 
@@ -116,4 +116,4 @@ The **Appearance** dropdown in the Chart tab controls the application's light/da
 - **Light** — forces the light theme regardless of OS setting.
 - **Dark** — forces the dark theme.
 
-This setting affects the UI chrome only, not the chart colors. Chart colors are set independently with color schemes and the Style tab.
+This setting affects the UI chrome only, not the chart colors. Chart colors are set independently with color schemes and the Figure tab.

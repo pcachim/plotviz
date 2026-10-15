@@ -16,7 +16,7 @@ The **View** menu in the menu bar lists all seven tabs as checkable menu items. 
 |-----------|-----|
 | View → Chart | Chart tab |
 | View → Data | Data tab |
-| View → Style | Style tab |
+| View → Figure | Figure tab |
 | View → Series | Series tab |
 | View → Axes | Axes tab |
 | View → Annotations | Annotations tab |

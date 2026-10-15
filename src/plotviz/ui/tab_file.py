@@ -87,7 +87,11 @@ class FileTabMixin:
         layout.addWidget(self._hline())
 
         # ── Subplot Grid ──────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Subplot Grid'))
+        self._subplot_grid_panel = QWidget()
+        pl = QVBoxLayout(self._subplot_grid_panel)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(6)
+        pl.addWidget(self._sec_label('Subplot Grid'))
         # sp_rows / sp_cols / sp_sharex / sp_sharey are kept as hidden widgets so
         # serialisation and on_subplot_layout_changed continue to work unchanged.
         self.sp_rows = QSpinBox()
@@ -109,9 +113,8 @@ class FileTabMixin:
         btn_subplot_cfg = QPushButton('⚙️  Configure Subplot Layout…')
         btn_subplot_cfg.setToolTip('Pick a preset or draw a custom mosaic layout')
         btn_subplot_cfg.clicked.connect(self._open_subplot_config_dialog)
-        layout.addWidget(btn_subplot_cfg)
+        pl.addWidget(btn_subplot_cfg)
 
-        layout.addWidget(self._hline())
 
         # ── Datasets ──────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('Datasets'))
@@ -134,10 +137,12 @@ class FileTabMixin:
         ds_btn_row.addWidget(btn_inspect)
         layout.addLayout(ds_btn_row)
 
-        layout.addWidget(self._hline())
-
         # ── Colour palette ────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Colour Palette'))
+        self._palette_panel = QWidget()
+        pl = QVBoxLayout(self._palette_panel)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(6)
+        pl.addWidget(self._sec_label('Colour Palette'))
         pal_row = QHBoxLayout()
         pal_row.setSpacing(6)
         self.palette_combo = QComboBox()
@@ -147,7 +152,7 @@ class FileTabMixin:
         self.palette_combo.currentTextChanged.connect(self._on_palette_changed)
         pal_row.addWidget(self.palette_combo)
         pal_row.addStretch()
-        layout.addLayout(pal_row)
+        pl.addLayout(pal_row)
         self._palette_swatch_row = QHBoxLayout()
         self._palette_swatch_row.setSpacing(2)
         self._palette_swatches = []
@@ -158,7 +163,7 @@ class FileTabMixin:
             self._palette_swatches.append(sw)
             self._palette_swatch_row.addWidget(sw)
         self._palette_swatch_row.addStretch()
-        layout.addLayout(self._palette_swatch_row)
+        pl.addLayout(self._palette_swatch_row)
         pal_btn_row = QHBoxLayout()
         pal_btn_row.setSpacing(4)
         btn_edit_pal = QPushButton('✏️ Edit palette…')
@@ -170,7 +175,7 @@ class FileTabMixin:
         btn_reset_locks.clicked.connect(self._reset_all_color_locks)
         pal_btn_row.addWidget(btn_reset_locks)
         pal_btn_row.addStretch()
-        layout.addLayout(pal_btn_row)
+        pl.addLayout(pal_btn_row)
         pal_io_row = QHBoxLayout()
         pal_io_row.setSpacing(4)
         btn_import_pal = QPushButton('📥 Load palette…')
@@ -182,20 +187,23 @@ class FileTabMixin:
         btn_export_pal.clicked.connect(self._export_palette_bundle)
         pal_io_row.addWidget(btn_export_pal)
         pal_io_row.addStretch()
-        layout.addLayout(pal_io_row)
+        pl.addLayout(pal_io_row)
         self._refresh_palette_swatches()
 
-        layout.addWidget(self._hline())
 
         # ── Color Schemes ─────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Color Schemes'))
+        self._scheme_panel = QWidget()
+        pl = QVBoxLayout(self._scheme_panel)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(6)
+        pl.addWidget(self._sec_label('Color Schemes'))
 
         cs_sel_row = QHBoxLayout()
         cs_sel_row.setSpacing(4)
         self._cs_combo = QComboBox()
         self._cs_combo.setToolTip('Choose a built-in or saved color scheme; it is applied at once')
         cs_sel_row.addWidget(self._cs_combo, 1)
-        layout.addLayout(cs_sel_row)
+        pl.addLayout(cs_sel_row)
 
         cs_btn_row = QHBoxLayout()
         cs_btn_row.setSpacing(4)
@@ -208,12 +216,11 @@ class FileTabMixin:
         btn_cs_save.clicked.connect(self._save_color_scheme)
         cs_btn_row.addWidget(btn_cs_save)
         cs_btn_row.addStretch()
-        layout.addLayout(cs_btn_row)
+        pl.addLayout(cs_btn_row)
 
         # Populate built-in schemes and set initial swatch
         self._init_color_schemes()
 
-        layout.addWidget(self._hline())
 
         layout.addStretch()
         scroll.setWidget(content)

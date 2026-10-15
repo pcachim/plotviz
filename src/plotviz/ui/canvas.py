@@ -186,12 +186,13 @@ class CanvasPlotter(FigureCanvas):
     # Outer tabs: 0=Chart  1=Style  2=Plots  3=Advanced
     _OUTER_STYLE  = 1
     _OUTER_PLOTS  = 2
-    # plots_inner_tabs add order: Data→Layout→Series→Axes→Annotations
+    # plots_inner_tabs add order: Data→Series→Axes→Annotations
+    # (canvas and grid live in the Axes tab)
     _INNER_DATA        = 0
-    _INNER_LAYOUT      = 1
-    _INNER_SERIES      = 2
-    _INNER_AXES        = 3
-    _INNER_ANNOTATIONS = 4
+    _INNER_SERIES      = 1
+    _INNER_AXES        = 2
+    _INNER_LAYOUT      = _INNER_AXES
+    _INNER_ANNOTATIONS = 3
 
     def _goto_tab(self, outer: int, inner: int | None = None) -> None:
         """Navigate to *outer* tab and optionally to *inner* plots sub-tab."""
@@ -322,7 +323,7 @@ class CanvasPlotter(FigureCanvas):
                     self._select_subplot(ax_idx)
                     self._goto_tab(self._OUTER_PLOTS, self._INNER_SERIES)
                     return
-                # No artist hit — show coordinates and go to Layout tab
+                # No artist hit — show coordinates and go to the Axes tab (canvas, grid)
                 sp_label = self._subplot_label(ax)
                 self._show_status(
                     f'{sp_label}  ·  x = {self._fmt(x)},  y = {self._fmt(y)}'

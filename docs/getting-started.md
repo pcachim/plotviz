@@ -74,9 +74,9 @@ The plotviz window has two main areas:
 
 | Tab | Purpose |
 |-----|---------|
-| Chart | Open/save files, export, subplot layout, color schemes, palette |
+| Chart | Open/save files, export, datasets |
 | Data | Load datasets, series table, chart type |
-| Style | Figure size, margins, colors, grid, borders |
+| Figure | Figure size, margins, subplot grid, colour scheme and palette |
 | Series | Per-curve line style, marker, color, curve fitting |
 | Axes | Labels, limits, scales, ticks, secondary Y axis |
 | Annotations | Subplot titles, legend, text/arrow/image annotations |
@@ -104,14 +104,14 @@ In the **Data** tab, select a chart type from the dropdown — Line, Scatter, Ba
 
 ### 4. Style the chart
 
-- **Style** tab: set background color, grid, figure size.
+- **Figure** tab: set background color, colour scheme, figure size.
 - **Series** tab: change line color, width, marker style.
 - **Axes** tab: set axis labels, limits and scale.
 - **Annotations** tab: add a legend, subplot title, or text annotations.
 
 ### 5. Export
 
-In the **Chart** tab, choose a format (PNG, SVG, PDF, JPEG) and click **Export Chart**. The DPI and figure dimensions set in the Style tab are used for the exported file.
+In the **Chart** tab, choose a format (PNG, SVG, PDF, JPEG) and click **Export Chart**. The DPI and figure dimensions set in the Figure tab are used for the exported file.
 
 ### 6. Save your work
 

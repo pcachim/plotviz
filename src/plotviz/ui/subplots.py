@@ -237,7 +237,8 @@ class SubplotMixin:
             self.global_sp_active.setCurrentIndex(0)  # set index while signals still blocked
             self.global_sp_active.blockSignals(False)
         if hasattr(self, '_global_sp_container'):
-            self._global_sp_container.setVisible(n > 1)
+            self._global_sp_container.setVisible(True)
+            self.global_sp_active.setEnabled(n > 1)
         if hasattr(self, '_axes_title_section'):
             _was_single = not self._axes_title_section.isVisible()
             self._axes_title_section.setVisible(n > 1)
@@ -463,7 +464,7 @@ class SubplotMixin:
         self._filter_series_table_by_subplot(idx)
         # Load per-subplot chart option group values into their widgets
         self._load_chart_opts(idx)
-        # Load per-subplot canvas/grid values into Layout tab widgets
+        # Load per-subplot canvas/grid values into the canvas and grid widgets (Axes tab)
         self._load_canvas_grid_opts(idx)
 
         # ── Sync chart_type_combo / plot_mode_combo to this subplot's state ─────
