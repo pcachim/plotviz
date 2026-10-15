@@ -64,6 +64,6 @@ Below the series table are two extra dropdowns:
 
 ## Chart type selection
 
-The **Chart type** dropdown at the top of the Data tab sets the default type for the entire chart. Individual series can override this with their own Type cell.
+The **Chart type** dropdown at the top of **Plots → Plot** sets the default type for the entire chart. Individual series can override this with their own Type cell.
 
 See [Chart Types](chart-types.md) for a full description of every chart type and its options.

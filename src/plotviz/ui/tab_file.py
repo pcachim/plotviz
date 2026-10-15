@@ -5,12 +5,13 @@ You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 
 ui/tab_file.py  –  plotviz
-FileTabMixin: create_file_tab(): open/save/export controls.
+FileTabMixin: create_file_tab(): the Data tab (datasets + Generate page); also builds the
+subplot-grid, palette and colour-scheme panels that the Figure tab shows.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QSpinBox, QPushButton, QListWidget,
-    QCheckBox, QScrollArea,
+    QCheckBox, QScrollArea, QTabWidget,
 )
 from ui.tab_constants import (
     COLOR_PALETTES,
@@ -26,50 +27,8 @@ class FileTabMixin:
         layout = QVBoxLayout(content)
         layout.setSpacing(6)
 
-        # ── Open row ──────────────────────────────────────────────────────────
-        open_row = QHBoxLayout()
-        open_row.setSpacing(4)
-        self._open_combo = QComboBox()
-        self._open_combo.addItems(['Open Chart…', 'Load Template…'])
-        open_row.addWidget(self._open_combo, 1)
-        btn_open_go = QPushButton('📂 Open')
-        btn_open_go.setFixedWidth(80)
-        def _do_open():
-            if self._open_combo.currentIndex() == 0: self._load_project()
-            else: self._load_template()
-        btn_open_go.clicked.connect(_do_open)
-        open_row.addWidget(btn_open_go)
-        layout.addLayout(open_row)
-
-        # ── Recent files ──────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Recent Files'))
-        self._recent_list = QListWidget()
-        self._recent_list.setMaximumHeight(110)
-        self._recent_list.setToolTip('Double-click to open')
-        self._recent_list.itemDoubleClicked.connect(self._open_recent_file)
-        layout.addWidget(self._recent_list)
-
-        # ── Save row ──────────────────────────────────────────────────────────
-        save_row = QHBoxLayout()
-        save_row.setSpacing(4)
-        self._save_combo = QComboBox()
-        self._save_combo.addItems(['Save Chart', 'Save Chart As…', 'Save Template…'])
-        save_row.addWidget(self._save_combo, 1)
-        btn_save_go = QPushButton('💾 Save')
-        btn_save_go.setFixedWidth(80)
-        def _do_save():
-            i = self._save_combo.currentIndex()
-            if i == 0: self._save_project()
-            elif i == 1: self._save_project_as()
-            else: self._save_template()
-        btn_save_go.clicked.connect(_do_save)
-        save_row.addWidget(btn_save_go)
-        layout.addLayout(save_row)
-
-        # ── Export row ────────────────────────────────────────────────────────
-        exp_row = QHBoxLayout()
-        exp_row.setSpacing(4)
-        # Hidden widgets kept for settings persistence (export_format / export_dpi)
+        # Hidden widgets kept for settings persistence (export_format / export_dpi);
+        # exporting itself is File > Export Image.
         self._export_fmt_combo = QComboBox()
         self._export_fmt_combo.addItems(['PNG', 'SVG', 'PDF', 'JPEG', 'TIFF', 'EPS'])
         self._export_fmt_combo.setVisible(False)
@@ -79,12 +38,6 @@ class FileTabMixin:
         self.dpi_spin.setValue(300)
         self.dpi_spin.setVisible(False)
         layout.addWidget(self.dpi_spin)
-        btn_export_go = QPushButton('⬆ Export Image…')
-        btn_export_go.clicked.connect(lambda: self.export_chart())
-        exp_row.addWidget(btn_export_go)
-        layout.addLayout(exp_row)
-
-        layout.addWidget(self._hline())
 
         # ── Subplot Grid ──────────────────────────────────────────────────────
         self._subplot_grid_panel = QWidget()
@@ -226,4 +179,9 @@ class FileTabMixin:
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)
         mlay.addWidget(scroll)
-        self.tabs.addTab(widget, 'Chart')
+
+        # Data tab = the loaded datasets, and the generators that create new ones
+        self.data_inner_tabs = QTabWidget()
+        self.data_inner_tabs.addTab(widget, 'Datasets')
+        self.data_inner_tabs.addTab(self._advanced_panel, 'Generate')
+        self.tabs.addTab(self.data_inner_tabs, 'Data')

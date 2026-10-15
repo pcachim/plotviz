@@ -52,7 +52,7 @@ class TestTabLayout(unittest.TestCase):
         return widget is page or page.isAncestorOf(widget)
 
     def test_inner_tab_order_follows_the_workflow(self):
-        self.assertEqual(self._inner(), ["Data", "Series", "Axes", "Annotations"])
+        self.assertEqual(self._inner(), ["Plot", "Curves", "Axes", "Annotations"])
 
     def test_canvas_borders_and_grid_live_with_the_axes(self):
         w = self.w
@@ -65,7 +65,7 @@ class TestTabLayout(unittest.TestCase):
         from ui.canvas import CanvasPlotter
         self.assertEqual(self._inner()[CanvasPlotter._INNER_AXES], "Axes")
         self.assertEqual(self._inner()[CanvasPlotter._INNER_LAYOUT], "Axes")
-        self.assertEqual(self._inner()[CanvasPlotter._INNER_SERIES], "Series")
+        self.assertEqual(self._inner()[CanvasPlotter._INNER_SERIES], "Curves")
         self.assertEqual(self._inner()[CanvasPlotter._INNER_ANNOTATIONS], "Annotations")
 
     def test_the_subplot_selector_is_always_shown(self):
@@ -87,16 +87,16 @@ class TestTabLayout(unittest.TestCase):
     def test_whole_figure_settings_share_the_figure_tab(self):
         w = self.w
         self.assertEqual([w.tabs.tabText(i) for i in range(w.tabs.count())],
-                         ["Chart", "Figure", "Plots", "Advanced"])
+                         ["Data", "Figure", "Plots"])
         for widget in (w.fig_width, w.fig_left, w.title_input, w.sp_hspace,
                        w._subplot_grid_panel, w._cs_combo, w.palette_combo, w.chart_bg_color_swatch):
             self.assertTrue(self._in_outer(widget, "Figure"), widget)
 
-    def test_the_chart_tab_keeps_files_and_datasets(self):
+    def test_the_data_tab_has_datasets_and_generators(self):
         w = self.w
-        for widget in (w._recent_list, w._save_combo, w.dataset_list):
-            self.assertTrue(self._in_outer(widget, "Chart"), widget)
-        self.assertFalse(self._in_outer(w.palette_combo, "Chart"))
+        self.assertTrue(self._in_outer(w.dataset_list, "Data"))
+        self.assertTrue(self._in_outer(w.gen_x_min, "Data"))      # the generators
+        self.assertFalse(self._in_outer(w.palette_combo, "Data"))
 
 
 if __name__ == "__main__":

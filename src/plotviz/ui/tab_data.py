@@ -163,7 +163,7 @@ class DataTabMixin:
         mlay = QVBoxLayout(widget)
         mlay.setContentsMargins(0,0,0,0)
         mlay.addWidget(scroll)
-        self.plots_inner_tabs.addTab(widget, 'Data')
+        self.plots_inner_tabs.addTab(widget, 'Plot')
         self._on_plot_mode_changed('Standard')
 
         # Dummy sp_chart_type — kept for compat

@@ -59,7 +59,7 @@ Minor grid controls (color, style, width, alpha) mirror the major grid controls.
 
 ## Color palettes
 
-The **Color palette** dropdown in the Chart tab sets the default cycle of colors assigned to new series. plotviz includes 11 built-in palettes and supports user-created custom palettes.
+The **Color palette** dropdown in the Figure tab sets the default cycle of colors assigned to new series. plotviz includes 11 built-in palettes and supports user-created custom palettes.
 
 See [Color Palettes](palettes.md) for the full palette reference.
 
@@ -86,9 +86,8 @@ A color scheme is a named preset that applies a coordinated set of colors to the
 
 ### Applying a color scheme
 
-1. Open the **Chart** tab.
-2. Select a scheme from the **Color Schemes** dropdown.
-3. Click **Apply**.
+1. Open the **Figure** tab.
+2. Choose a scheme from the **Color Schemes** dropdown. It is applied at once; use Ctrl+Z to undo.
 
 The five colored swatches next to the dropdown show a preview of BG, Plot, FG, Grid, and Title colors for the selected scheme.
 

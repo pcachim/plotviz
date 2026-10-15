@@ -90,6 +90,29 @@ class TestMenus(unittest.TestCase):
             w._undo_stack, w._redo_stack = saved
             w._update_undo_buttons()
 
+    def test_open_recent_lists_the_recent_charts(self):
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            a, b = os.path.join(d, "a.pviz"), os.path.join(d, "b.pviz")
+            for fp in (a, b):
+                open(fp, "w").close()
+            with mock.patch("config.settings.get_recent_files", return_value=[a, b]):
+                self.win._rebuild_recent_files_ui()
+            self.assertEqual([x.text() for x in self.win._recent_menu.actions()],
+                             ["a.pviz", "b.pviz"])
+            with mock.patch.object(self.win, "_load_project_from_path") as load:
+                self.win._recent_menu.actions()[1].trigger()
+            load.assert_called_once_with(b)
+
+    def test_open_recent_says_so_when_empty(self):
+        from unittest import mock
+        with mock.patch("config.settings.get_recent_files", return_value=[]):
+            self.win._rebuild_recent_files_ui()
+        acts = self.win._recent_menu.actions()
+        self.assertEqual([x.text() for x in acts], ["No recent charts"])
+        self.assertFalse(acts[0].isEnabled())
+
     def test_every_entry_has_a_status_tip(self):
         missing = [a.text() for a in self._actions()
                    if a.menu() is None and not a.statusTip()

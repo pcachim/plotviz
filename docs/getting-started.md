@@ -74,13 +74,11 @@ The plotviz window has two main areas:
 
 | Tab | Purpose |
 |-----|---------|
-| Chart | Open/save files, export, datasets |
-| Data | Load datasets, series table, chart type |
-| Figure | Figure size, margins, subplot grid, colour scheme and palette |
-| Series | Per-curve line style, marker, color, curve fitting |
-| Axes | Labels, limits, scales, ticks, secondary Y axis |
-| Annotations | Subplot titles, legend, text/arrow/image annotations |
-| Advanced | Function generator, manual data entry table |
+| Data | Loaded datasets, and the **Generate** page (function generators, data table) |
+| Figure | Whole-figure settings: size, margins, title, subplot grid, colour scheme, palette |
+| Plots | Per-subplot settings, with a **Editing** selector at the top when there are several subplots |
+
+The **Plots** tab has four pages: **Plot** (chart type, series table, options), **Curves** (per-curve line style, marker, colour, curve fitting), **Axes** (labels, limits, scales, ticks, secondary Y axis, canvas colours, borders, grid) and **Annotations** (subplot title, legend, text/arrow/image annotations). Opening, saving and exporting are in the **File** menu.
 
 **Right panel — canvas**
 
@@ -92,26 +90,26 @@ The live chart preview updates as you change settings. Use the matplotlib toolba
 
 ### 1. Load data
 
-Click **Data** tab → **Browse Files** and open a CSV, Excel, JSON or TXT file. plotviz reads all numeric and categorical columns and lists them in the dataset panel.
+Click the **Data** tab → **Browse Files** and open a CSV, Excel, JSON or TXT file. plotviz reads all numeric and categorical columns and lists them in the dataset panel.
 
 ### 2. Assign columns to series
 
-In the series table, use the **X** and **Y** dropdowns to pick which columns to plot. The **Label** column sets the legend entry. Add more rows with the **+ Add series** button.
+In **Plots → Plot**, in the series table, use the **X** and **Y** dropdowns to pick which columns to plot. The **Label** column sets the legend entry. Add more rows with the **+ Add series** button.
 
 ### 3. Choose a chart type
 
-In the **Data** tab, select a chart type from the dropdown — Line, Scatter, Bar, and so on. The canvas updates instantly.
+In **Plots → Plot**, select a chart type from the dropdown — Line, Scatter, Bar, and so on. The canvas updates instantly.
 
 ### 4. Style the chart
 
 - **Figure** tab: set background color, colour scheme, figure size.
-- **Series** tab: change line color, width, marker style.
-- **Axes** tab: set axis labels, limits and scale.
-- **Annotations** tab: add a legend, subplot title, or text annotations.
+- **Plots → Curves**: change line color, width, marker style.
+- **Plots → Axes**: set axis labels, limits, scale, grid and canvas colours.
+- **Plots → Annotations**: add a legend, subplot title, or text annotations.
 
 ### 5. Export
 
-In the **Chart** tab, choose a format (PNG, SVG, PDF, JPEG) and click **Export Chart**. The DPI and figure dimensions set in the Figure tab are used for the exported file.
+Choose **File → Export Image…**, pick a format (PNG, SVG, PDF, JPEG) and a DPI. The DPI and figure dimensions set in the Figure tab are used for the exported file.
 
 ### 6. Save your work
 
