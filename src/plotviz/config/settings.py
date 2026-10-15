@@ -33,6 +33,8 @@ CFG_FILE = _CFG_DIR / 'settings.json'
 # Subdirectory names for user-managed data (seeded from the bundled data/ dir)
 PLOTS_DIR_NAME    = 'plots'
 DATASETS_DIR_NAME = 'datasets'
+SCHEMES_DIR_NAME  = 'schemes'    # your colour schemes (.pvizc), loaded at start-up
+PALETTES_DIR_NAME = 'palettes'   # your colour palettes (.pvizp), loaded at start-up
 
 # Maximum number of recent files to track
 MAX_RECENT = 12
@@ -40,9 +42,6 @@ MAX_RECENT = 12
 DEFAULTS: dict = {
     # UI appearance
     'theme':            'System',   # 'System' | 'Light' | 'Dark'
-
-    # Active colour palette name
-    'color_palette':    'Matplotlib',
 
     # Last directory used in any open / save dialog
     'last_dir':         str(Path.home() / 'Documents')
@@ -74,8 +73,11 @@ DEFAULTS: dict = {
     # Figure size preset remembered across sessions
     'fig_preset':       'Custom',
 
+    # Which collapsible sections of the Layout & Style tab are open (key → bool)
+    'section_open':     {},
+
     # Custom palettes the user has created (name → list-of-hex)
-    'custom_palettes':  {},
+    'custom_palettes':  {},   # legacy: palettes now live in .pvizp files; migrated at start-up
 }
 
 
@@ -176,6 +178,28 @@ def plots_dir() -> Path:
     p = _CFG_DIR / PLOTS_DIR_NAME
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def schemes_dir() -> Path:
+    """Return (and guarantee creation of) the folder of your colour schemes."""
+    p = _CFG_DIR / SCHEMES_DIR_NAME
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def palettes_dir() -> Path:
+    """Return (and guarantee creation of) the folder of your colour palettes."""
+    p = _CFG_DIR / PALETTES_DIR_NAME
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def in_folder(filepath: str, folder: Path) -> bool:
+    """True when *filepath* lies directly in *folder* (so it is loaded at start-up)."""
+    try:
+        return Path(filepath).resolve().parent == Path(folder).resolve()
+    except OSError:
+        return False
 
 
 def datasets_dir() -> Path:

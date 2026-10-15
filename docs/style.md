@@ -30,6 +30,8 @@ The **DPI** spinbox (default 100) sets the resolution of exported PNG and JPEG f
 
 ### Chart background
 
+The figure background and the foreground are edited in **Edit scheme…**. The plot area is in the Canvas & Grid tab.
+
 - **Chart BG** — the outer figure background (outside the plot area). Default white.
 - **Plot BG** — the inner plot area background. Default white.
 - **Foreground** — the default color for axes, tick marks, tick labels, and spines. Default black.
@@ -95,19 +97,28 @@ A color scheme is a named preset that applies a coordinated set of colors to the
 
 The five colored swatches next to the dropdown show a preview of BG, Plot, FG, Grid, and Title colors for the selected scheme.
 
-### Saving a custom color scheme
+### The active scheme
 
-Style the chart exactly as you want it, then:
+The scheme shown in the dropdown is the **active scheme**: the colours of the chart *are* that scheme. It tracks the eight colours (figure and plot background, foreground, title, X and Y labels, grid and minor grid), whether the grid, minor grid and each border are shown, and the palette. Fonts, sizes and grid line style are applied with a scheme but are not tracked.
 
-1. Click **💾 Save scheme…** in the Color Schemes section.
-2. Enter a name for the scheme.
-3. Choose a save location — the file is saved as a `.pvizc` file.
+- **Built-in schemes are read-only.** The first time you change anything they track, plotviz makes an editable copy, `<name> – edited`, and makes it active. Every further change goes into that copy. If you change everything back, the copy is dropped.
+- **Your own schemes** (made with **Edit scheme…** or loaded from a file) are edited in place.
+- **Switching schemes never loses anything** during the session: the scheme you leave stays in the dropdown.
+- A **\*** after a name means the scheme is not in the **schemes folder**, so it will not be there next time. Saving it into the folder removes the *.
+- With several subplots, the grid, plot background, foreground and borders are per subplot. Changing them there is a local adjustment and does not touch the scheme, and **Apply to: Active subplot only** leaves the active scheme as it is.
+- A chart file (`.pviz`) stores its active scheme, name and values, so the chart looks the same when reopened.
 
-The scheme is registered in the dropdown for the rest of the session and can be reloaded in future sessions by clicking **📂 Load scheme…**.
+### Editing a color scheme
+
+Click **Edit** in the Color Schemes section to create or change a scheme in one place: the eight colours, grid and border switches and the palette. **Load from** starts from another scheme. **Save & apply** names the scheme, makes it active and applies it. Built-in names cannot be replaced.
+
+### Saving a color scheme
+
+Click **Save** in the Color Schemes section. The dialog opens in the schemes folder (`~/Library/Application Support/plotviz/schemes/` on macOS; Preferences shows it and can open it), and every `.pvizc` there is loaded when plotviz starts. You may save elsewhere, but then the scheme keeps its * and is not loaded at start-up. Built-in schemes cannot be saved. To delete a scheme, delete its file.
 
 ### Loading a color scheme
 
-Click **📂 Load scheme…** and select a `.pvizc` file. You are asked whether to apply it immediately. A `.pvizt` template file can also be loaded as a color source — only the color-related settings are extracted.
+Click **Load** and select a single `.pvizc` file, for instance one from outside the folder. You are asked whether to apply it, and applying it makes it the active scheme. A `.pvizt` template file can also be loaded as a color source — only the color-related settings are extracted.
 
 ---
 

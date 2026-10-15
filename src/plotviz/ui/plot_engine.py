@@ -1885,12 +1885,18 @@ class PlotEngineMixin:
 
     def update_preview(self):
         try:
+            if hasattr(self, '_refresh_style_summaries'):
+                self._refresh_style_summaries()
+            if hasattr(self, '_refresh_axes_summaries'):
+                self._refresh_axes_summaries()
             # Guard: bail silently if core widgets aren't built yet
             if not hasattr(self, 'canvas') or not hasattr(self, 'chart_type_combo'):
                 return
             # Guard: suppress intermediate redraws while _apply_settings is running.
             if getattr(self, '_applying_settings', False):
                 return
+            if hasattr(self, '_sync_active_scheme'):
+                self._sync_active_scheme()
             # Schedule snapshot on a debounce timer so it never blocks the render path.
             # _snapshot() calls _collect_settings() + deepcopy(datasets) which is expensive.
             if hasattr(self, '_snapshot'):

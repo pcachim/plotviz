@@ -4,8 +4,8 @@ This file is part of this project and is licensed under the GNU General Public L
 You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 
-ui/tab_data.py  –  plotviz
-DataTabMixin: create_data_tab(): dataset table and import controls.
+ui/tab_plot.py  –  plotviz
+PlotTabMixin: create_plot_tab(): the Plots > Plot page (plot mode, series selection and chart options).
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -20,8 +20,8 @@ from ui.tab_constants import (
 )
 
 
-class DataTabMixin:
-    def create_data_tab(self):
+class PlotTabMixin:
+    def create_plot_tab(self):
         widget = QWidget()
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)

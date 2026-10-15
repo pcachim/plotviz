@@ -21,9 +21,48 @@ from ui.tab_builders import (
 
 
 class PaletteColorMixin:
-    def _open_palette_editor(self):
-        """Open a dialog to create or edit a custom colour palette."""
+    # ── Palette registry ──────────────────────────────────────────────────────
+    # Built-in palettes are read-only. Your own live only in this session (marked with a
+    # *) until saved to a .pvizp file, exactly like colour schemes.
+    def _pad_palette(self, colors):
+        cols = list(colors)[:16]
+        return cols + ['#cccccc'] * (16 - len(cols))
 
+    def _register_palette(self, name: str, colors, unsaved: bool) -> str:
+        """Add or replace one of your palettes; returns the name used.
+
+        A clash with a built-in name gets a ' (file)' suffix: built-ins are never replaced.
+        """
+        if name in COLOR_PALETTES:
+            name += ' (file)'
+        add_custom_palette(name, self._pad_palette(colors))
+        if not hasattr(self, '_palette_unsaved'):
+            self._palette_unsaved = set()
+        (self._palette_unsaved.add if unsaved else self._palette_unsaved.discard)(name)
+        return name
+
+    def _rebuild_palette_combo(self):
+        """Refill the palette combo; unsaved palettes are marked with a *."""
+        combo = self.palette_combo
+        unsaved = getattr(self, '_palette_unsaved', set())
+        combo.blockSignals(True)
+        combo.clear()
+        for name in sorted(get_all_palettes(), key=str.casefold):
+            combo.addItem(name + (' *' if name in unsaved else ''), name)
+        combo.setCurrentIndex(max(0, combo.findData(getattr(self, '_color_palette', 'Matplotlib'))))
+        combo.blockSignals(False)
+        self._refresh_combo_icons()
+
+    def _on_palette_picked(self, index):
+        name = self.palette_combo.itemData(index)
+        if name:
+            self._on_palette_changed(name)
+
+    def _open_palette_editor(self):
+        """Create or edit one of your palettes; the result becomes the active palette."""
+        from PyQt6.QtWidgets import QComboBox as _QCB
+
+        active = getattr(self, '_color_palette', 'Matplotlib')
         dlg = QDialog(self)
         dlg.setWindowTitle('Palette Editor')
         dlg.setMinimumWidth(420)
@@ -32,7 +71,7 @@ class PaletteColorMixin:
         # ── Palette name ──────────────────────────────────────────────────────
         name_row = QHBoxLayout()
         name_row.addWidget(QLabel('Name:'))
-        name_edit = QLineEdit('My Palette')
+        name_edit = QLineEdit(active if active not in COLOR_PALETTES else 'My palette')
         name_row.addWidget(name_edit)
         vlay.addLayout(name_row)
 
@@ -40,13 +79,7 @@ class PaletteColorMixin:
         vlay.addWidget(QLabel('Colours (click to change):'))
         swatch_grid = QHBoxLayout()
         swatch_grid.setSpacing(4)
-
-        default_colors = list(self._active_palette_colors())
-        # Pad or trim to 16
-        while len(default_colors) < 16:
-            default_colors.append('#cccccc')
-        default_colors = default_colors[:16]
-        edit_colors = list(default_colors)
+        edit_colors = self._pad_palette(self._active_palette_colors())
 
         swatch_btns = []
         def _make_swatch(i):
@@ -73,15 +106,12 @@ class PaletteColorMixin:
         # ── Load from existing palette ─────────────────────────────────────────
         load_row = QHBoxLayout()
         load_row.addWidget(QLabel('Load from:'))
-        from PyQt6.QtWidgets import QComboBox as _QCB
         base_combo = _QCB()
         base_combo.addItems(list(get_all_palettes().keys()))
         load_row.addWidget(base_combo)
         def _load_base():
-            all_p = get_all_palettes()
-            cols = list(all_p.get(base_combo.currentText(), []))
-            while len(cols) < 16: cols.append('#cccccc')
-            for i, c in enumerate(cols[:16]):
+            cols = self._pad_palette(get_all_palettes().get(base_combo.currentText(), []))
+            for i, c in enumerate(cols):
                 edit_colors[i] = c
                 swatch_btns[i].setStyleSheet(
                     f'background:{c};border:1px solid #666;border-radius:3px;')
@@ -95,50 +125,82 @@ class PaletteColorMixin:
         # ── OK / Cancel ────────────────────────────────────────────────────────
         btns = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btns.button(QDialogButtonBox.StandardButton.Ok).setText('Save && apply')
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
         vlay.addWidget(btns)
 
-        if dlg.exec() != QDialog.DialogCode.Accepted:
+        while dlg.exec() == QDialog.DialogCode.Accepted:
+            pal_name = name_edit.text().strip()
+            if not pal_name:
+                QMessageBox.warning(self, 'Name required', 'Please enter a palette name.')
+                continue
+            if pal_name in COLOR_PALETTES:
+                QMessageBox.warning(self, 'Built-in palette',
+                    f'"{pal_name}" is a built-in palette and cannot be replaced.\n'
+                    'Please choose another name.')
+                continue
+            self._register_palette(pal_name, edit_colors, unsaved=True)
+            self._color_palette = pal_name
+            self._rebuild_palette_combo()
+            self._on_palette_changed(pal_name)
             return
 
-        pal_name = name_edit.text().strip()
-        if not pal_name:
-            QMessageBox.warning(self, 'Name required', 'Please enter a palette name.')
-            return
-
-        add_custom_palette(pal_name, list(edit_colors))
-
-        # Refresh combo and select the new palette
-        self.palette_combo.blockSignals(True)
-        if self.palette_combo.findText(pal_name) < 0:
-            self.palette_combo.addItem(pal_name)
-        self.palette_combo.setCurrentText(pal_name)
-        self.palette_combo.blockSignals(False)
-        self._on_palette_changed(pal_name)
+    def _load_palette_library(self):
+        """At start-up: bring palettes of an older version into the palettes folder, then
+        register every palette file found there."""
+        import logging
+        import re
+        import zipfile
+        import config.settings as settings
+        folder = settings.palettes_dir()
+        legacy = settings.get('custom_palettes') or {}
+        for name, colors in legacy.items():          # kept in the preferences until now
+            stem = re.sub(r'[\\/:*?"<>|]', '_', name).strip() or 'untitled'
+            fp = folder / (stem + '.pvizp')
+            if not fp.exists():
+                with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    zf.writestr('palette.json', json.dumps({name: colors}, indent=2))
+        if legacy:
+            settings.set('custom_palettes', {})
+        for fp in sorted(folder.glob('*.pvizp'), key=lambda f: f.name.casefold()):
+            try:
+                with zipfile.ZipFile(fp) as zf:
+                    text = zf.read('palette.json').decode()
+                self._load_custom_palettes_json(text, unsaved=False)
+            except Exception:  # noqa: BLE001 - one bad file must not stop the others
+                logging.getLogger('plotviz').warning('skipped palette %s', fp, exc_info=True)
+        self._rebuild_palette_combo()
 
     def _custom_palettes_json(self):
-        """Return _CUSTOM_PALETTES as a JSON string for saving."""
+        """Return all of your palettes as a JSON string."""
         return json.dumps(_CUSTOM_PALETTES, indent=2)
 
-    def _load_custom_palettes_json(self, json_str):
-        """Load custom palettes from a JSON string."""
+    def _active_palette_json(self):
+        """The active palette as JSON when it is one of yours (a chart file carries it)."""
+        name = getattr(self, '_color_palette', 'Matplotlib')
+        if name in _CUSTOM_PALETTES:
+            return json.dumps({name: _CUSTOM_PALETTES[name]}, indent=2)
+        return '{}'
+
+    def _load_custom_palettes_json(self, json_str, unsaved=True):
+        """Register palettes from a JSON string; returns the names registered.
+
+        From a chart file they are session-only (unsaved); from a .pvizp they are saved.
+        """
+        names = []
         try:
             data = json.loads(json_str)
             for name, colors in data.items():
-                add_custom_palette(name, colors)
-            # Rebuild combo
-            self.palette_combo.blockSignals(True)
-            from ui.tab_builders import get_all_palettes
-            existing = [self.palette_combo.itemText(i)
-                        for i in range(self.palette_combo.count())]
-            for name in get_all_palettes():
-                if name not in existing:
-                    self.palette_combo.addItem(name)
-            self.palette_combo.blockSignals(False)
-            self._refresh_combo_icons()
+                if (unsaved and name in _CUSTOM_PALETTES
+                        and self._pad_palette(colors) == list(_CUSTOM_PALETTES[name])):
+                    names.append(name)          # already here (e.g. from the palettes folder)
+                    continue
+                names.append(self._register_palette(name, colors, unsaved=unsaved))
         except (ValueError, AttributeError, TypeError, KeyError):
-            pass  # silently ignore corrupt palette data
+            return names                     # corrupt palette data: keep what was read
+        self._rebuild_palette_combo()
+        return names
 
     def _unlock_curve_color(self):
         """Remove the color lock from the currently selected curve."""

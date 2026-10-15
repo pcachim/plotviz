@@ -32,24 +32,29 @@ plotviz ships with 11 palettes:
 
 ## Custom palettes
 
-You can create your own palettes and save them for reuse.
+Palettes work like colour schemes: the built-in ones are read-only, and your own are files. Every `.pvizp` in the **palettes folder** is loaded when plotviz starts. Its location is shown in Preferences (**Colour palettes**), next to a button that opens it; on macOS it is `~/Library/Application Support/plotviz/palettes/`.
 
-### Creating a custom palette
+### Creating or editing a palette
 
-1. In the **Layout & Style** tab, click **Edit palette…** (or the palette management button).
-2. Click **New palette** and give it a name.
-3. Click each of the 16 color swatches to set the colors.
-4. Click **Save**.
+1. In the **Layout & Style** tab, click **Edit palette…**. It opens with the colours of the active palette; **Load from** starts from another one.
+2. Give it a name and click each of the 16 swatches to set the colours.
+3. Click **Save & apply**. The palette becomes the active one.
 
-The custom palette appears in the palette dropdown and is saved to user preferences immediately.
+Opening the editor on one of your own palettes edits it in place. Built-in names cannot be replaced.
 
-### Sharing palettes
+A **\*** after a palette's name in the dropdown means it is not in the palettes folder, so it will not be there next time. A new palette starts that way; saving it into the folder removes the *.
 
-Custom palettes can be exported to a `.pvizp` file and imported on another machine.
+### Sharing and keeping palettes
 
-**Export:** In the Layout & Style tab, click **📤 Save palette…**. All current custom palettes are saved to the file.
+**Save:** click **Save** under *Colour palette*. The dialog opens in the palettes folder; you can save anywhere else too, but a file outside the folder keeps its * and is not loaded at start-up. Built-in palettes cannot be saved, since they are always there. To delete a palette, delete its file.
 
-**Import:** Click **📂 Import palettes (.pvizp)**. The palettes from the file are merged into your current custom palette collection. Built-in palettes are not overwritten.
+**Load:** click **Load** and choose a single `.pvizp` file (for instance one from outside the folder). With one palette in the file you are asked whether to apply it.
+
+A chart file (`.pviz`) carries its active palette when it is one of yours, so the chart opens with the same colours.
+
+### Re-applying the palette
+
+Series whose colour you set by hand keep it when you change palette or scheme. **↺ Re-apply palette** (under the Edit / Load / Save buttons) gives every series its palette colour again, those included.
 
 See [File Formats](file-formats.md) for the `.pvizp` format specification.
 

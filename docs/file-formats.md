@@ -13,7 +13,7 @@ A `.pviz` file is a complete saved chart. It contains:
 | `settings.json` | All style, axis, and layout settings |
 | `series.json` | Series table rows, subplot assignments, Z and error column selections |
 | `data.json` | Dataset columns (all columns or used-only, depending on save choice) |
-| `palette.json` | Custom palette definitions (if any custom palettes are active) |
+| `palette.json` | The active palette's definition, when it is one of your own |
 | `images/` | Embedded image files referenced by image annotations |
 
 ### Saving
@@ -50,7 +50,7 @@ Select **Load Template (.pvizt)** from the open dropdown, or double-click a `.pv
 
 ## .pvizc — Color scheme
 
-A `.pvizc` file is a minimal settings file containing only color-related keys: background, foreground, plot area, grid, title/label colors, border visibility, and palette name. It does not contain axis limits, figure size, data, or series assignments.
+A `.pvizc` file is a minimal settings file containing only color-related keys: background, foreground, plot area, grid, title/label colors, border visibility, and the palette name. It also carries the palette's 16 colours (`_palette`), so the scheme looks the same on a machine that lacks that palette. It does not contain axis limits, figure size, data, or series assignments.
 
 | Entry | Contents |
 |-------|---------|
@@ -58,11 +58,11 @@ A `.pvizc` file is a minimal settings file containing only color-related keys: b
 
 ### Saving
 
-In the **Layout & Style** tab, Color Schemes section, click **💾 Save scheme…** (or **File → Save Scheme…**), enter a name, and choose a location.
+In the **Layout & Style** tab, Color Schemes section, click **Save** (or **File → Save Scheme…**). The dialog opens in the schemes folder, whose `.pvizc` files are loaded when plotviz starts; the file name is the scheme name.
 
 ### Loading
 
-Click **📂 Load scheme…** to open a `.pvizc` file. The scheme is registered in the Color Schemes dropdown for the session and you are asked whether to apply it immediately.
+Click **Load** to open a single `.pvizc` file. The scheme is registered in the Color Schemes dropdown (marked * when the file is outside the schemes folder) and you are asked whether to apply it immediately.
 
 Double-clicking a `.pvizc` file in Finder/Explorer applies it to the current chart silently.
 
@@ -70,21 +70,21 @@ Double-clicking a `.pvizc` file in Finder/Explorer applies it to the current cha
 
 ## .pvizp — Palette bundle
 
-A `.pvizp` file exports your custom color palettes so they can be shared or used on another machine.
+A `.pvizp` file holds one of your color palettes so it can be kept, shared or used on another machine. Every `.pvizp` in the palettes folder is loaded when plotviz starts.
 
 | Entry | Contents |
 |-------|---------|
-| `palettes.json` | All custom palette definitions (name → list of 16 hex colors) |
+| `palette.json` | The palette definition (name → list of 16 hex colors) |
 
 ### Saving
 
-In the **Layout & Style** tab, click **📤 Save palette…** (or **File → Save Palette…**).
+In the **Layout & Style** tab, click **Save** under *Colour palette* (or **File → Save Palette…**). The active palette is saved; built-in palettes are not.
 
 ### Loading
 
-Click **📂 Import palettes (.pvizp)**. The palettes are merged into the current session and saved to user preferences so they persist across restarts.
+Click **Load** under *Colour palette*. The palette is added to the current session (you are asked whether to apply it) and is marked as saved.
 
-Double-clicking a `.pvizp` file in Finder/Explorer imports and applies the palettes automatically.
+Double-clicking a `.pvizp` file in Finder/Explorer imports it.
 
 ---
 

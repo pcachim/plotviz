@@ -129,6 +129,6 @@ plotviz stores user preferences in a JSON file:
 | Linux | `~/.config/plotviz/settings.json` |
 | Windows | `%APPDATA%\plotviz\settings.json` |
 
-Stored preferences include the last-used directory, theme (System/Light/Dark), color palette, recent files list (up to 12), custom palettes, recent colors, and window geometry.
+Stored preferences include the last-used directory, theme (System/Light/Dark), recent files list (up to 12), recent colors; your colour schemes and palettes are files in the `schemes` and `palettes` folders beside it, and window geometry.
 
 To reset all settings to defaults, delete the `settings.json` file and restart the app.

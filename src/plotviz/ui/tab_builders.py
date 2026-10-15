@@ -9,14 +9,14 @@ TabBuildersMixin: composes the per-tab builder mixins (create_*_tab() methods).
 Shared constants live in ui.tab_constants and are re-exported here.
 """
 from ui.tab_helpers import WidgetHelpersMixin
-from ui.tab_file import FileTabMixin
 from ui.tab_data import DataTabMixin
+from ui.tab_plot import PlotTabMixin
 from ui.tab_chart_options import ChartOptionGroupsMixin
 from ui.tab_axes import AxesTabMixin
 from ui.tab_style import StyleTabMixin
-from ui.tab_series import SeriesTabMixin
+from ui.tab_curves import CurvesTabMixin
 from ui.tab_annotations import AnnotationsTabMixin
-from ui.tab_layout import LayoutTabMixin
+from ui.tab_plots import PlotsTabMixin
 from ui.tab_advanced import AdvancedTabMixin
 from ui.tab_constants import (  # noqa: F401  (re-exported for existing importers)
     _NO_X_TYPES,
@@ -35,5 +35,5 @@ from ui.tab_constants import (  # noqa: F401  (re-exported for existing importer
 )
 
 
-class TabBuildersMixin(WidgetHelpersMixin, FileTabMixin, DataTabMixin, ChartOptionGroupsMixin, AxesTabMixin, StyleTabMixin, SeriesTabMixin, AnnotationsTabMixin, LayoutTabMixin, AdvancedTabMixin):
+class TabBuildersMixin(WidgetHelpersMixin, DataTabMixin, PlotTabMixin, ChartOptionGroupsMixin, AxesTabMixin, StyleTabMixin, CurvesTabMixin, AnnotationsTabMixin, PlotsTabMixin, AdvancedTabMixin):
     """All create_*_tab() builders for PlotVizApp, one mixin per tab."""

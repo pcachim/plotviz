@@ -39,6 +39,9 @@ class DataMixin:
         paths_form = QFormLayout(grp_paths)
         paths_form.setSpacing(6)
 
+        import os as _os_mod
+        _os_sep = _os_mod.sep
+
         def _path_row(label, path_str):
             row = QHBoxLayout()
             row.setSpacing(4)
@@ -56,7 +59,10 @@ class DataMixin:
             paths_form.addRow(label, row)
 
         _path_row('Settings file:', str(_cfg.CFG_FILE))
-        _path_row('Config folder:', str(_cfg.CFG_FILE.parent))
+        # a trailing separator makes "containing folder" the folder itself
+        _path_row('Config folder:', str(_cfg.CFG_FILE.parent) + _os_sep)
+        _path_row('Colour schemes:', str(_cfg.schemes_dir()) + _os_sep)
+        _path_row('Colour palettes:', str(_cfg.palettes_dir()) + _os_sep)
 
         lay.addWidget(grp_paths)
 

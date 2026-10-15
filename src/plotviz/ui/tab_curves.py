@@ -4,8 +4,8 @@ This file is part of this project and is licensed under the GNU General Public L
 You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 
-ui/tab_series.py  –  plotviz
-SeriesTabMixin: create_series_tab(): series table and per-series options.
+ui/tab_curves.py  –  plotviz
+CurvesTabMixin: create_curves_tab(): the Plots > Curves page (per-curve options and curve fit).
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -18,9 +18,9 @@ from ui.tab_constants import (
 )
 
 
-class SeriesTabMixin:
+class CurvesTabMixin:
     # ─── Series tab ───────────────────────────────────────────────────────────
-    def create_series_tab(self):
+    def create_curves_tab(self):
         widget = QWidget()
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)

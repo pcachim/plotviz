@@ -10,6 +10,7 @@ Mixin providing settings collection/apply, series meta, and project save/load.
 import logging
 import json, zipfile, os, tempfile
 from ui.helpers import _get_dir, _remember_dir
+from ui.tab_builders import get_all_palettes, _CUSTOM_PALETTES
 from core.serialize import (
     encode_datasets, decode_datasets, write_project_zip, read_project_zip,
 )
@@ -133,6 +134,12 @@ class SerializationMixin:
 
         # Style
         s['color_palette']  = getattr(self, '_color_palette', 'Matplotlib')
+        # The active colour scheme travels with the chart: its name and its values
+        if hasattr(self, '_scheme_unsaved'):
+            _name = self._active_scheme
+            _cur = self._tracked_scheme_values() or {}
+            s['color_scheme_name'] = _name
+            s['color_scheme'] = {**self._COLOR_SCHEME_REGISTRY.get(_name, {}), **_cur}
         s['preset']         = self.preset_combo.currentText()
         s['chart_bg_color'] = self.chart_bg_color
         s['chart_fg_color'] = self.chart_fg_color
@@ -376,14 +383,9 @@ class SerializationMixin:
 
         pal = s.get('color_palette', 'Matplotlib')
         self._color_palette = pal
-        # Add to combo if it's a custom palette not yet registered
-        if self.palette_combo.findText(pal) < 0:
-            self.palette_combo.addItem(pal)
-        i = self.palette_combo.findText(pal)
-        if i >= 0:
-            self.palette_combo.blockSignals(True)
-            self.palette_combo.setCurrentIndex(i)
-            self.palette_combo.blockSignals(False)
+        if pal not in get_all_palettes():       # a palette this session does not have
+            pal = self._color_palette = 'Matplotlib'
+        self._rebuild_palette_combo()
         self._refresh_palette_swatches()
 
         # Style preset (must restore before color overrides so they're not clobbered)
@@ -877,9 +879,9 @@ class SerializationMixin:
             self._refresh_palette_swatches()
         # Sync annotation canvas style from restored defaults
         self._sync_ann_style()
-        # Show which colour scheme the restored colours correspond to
-        if hasattr(self, '_sync_color_scheme_combo'):
-            self._sync_color_scheme_combo(s)
+        # Make the active colour scheme describe the restored chart
+        if hasattr(self, '_adopt_scheme_from_settings'):
+            self._adopt_scheme_from_settings(s)
 
     def _apply_series_meta(self, m):
         """Restore series table and subplot assignments from series.json dict."""
@@ -1067,20 +1069,32 @@ class SerializationMixin:
         return out
 
     def _export_palette_bundle(self):
-        """Save a .pvizp file containing only the custom colour palettes."""
-        _stem = (os.path.splitext(os.path.basename(self._current_filepath))[0]
-                 if getattr(self, '_current_filepath', None) else 'untitled')
+        """Save the active palette as a .pvizp file (built-in palettes are not saved)."""
+        name = getattr(self, '_color_palette', 'Matplotlib')
+        if name not in _CUSTOM_PALETTES:
+            QMessageBox.information(
+                self, 'Built-in palette',
+                f'"{name}" is a built-in palette and is always available.\n'
+                'Use Edit palette… to make a copy of your own, then save that.')
+            return
+        import config.settings as _cfg
         fp, _ = QFileDialog.getSaveFileName(
-            self, 'Save Palette', os.path.join(_get_dir(), _stem + '.pvizp'),
+            self, 'Save Palette',
+            os.path.join(str(_cfg.palettes_dir()), self._safe_file_stem(name) + '.pvizp'),
             'plotviz Palette Bundle (*.pvizp);;All Files (*)')
         if not fp: return
         _remember_dir(fp)
         if not fp.endswith('.pvizp'): fp += '.pvizp'
         try:
-            custom_pal_json = self._custom_palettes_json()
             with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr('palette.json', custom_pal_json)
-            QMessageBox.information(self, 'Saved', f'Palette bundle saved:\n{fp}')
+                zf.writestr('palette.json', self._active_palette_json())
+            inside = _cfg.in_folder(fp, _cfg.palettes_dir())
+            (self._palette_unsaved.discard if inside else self._palette_unsaved.add)(name)
+            self._rebuild_palette_combo()
+            note = ('' if inside else
+                    '\n\nIt is outside the plotviz palettes folder, so it is not loaded '
+                    'automatically at start-up (it stays marked with a *).')
+            QMessageBox.information(self, 'Saved', f'Palette saved:\n{fp}{note}')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
@@ -1101,13 +1115,25 @@ class SerializationMixin:
 
     def _import_palette_bundle_inner(self, fp: str):
         """Core logic for importing a .pvizp palette bundle — no dialogs."""
+        import config.settings as _cfg
         try:
             with zipfile.ZipFile(fp, 'r') as zf:
                 if 'palette.json' not in zf.namelist():
                     QMessageBox.warning(self, 'Invalid', 'No palette.json in file.')
                     return
-                self._load_custom_palettes_json(zf.read('palette.json').decode())
-            QMessageBox.information(self, 'Imported', 'Palette bundle imported.')
+                names = self._load_custom_palettes_json(
+                    zf.read('palette.json').decode(),
+                    unsaved=not _cfg.in_folder(fp, _cfg.palettes_dir()))
+            if len(names) == 1:
+                reply = QMessageBox.question(
+                    self, 'Apply?', f'Palette "{names[0]}" loaded.\nApply it now?',
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                if reply == QMessageBox.StandardButton.Yes:
+                    self._color_palette = names[0]
+                    self._rebuild_palette_combo()
+                    self._on_palette_changed(names[0])
+            else:
+                QMessageBox.information(self, 'Loaded', f'{len(names)} palettes loaded.')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
@@ -1292,7 +1318,7 @@ class SerializationMixin:
             tmp = fp + '.tmp'
             try:
                 write_project_zip(tmp, settings, series_meta, datasets,
-                                  palette_json=self._custom_palettes_json(),
+                                  palette_json=self._active_palette_json(),
                                   image_paths=image_paths)
                 _os.replace(tmp, fp)
             finally:

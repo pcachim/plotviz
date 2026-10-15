@@ -113,26 +113,219 @@ class TestColorSchemeCoverage(unittest.TestCase):
 
     def test_combo_follows_the_scheme_of_the_loaded_chart(self):
         w = self._window(chart="Line", mode="Standard")      # a plain white chart
-        scheme = dict(self.PlotVizApp._BUILTIN_COLOR_SCHEMES["Dark (charcoal)"])
-        w._apply_color_scheme_dict(scheme)
+        w._activate_scheme("Dark (charcoal)")
         saved = w._collect_settings()
+        self.assertEqual(saved["color_scheme_name"], "Dark (charcoal)")
         w2 = self._window(chart="Line", mode="Standard")
-        w2._cs_combo.setCurrentText("Dark (slate)")           # a stale selection
+        w2._select_scheme("Dark (slate)")                    # a stale selection
         w2._applying_settings = True
         try:
             w2._apply_settings(saved)
         finally:
             w2._applying_settings = False
-        self.assertEqual(w2._cs_combo.currentText(), "Dark (charcoal)")
-        # colours that match no scheme read '(custom)'
+        self.assertEqual(w2._active_scheme, "Dark (charcoal)")
+        # a chart whose colours differ from its built-in scheme becomes an editable copy
         saved["chart_bg_color"] = "#123456"
         w2._applying_settings = True
         try:
             w2._apply_settings(saved)
         finally:
             w2._applying_settings = False
-        self.assertEqual(w2._cs_combo.currentText(), "(custom)")
+        self.assertEqual(w2._active_scheme, "Dark (charcoal) – edited")
+        self.assertIn("Dark (charcoal) – edited", w2._scheme_unsaved)
+        self.assertEqual(w2._cs_combo.currentText(), "Dark (charcoal) – edited *")
+        self.assertEqual(w2._COLOR_SCHEME_REGISTRY["Dark (charcoal)"]["chart_bg_color"], "#1e1e2e")
 
+    def test_a_chart_file_brings_its_own_scheme_back(self):
+        w = self._window(chart="Line", mode="Standard")
+        w._register_scheme("Mine", {**w._COLOR_SCHEME_REGISTRY["Ivory"],
+                                    "chart_bg_color": "#abcdef"}, unsaved=True)
+        w._activate_scheme("Mine")
+        saved = w._collect_settings()
+        w2 = self._window(chart="Line", mode="Standard")
+        self.assertNotIn("Mine", w2._COLOR_SCHEME_REGISTRY)
+        w2._applying_settings = True
+        try:
+            w2._apply_settings(saved)
+        finally:
+            w2._applying_settings = False
+        self.assertEqual(w2._active_scheme, "Mine")
+        self.assertIn("Mine", w2._scheme_unsaved)            # exists only in this session
+        self.assertEqual(w2._COLOR_SCHEME_REGISTRY["Mine"]["chart_bg_color"], "#abcdef")
+
+    def test_editing_a_builtin_makes_an_editable_copy(self):
+        w = self._window(chart="Line", mode="Standard")
+        w._activate_scheme("Ivory")
+        w.chart_bg_color = "#102030"                         # an edit made anywhere in the UI
+        w._sync_active_scheme()
+        self.assertEqual(w._active_scheme, "Ivory – edited")
+        self.assertEqual(w._COLOR_SCHEME_REGISTRY["Ivory"]["chart_bg_color"], "#fffff8")
+        self.assertEqual(w._COLOR_SCHEME_REGISTRY["Ivory – edited"]["chart_bg_color"], "#102030")
+        w.chart_fg_color = "#445566"                         # further edits go to the copy
+        w._sync_active_scheme()
+        self.assertEqual(w._active_scheme, "Ivory – edited")
+        self.assertEqual(w._COLOR_SCHEME_REGISTRY["Ivory – edited"]["chart_fg_color"], "#445566")
+        # switching away keeps it; coming back restores it
+        w._activate_scheme("Dark (slate)")
+        self.assertIn("Ivory – edited", w._COLOR_SCHEME_REGISTRY)
+        w._activate_scheme("Ivory – edited")
+        self.assertEqual(w.chart_bg_color, "#102030")
+
+    def test_a_copy_edited_back_to_its_origin_is_dropped(self):
+        w = self._window(chart="Line", mode="Standard")
+        w._activate_scheme("Ivory")
+        w.chart_bg_color = "#102030"
+        w._sync_active_scheme()
+        w.chart_bg_color = w._BUILTIN_COLOR_SCHEMES["Ivory"]["chart_bg_color"]
+        w._sync_active_scheme()
+        self.assertEqual(w._active_scheme, "Ivory")
+        self.assertNotIn("Ivory – edited", w._COLOR_SCHEME_REGISTRY)
+
+    def test_edits_go_into_a_scheme_of_your_own(self):
+        w = self._window(chart="Line", mode="Standard")
+        w._register_scheme("Mine", w._COLOR_SCHEME_REGISTRY["Ivory"], unsaved=False)
+        w._activate_scheme("Mine")
+        w.chart_bg_color = "#102030"
+        w._sync_active_scheme()
+        self.assertEqual(w._active_scheme, "Mine")           # no copy: it is edited in place
+        self.assertEqual(w._COLOR_SCHEME_REGISTRY["Mine"]["chart_bg_color"], "#102030")
+        self.assertIn("Mine", w._scheme_unsaved)             # no longer matches its file
+
+    def test_a_scheme_for_one_subplot_leaves_the_active_scheme_alone(self):
+        w = self._window(chart="Line", mode="Standard")
+        w.subplot_rows, w.subplot_cols = 1, 2
+        w._cs_target.setEnabled(True)
+        w._cs_target.setCurrentIndex(1)                      # Active subplot only
+        w._activate_scheme("Dark (charcoal)")
+        self.assertEqual(w._active_scheme, "Default (white)")
+        self.assertEqual(w._cs_combo.currentData(), "Default (white)")
+        w._sync_active_scheme()                              # per-subplot values are not tracked
+        self.assertEqual(w._active_scheme, "Default (white)")
+
+    def test_a_built_in_name_cannot_be_replaced_by_a_loaded_scheme(self):
+        w = self._window(chart="Line", mode="Standard")
+        name = w._register_scheme("Ivory", {"chart_bg_color": "#010203"}, unsaved=False)
+        self.assertEqual(name, "Ivory (file)")
+        self.assertEqual(w._COLOR_SCHEME_REGISTRY["Ivory"]["chart_bg_color"], "#fffff8")
+
+
+    def test_palettes_follow_the_same_rules_as_schemes(self):
+        from ui.tab_constants import COLOR_PALETTES, _CUSTOM_PALETTES
+        w = self._window(chart="Line", mode="Standard")
+        self.addCleanup(_CUSTOM_PALETTES.pop, "mine", None)
+        self.addCleanup(_CUSTOM_PALETTES.pop, "Bold (file)", None)
+        name = w._register_palette("mine", ["#112233"] * 3, unsaved=True)
+        self.assertEqual(len(_CUSTOM_PALETTES[name]), 16)          # padded to 16 colours
+        w._rebuild_palette_combo()
+        i = w.palette_combo.findData("mine")
+        self.assertEqual(w.palette_combo.itemText(i), "mine *")    # exists only in this session
+        # picking it applies it, by the data and not by the label
+        w.palette_combo.setCurrentIndex(i)
+        self.assertEqual(w._color_palette, "mine")
+        self.assertEqual(w._active_palette_colors()[0], "#112233")
+        # a built-in is never replaced
+        self.assertEqual(w._register_palette("Bold", ["#000000"] * 16, unsaved=False), "Bold (file)")
+        self.assertEqual(COLOR_PALETTES["Bold"][0] == "#000000", False)
+        # only the active palette travels with a chart, and only when it is yours
+        self.assertIn("mine", w._active_palette_json())
+        w._color_palette = "Bold"
+        self.assertEqual(w._active_palette_json(), "{}")
+        # a chart file brings its palette back as a session palette
+        w._load_custom_palettes_json('{"mine": ["#445566"]}')
+        self.assertIn("mine", w._palette_unsaved)
+        self.assertEqual(_CUSTOM_PALETTES["mine"][0], "#445566")
+
+    def test_a_scheme_file_carries_its_palette_colours(self):
+        from ui.tab_constants import _CUSTOM_PALETTES
+        w = self._window(chart="Line", mode="Standard")
+        self.addCleanup(_CUSTOM_PALETTES.pop, "travelling", None)
+        w._adopt_palette_from_scheme_file(
+            {"_palette": {"name": "travelling", "colors": ["#0a0b0c"] * 16}})
+        self.assertEqual(_CUSTOM_PALETTES["travelling"][0], "#0a0b0c")
+        self.assertIn("travelling", w._palette_unsaved)
+
+    def test_reset_palette_releases_manual_colours_and_says_so(self):
+        w = self._window(chart="Line", mode="Standard")
+        lbl = next(iter(w.curve_styles))
+        w.curve_styles[lbl]["color"] = "#ff0000"
+        w.curve_styles[lbl]["color_locked"] = True
+        w._reset_all_color_locks()
+        self.assertFalse(w.curve_styles[lbl].get("color_locked"))
+        self.assertNotEqual(w.curve_styles[lbl]["color"], "#ff0000")
+        self.assertIn("1 manually", w.statusBar().currentMessage())
+
+    def _library(self):
+        """Point the preferences folder at an empty temporary one."""
+        import tempfile
+        from pathlib import Path
+        import config.settings as cfg
+        tmp = tempfile.TemporaryDirectory()
+        saved = (cfg._CFG_DIR, cfg.CFG_FILE, dict(cfg.settings))
+        cfg._CFG_DIR, cfg.CFG_FILE = Path(tmp.name), Path(tmp.name) / "settings.json"
+        def restore():
+            cfg._CFG_DIR, cfg.CFG_FILE = saved[0], saved[1]
+            cfg.settings.clear()
+            cfg.settings.update(saved[2])
+            tmp.cleanup()
+        self.addCleanup(restore)
+        return cfg
+
+    def test_start_up_loads_every_scheme_and_palette_in_the_folders(self):
+        import json
+        import zipfile
+        from ui.tab_constants import _CUSTOM_PALETTES
+        cfg = self._library()
+        self.addCleanup(_CUSTOM_PALETTES.pop, "shelf", None)
+        w = self._window(chart="Line", mode="Standard")
+        w._write_scheme_file(str(cfg.schemes_dir() / "Mine.pvizc"), "Mine",
+                             {**w._COLOR_SCHEME_REGISTRY["Ivory"], "chart_bg_color": "#abcdef"})
+        (cfg.schemes_dir() / "broken.pvizc").write_bytes(b"not a zip")
+        with zipfile.ZipFile(cfg.palettes_dir() / "shelf.pvizp", "w") as zf:
+            zf.writestr("palette.json", json.dumps({"shelf": ["#010203"] * 16}))
+        (cfg.palettes_dir() / "broken.pvizp").write_bytes(b"not a zip")
+        w._load_palette_library()
+        w._load_library_schemes()                                 # a bad file is skipped
+        self.assertEqual(w._COLOR_SCHEME_REGISTRY["Mine"]["chart_bg_color"], "#abcdef")
+        self.assertNotIn("Mine", w._scheme_unsaved)                # in the folder: no *
+        self.assertGreaterEqual(w._cs_combo.findData("Mine"), 0)
+        self.assertEqual(_CUSTOM_PALETTES["shelf"][0], "#010203")
+        self.assertNotIn("shelf", w._palette_unsaved)
+        self.assertEqual(w.palette_combo.itemText(w.palette_combo.findData("shelf")), "shelf")
+
+    def test_palettes_kept_in_the_preferences_move_to_the_folder(self):
+        from ui.tab_constants import _CUSTOM_PALETTES
+        cfg = self._library()
+        self.addCleanup(_CUSTOM_PALETTES.pop, "Old one", None)
+        cfg.settings["custom_palettes"] = {"Old one": ["#0a0a0a"] * 16}
+        w = self._window(chart="Line", mode="Standard")
+        w._load_palette_library()
+        self.assertTrue((cfg.palettes_dir() / "Old one.pvizp").is_file())
+        self.assertEqual(cfg.settings["custom_palettes"], {})
+        self.assertNotIn("Old one", w._palette_unsaved)           # it is in the folder now
+
+    def test_a_star_means_not_in_the_folder(self):
+        import os
+        cfg = self._library()
+        self.assertTrue(cfg.in_folder(str(cfg.schemes_dir() / "x.pvizc"), cfg.schemes_dir()))
+        self.assertFalse(cfg.in_folder(os.path.join(os.path.dirname(cfg.schemes_dir()), "x.pvizc"),
+                                       cfg.schemes_dir()))
+        w = self._window(chart="Line", mode="Standard")
+        self.assertTrue(w._scheme_in_library(str(cfg.schemes_dir() / "x.pvizc")))
+        self.assertFalse(w._scheme_in_library(str(cfg.palettes_dir() / "x.pvizc")))
+
+    def test_a_scheme_file_round_trips_with_its_palette(self):
+        from ui.tab_constants import _CUSTOM_PALETTES
+        cfg = self._library()
+        self.addCleanup(_CUSTOM_PALETTES.pop, "carried", None)
+        w = self._window(chart="Line", mode="Standard")
+        w._register_palette("carried", ["#0a0b0c"] * 16, unsaved=True)
+        scheme = {**w._COLOR_SCHEME_REGISTRY["Ivory"], "color_palette": "carried"}
+        fp = str(cfg.schemes_dir() / "round.pvizc")
+        w._write_scheme_file(fp, "round", scheme)
+        _CUSTOM_PALETTES.pop("carried")                            # a machine without it
+        name, got = w._read_scheme_file(fp)
+        self.assertEqual((name, got["color_palette"]), ("round", "carried"))
+        self.assertEqual(_CUSTOM_PALETTES["carried"][0], "#0a0b0c")
 
     def test_the_light_schemes_are_distinct(self):
         from ui.tab_constants import COLOR_PALETTES
@@ -164,11 +357,10 @@ class TestColorSchemeCoverage(unittest.TestCase):
                        if combo.itemIcon(i).isNull() and combo.itemText(i) != "(custom)"]
             self.assertEqual(missing, [])
         # a palette added later gets its strip too
-        from ui.tab_constants import add_custom_palette
-        add_custom_palette("mine", ["#112233"] * 16)
-        w.palette_combo.addItem("mine")
+        w._register_palette("mine", ["#112233"] * 16, unsaved=True)
+        w._rebuild_palette_combo()
         w._refresh_palette_swatches()
-        self.assertFalse(w.palette_combo.itemIcon(w.palette_combo.findText("mine")).isNull())
+        self.assertFalse(w.palette_combo.itemIcon(w.palette_combo.findData("mine")).isNull())
 
 
     # ── Apply to: all subplots / the active subplot only ─────────────────────

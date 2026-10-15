@@ -10,15 +10,28 @@ AxesTabMixin: create_axes_tab(): axis labels, scales, limits, ticks, 3D viewpoin
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
     QSpinBox, QDoubleSpinBox, QPushButton, QCheckBox, QScrollArea, QButtonGroup, QRadioButton,
-    QGroupBox,
 )
 from PyQt6.QtCore import Qt
+from ui.collapsible import CollapsibleSection
 from ui.tab_constants import (
     _FONTS,
 )
 
 
 class AxesTabMixin:
+    def _refresh_axes_summaries(self):
+        for sec in getattr(self, '_axes_sections', ()):
+            sec.refresh_summary()
+
+    def _axis_summary(self, prefix):
+        """One-line summary of an axis (label and limits) for its closed section."""
+        label = getattr(self, prefix + 'label_input').text() or '(no label)'
+        if getattr(self, prefix + '_auto').isChecked():
+            lim = 'auto limits'
+        else:
+            lim = f'{getattr(self, prefix + "_min").value():g} – {getattr(self, prefix + "_max").value():g}'
+        return f'{label} · {lim}'
+
     # ─── Axes tab ─────────────────────────────────────────────────────────────
     def create_axes_tab(self):
         widget = QWidget()
@@ -26,9 +39,19 @@ class AxesTabMixin:
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget()
-        layout = QVBoxLayout(content)
-        layout.setSpacing(5)
-        layout.setContentsMargins(6, 6, 6, 6)
+        main = QVBoxLayout(content)
+        main.setSpacing(5)
+        main.setContentsMargins(6, 6, 6, 6)
+        layout = main          # where the rows are added: the open section's body
+        sections = []
+
+        def open_section(title, key, expanded, summary):
+            """Start a collapsible section; the following rows go into its body."""
+            nonlocal layout
+            sec = CollapsibleSection(title, key, expanded, summary)
+            main.addWidget(sec)
+            sections.append(sec)
+            layout = sec.body_layout
 
         # Helper: compact spinbox widths
         _SW = 60   # narrow spinbox (sizes, rotation)
@@ -49,11 +72,20 @@ class AxesTabMixin:
         self._axes_sp_row_widget.setVisible(False)
         layout.addWidget(self._axes_sp_row_widget)
 
+        # ── Equal Scale ───────────────────────────────────────────────────────
+        self.equal_scale_check = QCheckBox('Equal scale (1:1 aspect ratio)')
+        self.equal_scale_check.setToolTip(
+            'Force X and Y axes to use the same scale length (ax.set_aspect("equal")).\n'
+            'Useful for scatter plots, maps, and any data where distances should be preserved.'
+        )
+        self.equal_scale_check.stateChanged.connect(self._save_axes_state)
+        layout.addWidget(self.equal_scale_check)
+
         layout.addWidget(self._hline())
 
         # ══════════════════════════════════════════════════════════════════════
         # ── X Axis ────────────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('X Axis'))
+        open_section('X Axis', 'axes_x', True, lambda: self._axis_summary('x'))
 
         # Show checkbox
         self.xlabel_show_check = QCheckBox('Show X label')
@@ -274,11 +306,11 @@ class AxesTabMixin:
         xpos_row.addStretch()
         layout.addLayout(xpos_row)
 
-        layout.addWidget(self._hline())
+        main.addWidget(self._hline())
 
         # ══════════════════════════════════════════════════════════════════════
         # ── Y Axis (Left) ─────────────────────────────────────────────────────
-        layout.addWidget(self._sec_label('Y Axis (Left)'))
+        open_section('Y Axis (Left)', 'axes_y', True, lambda: self._axis_summary('y'))
 
         self.ylabel_show_check = QCheckBox('Show Y label')
         self.ylabel_show_check.setChecked(True)
@@ -488,22 +520,13 @@ class AxesTabMixin:
         ypos_row.addStretch()
         layout.addLayout(ypos_row)
 
-        layout.addWidget(self._hline())
-
-        # ── Equal Scale ───────────────────────────────────────────────────────
-        self.equal_scale_check = QCheckBox('Equal scale (1:1 aspect ratio)')
-        self.equal_scale_check.setToolTip(
-            'Force X and Y axes to use the same scale length (ax.set_aspect("equal")).\n'
-            'Useful for scatter plots, maps, and any data where distances should be preserved.'
-        )
-        self.equal_scale_check.stateChanged.connect(self._save_axes_state)
-        layout.addWidget(self.equal_scale_check)
-
+        layout = main
         layout.addWidget(self._hline())
 
         # ══════════════════════════════════════════════════════════════════════
         # ── Y Axis (Right / Secondary) ────────────────────────────────────────
-        layout.addWidget(self._sec_label('Y Axis (Right / Secondary)'))
+        open_section('Y Axis (Right / Secondary)', 'axes_y2', False,
+                     lambda: self._axis_summary('y2'))
         layout.addWidget(QLabel('(Activate by ticking Y2 in the Series table)'))
 
         self.y2label_show_check = QCheckBox('Show Y2 label')
@@ -617,13 +640,18 @@ class AxesTabMixin:
         y2auto_row.addStretch()
         layout.addLayout(y2auto_row)
 
+        layout = main
+
         layout.addWidget(self._hline())
 
         # ══════════════════════════════════════════════════════════════════════
         # ── Z Axis (3D Surface only) ──────────────────────────────────────────
-        self._z_axis_widget = QGroupBox('Z / Color Axis')
-        _zlay = QVBoxLayout(self._z_axis_widget)
-        _zlay.setSpacing(4)
+        # The section also holds the 3D viewpoint (built in create_canvas_grid_tab).
+        self._z_axis_widget = CollapsibleSection(
+            'Z / Color Axis', 'axes_z', True,
+            lambda: self.zlabel_input.text() or '(no label)')
+        sections.append(self._z_axis_widget)
+        _zlay = self._z_axis_widget.body_layout
 
         self.zlabel_show_check = QCheckBox('Show Z label')
         self.zlabel_show_check.setChecked(True)
@@ -687,9 +715,11 @@ class AxesTabMixin:
 
         self._z_axis_widget.setVisible(False)
         layout.addWidget(self._z_axis_widget)
-        layout.addWidget(self._layout_3d_view_widget)       # 3D viewpoint, built in create_layout_tab
+        _zlay.addWidget(self._layout_3d_view_widget)
 
         layout.addStretch()
+        self._axes_sections = sections
+        self._refresh_axes_summaries()
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)
         mlay.addWidget(scroll)

@@ -4,8 +4,9 @@ This file is part of this project and is licensed under the GNU General Public L
 You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 
-ui/tab_layout.py  –  plotviz
-LayoutTabMixin: create_layout_tab() and create_plots_tab(): figure size, subplots and plot-mode selection.
+ui/tab_plots.py  –  plotviz
+PlotsTabMixin: create_canvas_grid_tab() and create_plots_tab(): the Plots tab (subplot selector,
+Canvas & Grid page and the inner pages).
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -14,9 +15,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 
-class LayoutTabMixin:
+class PlotsTabMixin:
     # ─── Canvas & Grid tab (per subplot) ───────────────────────────────────────
-    def create_layout_tab(self):
+    def create_canvas_grid_tab(self):
         """Build the per-subplot canvas, border and grid controls, and the 3D viewpoint.
 
         The tab widget is kept in ``self._canvas_grid_tab`` and create_plots_tab()
@@ -248,9 +249,9 @@ class LayoutTabMixin:
 
         # ── Inner tab widget ──────────────────────────────────────────────────
         self.plots_inner_tabs = QTabWidget()
-        self.create_data_tab()
-        self.create_layout_tab()
-        self.create_series_tab()
+        self.create_plot_tab()
+        self.create_canvas_grid_tab()
+        self.create_curves_tab()
         self.create_axes_tab()
         self.plots_inner_tabs.addTab(self._canvas_grid_tab, 'Canvas && Grid')
         self.create_annotations_tab()

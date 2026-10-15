@@ -41,8 +41,7 @@ class _NavToolbar(SafeNavigationToolbar):
 
 from ui.canvas import CanvasPlotter
 from ui.tab_builders import (
-    TabBuildersMixin, COLOR_PALETTES, get_all_palettes, add_custom_palette,
-    _CUSTOM_PALETTES,
+    TabBuildersMixin, COLOR_PALETTES, get_all_palettes,
 )
 from ui.plot_engine import PlotEngineMixin
 from ui.serialization import SerializationMixin
@@ -652,7 +651,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.subplot_yticks_show    = {0: True}
         self._subplot_mosaic = None  # None = regular grid; list-of-lists = mosaic
         self._colour_mode  = 'system'  # track current scheme for serialization
-        self._color_palette = settings.get('color_palette', 'Matplotlib')
+        self._color_palette = 'Matplotlib'   # a new session starts from the first scheme's palette
         self.subplot_ann_visible  = {0: True}   # per-subplot annotation visibility
         self.subplot_equal_aspect = {0: False}  # per-subplot equal-scale (set_aspect('equal'))
         self.subplot_xaxis_pos    = {0: 'bottom'}  # x-axis position: bottom / top / zero
@@ -787,7 +786,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             'title_show':    True,
             'title_text':    'Welcome to plotviz',
             'title_size':    14,
-            'title_color':   '#222222',
             'grid_on':       True,
             'grid_color':    '#cccccc',
             'grid_linestyle': '-',
@@ -935,7 +933,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         geo = self.geometry()
         settings.set('window_geometry', [geo.x(), geo.y(), geo.width(), geo.height()])
         settings.set('window_maximised', self.isMaximized())
-        settings.set('color_palette', getattr(self, '_color_palette', 'Matplotlib'))
         settings.set('theme', getattr(self, '_colour_mode', 'system').capitalize()
                      if not hasattr(self, 'colour_scheme_combo')
                      else self.colour_scheme_combo.currentText())
@@ -945,8 +942,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             settings.set('export_dpi', self.dpi_spin.value())
         if hasattr(self, 'fig_preset_combo'):
             settings.set('fig_preset', self.fig_preset_combo.currentText())
-        # Persist any custom palettes to settings
-        settings.set('custom_palettes', dict(_CUSTOM_PALETTES))
         event.accept()
 
     def _restore_prefs_from_settings(self):
@@ -962,19 +957,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._apply_colour_scheme(theme)
 
         # Colour palette
-        pal = settings.get('color_palette') or 'Matplotlib'
-        # Register any saved custom palettes first
-        custom = settings.get('custom_palettes') or {}
-        if custom:
-            for name, colors in custom.items():
-                add_custom_palette(name, colors)
-                if self.palette_combo.findText(name) < 0:
-                    self.palette_combo.addItem(name)
-        pal_idx = self.palette_combo.findText(pal)
-        if pal_idx >= 0:
-            self.palette_combo.blockSignals(True)
-            self.palette_combo.setCurrentIndex(pal_idx)
-            self.palette_combo.blockSignals(False)
+        pal = 'Matplotlib'
+        # Your palettes and colour schemes are the files in their folders (palettes first:
+        # a scheme file can refer to one of them)
+        self._load_palette_library()
+        self._load_library_schemes()
         self._color_palette = pal
         self._refresh_palette_swatches()
 
@@ -1010,9 +997,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         self.tabs = QTabWidget()
         self.create_advanced_tab()   # built first: the Data tab shows it as its Generate page
-        self.create_file_tab()       # Data tab: datasets + generators
+        self.create_data_tab()       # Data tab: datasets + generators
         self.create_style_tab()      # Layout & Style tab: size, margins, colours, scheme, palette
-        self.create_plots_tab()      # subplot selector + Plot, Curves, Axes, Annotations
+        self.create_plots_tab()      # subplot selector + Plot, Curves, Axes, Canvas & Grid, Annotations
 
         # ── Menu bar — File ───────────────────────────────────────────────────
         from PyQt6.QtGui import QAction
@@ -1449,7 +1436,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         return colors[idx % len(colors)]
 
     def _refresh_palette_swatches(self):
-        """Update the 16 swatch squares in the Data tab to show the active palette."""
+        """Update the 16 swatch squares in the Layout & Style tab to show the active palette."""
         self._refresh_combo_icons()
         all_pals = get_all_palettes()
         pal_name = getattr(self, '_color_palette', 'Matplotlib')
@@ -1461,7 +1448,6 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     def _on_palette_changed(self, name):
         """Called when the palette combo changes. Updates state and re-colors unlocked series."""
         self._color_palette = name
-        settings.set('color_palette', name)
         self._refresh_palette_swatches()
         # Re-assign auto-colors to every series row that has no manually locked color.
         for row in range(self.series_table.rowCount()):
@@ -1512,10 +1498,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     def _reset_all_color_locks(self):
         """Remove color_locked from every series and re-apply the active palette."""
+        released = 0
         for row in range(self.series_table.rowCount()):
             lbl = self._resolve_series_label(row)
             s = self.curve_styles.get(lbl, {})
-            s.pop('color_locked', None)
+            released += bool(s.pop('color_locked', None))
             new_color = self._palette_color(self._local_palette_index(row))
             s['color'] = new_color
             s['marker_color'] = new_color
@@ -1523,7 +1510,11 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             # For Pie subplots, also update per-wedge entries keyed by x-value
             self._recolor_pie_wedges(row, self._local_palette_index(row))
         self._refresh_lock_indicator()
+        self.load_curve_style()          # refresh the colour swatches of the Curves tab
         self.update_preview()
+        self.statusBar().showMessage(
+            f'Palette re-applied: {released} manually coloured series released.'
+            if released else 'Palette re-applied: no series had a manual colour.', 5000)
 
     def _recolor_pie_wedges(self, row, palette_offset):
         """If the series at `row` belongs to a Pie subplot, assign palette colors

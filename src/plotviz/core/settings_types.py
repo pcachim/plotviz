@@ -237,6 +237,8 @@ class UiSettings(TypedDict, total=False):
     subplot_zlabel_rotation: dict[str, Any]
     subplot_zlabel_labelpad: dict[str, Any]
     color_palette: str
+    color_scheme_name: str
+    color_scheme: dict[str, Any]
     preset: str
     chart_bg_color: str
     chart_fg_color: str
