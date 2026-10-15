@@ -389,4 +389,4 @@ class SeriesTabMixin:
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)
         mlay.addWidget(scroll)
-        self.plots_inner_tabs.addTab(widget, 'Series')
+        self.plots_inner_tabs.addTab(widget, 'Curves')

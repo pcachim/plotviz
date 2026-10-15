@@ -6,7 +6,7 @@ A color palette is an ordered list of 16 colors used as the default cycle for se
 
 ## Selecting a palette
 
-In the **Chart** tab, choose a palette from the **Color palette** dropdown. The chart updates immediately, reassigning colors to all series that do not have a locked color.
+In the **Layout & Style** tab, choose a palette from the **Color palette** dropdown. The chart updates immediately, reassigning colors to all series that do not have a locked color.
 
 ---
 
@@ -36,7 +36,7 @@ You can create your own palettes and save them for reuse.
 
 ### Creating a custom palette
 
-1. In the **Chart** tab, click **Edit palettes…** (or the palette management button).
+1. In the **Layout & Style** tab, click **Edit palette…** (or the palette management button).
 2. Click **New palette** and give it a name.
 3. Click each of the 16 color swatches to set the colors.
 4. Click **Save**.
@@ -47,7 +47,7 @@ The custom palette appears in the palette dropdown and is saved to user preferen
 
 Custom palettes can be exported to a `.pvizp` file and imported on another machine.
 
-**Export:** In the Chart tab, click **💾 Export palettes (.pvizp)**. All current custom palettes are saved to the file.
+**Export:** In the Layout & Style tab, click **📤 Save palette…**. All current custom palettes are saved to the file.
 
 **Import:** Click **📂 Import palettes (.pvizp)**. The palettes from the file are merged into your current custom palette collection. Built-in palettes are not overwritten.
 

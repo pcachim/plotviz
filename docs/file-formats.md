@@ -18,15 +18,15 @@ A `.pviz` file is a complete saved chart. It contains:
 
 ### Saving
 
-In the **Chart** tab, click the **Save Chart (.pviz)** option from the save dropdown. A dialog asks whether to save **Used series only** (keeps only the columns currently assigned in the series table) or **All columns** (preserves every loaded column for future reassignment). Used-only files are smaller; all-columns files are more portable.
+Choose **File → Save Chart** (Ctrl+S). It rewrites the open file without asking; the first time, or with **Save Chart As…** (Ctrl+Shift+S), a dialog asks where to save. A dialog asks whether to save **Used series only** (keeps only the columns currently assigned in the series table) or **All columns** (preserves every loaded column for future reassignment). Used-only files are smaller; all-columns files are more portable.
 
 ### Loading
 
-Select **Open Chart (.pviz)** from the open dropdown, or double-click a `.pviz` file in Finder/Explorer. The chart, all datasets, and all settings are restored exactly.
+Choose **File → Open Chart…** (Ctrl+O), or double-click a `.pviz` file in Finder/Explorer. The chart, all datasets, and all settings are restored exactly.
 
 ### Recent files
 
-The last 12 opened `.pviz` files appear in the **Recent files** list in the Chart tab for quick access.
+The last 12 opened `.pviz` files appear in **File → Open Recent** for quick access.
 
 ---
 
@@ -58,7 +58,7 @@ A `.pvizc` file is a minimal settings file containing only color-related keys: b
 
 ### Saving
 
-In the **Chart** tab, Color Schemes section, click **💾 Save scheme…**, enter a name, and choose a location.
+In the **Layout & Style** tab, Color Schemes section, click **💾 Save scheme…** (or **File → Save Scheme…**), enter a name, and choose a location.
 
 ### Loading
 
@@ -78,7 +78,7 @@ A `.pvizp` file exports your custom color palettes so they can be shared or used
 
 ### Saving
 
-In the **Chart** tab, click **💾 Export palettes (.pvizp)**.
+In the **Layout & Style** tab, click **📤 Save palette…** (or **File → Save Palette…**).
 
 ### Loading
 

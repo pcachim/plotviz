@@ -160,5 +160,70 @@ class TestColorSchemeCoverage(unittest.TestCase):
         self.assertFalse(w.palette_combo.itemIcon(w.palette_combo.findText("mine")).isNull())
 
 
+    # ── Apply to: all subplots / the active subplot only ─────────────────────
+    def _multi(self):
+        w = self._window(types=["Line", "Bar", "Line", "Bar"])
+        w.update_preview()
+        return w
+
+    def test_apply_to_is_only_offered_with_several_subplots(self):
+        w = self._window(chart="Line", mode="Standard")
+        self.assertFalse(w._cs_target.isEnabled())
+        self.assertTrue(self._multi()._cs_target.isEnabled())
+
+    def test_a_scheme_can_be_applied_to_the_active_subplot_only(self):
+        w = self._multi()
+        before_fig = w.chart_bg_color
+        w.global_sp_active.setCurrentIndex(1)
+        w._cs_combo.setCurrentText("Dark (charcoal)")
+        w._cs_target.setCurrentIndex(1)                       # Active subplot only
+        w._cs_combo.activated.emit(w._cs_combo.currentIndex())
+        w.update_preview()                                    # must not undo it
+        opts = w.subplot_canvas_opts
+        self.assertEqual(opts[1]["plot_bg"], "#181825")
+        self.assertEqual(opts[1]["fg"], "#cdd6f4")
+        self.assertFalse(opts[1]["border_top"])
+        self.assertEqual(w.subplot_grid_opts[1]["color"], "#45475a")
+        self.assertEqual(w.subplot_title_color[1], "#cdd6f4")
+        for other in (0, 2, 3):                               # the rest is untouched
+            self.assertEqual(to_hex(opts[other]["plot_bg"]), "#ffffff", other)
+            self.assertTrue(opts[other]["border_top"], other)
+        self.assertEqual(to_hex(w.chart_bg_color), to_hex(before_fig))   # figure background too
+        facecolors = [to_hex(a.get_facecolor()) for a in w.canvas.figure.axes]
+        self.assertEqual(facecolors.count("#181825"), 1)
+
+    def test_loading_a_scheme_file_respects_apply_to(self):
+        import json
+        import tempfile
+        import zipfile
+        from unittest import mock
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        w = self._multi()
+        scheme = dict(self.PlotVizApp._BUILTIN_COLOR_SCHEMES["Dark (charcoal)"])
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "dark.pvizc")
+            with zipfile.ZipFile(fp, "w") as zf:
+                zf.writestr("settings.json", json.dumps({"_scheme_name": "mine", **scheme}))
+            w.global_sp_active.setCurrentIndex(2)
+            w._cs_target.setCurrentIndex(1)
+            asked = []
+            with mock.patch.object(QFileDialog, "getOpenFileName", return_value=(fp, "")), \
+                    mock.patch.object(QMessageBox, "question",
+                                      side_effect=lambda *a, **k: (asked.append(a[2]),
+                                                                   QMessageBox.StandardButton.Yes)[1]):
+                w._load_color_scheme()
+        self.assertIn("subplot 3", asked[0])                  # the question says where
+        opts = w.subplot_canvas_opts
+        self.assertEqual(opts[2]["plot_bg"], "#181825")
+        for other in (0, 1, 3):
+            self.assertEqual(to_hex(opts[other]["plot_bg"]), "#ffffff", other)
+
+    def test_all_subplots_is_still_the_default(self):
+        w = self._multi()
+        w._cs_combo.setCurrentText("Dark (charcoal)")
+        w._cs_combo.activated.emit(w._cs_combo.currentIndex())
+        self.assertTrue(all(o["plot_bg"] == "#181825" for o in w.subplot_canvas_opts.values()))
+
+
 if __name__ == "__main__":
     unittest.main()

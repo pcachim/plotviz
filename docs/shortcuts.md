@@ -4,23 +4,30 @@
 
 | Shortcut | Action |
 |----------|--------|
+| `Ctrl + N` | New chart |
+| `Ctrl + O` | Open chart |
+| `Ctrl + S` | Save chart (rewrites the open file; asks where the first time) |
+| `Ctrl + Shift + S` | Save chart as… |
+| `Ctrl + L` | Load data |
+| `Ctrl + E` | Export image |
+| `Ctrl + Shift + E` | Export Python bundle |
 | `Ctrl + Z` | Undo |
-| `Ctrl + Y` | Redo |
-| `Ctrl + Shift + Z` | Redo (alternative) |
+| `Ctrl + Y` or `Ctrl + Shift + Z` | Redo |
+| `Ctrl + Shift + C` | Copy the chart as an image (`Ctrl + C` keeps copying text in fields and tables) |
+| `Ctrl + ,` (macOS) / `Ctrl + Alt + S` | Preferences / Settings |
+| `Ctrl + Shift + B` | Seaborn Explorer |
+| `Ctrl + Shift + P` | Python Code Runner |
+| `Ctrl + Shift + R` | Code Runner from the current chart |
 
 ## Tab navigation (View menu)
 
-The **View** menu in the menu bar lists all seven tabs as checkable menu items. Click any item to switch to that tab. The active tab is shown with a checkmark.
+The **View** menu lists the three tabs as checkable items; the active one is ticked.
 
 | Menu item | Tab |
 |-----------|-----|
-| View → Chart | Chart tab |
-| View → Data | Data tab |
-| View → Style | Style tab |
-| View → Series | Series tab |
-| View → Axes | Axes tab |
-| View → Annotations | Annotations tab |
-| View → Advanced | Advanced tab |
+| View → Data | Datasets and the Generate page |
+| View → Layout & Style | Figure size, margins, title, subplot grid, colour scheme, palette |
+| View → Plots | Per-subplot settings: Plot, Curves, Axes, Annotations |
 
 ## Canvas (matplotlib toolbar)
 

@@ -989,10 +989,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         main_layout = QHBoxLayout(central)
 
         self.tabs = QTabWidget()
-        self.create_file_tab()
-        self.create_style_tab()      # figure size, margins, colours, grid
-        self.create_plots_tab()      # subplot selector + Data, Series, Axes, Annotations
-        self.create_advanced_tab()
+        self.create_advanced_tab()   # built first: the Data tab shows it as its Generate page
+        self.create_file_tab()       # Data tab: datasets + generators
+        self.create_style_tab()      # Layout & Style tab: size, margins, colours, scheme, palette
+        self.create_plots_tab()      # subplot selector + Plot, Curves, Axes, Annotations
 
         # ── Menu bar — File ───────────────────────────────────────────────────
         from PyQt6.QtGui import QAction
@@ -1000,19 +1000,19 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         file_menu = menubar.addMenu('File')
 
-        def _go_chart_tab():
-            self.tabs.setCurrentIndex(0)   # Chart / File tab
-
         def _go_data_tab():
-            self.tabs.setCurrentIndex(2)   # Plots tab
-            if hasattr(self, 'plots_inner_tabs'):
-                self.plots_inner_tabs.setCurrentIndex(0)  # Data inner tab
+            self.tabs.setCurrentIndex(0)   # Data tab, Datasets page
+            if hasattr(self, 'data_inner_tabs'):
+                self.data_inner_tabs.setCurrentIndex(0)
+
+        def _go_figure_tab():
+            self.tabs.setCurrentIndex(1)   # Layout & Style tab (palette and colour scheme)
 
         # ── New ───────────────────────────────────────────────────────────────
         act_new = QAction('New Chart', self)
         act_new.setStatusTip('Start a new, empty chart')
         act_new.setShortcut('Ctrl+N')
-        act_new.triggered.connect(lambda: (_go_chart_tab(), self._reset_app()))
+        act_new.triggered.connect(self._reset_app)
         file_menu.addAction(act_new)
 
         # ── Open / Load ───────────────────────────────────────────────────────
@@ -1022,27 +1022,30 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         act_open.setStatusTip('Open a chart (.pviz file)')
         act_open.setToolTip('Open a chart (.pviz file)')
         act_open.setShortcut('Ctrl+O')
-        act_open.triggered.connect(lambda: (_go_chart_tab(), self._load_project()))
+        act_open.triggered.connect(self._load_project)
         file_menu.addAction(act_open)
+
+        self._recent_menu = file_menu.addMenu('Open Recent')
+        self._rebuild_recent_files_ui()
 
         act_open_tpl = QAction('Load Template…', self)
         act_open_tpl.setStatusTip('Apply a template (.pvizt file): settings only, no data')
         act_open_tpl.setToolTip('Apply a template (.pvizt file): settings only, no data')
-        act_open_tpl.triggered.connect(lambda: (_go_chart_tab(), self._load_template()))
+        act_open_tpl.triggered.connect(self._load_template)
         file_menu.addAction(act_open_tpl)
 
         act_load_pal = QAction('Load Palette…', self)
         act_load_pal.setStatusTip('Load colour palettes from a .pvizp file')
         act_load_pal.setToolTip('Load colour palettes from a .pvizp file')
         act_load_pal.triggered.connect(
-            lambda: (_go_chart_tab(), self._import_palette_bundle()))
+            lambda: (_go_figure_tab(), self._import_palette_bundle()))
         file_menu.addAction(act_load_pal)
 
         act_load_scheme = QAction('Load Scheme…', self)
         act_load_scheme.setStatusTip('Load a colour scheme from a .pvizc file')
         act_load_scheme.setToolTip('Load a colour scheme from a .pvizc file')
         act_load_scheme.triggered.connect(
-            lambda: (_go_chart_tab(), self._load_color_scheme()))
+            lambda: (_go_figure_tab(), self._load_color_scheme()))
         file_menu.addAction(act_load_scheme)
 
         # ── Load Data ─────────────────────────────────────────────────────────
@@ -1061,34 +1064,34 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         act_save.setStatusTip('Save the chart to its .pviz file')
         act_save.setToolTip('Save the chart to its .pviz file')
         act_save.setShortcut('Ctrl+S')
-        act_save.triggered.connect(lambda: (_go_chart_tab(), self._save_project()))
+        act_save.triggered.connect(self._save_project)
         file_menu.addAction(act_save)
 
         act_save_as = QAction('Save Chart As…', self)
         act_save_as.setStatusTip('Save the chart as a new .pviz file')
         act_save_as.setToolTip('Save the chart as a new .pviz file')
         act_save_as.setShortcut('Ctrl+Shift+S')
-        act_save_as.triggered.connect(lambda: (_go_chart_tab(), self._save_project_as()))
+        act_save_as.triggered.connect(self._save_project_as)
         file_menu.addAction(act_save_as)
 
         act_save_tpl = QAction('Save Template…', self)
         act_save_tpl.setStatusTip('Save the settings, without data, as a .pvizt template')
         act_save_tpl.setToolTip('Save the settings, without data, as a .pvizt template')
-        act_save_tpl.triggered.connect(lambda: (_go_chart_tab(), self._save_template()))
+        act_save_tpl.triggered.connect(self._save_template)
         file_menu.addAction(act_save_tpl)
 
         act_save_pal = QAction('Save Palette…', self)
         act_save_pal.setStatusTip('Save the custom palettes as a .pvizp file')
         act_save_pal.setToolTip('Save the custom palettes as a .pvizp file')
         act_save_pal.triggered.connect(
-            lambda: (_go_chart_tab(), self._export_palette_bundle()))
+            lambda: (_go_figure_tab(), self._export_palette_bundle()))
         file_menu.addAction(act_save_pal)
 
         act_save_scheme = QAction('Save Scheme…', self)
         act_save_scheme.setStatusTip('Save the current colours as a .pvizc colour scheme')
         act_save_scheme.setToolTip('Save the current colours as a .pvizc colour scheme')
         act_save_scheme.triggered.connect(
-            lambda: (_go_chart_tab(), self._save_color_scheme()))
+            lambda: (_go_figure_tab(), self._save_color_scheme()))
         file_menu.addAction(act_save_scheme)
 
         # ── Export ────────────────────────────────────────────────────────────
@@ -1098,8 +1101,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         act_export_img.setStatusTip('Export the chart as PNG, SVG, PDF, JPEG, TIFF or EPS')
         act_export_img.setShortcut('Ctrl+E')
         act_export_img.triggered.connect(
-            lambda: (_go_chart_tab(),
-                     self.export_chart()))
+            lambda: self.export_chart())
         file_menu.addAction(act_export_img)
 
         act_export_py = QAction('Export Python Bundle…', self)
@@ -1107,7 +1109,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         act_export_py.setToolTip('Export the chart as a standalone Python script bundle (.pvizx)')
         act_export_py.setShortcut('Ctrl+Shift+E')
         act_export_py.triggered.connect(
-            lambda: (_go_chart_tab(), self._export_python_bundle()))
+            self._export_python_bundle)
         file_menu.addAction(act_export_py)
 
         self._file_menu = file_menu
@@ -1146,7 +1148,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             name = self.tabs.tabText(i)
             action = QAction(name, self)
             action.setCheckable(True)
-            action.setStatusTip(f'Show the {name} tab')
+            action.setStatusTip(f"Show the {name.replace('&&', '&')} tab")
             action.setChecked(i == 0)
             action.triggered.connect(lambda checked, idx=i: self.tabs.setCurrentIndex(idx))
             view_menu.addAction(action)
@@ -1175,8 +1177,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         cr_from_chart_action.setStatusTip(
             'Export the current chart as a .pvizx bundle and open it in the Code Runner')
         cr_from_chart_action.triggered.connect(
-            lambda: (self._go_chart_tab() if hasattr(self, '_go_chart_tab') else None,
-                     self._export_to_code_runner()))
+            self._export_to_code_runner)
         tools_menu.addAction(cr_from_chart_action)
 
         self._tools_menu = tools_menu
@@ -1269,7 +1270,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         btn_new = QPushButton('＋ New Chart')
         btn_new.setToolTip('Start a new blank chart (Ctrl+N)')
-        btn_new.clicked.connect(lambda: (self.tabs.setCurrentIndex(0), self._reset_app()))
+        btn_new.clicked.connect(self._reset_app)
         top_bar_layout.addWidget(btn_new)
 
         top_bar_layout.addStretch()
@@ -1509,19 +1510,27 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # RECENT FILES
     # ═══════════════════════════════════════════════════════════════════════════
     def _rebuild_recent_files_ui(self):
-        """Refresh the recent-files list widget in the File tab."""
-        if not hasattr(self, '_recent_list'):
+        """Refresh File > Open Recent from the saved list of recent charts."""
+        menu = getattr(self, '_recent_menu', None)
+        if menu is None:
             return
-        self._recent_list.clear()
-        for fp in settings.get_recent_files():
-            self._recent_list.addItem(os.path.basename(fp))
-            item = self._recent_list.item(self._recent_list.count() - 1)
-            item.setToolTip(fp)
-            item.setData(Qt.ItemDataRole.UserRole, fp)
+        menu.clear()
+        files = settings.get_recent_files()
+        names = [os.path.basename(fp) for fp in files]
+        for fp in files:
+            name = os.path.basename(fp)
+            if names.count(name) > 1:       # same name in two folders: say which
+                name = f'{name}  —  {os.path.basename(os.path.dirname(fp))}'
+            act = menu.addAction(name)
+            act.setToolTip(fp)
+            act.setStatusTip(fp)
+            act.triggered.connect(lambda _=False, p=fp: self._open_recent_file(p))
+        if not files:
+            empty = menu.addAction('No recent charts')
+            empty.setEnabled(False)
 
-    def _open_recent_file(self, item):
-        """Open a recently used chart file chosen from the list."""
-        fp = item.data(Qt.ItemDataRole.UserRole)
+    def _open_recent_file(self, fp):
+        """Open a recently used chart file chosen from File > Open Recent."""
         if not fp or not os.path.isfile(fp):
             QMessageBox.warning(self, 'Not found', f'File no longer exists:\n{fp}')
             settings.prune_recent_files()

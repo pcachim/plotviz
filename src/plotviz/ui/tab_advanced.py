@@ -646,4 +646,4 @@ class AdvancedTabMixin:
         mlay = QVBoxLayout(outer_widget)
         mlay.setContentsMargins(0,0,0,0)
         mlay.addWidget(outer_scroll)
-        self.tabs.addTab(outer_widget, 'Advanced')
+        self._advanced_panel = outer_widget      # shown by the Data tab (Generate page)

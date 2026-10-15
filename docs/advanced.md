@@ -1,6 +1,6 @@
 # Advanced
 
-The **Advanced** tab provides two tools for generating data without loading a file: the **Function Generator** and the **Data Table**.
+The **Data** tab's **Generate** page provides tools for generating data without loading a file: the **Function Generator** and the **Data Table**.
 
 ---
 
@@ -43,7 +43,7 @@ log(x + 1) / (1 + cos(x))
 1. Enter an expression in the **f(x)** field.
 2. Set the X range and number of points.
 3. Name the X and Y columns.
-4. Click **Generate** — the columns appear in the Datasets list and can be assigned to series in the Data tab.
+4. Click **Generate** — the columns appear in the Datasets list and can be assigned to series in **Plots → Plot**.
 
 Clicking **Generate** again with the same column names replaces the previous data.
 

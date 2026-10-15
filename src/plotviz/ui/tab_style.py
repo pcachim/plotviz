@@ -274,13 +274,24 @@ class StyleTabMixin:
 
         layout.addWidget(self._hline())
 
+        # ── Subplot grid (rows x columns; built in create_file_tab) ───────────
+        layout.addWidget(self._subplot_grid_panel)
+
+        layout.addWidget(self._hline())
+
         # ── Colors ────────────────────────────────────────────────────────────
         layout.addWidget(self._sec_label('Colors'))
         color_row('Background:',  'chart_bg_color', '#ffffff', 'chart_bg')
         color_row('Foreground:',  'chart_fg_color', '#000000', 'chart_fg')
 
+        # Colour scheme and palette (whole figure; built in create_file_tab)
+        layout.addWidget(self._hline())
+        layout.addWidget(self._scheme_panel)
+        layout.addWidget(self._hline())
+        layout.addWidget(self._palette_panel)
+
         layout.addStretch()
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)
         mlay.addWidget(scroll)
-        self.tabs.addTab(widget,'Style')
+        self.tabs.addTab(widget, 'Layout && Style')   # &&: a single & in Qt tab text

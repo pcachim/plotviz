@@ -8,7 +8,7 @@ When the chart has more than one subplot, the **Subplot** selector at the top of
 
 ## Subplot title
 
-The subplot title section is only visible when the chart has more than one panel. For a single-panel chart, the global chart title is set in the **Style** tab.
+The subplot title section is only visible when the chart has more than one panel. For a single-panel chart, the global chart title is set in the **Layout & Style** tab.
 
 | Control | Description |
 |---------|-------------|

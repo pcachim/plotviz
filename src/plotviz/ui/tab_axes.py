@@ -690,6 +690,9 @@ class AxesTabMixin:
 
         layout.addWidget(self._hline())
 
+        # Canvas, borders, grid and 3D viewpoint (per subplot, like everything above)
+        layout.addWidget(self._canvas_grid_panel)
+
         layout.addStretch()
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)

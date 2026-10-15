@@ -29,7 +29,7 @@ Select a series from the **Curve** dropdown to edit its style. Changes take effe
 
 ### Color auto-assignment
 
-When a palette is active (set in the Chart tab), plotviz assigns the next palette color to each new series automatically. If **Lock color** is off, switching palettes reassigns all unlocked series colors to match the new palette. Lock a color to keep it fixed across palette changes.
+When a palette is active (set in the Layout & Style tab), plotviz assigns the next palette color to each new series automatically. If **Lock color** is off, switching palettes reassigns all unlocked series colors to match the new palette. Lock a color to keep it fixed across palette changes.
 
 ---
 

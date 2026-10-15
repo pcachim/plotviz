@@ -1,6 +1,6 @@
 # Axes
 
-The **Axes** tab controls per-subplot axis configuration: labels, limits, scale, ticks, and the secondary Y axis. When the chart has more than one subplot, a **Subplot** selector at the top lets you switch between panels. Changing the selector in the Axes tab automatically syncs with the selectors in the Annotations and Series tabs.
+The **Axes** tab controls per-subplot axis configuration: labels, limits, scale, ticks, and the secondary Y axis. When the chart has more than one subplot, a **Subplot** selector at the top lets you switch between panels. Changing the selector in the Axes tab automatically syncs with the selectors in the other Plots pages.
 
 ---
 
@@ -72,7 +72,7 @@ The **Formatter** dropdown on each axis controls how tick values are displayed:
 
 ## Secondary Y axis (Y2)
 
-Enable the secondary Y axis by ticking the **Y2** checkbox on one or more series rows in the Data tab. The Y2 axis appears on the right side of the plot.
+Enable the secondary Y axis by ticking the **Y2** checkbox on one or more series rows in **Plots → Plot**. The Y2 axis appears on the right side of the plot.
 
 In the Axes tab, the Y2 section provides the same controls as the primary Y axis: label text/font/size/color, limits (auto or manual).
 

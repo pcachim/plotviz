@@ -211,8 +211,50 @@ class ColorSchemeMixin:
         full = self._collect_settings()
         return {k: full[k] for k in self._COLOR_SCHEME_KEYS if k in full}
 
-    def _apply_color_scheme_dict(self, scheme: dict):
-        """Apply a partial settings dict containing only color-scheme keys."""
+    # What a scheme can change for ONE subplot: its plot area, axes colour, borders,
+    # grid and title colour. Everything else in a scheme (figure background, palette,
+    # fonts, axis-label colours) belongs to the whole figure.
+    _SUBPLOT_CANVAS_KEYS = {'chart_fg_color': 'fg', 'plot_bg_color': 'plot_bg',
+                            'border_top': 'border_top', 'border_bottom': 'border_bottom',
+                            'border_left': 'border_left', 'border_right': 'border_right'}
+    _SUBPLOT_GRID_KEYS = {'grid_on': 'enabled', 'grid_color': 'color', 'grid_linestyle': 'ls',
+                          'grid_linewidth': 'lw', 'grid_alpha': 'alpha',
+                          'minor_grid_on': 'minor_enabled', 'minor_grid_color': 'minor_color',
+                          'minor_grid_linestyle': 'minor_ls', 'minor_grid_linewidth': 'minor_lw',
+                          'minor_grid_alpha': 'minor_alpha'}
+
+    def _apply_color_scheme_to_subplot(self, scheme: dict, idx: int):
+        """Apply the per-subplot part of *scheme* to subplot *idx* only (the active one)."""
+        self._save_canvas_grid_opts(idx)            # keep the widgets' current values
+        co = dict(self.subplot_canvas_opts.get(idx, self._default_canvas_opts()))
+        go = dict(self.subplot_grid_opts.get(idx, self._default_grid_opts()))
+        for key, dest in self._SUBPLOT_CANVAS_KEYS.items():
+            if key in scheme:
+                co[dest] = scheme[key]
+        for key, dest in self._SUBPLOT_GRID_KEYS.items():
+            if key in scheme:
+                go[dest] = scheme[key]
+        self.subplot_canvas_opts[idx] = co
+        self.subplot_grid_opts[idx] = go
+        if 'title_color' in scheme:
+            self.subplot_title_color[idx] = scheme['title_color']
+            self.sp_title_color = scheme['title_color']       # the Annotations-tab widget state
+            if hasattr(self, 'sp_title_color_label'):
+                self.sp_title_color_label.setStyleSheet(
+                    f"background-color:{scheme['title_color']};border:1px solid #888;"
+                    f"border-radius:2px;")
+        self._load_canvas_grid_opts(idx)                   # refresh the Axes-tab widgets
+        self.update_preview()
+
+    def _apply_color_scheme_dict(self, scheme: dict, subplot: int | None = None):
+        """Apply a partial settings dict containing only color-scheme keys.
+
+        With *subplot* only that subplot's share of the scheme is applied
+        (see _apply_color_scheme_to_subplot); otherwise the whole figure changes.
+        """
+        if subplot is not None:
+            self._apply_color_scheme_to_subplot(scheme, subplot)
+            return
         # Build a full settings dict from current state, overwrite scheme keys only
         full = self._collect_settings()
         full.update(scheme)
@@ -225,12 +267,23 @@ class ColorSchemeMixin:
             self._applying_settings = False
         self.update_preview()
 
+    def _scheme_target_subplot(self) -> int | None:
+        """The subplot a scheme is to be applied to, or None for the whole figure.
+
+        Follows the "Apply to" selector; with a single subplot it is always the figure.
+        """
+        if (getattr(self, '_cs_target', None) is not None
+                and self._cs_target.currentIndex() == 1
+                and self.subplot_rows * self.subplot_cols > 1):
+            return self.global_sp_active.currentIndex()
+        return None
+
     def _apply_color_scheme_selected(self):
         """Apply the scheme currently selected in the combo."""
         name = self._cs_combo.currentText()
         scheme = self._COLOR_SCHEME_REGISTRY.get(name)
         if scheme:
-            self._apply_color_scheme_dict(scheme)
+            self._apply_color_scheme_dict(scheme, subplot=self._scheme_target_subplot())
 
     def _save_color_scheme(self):
         """Save the current chart colors as a .pvizc color-scheme file."""
@@ -307,12 +360,14 @@ class ColorSchemeMixin:
             self._cs_combo.setCurrentText(name)
             self._refresh_combo_icons()
 
+            target = self._scheme_target_subplot()
+            where = 'to the whole figure' if target is None else f'to subplot {target + 1}'
             reply = QMessageBox.question(
                 self, 'Apply?',
-                f'Scheme "{name}" loaded.\nApply it now?',
+                f'Scheme "{name}" loaded.\nApply it {where} now?',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
-                self._apply_color_scheme_dict(scheme)
+                self._apply_color_scheme_dict(scheme, subplot=target)
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
@@ -331,6 +386,6 @@ class ColorSchemeMixin:
             if self._cs_combo.findText(name) < 0:
                 self._cs_combo.addItem(name)
             self._cs_combo.setCurrentText(name)
-            self._apply_color_scheme_dict(scheme)
+            self._apply_color_scheme_dict(scheme, subplot=self._scheme_target_subplot())
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
