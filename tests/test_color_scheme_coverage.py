@@ -146,6 +146,16 @@ class TestColorSchemeCoverage(unittest.TestCase):
         self.assertEqual(len({(s["plot_bg_color"], s["color_palette"]) for s in light}), 9)
 
 
+    def test_colormap_combos_show_their_gradients(self):
+        w = self._window(chart="Line", mode="Standard")
+        for name in ("cmap_combo", "tri_cmap_combo", "hist2d_cmap_combo", "hexbin_cmap_combo",
+                     "quiver_cmap_combo", "barbs_cmap_combo", "stream_cmap_combo",
+                     "scatter_cmap_combo"):
+            combo = getattr(w, name)
+            self.assertGreater(combo.count(), 10)
+            self.assertTrue(all(not combo.itemIcon(i).isNull() for i in range(combo.count())), name)
+
+
     def test_palette_and_scheme_combos_show_their_colours(self):
         w = self._window(chart="Line", mode="Standard")
         for combo in (w.palette_combo, w._cs_combo):

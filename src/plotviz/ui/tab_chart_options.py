@@ -62,7 +62,7 @@ class ChartOptionGroupsMixin:
         # ── Heatmap / Contour / 3D Surface ────────────────────────────────────
         self.heat_group = QGroupBox('Heatmap / Contour / 3D Options')
         hgb = QVBoxLayout(self.heat_group)
-        hgb.addLayout(_row(QLabel('Colormap:'), self._make_combo('cmap_combo', _CMAP_LIST, default='rainbow')))
+        hgb.addLayout(_row(QLabel('Colormap:'), self._make_cmap_combo('cmap_combo', _CMAP_LIST, default='rainbow')))
         # Bug 9: wrap Contour-levels and Interpolation rows in QWidget containers so
         # each can be independently shown/hidden depending on the active chart type.
         # - Contour levels: relevant for Contour only (not Heatmap, not 3D Surface)
@@ -177,7 +177,7 @@ class ChartOptionGroupsMixin:
         # ── Tricontour ────────────────────────────────────────────────────────
         self.tri_group = QGroupBox('Tricontour Options')
         tg = QVBoxLayout(self.tri_group)
-        tg.addLayout(_row(QLabel('Colormap:'),      self._make_combo('tri_cmap_combo', _CMAP_LIST, default='rainbow')))
+        tg.addLayout(_row(QLabel('Colormap:'),      self._make_cmap_combo('tri_cmap_combo', _CMAP_LIST, default='rainbow')))
         tg.addLayout(_row(QLabel('Levels:'),         self._make_spin('tri_levels', 3, 100, 10)))
         tg.addLayout(_row(QLabel('Alpha:'),          self._make_dbl_spin('tri_alpha', 0.05, 1.0, 1.0, 0.05)))
         tg.addLayout(_row(QLabel('Fill style:'), self._make_combo('tri_fill_mode',
@@ -326,7 +326,7 @@ class ChartOptionGroupsMixin:
         h2g.addLayout(_row(QLabel('Bins X:'), self._make_spin('hist2d_bins_x', 2, 200, 20),
                            QLabel('Y:'),      self._make_spin('hist2d_bins_y', 2, 200, 20)))
         h2g.addLayout(_row(QLabel('Alpha:'),  self._make_dbl_spin('hist2d_alpha', 0.05, 1.0, 1.0, 0.05)))
-        h2g.addLayout(_row(QLabel('Colormap:'), self._make_combo('hist2d_cmap_combo', _CMAP_LIST, default='rainbow')))
+        h2g.addLayout(_row(QLabel('Colormap:'), self._make_cmap_combo('hist2d_cmap_combo', _CMAP_LIST, default='rainbow')))
         self.hist2d_colorbar = QCheckBox('Show colorbar')
         self.hist2d_colorbar.setChecked(True)
         self.hist2d_colorbar.stateChanged.connect(self.update_preview)
@@ -341,7 +341,7 @@ class ChartOptionGroupsMixin:
         hxg = QVBoxLayout(self.hexbin_group)
         hxg.addLayout(_row(QLabel('Grid size:'), self._make_spin('hexbin_gridsize', 5, 100, 20)))
         hxg.addLayout(_row(QLabel('Alpha:'),     self._make_dbl_spin('hexbin_alpha', 0.05, 1.0, 1.0, 0.05)))
-        hxg.addLayout(_row(QLabel('Colormap:'),  self._make_combo('hexbin_cmap_combo', _CMAP_LIST, default='rainbow')))
+        hxg.addLayout(_row(QLabel('Colormap:'),  self._make_cmap_combo('hexbin_cmap_combo', _CMAP_LIST, default='rainbow')))
         self.hexbin_colorbar = QCheckBox('Show colorbar')
         self.hexbin_colorbar.setChecked(True)
         self.hexbin_colorbar.stateChanged.connect(self.update_preview)
@@ -375,7 +375,7 @@ class ChartOptionGroupsMixin:
         self.quiver_color_by_mag = QCheckBox('Color by magnitude')
         self.quiver_color_by_mag.stateChanged.connect(self.update_preview)
         qvg.addWidget(self.quiver_color_by_mag)
-        qvg.addLayout(_row(QLabel('Colormap:'), self._make_combo('quiver_cmap_combo', _CMAP_LIST, default='rainbow')))
+        qvg.addLayout(_row(QLabel('Colormap:'), self._make_cmap_combo('quiver_cmap_combo', _CMAP_LIST, default='rainbow')))
         layout.addWidget(self.quiver_group)
 
         # ── Barbs ─────────────────────────────────────────────────────────────
@@ -389,7 +389,7 @@ class ChartOptionGroupsMixin:
         self.barbs_color_by_mag = QCheckBox('Color by magnitude')
         self.barbs_color_by_mag.stateChanged.connect(self.update_preview)
         brg.addWidget(self.barbs_color_by_mag)
-        brg.addLayout(_row(QLabel('Colormap:'),   self._make_combo('barbs_cmap_combo', _CMAP_LIST, default='rainbow')))
+        brg.addLayout(_row(QLabel('Colormap:'),   self._make_cmap_combo('barbs_cmap_combo', _CMAP_LIST, default='rainbow')))
         layout.addWidget(self.barbs_group)
 
         # ── Streamplot ────────────────────────────────────────────────────────
@@ -403,5 +403,5 @@ class ChartOptionGroupsMixin:
         self.stream_color_by_mag = QCheckBox('Color by magnitude')
         self.stream_color_by_mag.stateChanged.connect(self.update_preview)
         spg.addWidget(self.stream_color_by_mag)
-        spg.addLayout(_row(QLabel('Colormap:'),   self._make_combo('stream_cmap_combo', _CMAP_LIST, default='rainbow')))
+        spg.addLayout(_row(QLabel('Colormap:'),   self._make_cmap_combo('stream_cmap_combo', _CMAP_LIST, default='rainbow')))
         layout.addWidget(self.streamplot_group)

@@ -2157,11 +2157,13 @@ class PlotEngineMixin:
         """Ask for the export format and DPI.
 
         wi/hi are the figure size in inches (for the pixel-size read-out).
-        Returns (format_lowercase, dpi, action) with action 'save' or 'copy'
-        (copy to the clipboard instead of writing a file), or None if cancelled.
+        Returns (format_lowercase, dpi, action, each_subplot) with action 'save' or
+        'copy' (copy to the clipboard instead of writing a file) and each_subplot
+        True when every subplot is also to be saved as its own file; or None if
+        cancelled.
         """
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout,
-                                     QLabel, QComboBox, QSpinBox,
+                                     QLabel, QComboBox, QSpinBox, QCheckBox,
                                      QDialogButtonBox)
         from PyQt6.QtCore import Qt
 
@@ -2215,6 +2217,20 @@ class PlotEngineMixin:
         px_label.setWordWrap(True)
         grid.addWidget(px_label, 2, 1)
         px_text = {'text': ''}
+
+        n_subplots = self._n_export_subplots()
+        each_check = QCheckBox('Also save each subplot as its own file')
+        each_check.setChecked(bool(getattr(self, '_export_each_subplot', False)) and n_subplots > 1)
+        each_check.setEnabled(n_subplots > 1)
+        each_check.setToolTip(
+            'The whole figure is always saved. This adds one file per subplot, named\n'
+            'name_1, name_2…, each keeping its own proportions and sized so that its\n'
+            'longer side matches the longer side of the figure.\n'
+            'Axis labels, twin axes, legends inside the plot and colorbars come along;\n'
+            'the figure title and a shared figure legend do not.\n'
+            'Vector formats (SVG, PDF, EPS) keep the subplot\'s natural size.'
+            if n_subplots > 1 else 'Needs more than one subplot.')
+        grid.addWidget(each_check, 3, 1)
         from PyQt6.QtCore import QTimer
         size_timer = QTimer(pre)
         size_timer.setSingleShot(True)
@@ -2298,7 +2314,10 @@ class PlotEngineMixin:
 
         fmt     = fmt_combo.currentText().lower()
         dpi     = dpi_spin.value()
-        return fmt, dpi, chosen['action']
+        each    = each_check.isChecked()
+        if n_subplots > 1:
+            self._export_each_subplot = each
+        return fmt, dpi, chosen['action'], each
 
     def _build_export_figure(self, wi, hi, dpi):
         """Render the chart onto a fresh figure of wi x hi inches for export.
@@ -2312,6 +2331,7 @@ class PlotEngineMixin:
         exp_fig.patch.set_facecolor(self.chart_bg_color)
 
         axes_list, ax2_map, is3d, n = self._render_axes(exp_fig)
+        exp_fig._pviz_axes, exp_fig._pviz_ax2 = axes_list, ax2_map   # for per-subplot files
 
         # Apply margins — convert physical-unit spinbox values to fractions
         # The export measures its own text below, so it must not start from the
@@ -2364,6 +2384,80 @@ class PlotEngineMixin:
 
         return exp_fig
 
+    _RASTER_FMTS = ('png', 'jpeg', 'jpg', 'tiff')
+    _SUBPLOT_PAD_IN = 0.05
+
+    def _subplot_export_boxes(self, fig):
+        """Per subplot, the figure region (inches) holding it and what belongs to it.
+
+        That is the axes with its labels and ticks, its twin axis and its colorbar.
+        The figure title and a figure-level legend belong to no subplot and are left out.
+        """
+        axes_list = getattr(fig, '_pviz_axes', [])
+        twins = getattr(fig, '_pviz_ax2', {})
+        inv = fig.dpi_scale_trans.inverted()
+        boxes = []
+        for i, ax in enumerate(axes_list):
+            group = [ax] + ([twins[i]] if twins.get(i) is not None else [])
+            for cax in fig.axes:                      # colorbars of this subplot
+                cb = getattr(cax, '_colorbar', None)
+                if cb is not None and getattr(cb.mappable, 'axes', None) in group:
+                    group.append(cax)
+            box = None
+            for a in group:
+                try:
+                    bb = a.get_tightbbox()
+                except Exception:  # noqa: BLE001 - e.g. an axes type without a tight box
+                    bb = a.get_window_extent()
+                if bb is not None:
+                    box = bb if box is None else matplotlib.transforms.Bbox.union([box, bb])
+            boxes.append((group, box.transformed(inv)))
+        return boxes
+
+    def _n_export_subplots(self):
+        """How many subplots the chart has (a mosaic names its cells with letters)."""
+        mosaic = getattr(self, '_subplot_mosaic', None)
+        if mosaic is not None and self.subplot_rows * self.subplot_cols > 1:
+            return len({c for row in mosaic for c in row})
+        return self.subplot_rows * self.subplot_cols
+
+    @staticmethod
+    def _subplot_file_names(stem, ext, n):
+        return [f'{stem}_{i + 1}.{ext}' for i in range(n)]
+
+    def _save_subplot_files(self, fig, paths, wi, hi, dpi, mpl_fmt):
+        """Save each subplot of the export figure *fig* to its own file in *paths*.
+
+        A subplot keeps the proportions it has in the figure. Raster files are scaled
+        up so that the longer side is as long as the figure's longer side (same look,
+        more pixels); vector files keep the natural size, as they scale without loss.
+        """
+        from matplotlib.transforms import Bbox
+        boxes = self._subplot_export_boxes(fig)
+        raster = mpl_fmt in self._RASTER_FMTS
+        pad = self._SUBPLOT_PAD_IN
+        for path, (group, box) in zip(paths, boxes):
+            hidden = []
+            for a in fig.axes:                        # draw this subplot alone
+                if a not in group and a.get_visible():
+                    a.set_visible(False)
+                    hidden.append(a)
+            others = list(fig.texts) + list(fig.legends)
+            sup = getattr(fig, '_suptitle', None)
+            if sup is not None:
+                others.append(sup)
+            for t in others:
+                if t.get_visible():
+                    t.set_visible(False)
+                    hidden.append(t)
+            try:
+                crop = Bbox([[box.x0 - pad, box.y0 - pad], [box.x1 + pad, box.y1 + pad]])
+                scale = max(wi, hi) / max(crop.width, crop.height) if raster else 1.0
+                fig.savefig(path, dpi=dpi * scale, format=mpl_fmt, bbox_inches=crop)
+            finally:
+                for a in hidden:
+                    a.set_visible(True)
+
     def export_chart(self, fmt=None):
         try:
             import os
@@ -2379,7 +2473,7 @@ class PlotEngineMixin:
             opts = self._ask_export_options(wi, hi, fmt)
             if opts is None:
                 return
-            fmt, dpi, action = opts
+            fmt, dpi, action, each_subplot = opts
             ext     = 'jpg' if fmt == 'jpeg' else fmt
             mpl_fmt = 'jpeg' if fmt == 'jpeg' else fmt
 
@@ -2410,13 +2504,28 @@ class PlotEngineMixin:
                 self._export_fmt_combo.setCurrentIndex(_fi)
                 self._export_fmt_combo.blockSignals(False)
 
+            sub_paths = []
+            if each_subplot:
+                sub_paths = self._subplot_file_names(
+                    os.path.splitext(fp)[0], ext, self._n_export_subplots())
+                clash = [os.path.basename(q) for q in sub_paths if os.path.exists(q)]
+                if clash and QMessageBox.question(
+                        self, 'Replace files?',
+                        'These files already exist and will be replaced:\n\n'
+                        + '\n'.join(clash[:8]) + ('\n…' if len(clash) > 8 else '')
+                ) != QMessageBox.StandardButton.Yes:
+                    return
+
             with self._export_rc():
                 exp_fig = self._build_export_figure(wi, hi, dpi)
                 exp_fig.savefig(fp, dpi=dpi, format=mpl_fmt, bbox_inches=None)
+                if sub_paths:
+                    self._save_subplot_files(exp_fig, sub_paths, wi, hi, dpi, mpl_fmt)
                 plt.close(exp_fig)
 
             _remember_dir(fp)
-            QMessageBox.information(self, 'Success', f'Exported to {fp}')
+            extra = f'\n+ {len(sub_paths)} subplot files' if sub_paths else ''
+            QMessageBox.information(self, 'Success', f'Exported to {fp}{extra}')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 

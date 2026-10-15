@@ -162,7 +162,7 @@ class SeriesTabMixin:
         self.scatter_colorby_check = QCheckBox('Color by Z column')
         self.scatter_colorby_check.stateChanged.connect(self.update_preview)
         stsg.addWidget(self.scatter_colorby_check)
-        stsg.addLayout(_srow(QLabel('Colormap:'), self._make_combo('scatter_cmap_combo', _CMAP_LIST, default='rainbow')))
+        stsg.addLayout(_srow(QLabel('Colormap:'), self._make_cmap_combo('scatter_cmap_combo', _CMAP_LIST, default='rainbow')))
         layout.addWidget(self.st_scatter_group)
 
         # Bar series options

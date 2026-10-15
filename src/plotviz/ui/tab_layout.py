@@ -9,18 +9,19 @@ LayoutTabMixin: create_layout_tab() and create_plots_tab(): figure size, subplot
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QSpinBox, QDoubleSpinBox, QPushButton, QCheckBox, QGroupBox, QTabWidget, QSlider,
+    QSpinBox, QDoubleSpinBox, QPushButton, QCheckBox, QGroupBox, QTabWidget, QSlider, QScrollArea,
 )
 from PyQt6.QtCore import Qt
 
 
 class LayoutTabMixin:
-    # ─── Canvas + grid panel (per subplot; shown inside the Axes tab) ─────────
+    # ─── Canvas & Grid tab (per subplot) ───────────────────────────────────────
     def create_layout_tab(self):
-        """Build the per-subplot canvas, border, grid and 3D-viewpoint controls.
+        """Build the per-subplot canvas, border and grid controls, and the 3D viewpoint.
 
-        They are not a tab of their own: the panel is kept in
-        ``self._canvas_grid_panel`` and create_axes_tab() adds it to the Axes tab.
+        The tab widget is kept in ``self._canvas_grid_tab`` and create_plots_tab()
+        adds it. The 3D viewpoint is ``self._layout_3d_view_widget``; create_axes_tab()
+        places it with the Z axis.
         """
         content = QWidget()
         layout = QVBoxLayout(content)
@@ -158,8 +159,9 @@ class LayoutTabMixin:
 
         layout.addLayout(grid_row)
 
-        # ── 3D Viewpoint (shown only for 3D Surface charts) ───────────────────
-        layout.addWidget(self._hline())
+        layout.addStretch()
+
+        # ── 3D Viewpoint (shown only for 3D Surface charts; placed by the Axes tab)
         self._layout_3d_view_widget = QGroupBox('3D Viewpoint')
         _3dv_lay = QVBoxLayout(self._layout_3d_view_widget)
         _3dv_lay.setSpacing(5)
@@ -212,9 +214,13 @@ class LayoutTabMixin:
         _3dv_lay.addLayout(_3dv_btn_row)
 
         self._layout_3d_view_widget.setVisible(False)
-        layout.addWidget(self._layout_3d_view_widget)
 
-        self._canvas_grid_panel = content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        content.setContentsMargins(6, 6, 6, 6)
+        scroll.setWidget(content)
+        self._canvas_grid_tab = scroll
 
     # ─── Plots tab (container for subplot selector + inner tabs) ──────────────
     def create_plots_tab(self):
@@ -246,6 +252,7 @@ class LayoutTabMixin:
         self.create_layout_tab()
         self.create_series_tab()
         self.create_axes_tab()
+        self.plots_inner_tabs.addTab(self._canvas_grid_tab, 'Canvas && Grid')
         self.create_annotations_tab()
         outer_lay.addWidget(self.plots_inner_tabs)
 

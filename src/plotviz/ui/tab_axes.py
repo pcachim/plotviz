@@ -5,7 +5,7 @@ You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 
 ui/tab_axes.py  –  plotviz
-AxesTabMixin: create_axes_tab(): axis labels, scales, limits, ticks, grid.
+AxesTabMixin: create_axes_tab(): axis labels, scales, limits, ticks, 3D viewpoint.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
@@ -687,11 +687,7 @@ class AxesTabMixin:
 
         self._z_axis_widget.setVisible(False)
         layout.addWidget(self._z_axis_widget)
-
-        layout.addWidget(self._hline())
-
-        # Canvas, borders, grid and 3D viewpoint (per subplot, like everything above)
-        layout.addWidget(self._canvas_grid_panel)
+        layout.addWidget(self._layout_3d_view_widget)       # 3D viewpoint, built in create_layout_tab
 
         layout.addStretch()
         scroll.setWidget(content)

@@ -52,19 +52,24 @@ class TestTabLayout(unittest.TestCase):
         return widget is page or page.isAncestorOf(widget)
 
     def test_inner_tab_order_follows_the_workflow(self):
-        self.assertEqual(self._inner(), ["Plot", "Curves", "Axes", "Annotations"])
+        self.assertEqual(self._inner(), ["Plot", "Curves", "Axes", "Canvas && Grid", "Annotations"])
 
-    def test_canvas_borders_and_grid_live_with_the_axes(self):
+    def test_canvas_borders_and_grid_have_their_own_tab(self):
         w = self.w
         for widget in (w.border_top, w.border_left, w.grid_check, w.grid_linestyle,
-                       w.minor_grid_check, w.view3d_elev_spin):
+                       w.minor_grid_check):
+            self.assertTrue(self._in_tab(widget, "Canvas && Grid"), widget)
+
+    def test_the_3d_viewpoint_sits_with_the_z_axis(self):
+        w = self.w
+        for widget in (w.view3d_elev_spin, w.view3d_azim_spin):
             self.assertTrue(self._in_tab(widget, "Axes"), widget)
 
-    def test_clicking_the_plot_area_goes_to_the_axes_tab(self):
-        # The canvas jumps to the tab by index: it must still be the Axes tab.
+    def test_clicking_the_plot_area_goes_to_the_canvas_and_grid_tab(self):
+        # The canvas jumps to the tab by index: it must still be the right tab.
         from ui.canvas import CanvasPlotter
         self.assertEqual(self._inner()[CanvasPlotter._INNER_AXES], "Axes")
-        self.assertEqual(self._inner()[CanvasPlotter._INNER_LAYOUT], "Axes")
+        self.assertEqual(self._inner()[CanvasPlotter._INNER_LAYOUT], "Canvas && Grid")
         self.assertEqual(self._inner()[CanvasPlotter._INNER_SERIES], "Curves")
         self.assertEqual(self._inner()[CanvasPlotter._INNER_ANNOTATIONS], "Annotations")
 
@@ -159,9 +164,9 @@ class TestTabLayout(unittest.TestCase):
             return self.w._ask_export_options(8.0, 6.0, "png"), seen
 
     def test_the_export_dialog_can_copy_instead_of_save(self):
-        (fmt, dpi, action), _ = self._press("Copy to clipboard")
+        (fmt, dpi, action, _each), _ = self._press("Copy to clipboard")
         self.assertEqual((fmt, action), ("png", "copy"))
-        (fmt, dpi, action), seen = self._press("Save…")
+        (fmt, dpi, action, _each), seen = self._press("Save…")
         self.assertEqual(action, "save")
         self.assertIn("PNG", seen["tooltip"])                  # says what it copies
         self.assertIn(f"{dpi} dpi", seen["tooltip"])           # names the resolution
@@ -177,7 +182,7 @@ class TestTabLayout(unittest.TestCase):
         from PyQt6.QtWidgets import QApplication, QFileDialog
         QApplication.clipboard().clear()
         with mock.patch.object(type(self.w), "_ask_export_options",
-                               return_value=("png", 96, "copy")), \
+                               return_value=("png", 96, "copy", False)), \
                 mock.patch.object(QFileDialog, "getSaveFileName") as save_dialog:
             self.w.export_chart()
         save_dialog.assert_not_called()                         # no file was asked for

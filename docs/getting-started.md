@@ -78,7 +78,7 @@ The plotviz window has two main areas:
 | Layout & Style | Whole-figure settings: size, margins, title, subplot grid, colour scheme, palette |
 | Plots | Per-subplot settings, with a **Editing** selector at the top when there are several subplots |
 
-The **Plots** tab has four pages: **Plot** (chart type, series table, options), **Curves** (per-curve line style, marker, colour, curve fitting), **Axes** (labels, limits, scales, ticks, secondary Y axis, canvas colours, borders, grid) and **Annotations** (subplot title, legend, text/arrow/image annotations). Opening, saving and exporting are in the **File** menu.
+The **Plots** tab has five pages: **Plot** (chart type, series table, options), **Curves** (per-curve line style, marker, colour, curve fitting), **Axes** (labels, limits, scales, ticks, secondary Y axis, Z axis and 3D viewpoint), **Canvas & Grid** (plot-area colour, borders, major and minor grid) and **Annotations** (subplot title, legend, text/arrow/image annotations). Opening, saving and exporting are in the **File** menu.
 
 **Right panel — canvas**
 
@@ -110,6 +110,8 @@ In **Plots → Plot**, select a chart type from the dropdown — Line, Scatter, 
 ### 5. Export
 
 Click **⬆ Export** in the top bar (or **File → Export Image…**, Ctrl+E), pick a format (PNG, SVG, PDF, JPEG) and a DPI, then **Save…** to write a file or **Copy to clipboard** to paste the image into another app (raster formats only). The DPI and figure dimensions set in the Layout & Style tab are used for the exported file.
+
+With more than one subplot, tick **Also save each subplot as its own file** to get, besides the whole figure, one file per subplot (`name_1`, `name_2`, …). Each keeps its own proportions; raster files are scaled so the longer side matches the longer side of the figure, and vector files (SVG, PDF, EPS) keep the subplot's natural size. A subplot file includes its axis labels, twin axis, legend and colorbar, but not the figure title or a figure-wide legend. Existing files with those names are replaced after you confirm.
 
 ### 6. Save your work
 
