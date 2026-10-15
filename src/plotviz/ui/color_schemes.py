@@ -8,7 +8,22 @@ mixed into PlotVizApp, so methods share its widgets and `self` state.
 """
 import os
 
+from PyQt6.QtCore import QSize
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
+
+
+def swatch_icon(colors, cell=11, height=12) -> QIcon:
+    """A strip of small colour squares, for showing a palette or scheme in a combo."""
+    pm = QPixmap(cell * len(colors) + 1, height)
+    pm.fill(QColor(0, 0, 0, 0))
+    p = QPainter(pm)
+    for i, color in enumerate(colors):
+        p.fillRect(i * cell, 0, cell, height, QColor(color))
+    p.setPen(QColor('#888888'))
+    p.drawRect(0, 0, cell * len(colors), height - 1)
+    p.end()
+    return QIcon(pm)
 
 
 class ColorSchemeMixin:
@@ -169,8 +184,31 @@ class ColorSchemeMixin:
             self._cs_combo.addItem(found)
         self._cs_combo.setCurrentText(found)      # also refreshes the swatches
 
+    def _refresh_combo_icons(self):
+        """Show each palette's colours and each scheme's colours beside its name."""
+        from ui.tab_builders import get_all_palettes
+        combo = getattr(self, 'palette_combo', None)
+        if combo is not None:
+            pals = get_all_palettes()
+            combo.setIconSize(QSize(8 * 11 + 1, 12))
+            for i in range(combo.count()):
+                colors = pals.get(combo.itemText(i))
+                if colors:
+                    combo.setItemIcon(i, swatch_icon(colors[:8]))
+        combo = getattr(self, '_cs_combo', None)
+        if combo is not None:
+            combo.setIconSize(QSize(5 * 11 + 1, 12))
+            for i in range(combo.count()):
+                sch = self._COLOR_SCHEME_REGISTRY.get(combo.itemText(i))
+                if sch:
+                    combo.setItemIcon(i, swatch_icon([
+                        sch.get('chart_bg_color', '#ffffff'), sch.get('plot_bg_color', '#ffffff'),
+                        sch.get('chart_fg_color', '#000000'), sch.get('grid_color', '#cccccc'),
+                        sch.get('title_color', '#000000')]))
+
     def _refresh_cs_swatches(self):
         """Update the 5 preview swatches for the currently selected scheme."""
+        self._refresh_combo_icons()
         name = self._cs_combo.currentText()
         scheme = self._COLOR_SCHEME_REGISTRY.get(name, {})
         colors = [

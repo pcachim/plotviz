@@ -136,6 +136,7 @@ class PaletteColorMixin:
                 if name not in existing:
                     self.palette_combo.addItem(name)
             self.palette_combo.blockSignals(False)
+            self._refresh_combo_icons()
         except (ValueError, AttributeError, TypeError, KeyError):
             pass  # silently ignore corrupt palette data
 

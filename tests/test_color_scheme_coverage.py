@@ -145,5 +145,20 @@ class TestColorSchemeCoverage(unittest.TestCase):
         self.assertEqual(len({tuple(sorted(s.items())) for s in light}), 3)
 
 
+    def test_palette_and_scheme_combos_show_their_colours(self):
+        w = self._window(chart="Line", mode="Standard")
+        for combo in (w.palette_combo, w._cs_combo):
+            self.assertGreater(combo.count(), 3)
+            missing = [combo.itemText(i) for i in range(combo.count())
+                       if combo.itemIcon(i).isNull() and combo.itemText(i) != "(custom)"]
+            self.assertEqual(missing, [])
+        # a palette added later gets its strip too
+        from ui.tab_constants import add_custom_palette
+        add_custom_palette("mine", ["#112233"] * 16)
+        w.palette_combo.addItem("mine")
+        w._refresh_palette_swatches()
+        self.assertFalse(w.palette_combo.itemIcon(w.palette_combo.findText("mine")).isNull())
+
+
 if __name__ == "__main__":
     unittest.main()

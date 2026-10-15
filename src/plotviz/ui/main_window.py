@@ -1389,6 +1389,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     def _refresh_palette_swatches(self):
         """Update the 16 swatch squares in the Data tab to show the active palette."""
+        self._refresh_combo_icons()
         all_pals = get_all_palettes()
         pal_name = getattr(self, '_color_palette', 'Matplotlib')
         colors = all_pals.get(pal_name, COLOR_PALETTES['Matplotlib'])
