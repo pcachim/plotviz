@@ -109,7 +109,7 @@ In **Plots → Plot**, select a chart type from the dropdown — Line, Scatter, 
 
 ### 5. Export
 
-Choose **File → Export Image…**, pick a format (PNG, SVG, PDF, JPEG) and a DPI. The DPI and figure dimensions set in the Layout & Style tab are used for the exported file.
+Click **⬆ Export** in the top bar (or **File → Export Image…**, Ctrl+E), pick a format (PNG, SVG, PDF, JPEG) and a DPI, then **Save…** to write a file or **Copy to clipboard** to paste the image into another app (raster formats only). The DPI and figure dimensions set in the Layout & Style tab are used for the exported file.
 
 ### 6. Save your work
 

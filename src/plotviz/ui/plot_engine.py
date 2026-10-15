@@ -2035,8 +2035,7 @@ class PlotEngineMixin:
     def _copy_image_to_clipboard(self):
         """Show a small DPI picker then copy the chart as PNG to the system clipboard."""
         try:
-            from PyQt6.QtGui import QImage, QPixmap, QClipboard
-            from PyQt6.QtWidgets import (QApplication, QDialog, QVBoxLayout,
+            from PyQt6.QtWidgets import (QDialog, QVBoxLayout,
                                          QHBoxLayout, QLabel, QSpinBox,
                                          QDialogButtonBox)
 
@@ -2087,21 +2086,23 @@ class PlotEngineMixin:
             chosen_dpi = dpi_spin.value()
             self._clipboard_dpi = chosen_dpi   # remember for next time
 
-            # ── Render the export figure (same path as File > Export) and copy ─
-            img = QImage.fromData(self._render_export_bytes('png', chosen_dpi))
-            if img.isNull():
-                return
-            QApplication.clipboard().setPixmap(
-                QPixmap.fromImage(img), QClipboard.Mode.Clipboard)
-
-            if hasattr(self, 'statusBar'):
-                px_w = round(wi * chosen_dpi)
-                px_h = round(hi * chosen_dpi)
-                self.statusBar().showMessage(
-                    f'Image copied to clipboard  ({px_w}×{px_h} px, {chosen_dpi} dpi).', 4000)
+            self._copy_export_to_clipboard(wi, hi, chosen_dpi)
         except Exception as e:  # noqa: BLE001 - clipboard failure is logged, not fatal
             import logging
             logging.getLogger('plotviz').warning('Copy to clipboard failed: %s', e)
+
+    def _copy_export_to_clipboard(self, wi, hi, dpi):
+        """Render the export figure (the path File > Export uses) and put it on the clipboard."""
+        from PyQt6.QtGui import QImage, QPixmap, QClipboard
+        from PyQt6.QtWidgets import QApplication
+        img = QImage.fromData(self._render_export_bytes('png', dpi))
+        if img.isNull():
+            return
+        QApplication.clipboard().setPixmap(QPixmap.fromImage(img), QClipboard.Mode.Clipboard)
+        if hasattr(self, 'statusBar'):
+            self.statusBar().showMessage(
+                f'Image copied to clipboard  ({round(wi * dpi)}×{round(hi * dpi)} px, {dpi} dpi).',
+                4000)
 
     def _render_export_bytes(self, fmt, dpi):
         """Render the export figure to bytes in *fmt* at *dpi* (as File > Export does)."""
@@ -2130,7 +2131,8 @@ class PlotEngineMixin:
         """Ask for the export format and DPI.
 
         wi/hi are the figure size in inches (for the pixel-size read-out).
-        Returns (format_lowercase, dpi), or None if the user cancelled.
+        Returns (format_lowercase, dpi, action) with action 'save' or 'copy'
+        (copy to the clipboard instead of writing a file), or None if cancelled.
         """
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout,
                                      QLabel, QComboBox, QSpinBox,
@@ -2148,7 +2150,7 @@ class PlotEngineMixin:
 
         pre = QDialog(self)
         pre.setWindowTitle('Export Image')
-        pre.setFixedWidth(320)
+        pre.setFixedWidth(380)
         vbox = QVBoxLayout(pre)
         vbox.setSpacing(10)
         vbox.setContentsMargins(16, 14, 16, 14)
@@ -2193,6 +2195,14 @@ class PlotEngineMixin:
         btns.button(QDialogButtonBox.StandardButton.Ok).setText('Save…')
         btns.accepted.connect(pre.accept)
         btns.rejected.connect(pre.reject)
+        # The clipboard takes pictures, not PDF/SVG/EPS: Copy is for raster formats
+        btn_copy = btns.addButton('Copy to clipboard', QDialogButtonBox.ButtonRole.ActionRole)
+        chosen = {'action': 'save'}
+
+        def _copy_clicked():
+            chosen['action'] = 'copy'
+            pre.accept()
+        btn_copy.clicked.connect(_copy_clicked)
         vbox.addWidget(btns)
 
         def _update_px():
@@ -2200,6 +2210,9 @@ class PlotEngineMixin:
             vec = f in _VECTOR_FMTS
             dpi_combo.setEnabled(not vec)
             dpi_spin.setEnabled(not vec)
+            btn_copy.setEnabled(not vec)
+            btn_copy.setToolTip('The clipboard needs a raster format (PNG, JPEG, TIFF)' if vec
+                                else 'Copy the image instead of saving a file')
             px_label.setText(
                 'Vector format — DPI not applied' if vec
                 else f'{round(wi * dpi_spin.value())} × {round(hi * dpi_spin.value())} px')
@@ -2238,7 +2251,7 @@ class PlotEngineMixin:
 
         fmt     = fmt_combo.currentText().lower()
         dpi     = dpi_spin.value()
-        return fmt, dpi
+        return fmt, dpi, chosen['action']
 
     def _build_export_figure(self, wi, hi, dpi):
         """Render the chart onto a fresh figure of wi x hi inches for export.
@@ -2319,9 +2332,14 @@ class PlotEngineMixin:
             opts = self._ask_export_options(wi, hi, fmt)
             if opts is None:
                 return
-            fmt, dpi = opts
+            fmt, dpi, action = opts
             ext     = 'jpg' if fmt == 'jpeg' else fmt
             mpl_fmt = 'jpeg' if fmt == 'jpeg' else fmt
+
+            if action == 'copy':
+                self.dpi_spin.setValue(dpi)         # remember the resolution, as saving does
+                self._copy_export_to_clipboard(wi, hi, dpi)
+                return
 
             # ── Native file dialog with pre-filled name ────────────────────
             suggested = os.path.join(_get_dir(), f'{default_stem}.{ext}')

@@ -136,5 +136,52 @@ class TestTabLayout(unittest.TestCase):
         export.assert_called_once()
 
 
+    # ── export dialog: Save… or Copy to clipboard ────────────────────────────
+    def _press(self, text, fmt=None):
+        """Run the export-options dialog, 'clicking' the button called *text*."""
+        from unittest import mock
+        from PyQt6.QtWidgets import QDialog, QPushButton, QComboBox
+        seen = {}
+
+        def fake_exec(dlg):
+            if fmt:
+                dlg.findChild(QComboBox).setCurrentText(fmt)
+            btn = next(b for b in dlg.findChildren(QPushButton) if b.text() == text)
+            seen["copy_enabled"] = next(b for b in dlg.findChildren(QPushButton)
+                                        if b.text() == "Copy to clipboard").isEnabled()
+            if btn.isEnabled():
+                btn.click()
+                return QDialog.DialogCode.Accepted
+            return QDialog.DialogCode.Rejected
+        with mock.patch.object(QDialog, "exec", new=fake_exec):
+            return self.w._ask_export_options(8.0, 6.0, "png"), seen
+
+    def test_the_export_dialog_can_copy_instead_of_save(self):
+        (fmt, dpi, action), _ = self._press("Copy to clipboard")
+        self.assertEqual((fmt, action), ("png", "copy"))
+        (fmt, dpi, action), _ = self._press("Save…")
+        self.assertEqual(action, "save")
+
+    def test_copy_is_not_offered_for_vector_formats(self):
+        result, seen = self._press("Copy to clipboard", fmt="SVG")
+        self.assertFalse(seen["copy_enabled"])
+        self.assertIsNone(result)                               # nothing could be clicked
+
+    def test_copying_from_the_export_dialog_fills_the_clipboard(self):
+        from unittest import mock
+        from PyQt6.QtWidgets import QApplication, QFileDialog
+        QApplication.clipboard().clear()
+        with mock.patch.object(type(self.w), "_ask_export_options",
+                               return_value=("png", 96, "copy")), \
+                mock.patch.object(QFileDialog, "getSaveFileName") as save_dialog:
+            self.w.export_chart()
+        save_dialog.assert_not_called()                         # no file was asked for
+        clip = QApplication.clipboard().image()
+        self.assertFalse(clip.isNull())
+        wi, hi = self.w._fig_size_in_inches()
+        self.assertAlmostEqual(clip.width(), wi * 96, delta=1)
+        self.assertAlmostEqual(clip.height(), hi * 96, delta=1)
+
+
 if __name__ == "__main__":
     unittest.main()
