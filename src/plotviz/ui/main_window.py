@@ -561,6 +561,25 @@ import config.settings as settings
 
 
 class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonExportMixin, ColorSchemeMixin, CurveStyleMixin, SubplotMixin, DataMixin, FitPresetMixin, ChartOptionsMixin, PaletteColorMixin, AnnotationUIMixin, QMainWindow):
+    @property
+    def _is_dirty(self):
+        """True while the chart has changes that are not saved to its file."""
+        return self.__dict__.get('_dirty_flag', False)
+
+    @_is_dirty.setter
+    def _is_dirty(self, value):
+        self.__dict__['_dirty_flag'] = bool(value)
+        self._update_save_button()
+
+    def _update_save_button(self):
+        """The top-bar Save button is live only when there is something to save.
+
+        That is: unsaved changes, or a chart that has no file yet (Save then asks where).
+        """
+        btn = getattr(self, '_btn_save', None)
+        if btn is not None:
+            btn.setEnabled(self._is_dirty or not getattr(self, '_current_filepath', None))
+
     def __init__(self):
         super().__init__()
         from config._version import __version__
@@ -709,6 +728,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         else:
             stem = 'new chart'
         self.setWindowTitle(f'plotviz {__version__} - {stem}')
+        self._update_save_button()      # no file yet <-> Save must stay available
 
     # ═══════════════════════════════════════════════════════════════════════════
     # STARTUP LOAD
@@ -1262,30 +1282,52 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         left_vbox.setContentsMargins(0, 0, 0, 0)
         left_vbox.setSpacing(0)
 
-        # Top action bar (above tabs): New Plot | Undo | Redo
+        # Top action bar (above tabs): New | Open | Save | Export ... Undo | Redo
         top_bar = QWidget()
         top_bar_layout = QHBoxLayout(top_bar)
         top_bar_layout.setContentsMargins(6, 4, 6, 4)
         top_bar_layout.setSpacing(4)
 
-        btn_new = QPushButton('＋ New Chart')
-        btn_new.setToolTip('Start a new blank chart (Ctrl+N)')
+        btn_new = QPushButton('＋ New')
+        btn_new.setToolTip('Start a new, blank chart (Ctrl+N)')
         btn_new.clicked.connect(self._reset_app)
         top_bar_layout.addWidget(btn_new)
 
+        btn_open = QPushButton('📂')
+        btn_open.setToolTip('Open a chart… (Ctrl+O)')
+        btn_open.setFixedWidth(36)
+        btn_open.clicked.connect(lambda: self._load_project())
+        top_bar_layout.addWidget(btn_open)
+        self._btn_open = btn_open
+
+        btn_save = QPushButton('💾')
+        btn_save.setToolTip('Save the chart (Ctrl+S); Save As… is in the File menu')
+        btn_save.setFixedWidth(36)
+        btn_save.clicked.connect(lambda: self._save_project())
+        top_bar_layout.addWidget(btn_save)
+        self._btn_save = btn_save
+        self._update_save_button()
+
+        # Exporting the picture is what the app is for: give it a labelled button
+        btn_export = QPushButton('⬆ Export')
+        btn_export.setToolTip('Export the chart as an image… (Ctrl+E)')
+        btn_export.clicked.connect(lambda: self.export_chart())
+        top_bar_layout.addWidget(btn_export)
+        self._btn_export = btn_export
+
         top_bar_layout.addStretch()
 
-        btn_undo = QPushButton('↩ Undo')
+        btn_undo = QPushButton('↩')
         btn_undo.setToolTip('Undo last change (Ctrl+Z)')
         btn_undo.clicked.connect(self._undo)
-        btn_undo.setFixedWidth(72)
+        btn_undo.setFixedWidth(36)
         top_bar_layout.addWidget(btn_undo)
         self._btn_undo = btn_undo
 
-        btn_redo = QPushButton('↪ Redo')
+        btn_redo = QPushButton('↪')
         btn_redo.setToolTip('Redo (Ctrl+Y)')
         btn_redo.clicked.connect(self._redo)
-        btn_redo.setFixedWidth(72)
+        btn_redo.setFixedWidth(36)
         top_bar_layout.addWidget(btn_redo)
         self._btn_redo = btn_redo
 

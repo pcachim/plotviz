@@ -99,5 +99,42 @@ class TestTabLayout(unittest.TestCase):
         self.assertFalse(self._in_outer(w.palette_combo, "Data"))
 
 
+    # ── top bar: New / Open / Save ... Undo / Redo ───────────────────────────
+    def test_the_top_bar_has_open_and_save(self):
+        w = self.w
+        for btn in (w._btn_open, w._btn_save, w._btn_export, w._btn_undo, w._btn_redo):
+            self.assertFalse(btn.isHidden())
+        self.assertIn("Ctrl+O", w._btn_open.toolTip())
+        self.assertIn("Ctrl+S", w._btn_save.toolTip())
+
+    def test_save_is_live_only_when_there_is_something_to_save(self):
+        w = self.w
+        w._current_filepath = None
+        w._is_dirty = False
+        w._update_window_title()
+        self.assertTrue(w._btn_save.isEnabled())          # no file yet: Save asks where
+        w._current_filepath = "/tmp/some/chart.pviz"
+        w._is_dirty = False
+        w._update_window_title()
+        self.assertFalse(w._btn_save.isEnabled())         # saved and unchanged
+        w._is_dirty = True
+        self.assertTrue(w._btn_save.isEnabled())          # an edit makes it live again
+        w._is_dirty = False
+        self.assertFalse(w._btn_save.isEnabled())
+
+    def test_the_buttons_call_open_and_save(self):
+        from unittest import mock
+        w = self.w
+        with mock.patch.object(type(w), "_load_project") as load, \
+                mock.patch.object(type(w), "_save_project") as save, \
+                mock.patch.object(type(w), "export_chart") as export:
+            w._btn_open.click()
+            w._btn_save.click()
+            w._btn_export.click()
+        load.assert_called_once()
+        save.assert_called_once()
+        export.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

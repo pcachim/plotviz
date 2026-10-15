@@ -1528,7 +1528,7 @@ class PlotEngineMixin:
         fig.set_size_inches(px_w / dpi, px_h / dpi, forward=False)
         return (1.0 - box_w) / 2.0, (1.0 - box_h) / 2.0, box_w, box_h
 
-    def _margins_as_fractions(self):
+    def _margins_as_fractions(self, keep_text_on_page=True):
         """The figure margins (left, right, bottom, top) as fractions of the figure.
 
         They are stored as fractions (see _refresh_geometry_widgets), so there is
@@ -1538,7 +1538,8 @@ class PlotEngineMixin:
         left, right, bottom, top = getattr(self, '_fig_margins', self._DEFAULT_MARGINS)
         # Never let tick labels, axis titles or colorbar labels fall off the page
         # (the stored margin stays as the user set it; this is only what is drawn).
-        ext_l, ext_r, ext_b, ext_t = getattr(self, '_margin_minimums', (0.0, 0.0, 0.0, 0.0))
+        ext_l, ext_r, ext_b, ext_t = (getattr(self, '_margin_minimums', (0.0, 0.0, 0.0, 0.0))
+                                      if keep_text_on_page else (0.0, 0.0, 0.0, 0.0))
         left = max(left, ext_l)
         right = min(right, 1.0 - ext_r)
         bottom = max(bottom, ext_b)
@@ -2253,7 +2254,9 @@ class PlotEngineMixin:
         axes_list, ax2_map, is3d, n = self._render_axes(exp_fig)
 
         # Apply margins — convert physical-unit spinbox values to fractions
-        _ml, _mr, _mb, _mt = self._margins_as_fractions()
+        # The export measures its own text below, so it must not start from the
+        # preview's measurement (taken at another scale): script and file stay equal.
+        _ml, _mr, _mb, _mt = self._margins_as_fractions(keep_text_on_page=False)
         _n_sp_exp = self.subplot_rows * self.subplot_cols
         _exp_title_raw = self.title_input.text().strip()
         # For a single subplot, fall back to the placeholder just like the preview does.
