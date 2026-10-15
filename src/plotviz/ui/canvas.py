@@ -183,7 +183,7 @@ class CanvasPlotter(FigureCanvas):
             self.draw_idle()
 
     # ── Tab-navigation constants ──────────────────────────────────────────────
-    # Outer tabs: 0=Data  1=Figure  2=Plots
+    # Outer tabs: 0=Data  1=Layout & Style  2=Plots
     _OUTER_FIGURE  = 1
     _OUTER_PLOTS  = 2
     # plots_inner_tabs add order: Data→Series→Axes→Annotations
@@ -349,7 +349,7 @@ class CanvasPlotter(FigureCanvas):
             self._goto_tab(self._OUTER_PLOTS, self._INNER_AXES)
 
         else:  # 'style' — figure margins / title area
-            self._show_status('Figure — Style area')
+            self._show_status('Layout & Style')
             self._goto_tab(self._OUTER_FIGURE)
 
     def on_release(self, event):

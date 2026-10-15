@@ -58,7 +58,7 @@ A `.pvizc` file is a minimal settings file containing only color-related keys: b
 
 ### Saving
 
-In the **Figure** tab, Color Schemes section, click **💾 Save scheme…** (or **File → Save Scheme…**), enter a name, and choose a location.
+In the **Layout & Style** tab, Color Schemes section, click **💾 Save scheme…** (or **File → Save Scheme…**), enter a name, and choose a location.
 
 ### Loading
 
@@ -78,7 +78,7 @@ A `.pvizp` file exports your custom color palettes so they can be shared or used
 
 ### Saving
 
-In the **Figure** tab, click **📤 Save palette…** (or **File → Save Palette…**).
+In the **Layout & Style** tab, click **📤 Save palette…** (or **File → Save Palette…**).
 
 ### Loading
 

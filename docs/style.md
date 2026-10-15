@@ -1,6 +1,6 @@
 # Style & Appearance
 
-## The Figure tab
+## The Layout & Style tab
 
 The **Style** tab controls the figure-level appearance: size, margins, background colors, borders, and the grid.
 
@@ -59,7 +59,7 @@ Minor grid controls (color, style, width, alpha) mirror the major grid controls.
 
 ## Color palettes
 
-The **Color palette** dropdown in the Figure tab sets the default cycle of colors assigned to new series. plotviz includes 11 built-in palettes and supports user-created custom palettes.
+The **Color palette** dropdown in the Layout & Style tab sets the default cycle of colors assigned to new series. plotviz includes 11 built-in palettes and supports user-created custom palettes.
 
 See [Color Palettes](palettes.md) for the full palette reference.
 
@@ -86,7 +86,7 @@ A color scheme is a named preset that applies a coordinated set of colors to the
 
 ### Applying a color scheme
 
-1. Open the **Figure** tab.
+1. Open the **Layout & Style** tab.
 2. Choose a scheme from the **Color Schemes** dropdown. It is applied at once; use Ctrl+Z to undo.
 3. With several subplots, **Apply to** chooses *All subplots* (the default) or *Active subplot only*. The second changes just that subplot's plot area, axes colour, borders, grid and title colour; the figure background, palette, fonts and axis-label colours belong to the whole figure and stay as they are. Pick the active subplot with the **Editing** selector in the Plots tab.
 
@@ -116,4 +116,4 @@ The **Appearance** dropdown in the Chart tab controls the application's light/da
 - **Light** — forces the light theme regardless of OS setting.
 - **Dark** — forces the dark theme.
 
-This setting affects the UI chrome only, not the chart colors. Chart colors are set independently with color schemes and the Figure tab.
+This setting affects the UI chrome only, not the chart colors. Chart colors are set independently with color schemes and the Layout & Style tab.

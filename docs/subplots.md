@@ -6,7 +6,7 @@ plotviz supports multi-panel layouts with up to 9 subplots per chart. Each subpl
 
 ## Opening the layout dialog
 
-In the **Figure** tab, click **⚙️ Configure Subplot Layout…** to open the layout picker.
+In the **Layout & Style** tab, click **⚙️ Configure Subplot Layout…** to open the layout picker.
 
 ---
 

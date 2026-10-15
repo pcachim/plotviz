@@ -294,4 +294,4 @@ class StyleTabMixin:
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)
         mlay.addWidget(scroll)
-        self.tabs.addTab(widget, 'Figure')
+        self.tabs.addTab(widget, 'Layout && Style')   # &&: a single & in Qt tab text

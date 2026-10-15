@@ -75,7 +75,7 @@ The plotviz window has two main areas:
 | Tab | Purpose |
 |-----|---------|
 | Data | Loaded datasets, and the **Generate** page (function generators, data table) |
-| Figure | Whole-figure settings: size, margins, title, subplot grid, colour scheme, palette |
+| Layout & Style | Whole-figure settings: size, margins, title, subplot grid, colour scheme, palette |
 | Plots | Per-subplot settings, with a **Editing** selector at the top when there are several subplots |
 
 The **Plots** tab has four pages: **Plot** (chart type, series table, options), **Curves** (per-curve line style, marker, colour, curve fitting), **Axes** (labels, limits, scales, ticks, secondary Y axis, canvas colours, borders, grid) and **Annotations** (subplot title, legend, text/arrow/image annotations). Opening, saving and exporting are in the **File** menu.
@@ -102,14 +102,14 @@ In **Plots → Plot**, select a chart type from the dropdown — Line, Scatter, 
 
 ### 4. Style the chart
 
-- **Figure** tab: set background color, colour scheme, figure size.
+- **Layout & Style** tab: set background color, colour scheme, figure size.
 - **Plots → Curves**: change line color, width, marker style.
 - **Plots → Axes**: set axis labels, limits, scale, grid and canvas colours.
 - **Plots → Annotations**: add a legend, subplot title, or text annotations.
 
 ### 5. Export
 
-Choose **File → Export Image…**, pick a format (PNG, SVG, PDF, JPEG) and a DPI. The DPI and figure dimensions set in the Figure tab are used for the exported file.
+Choose **File → Export Image…**, pick a format (PNG, SVG, PDF, JPEG) and a DPI. The DPI and figure dimensions set in the Layout & Style tab are used for the exported file.
 
 ### 6. Save your work
 

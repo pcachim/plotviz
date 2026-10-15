@@ -84,13 +84,13 @@ class TestTabLayout(unittest.TestCase):
         page = t.widget(names.index(name))
         return page.isAncestorOf(widget)
 
-    def test_whole_figure_settings_share_the_figure_tab(self):
+    def test_whole_figure_settings_share_the_layout_and_style_tab(self):
         w = self.w
         self.assertEqual([w.tabs.tabText(i) for i in range(w.tabs.count())],
-                         ["Data", "Figure", "Plots"])
+                         ["Data", "Layout && Style", "Plots"])
         for widget in (w.fig_width, w.fig_left, w.title_input, w.sp_hspace,
                        w._subplot_grid_panel, w._cs_combo, w.palette_combo, w.chart_bg_color_swatch):
-            self.assertTrue(self._in_outer(widget, "Figure"), widget)
+            self.assertTrue(self._in_outer(widget, "Layout && Style"), widget)
 
     def test_the_data_tab_has_datasets_and_generators(self):
         w = self.w

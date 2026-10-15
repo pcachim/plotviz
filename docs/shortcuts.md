@@ -26,7 +26,7 @@ The **View** menu lists the three tabs as checkable items; the active one is tic
 | Menu item | Tab |
 |-----------|-----|
 | View → Data | Datasets and the Generate page |
-| View → Figure | Figure size, margins, title, subplot grid, colour scheme, palette |
+| View → Layout & Style | Figure size, margins, title, subplot grid, colour scheme, palette |
 | View → Plots | Per-subplot settings: Plot, Curves, Axes, Annotations |
 
 ## Canvas (matplotlib toolbar)

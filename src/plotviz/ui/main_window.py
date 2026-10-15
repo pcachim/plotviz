@@ -991,7 +991,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self.tabs = QTabWidget()
         self.create_advanced_tab()   # built first: the Data tab shows it as its Generate page
         self.create_file_tab()       # Data tab: datasets + generators
-        self.create_style_tab()      # Figure tab: size, margins, colours, scheme, palette
+        self.create_style_tab()      # Layout & Style tab: size, margins, colours, scheme, palette
         self.create_plots_tab()      # subplot selector + Plot, Curves, Axes, Annotations
 
         # ── Menu bar — File ───────────────────────────────────────────────────
@@ -1006,7 +1006,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                 self.data_inner_tabs.setCurrentIndex(0)
 
         def _go_figure_tab():
-            self.tabs.setCurrentIndex(1)   # Figure tab (palette and colour scheme)
+            self.tabs.setCurrentIndex(1)   # Layout & Style tab (palette and colour scheme)
 
         # ── New ───────────────────────────────────────────────────────────────
         act_new = QAction('New Chart', self)
@@ -1148,7 +1148,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             name = self.tabs.tabText(i)
             action = QAction(name, self)
             action.setCheckable(True)
-            action.setStatusTip(f'Show the {name} tab')
+            action.setStatusTip(f"Show the {name.replace('&&', '&')} tab")
             action.setChecked(i == 0)
             action.triggered.connect(lambda checked, idx=i: self.tabs.setCurrentIndex(idx))
             view_menu.addAction(action)
