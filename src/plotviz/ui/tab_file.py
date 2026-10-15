@@ -158,6 +158,19 @@ class FileTabMixin:
         cs_sel_row.addWidget(self._cs_combo, 1)
         pl.addLayout(cs_sel_row)
 
+        cs_target_row = QHBoxLayout()
+        cs_target_row.setSpacing(4)
+        cs_target_row.addWidget(QLabel('Apply to:'))
+        self._cs_target = QComboBox()
+        self._cs_target.addItems(['All subplots', 'Active subplot only'])
+        self._cs_target.setToolTip(
+            'Active subplot only changes that subplot\'s plot area, axes colour, borders,\n'
+            'grid and title colour. Figure background, palette, fonts and axis-label\n'
+            'colours belong to the whole figure and stay as they are.')
+        self._cs_target.setEnabled(False)          # needs more than one subplot
+        cs_target_row.addWidget(self._cs_target, 1)
+        pl.addLayout(cs_target_row)
+
         cs_btn_row = QHBoxLayout()
         cs_btn_row.setSpacing(4)
         btn_cs_load = QPushButton('📂 Load scheme…')

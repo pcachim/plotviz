@@ -239,6 +239,10 @@ class SubplotMixin:
         if hasattr(self, '_global_sp_container'):
             self._global_sp_container.setVisible(True)
             self.global_sp_active.setEnabled(n > 1)
+            if hasattr(self, '_cs_target'):
+                self._cs_target.setEnabled(n > 1)
+                if n <= 1:
+                    self._cs_target.setCurrentIndex(0)
         if hasattr(self, '_axes_title_section'):
             _was_single = not self._axes_title_section.isVisible()
             self._axes_title_section.setVisible(n > 1)

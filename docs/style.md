@@ -88,6 +88,7 @@ A color scheme is a named preset that applies a coordinated set of colors to the
 
 1. Open the **Figure** tab.
 2. Choose a scheme from the **Color Schemes** dropdown. It is applied at once; use Ctrl+Z to undo.
+3. With several subplots, **Apply to** chooses *All subplots* (the default) or *Active subplot only*. The second changes just that subplot's plot area, axes colour, borders, grid and title colour; the figure background, palette, fonts and axis-label colours belong to the whole figure and stay as they are. Pick the active subplot with the **Editing** selector in the Plots tab.
 
 The five colored swatches next to the dropdown show a preview of BG, Plot, FG, Grid, and Title colors for the selected scheme.
 
