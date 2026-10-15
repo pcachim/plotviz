@@ -71,18 +71,21 @@ A color scheme is a named preset that applies a coordinated set of colors to the
 
 ### Built-in color schemes
 
-| Name | Character |
-|------|-----------|
-| Default (white) | Clean white background, matplotlib palette |
-| Dark (charcoal) | Deep charcoal `#1e1e2e`, light text, Bold palette |
-| Dark (slate) | Navy `#0f172a`, slate plot area, Bold palette |
-| Seaborn (whitegrid) | Muted lavender background, white grid lines |
-| Scientific (minimal) | White, no top/right spines, very light grid |
-| Nature / print | White, no grid, no top/right spines — publication ready |
-| Midnight blue | Deep blue, cyan axis labels |
-| Warm parchment | Cream background, brown text |
-| High contrast | Black background, white text |
-| Pastel soft | Off-white, purple-tinted grid, Pastel palette |
+| Name | Character | Palette |
+|------|-----------|---------|
+| Default (white) | Clean white background | Matplotlib |
+| Ivory | Ivory, no grid, only left/bottom spines | Publication |
+| Blueprint (light) | Ice-blue, solid major and minor grid | Cool |
+| Grey panel | Grey plot area, thick white grid, no spines | Matplotlib |
+| Graph paper | Pale green, dense fine grid | Earth |
+| Newsprint | Cream-salmon, bottom spine only | Colorblind |
+| Solarized (light) | Solarized beige, dashed grid | Warm |
+| Lavender | Lilac, white plot area, dotted grid | Ocean |
+| Sage | Grey-green, white plot area | Nature |
+| Dark (charcoal) | Deep charcoal `#1e1e2e`, light text | Bold |
+| Dark (slate) | Navy `#0f172a`, slate plot area | Bold |
+| Midnight blue | Deep blue, cyan axis labels | Bold |
+| High contrast | Black background, white text | Bold |
 
 ### Applying a color scheme
 

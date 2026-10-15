@@ -137,12 +137,13 @@ class TestColorSchemeCoverage(unittest.TestCase):
     def test_the_light_schemes_are_distinct(self):
         from ui.tab_constants import COLOR_PALETTES
         schemes = self.PlotVizApp._BUILTIN_COLOR_SCHEMES
-        self.assertEqual(schemes["Nature / print"]["color_palette"], "Nature")
-        self.assertEqual(schemes["Scientific (minimal)"]["color_palette"], "Colorblind")
         for s in schemes.values():                       # every palette must exist
             self.assertIn(s["color_palette"], COLOR_PALETTES)
-        light = [schemes[n] for n in ("Default (white)", "Nature / print", "Scientific (minimal)")]
-        self.assertEqual(len({tuple(sorted(s.items())) for s in light}), 3)
+        light = [s for s in schemes.values() if s["chart_bg_color"] > "#cccccc"]
+        self.assertEqual(len(light), 9)
+        self.assertEqual(len({tuple(sorted(s.items())) for s in light}), 9)
+        # no two light schemes share both a plot background and a palette
+        self.assertEqual(len({(s["plot_bg_color"], s["color_palette"]) for s in light}), 9)
 
 
     def test_palette_and_scheme_combos_show_their_colours(self):
