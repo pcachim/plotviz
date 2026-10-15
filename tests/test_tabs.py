@@ -188,5 +188,48 @@ class TestTabLayout(unittest.TestCase):
         self.assertAlmostEqual(clip.height(), hi * 96, delta=1)
 
 
+    # ── export dialog: estimated file size ───────────────────────────────────
+    def test_the_size_estimate_matches_what_export_writes(self):
+        w = self.w
+        for fmt in ("png", "jpeg"):
+            real = len(w._render_export_bytes(fmt, 150))
+            self.assertAlmostEqual(w._estimate_export_bytes(fmt, 150), real, delta=real * 0.05, msg=fmt)
+        wi, hi = w._fig_size_in_inches()
+        real = len(w._render_export_bytes("tiff", 100))
+        self.assertAlmostEqual(w._estimate_export_bytes("tiff", 100), real, delta=real * 0.01)
+        svg = w._estimate_export_bytes("svg", 96)
+        self.assertEqual(svg, w._estimate_export_bytes("svg", 600))     # dpi does not matter
+        self.assertGreater(svg, 0)
+
+    def test_the_estimate_grows_with_the_resolution(self):
+        w = self.w
+        sizes = [w._estimate_export_bytes("png", d) for d in (96, 300, 1200)]
+        self.assertEqual(sizes, sorted(sizes))
+        self.assertGreater(sizes[2], sizes[1] * 4)          # 1200 dpi is scaled, not capped
+
+    def test_megabytes_are_shown_readably(self):
+        f = self.PlotVizApp._format_megabytes
+        self.assertEqual(f(3_000), "<0.01 MB")
+        self.assertEqual(f(69_000), "0.07 MB")
+        self.assertEqual(f(4_181_760), "4.2 MB")
+
+    def test_the_dialog_shows_the_estimated_size_beside_the_pixels(self):
+        from unittest import mock
+        from PyQt6.QtTest import QTest
+        from PyQt6.QtWidgets import QDialog, QLabel
+        seen = {}
+
+        def fake_exec(dlg):
+            label = next(lbl for lbl in dlg.findChildren(QLabel) if " px" in lbl.text())
+            seen["before"] = label.text()
+            QTest.qWait(450)                                  # past the 200 ms debounce
+            seen["after"] = label.text()
+            return QDialog.DialogCode.Rejected
+        with mock.patch.object(QDialog, "exec", new=fake_exec):
+            self.w._ask_export_options(8.0, 6.0, "png")
+        self.assertIn("… MB", seen["before"])                 # measuring
+        self.assertRegex(seen["after"], r"\d+ × \d+ px  ·  ≈ (<0\.01|\d+\.?\d*) MB")
+
+
 if __name__ == "__main__":
     unittest.main()

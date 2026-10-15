@@ -2115,6 +2115,32 @@ class PlotEngineMixin:
             plt.close(fig)
         return buf.getvalue()
 
+    def _estimate_export_bytes(self, fmt, dpi):
+        """Size in bytes of the file File > Export would write, without writing it.
+
+        Vector formats are rendered once (their size does not depend on the dpi).
+        TIFF is uncompressed, so its size is a product. PNG and JPEG are rendered
+        for real up to 600 dpi; beyond that the 600 dpi result is scaled by the
+        pixel count (rendering a 1200 dpi picture just to size it would be slow).
+        """
+        fmt = fmt.lower()
+        wi, hi = self._fig_size_in_inches()
+        if fmt in ('svg', 'pdf', 'eps'):
+            return len(self._render_export_bytes(fmt, 72))
+        if fmt == 'tiff':
+            return round(wi * dpi) * round(hi * dpi) * 4          # RGBA, uncompressed
+        sample = min(dpi, 600)
+        size = len(self._render_export_bytes(fmt, sample))
+        return round(size * (dpi / sample) ** 2)
+
+    @staticmethod
+    def _format_megabytes(n):
+        """'0.07 MB' / '4.2 MB' / '<0.01 MB' for a byte count."""
+        mb = n / 1_000_000
+        if mb < 0.01:
+            return '<0.01 MB'
+        return f'{mb:.2f} MB' if mb < 1 else f'{mb:.1f} MB'
+
     @contextmanager
     def _export_rc(self):
         """The matplotlib settings every export path draws under.
@@ -2186,7 +2212,13 @@ class PlotEngineMixin:
 
         px_label = QLabel()
         px_label.setStyleSheet('color: palette(mid); font-size: 10px;')
+        px_label.setWordWrap(True)
         grid.addWidget(px_label, 2, 1)
+        px_text = {'text': ''}
+        from PyQt6.QtCore import QTimer
+        size_timer = QTimer(pre)
+        size_timer.setSingleShot(True)
+        size_timer.timeout.connect(lambda: _show_size())
 
         vbox.addLayout(grid)
 
@@ -2218,9 +2250,19 @@ class PlotEngineMixin:
                 f'({round(wi * dpi_spin.value())} × {round(hi * dpi_spin.value())} px).\n'
                 f'The clipboard keeps pixels, not dpi, so the size it is pasted at '
                 f'depends on the receiving app.')
-            px_label.setText(
-                'Vector format — DPI not applied' if vec
+            px_text.update(
+                text='Vector format — DPI not applied' if vec
                 else f'{round(wi * dpi_spin.value())} × {round(hi * dpi_spin.value())} px')
+            px_label.setText(px_text['text'] + '  ·  … MB')
+            size_timer.start(200)       # measure once the user stops typing
+
+        def _show_size():
+            try:
+                n = self._estimate_export_bytes(fmt_combo.currentText(), dpi_spin.value())
+                px_label.setText(f"{px_text['text']}  ·  ≈ {self._format_megabytes(n)}")
+            except Exception:  # noqa: BLE001 - the estimate is a nicety, never block exporting
+                logging.getLogger('plotviz').debug('size estimate failed', exc_info=True)
+                px_label.setText(px_text['text'])
 
         def _preset_picked(i):
             dpi_spin.blockSignals(True)
