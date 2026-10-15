@@ -756,10 +756,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#saving-a-custom-color-scheme" class="md-nav__link">
+  <a href="#the-active-scheme" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Saving a custom color scheme
+        The active scheme
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#editing-a-color-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing a color scheme
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saving-a-color-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving a color scheme
       
     </span>
   </a>
@@ -1441,10 +1463,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#saving-a-custom-color-scheme" class="md-nav__link">
+  <a href="#the-active-scheme" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Saving a custom color scheme
+        The active scheme
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#editing-a-color-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing a color scheme
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saving-a-color-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving a color scheme
       
     </span>
   </a>
@@ -1538,6 +1582,7 @@
 <hr />
 <h2 id="colors">Colors<a class="headerlink" href="#colors" title="Permanent link">&para;</a></h2>
 <h3 id="chart-background">Chart background<a class="headerlink" href="#chart-background" title="Permanent link">&para;</a></h3>
+<p>The figure background and the foreground are edited in <strong>Edit scheme…</strong>. The plot area is in the Canvas &amp; Grid tab.</p>
 <ul>
 <li><strong>Chart BG</strong> — the outer figure background (outside the plot area). Default white.</li>
 <li><strong>Plot BG</strong> — the inner plot area background. Default white.</li>
@@ -1674,16 +1719,22 @@
 <li>With several subplots, <strong>Apply to</strong> chooses <em>All subplots</em> (the default) or <em>Active subplot only</em>. The second changes just that subplot's plot area, axes colour, borders, grid and title colour; the figure background, palette, fonts and axis-label colours belong to the whole figure and stay as they are. Pick the active subplot with the <strong>Editing</strong> selector in the Plots tab.</li>
 </ol>
 <p>The five colored swatches next to the dropdown show a preview of BG, Plot, FG, Grid, and Title colors for the selected scheme.</p>
-<h3 id="saving-a-custom-color-scheme">Saving a custom color scheme<a class="headerlink" href="#saving-a-custom-color-scheme" title="Permanent link">&para;</a></h3>
-<p>Style the chart exactly as you want it, then:</p>
-<ol>
-<li>Click <strong>💾 Save scheme…</strong> in the Color Schemes section.</li>
-<li>Enter a name for the scheme.</li>
-<li>Choose a save location — the file is saved as a <code>.pvizc</code> file.</li>
-</ol>
-<p>The scheme is registered in the dropdown for the rest of the session and can be reloaded in future sessions by clicking <strong>📂 Load scheme…</strong>.</p>
+<h3 id="the-active-scheme">The active scheme<a class="headerlink" href="#the-active-scheme" title="Permanent link">&para;</a></h3>
+<p>The scheme shown in the dropdown is the <strong>active scheme</strong>: the colours of the chart <em>are</em> that scheme. It tracks the eight colours (figure and plot background, foreground, title, X and Y labels, grid and minor grid), whether the grid, minor grid and each border are shown, and the palette. Fonts, sizes and grid line style are applied with a scheme but are not tracked.</p>
+<ul>
+<li><strong>Built-in schemes are read-only.</strong> The first time you change anything they track, plotviz makes an editable copy, <code>&lt;name&gt; – edited</code>, and makes it active. Every further change goes into that copy. If you change everything back, the copy is dropped.</li>
+<li><strong>Your own schemes</strong> (made with <strong>Edit scheme…</strong> or loaded from a file) are edited in place.</li>
+<li><strong>Switching schemes never loses anything</strong> during the session: the scheme you leave stays in the dropdown.</li>
+<li>A <strong>*</strong> after a name means the scheme is not in the <strong>schemes folder</strong>, so it will not be there next time. Saving it into the folder removes the *.</li>
+<li>With several subplots, the grid, plot background, foreground and borders are per subplot. Changing them there is a local adjustment and does not touch the scheme, and <strong>Apply to: Active subplot only</strong> leaves the active scheme as it is.</li>
+<li>A chart file (<code>.pviz</code>) stores its active scheme, name and values, so the chart looks the same when reopened.</li>
+</ul>
+<h3 id="editing-a-color-scheme">Editing a color scheme<a class="headerlink" href="#editing-a-color-scheme" title="Permanent link">&para;</a></h3>
+<p>Click <strong>Edit</strong> in the Color Schemes section to create or change a scheme in one place: the eight colours, grid and border switches and the palette. <strong>Load from</strong> starts from another scheme. <strong>Save &amp; apply</strong> names the scheme, makes it active and applies it. Built-in names cannot be replaced.</p>
+<h3 id="saving-a-color-scheme">Saving a color scheme<a class="headerlink" href="#saving-a-color-scheme" title="Permanent link">&para;</a></h3>
+<p>Click <strong>Save</strong> in the Color Schemes section. The dialog opens in the schemes folder (<code>~/Library/Application Support/plotviz/schemes/</code> on macOS; Preferences shows it and can open it), and every <code>.pvizc</code> there is loaded when plotviz starts. You may save elsewhere, but then the scheme keeps its * and is not loaded at start-up. Built-in schemes cannot be saved. To delete a scheme, delete its file.</p>
 <h3 id="loading-a-color-scheme">Loading a color scheme<a class="headerlink" href="#loading-a-color-scheme" title="Permanent link">&para;</a></h3>
-<p>Click <strong>📂 Load scheme…</strong> and select a <code>.pvizc</code> file. You are asked whether to apply it immediately. A <code>.pvizt</code> template file can also be loaded as a color source — only the color-related settings are extracted.</p>
+<p>Click <strong>Load</strong> and select a single <code>.pvizc</code> file, for instance one from outside the folder. You are asked whether to apply it, and applying it makes it the active scheme. A <code>.pvizt</code> template file can also be loaded as a color source — only the color-related settings are extracted.</p>
 <hr />
 <h2 id="appearance-ui-theme">Appearance (UI theme)<a class="headerlink" href="#appearance-ui-theme" title="Permanent link">&para;</a></h2>
 <p>The <strong>Appearance</strong> dropdown in the Chart tab controls the application's light/dark mode:</p>

@@ -986,10 +986,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#creating-a-custom-palette" class="md-nav__link">
+  <a href="#creating-or-editing-a-palette" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating a custom palette
+        Creating or editing a palette
       
     </span>
   </a>
@@ -997,10 +997,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sharing-palettes" class="md-nav__link">
+  <a href="#sharing-and-keeping-palettes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sharing palettes
+        Sharing and keeping palettes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-applying-the-palette" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-applying the palette
       
     </span>
   </a>
@@ -1230,10 +1241,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#creating-a-custom-palette" class="md-nav__link">
+  <a href="#creating-or-editing-a-palette" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating a custom palette
+        Creating or editing a palette
       
     </span>
   </a>
@@ -1241,10 +1252,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sharing-palettes" class="md-nav__link">
+  <a href="#sharing-and-keeping-palettes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sharing palettes
+        Sharing and keeping palettes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-applying-the-palette" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-applying the palette
       
     </span>
   </a>
@@ -1367,19 +1389,21 @@
 </table>
 <hr />
 <h2 id="custom-palettes">Custom palettes<a class="headerlink" href="#custom-palettes" title="Permanent link">&para;</a></h2>
-<p>You can create your own palettes and save them for reuse.</p>
-<h3 id="creating-a-custom-palette">Creating a custom palette<a class="headerlink" href="#creating-a-custom-palette" title="Permanent link">&para;</a></h3>
+<p>Palettes work like colour schemes: the built-in ones are read-only, and your own are files. Every <code>.pvizp</code> in the <strong>palettes folder</strong> is loaded when plotviz starts. Its location is shown in Preferences (<strong>Colour palettes</strong>), next to a button that opens it; on macOS it is <code>~/Library/Application Support/plotviz/palettes/</code>.</p>
+<h3 id="creating-or-editing-a-palette">Creating or editing a palette<a class="headerlink" href="#creating-or-editing-a-palette" title="Permanent link">&para;</a></h3>
 <ol>
-<li>In the <strong>Layout &amp; Style</strong> tab, click <strong>Edit palette…</strong> (or the palette management button).</li>
-<li>Click <strong>New palette</strong> and give it a name.</li>
-<li>Click each of the 16 color swatches to set the colors.</li>
-<li>Click <strong>Save</strong>.</li>
+<li>In the <strong>Layout &amp; Style</strong> tab, click <strong>Edit palette…</strong>. It opens with the colours of the active palette; <strong>Load from</strong> starts from another one.</li>
+<li>Give it a name and click each of the 16 swatches to set the colours.</li>
+<li>Click <strong>Save &amp; apply</strong>. The palette becomes the active one.</li>
 </ol>
-<p>The custom palette appears in the palette dropdown and is saved to user preferences immediately.</p>
-<h3 id="sharing-palettes">Sharing palettes<a class="headerlink" href="#sharing-palettes" title="Permanent link">&para;</a></h3>
-<p>Custom palettes can be exported to a <code>.pvizp</code> file and imported on another machine.</p>
-<p><strong>Export:</strong> In the Layout &amp; Style tab, click <strong>📤 Save palette…</strong>. All current custom palettes are saved to the file.</p>
-<p><strong>Import:</strong> Click <strong>📂 Import palettes (.pvizp)</strong>. The palettes from the file are merged into your current custom palette collection. Built-in palettes are not overwritten.</p>
+<p>Opening the editor on one of your own palettes edits it in place. Built-in names cannot be replaced.</p>
+<p>A <strong>*</strong> after a palette's name in the dropdown means it is not in the palettes folder, so it will not be there next time. A new palette starts that way; saving it into the folder removes the *.</p>
+<h3 id="sharing-and-keeping-palettes">Sharing and keeping palettes<a class="headerlink" href="#sharing-and-keeping-palettes" title="Permanent link">&para;</a></h3>
+<p><strong>Save:</strong> click <strong>Save</strong> under <em>Colour palette</em>. The dialog opens in the palettes folder; you can save anywhere else too, but a file outside the folder keeps its * and is not loaded at start-up. Built-in palettes cannot be saved, since they are always there. To delete a palette, delete its file.</p>
+<p><strong>Load:</strong> click <strong>Load</strong> and choose a single <code>.pvizp</code> file (for instance one from outside the folder). With one palette in the file you are asked whether to apply it.</p>
+<p>A chart file (<code>.pviz</code>) carries its active palette when it is one of yours, so the chart opens with the same colours.</p>
+<h3 id="re-applying-the-palette">Re-applying the palette<a class="headerlink" href="#re-applying-the-palette" title="Permanent link">&para;</a></h3>
+<p>Series whose colour you set by hand keep it when you change palette or scheme. <strong>↺ Re-apply palette</strong> (under the Edit / Load / Save buttons) gives every series its palette colour again, those included.</p>
 <p>See <a href="../file-formats/">File Formats</a> for the <code>.pvizp</code> format specification.</p>
 <hr />
 <h2 id="color-locking">Color locking<a class="headerlink" href="#color-locking" title="Permanent link">&para;</a></h2>
