@@ -877,6 +877,9 @@ class SerializationMixin:
             self._refresh_palette_swatches()
         # Sync annotation canvas style from restored defaults
         self._sync_ann_style()
+        # Show which colour scheme the restored colours correspond to
+        if hasattr(self, '_sync_color_scheme_combo'):
+            self._sync_color_scheme_combo(s)
 
     def _apply_series_meta(self, m):
         """Restore series table and subplot assignments from series.json dict."""

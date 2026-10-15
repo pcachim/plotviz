@@ -103,5 +103,36 @@ class TestColorSchemeCoverage(unittest.TestCase):
         self.assertEqual(w.zlabel_color, "#a6adc8")        # follows the y-label colour
 
 
+    def test_choosing_a_scheme_applies_it_but_loading_a_file_does_not(self):
+        w = self._window(chart="Line", mode="Standard")
+        idx = w._cs_combo.findText("Dark (charcoal)")
+        w._cs_combo.setCurrentIndex(idx)                       # by code: nothing applied
+        self.assertNotEqual(w.chart_bg_color, "#1e1e2e")
+        w._cs_combo.activated.emit(idx)                        # the user picks it
+        self.assertEqual(w.chart_bg_color, "#1e1e2e")
+
+    def test_combo_follows_the_scheme_of_the_loaded_chart(self):
+        w = self._window(chart="Line", mode="Standard")      # a plain white chart
+        scheme = dict(self.PlotVizApp._BUILTIN_COLOR_SCHEMES["Dark (charcoal)"])
+        w._apply_color_scheme_dict(scheme)
+        saved = w._collect_settings()
+        w2 = self._window(chart="Line", mode="Standard")
+        w2._cs_combo.setCurrentText("Dark (slate)")           # a stale selection
+        w2._applying_settings = True
+        try:
+            w2._apply_settings(saved)
+        finally:
+            w2._applying_settings = False
+        self.assertEqual(w2._cs_combo.currentText(), "Dark (charcoal)")
+        # colours that match no scheme read '(custom)'
+        saved["chart_bg_color"] = "#123456"
+        w2._applying_settings = True
+        try:
+            w2._apply_settings(saved)
+        finally:
+            w2._applying_settings = False
+        self.assertEqual(w2._cs_combo.currentText(), "(custom)")
+
+
 if __name__ == "__main__":
     unittest.main()

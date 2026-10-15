@@ -121,7 +121,46 @@ class ColorSchemeMixin:
         self._cs_combo.addItems(list(self._COLOR_SCHEME_REGISTRY.keys()))
         self._cs_combo.blockSignals(False)
         self._cs_combo.currentIndexChanged.connect(self._refresh_cs_swatches)
+        # `activated` fires only when the user picks an entry, never when the combo is
+        # updated by code (loading a file, saving a scheme), so those never re-apply.
+        self._cs_combo.activated.connect(lambda _i: self._apply_color_scheme_selected())
         self._refresh_cs_swatches()
+
+    _CUSTOM_SCHEME = '(custom)'
+
+    @staticmethod
+    def _same_scheme_value(a, b) -> bool:
+        """Equal settings values, treating colour spellings ('#fff' / '#FFFFFF') alike."""
+        if isinstance(a, str) and isinstance(b, str) and a.startswith('#') and b.startswith('#'):
+            from matplotlib.colors import to_hex
+            try:
+                return to_hex(a) == to_hex(b)
+            except ValueError:
+                return a == b
+        return a == b
+
+    def _sync_color_scheme_combo(self, settings: dict):
+        """Select the scheme whose colours *settings* match, or '(custom)'.
+
+        Called after a file or template is loaded, so the combo describes the chart
+        on screen instead of keeping the previous selection. The scheme already
+        selected wins when several match.
+        """
+        names = list(self._COLOR_SCHEME_REGISTRY)
+        current = self._cs_combo.currentText()
+        if current in names:
+            names.remove(current)
+            names.insert(0, current)
+        found = self._CUSTOM_SCHEME
+        for name in names:
+            scheme = self._COLOR_SCHEME_REGISTRY[name]
+            if all(k in settings and self._same_scheme_value(settings[k], v)
+                   for k, v in scheme.items()):
+                found = name
+                break
+        if self._cs_combo.findText(found) < 0:
+            self._cs_combo.addItem(found)
+        self._cs_combo.setCurrentText(found)      # also refreshes the swatches
 
     def _refresh_cs_swatches(self):
         """Update the 5 preview swatches for the currently selected scheme."""

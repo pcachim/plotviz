@@ -194,13 +194,8 @@ class FileTabMixin:
         cs_sel_row = QHBoxLayout()
         cs_sel_row.setSpacing(4)
         self._cs_combo = QComboBox()
-        self._cs_combo.setToolTip('Select a built-in or saved color scheme')
+        self._cs_combo.setToolTip('Choose a built-in or saved color scheme; it is applied at once')
         cs_sel_row.addWidget(self._cs_combo, 1)
-        btn_cs_apply = QPushButton('Apply')
-        btn_cs_apply.setFixedWidth(54)
-        btn_cs_apply.setToolTip('Apply selected color scheme to the chart')
-        btn_cs_apply.clicked.connect(self._apply_color_scheme_selected)
-        cs_sel_row.addWidget(btn_cs_apply)
         layout.addLayout(cs_sel_row)
 
         # Swatch row — 5 colored squares showing bg / fg / plot / grid / accent
