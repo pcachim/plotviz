@@ -192,6 +192,32 @@ class TestColorSchemeCoverage(unittest.TestCase):
         facecolors = [to_hex(a.get_facecolor()) for a in w.canvas.figure.axes]
         self.assertEqual(facecolors.count("#181825"), 1)
 
+    def test_loading_a_scheme_file_respects_apply_to(self):
+        import json
+        import tempfile
+        import zipfile
+        from unittest import mock
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        w = self._multi()
+        scheme = dict(self.PlotVizApp._BUILTIN_COLOR_SCHEMES["Dark (charcoal)"])
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "dark.pvizc")
+            with zipfile.ZipFile(fp, "w") as zf:
+                zf.writestr("settings.json", json.dumps({"_scheme_name": "mine", **scheme}))
+            w.global_sp_active.setCurrentIndex(2)
+            w._cs_target.setCurrentIndex(1)
+            asked = []
+            with mock.patch.object(QFileDialog, "getOpenFileName", return_value=(fp, "")), \
+                    mock.patch.object(QMessageBox, "question",
+                                      side_effect=lambda *a, **k: (asked.append(a[2]),
+                                                                   QMessageBox.StandardButton.Yes)[1]):
+                w._load_color_scheme()
+        self.assertIn("subplot 3", asked[0])                  # the question says where
+        opts = w.subplot_canvas_opts
+        self.assertEqual(opts[2]["plot_bg"], "#181825")
+        for other in (0, 1, 3):
+            self.assertEqual(to_hex(opts[other]["plot_bg"]), "#ffffff", other)
+
     def test_all_subplots_is_still_the_default(self):
         w = self._multi()
         w._cs_combo.setCurrentText("Dark (charcoal)")

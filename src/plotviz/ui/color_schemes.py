@@ -267,16 +267,23 @@ class ColorSchemeMixin:
             self._applying_settings = False
         self.update_preview()
 
+    def _scheme_target_subplot(self) -> int | None:
+        """The subplot a scheme is to be applied to, or None for the whole figure.
+
+        Follows the "Apply to" selector; with a single subplot it is always the figure.
+        """
+        if (getattr(self, '_cs_target', None) is not None
+                and self._cs_target.currentIndex() == 1
+                and self.subplot_rows * self.subplot_cols > 1):
+            return self.global_sp_active.currentIndex()
+        return None
+
     def _apply_color_scheme_selected(self):
         """Apply the scheme currently selected in the combo."""
         name = self._cs_combo.currentText()
         scheme = self._COLOR_SCHEME_REGISTRY.get(name)
         if scheme:
-            only_active = (getattr(self, '_cs_target', None) is not None
-                           and self._cs_target.currentIndex() == 1
-                           and self.subplot_rows * self.subplot_cols > 1)
-            self._apply_color_scheme_dict(
-                scheme, subplot=self.global_sp_active.currentIndex() if only_active else None)
+            self._apply_color_scheme_dict(scheme, subplot=self._scheme_target_subplot())
 
     def _save_color_scheme(self):
         """Save the current chart colors as a .pvizc color-scheme file."""
@@ -353,12 +360,14 @@ class ColorSchemeMixin:
             self._cs_combo.setCurrentText(name)
             self._refresh_combo_icons()
 
+            target = self._scheme_target_subplot()
+            where = 'to the whole figure' if target is None else f'to subplot {target + 1}'
             reply = QMessageBox.question(
                 self, 'Apply?',
-                f'Scheme "{name}" loaded.\nApply it now?',
+                f'Scheme "{name}" loaded.\nApply it {where} now?',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
-                self._apply_color_scheme_dict(scheme)
+                self._apply_color_scheme_dict(scheme, subplot=target)
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
 
@@ -377,6 +386,6 @@ class ColorSchemeMixin:
             if self._cs_combo.findText(name) < 0:
                 self._cs_combo.addItem(name)
             self._cs_combo.setCurrentText(name)
-            self._apply_color_scheme_dict(scheme)
+            self._apply_color_scheme_dict(scheme, subplot=self._scheme_target_subplot())
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
