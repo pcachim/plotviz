@@ -1020,21 +1020,29 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ── Open / Load ───────────────────────────────────────────────────────
         file_menu.addSeparator()
 
-        act_open = QAction('Open Chart (.pviz)…', self)
+        act_open = QAction('Open Chart…', self)
+        act_open.setStatusTip('Open a chart (.pviz file)')
+        act_open.setToolTip('Open a chart (.pviz file)')
         act_open.setShortcut('Ctrl+O')
         act_open.triggered.connect(lambda: (_go_chart_tab(), self._load_project()))
         file_menu.addAction(act_open)
 
-        act_open_tpl = QAction('Load Template (.pvizt)…', self)
+        act_open_tpl = QAction('Load Template…', self)
+        act_open_tpl.setStatusTip('Apply a template (.pvizt file): settings only, no data')
+        act_open_tpl.setToolTip('Apply a template (.pvizt file): settings only, no data')
         act_open_tpl.triggered.connect(lambda: (_go_chart_tab(), self._load_template()))
         file_menu.addAction(act_open_tpl)
 
-        act_load_pal = QAction('Load Palette (.pvizp)…', self)
+        act_load_pal = QAction('Load Palette…', self)
+        act_load_pal.setStatusTip('Load colour palettes from a .pvizp file')
+        act_load_pal.setToolTip('Load colour palettes from a .pvizp file')
         act_load_pal.triggered.connect(
             lambda: (_go_chart_tab(), self._import_palette_bundle()))
         file_menu.addAction(act_load_pal)
 
-        act_load_scheme = QAction('Load Scheme (.pvizc)…', self)
+        act_load_scheme = QAction('Load Scheme…', self)
+        act_load_scheme.setStatusTip('Load a colour scheme from a .pvizc file')
+        act_load_scheme.setToolTip('Load a colour scheme from a .pvizc file')
         act_load_scheme.triggered.connect(
             lambda: (_go_chart_tab(), self._load_color_scheme()))
         file_menu.addAction(act_load_scheme)
@@ -1050,26 +1058,36 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ── Save ──────────────────────────────────────────────────────────────
         file_menu.addSeparator()
 
-        act_save = QAction('Save Chart (.pviz)', self)
+        act_save = QAction('Save Chart', self)
+        act_save.setStatusTip('Save the chart to its .pviz file')
+        act_save.setToolTip('Save the chart to its .pviz file')
         act_save.setShortcut('Ctrl+S')
         act_save.triggered.connect(lambda: (_go_chart_tab(), self._save_project()))
         file_menu.addAction(act_save)
 
         act_save_as = QAction('Save Chart As…', self)
+        act_save_as.setStatusTip('Save the chart as a new .pviz file')
+        act_save_as.setToolTip('Save the chart as a new .pviz file')
         act_save_as.setShortcut('Ctrl+Shift+S')
         act_save_as.triggered.connect(lambda: (_go_chart_tab(), self._save_project_as()))
         file_menu.addAction(act_save_as)
 
-        act_save_tpl = QAction('Save Template (.pvizt)…', self)
+        act_save_tpl = QAction('Save Template…', self)
+        act_save_tpl.setStatusTip('Save the settings, without data, as a .pvizt template')
+        act_save_tpl.setToolTip('Save the settings, without data, as a .pvizt template')
         act_save_tpl.triggered.connect(lambda: (_go_chart_tab(), self._save_template()))
         file_menu.addAction(act_save_tpl)
 
-        act_save_pal = QAction('Save Palette (.pvizp)…', self)
+        act_save_pal = QAction('Save Palette…', self)
+        act_save_pal.setStatusTip('Save the custom palettes as a .pvizp file')
+        act_save_pal.setToolTip('Save the custom palettes as a .pvizp file')
         act_save_pal.triggered.connect(
             lambda: (_go_chart_tab(), self._export_palette_bundle()))
         file_menu.addAction(act_save_pal)
 
-        act_save_scheme = QAction('Save Scheme (.pvizc)…', self)
+        act_save_scheme = QAction('Save Scheme…', self)
+        act_save_scheme.setStatusTip('Save the current colours as a .pvizc colour scheme')
+        act_save_scheme.setToolTip('Save the current colours as a .pvizc colour scheme')
         act_save_scheme.triggered.connect(
             lambda: (_go_chart_tab(), self._save_color_scheme()))
         file_menu.addAction(act_save_scheme)
@@ -1084,7 +1102,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
                      self.export_chart()))
         file_menu.addAction(act_export_img)
 
-        act_export_py = QAction('Export Python Bundle (.pvizx)…', self)
+        act_export_py = QAction('Export Python Bundle…', self)
+        act_export_py.setStatusTip('Export the chart as a standalone Python script bundle (.pvizx)')
+        act_export_py.setToolTip('Export the chart as a standalone Python script bundle (.pvizx)')
         act_export_py.setShortcut('Ctrl+Shift+E')
         act_export_py.triggered.connect(
             lambda: (_go_chart_tab(), self._export_python_bundle()))
