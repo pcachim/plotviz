@@ -1583,6 +1583,31 @@ class PlotEngineMixin:
         out = [min(max((n + pad) / d, 0.0), 0.45) for n, d in zip(need, (fw, fw, fh, fh))]
         return out[0], out[1], out[2], out[3]
 
+    def _decoration_rect(self, fig):
+        """Everything the margins place, as (left, bottom, width, height) fractions.
+
+        The union of each axes with its tick labels, axis titles and colorbar
+        (the chart's own title is positioned separately and is not included).
+        None when nothing can be measured.
+        """
+        try:
+            if not hasattr(fig.canvas, 'get_renderer'):
+                from matplotlib.backends.backend_agg import FigureCanvasAgg
+                FigureCanvasAgg(fig)
+            renderer = fig.canvas.get_renderer()
+            boxes = [a.bbox if getattr(a, 'name', '') == '3d' else a.get_tightbbox(renderer)
+                     for a in fig.axes if a.get_visible()]
+        except (AttributeError, ValueError, RuntimeError):
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+            return None
+        boxes = [b for b in boxes if b is not None and b.width > 0]
+        if not boxes:
+            return None
+        w, h = fig.bbox.width, fig.bbox.height
+        x0, x1 = min(b.x0 for b in boxes) / w, max(b.x1 for b in boxes) / w
+        y0, y1 = min(b.y0 for b in boxes) / h, max(b.y1 for b in boxes) / h
+        return x0, y0, x1 - x0, y1 - y0
+
     def _title_pos_as_fractions(self):
         """The chart title position (x, y) as fractions of the figure."""
         tx, ty = getattr(self, '_title_frac', self._DEFAULT_TITLE_FRAC)
@@ -1985,10 +2010,11 @@ class PlotEngineMixin:
 
                 if getattr(self, 'margin_mask_btn', None) is not None \
                         and self.margin_mask_btn.isChecked():
+                    _plot = (box_left + ul * box_w, box_bottom + ub * box_h,
+                             (ur - ul) * box_w, (ut - ub) * box_h)
                     self.canvas.draw_margin_mask(
                         (box_left, box_bottom, box_w, box_h),
-                        (box_left + ul * box_w, box_bottom + ub * box_h,
-                         (ur - ul) * box_w, (ut - ub) * box_h))
+                        self._decoration_rect(self.canvas.figure) or _plot, _plot)
 
                 # Redraw annotations AFTER layout is finalised so axes limits are set
                 if not is3d:

@@ -93,13 +93,14 @@ class CanvasPlotter(FigureCanvas):
         self._border_rect = rect
 
     # ─── Margin mask ──────────────────────────────────────────────────────────
-    def draw_margin_mask(self, page, inner, color='#d6336c'):
-        """Overlay the area the margins reserve, to show what they control.
+    def draw_margin_mask(self, page, inner, plot=None, color='#d6336c'):
+        """Overlay what the margins control, to show what is being resized.
 
-        *page* and *inner* are (left, bottom, width, height) in figure fractions:
-        the export page, and the rectangle the axes are laid out in. The margins
-        are the shaded band between them; a solid outline marks the inner edge.
-        Preview only: exports build their own figure and never see this.
+        All rectangles are (left, bottom, width, height) in figure fractions:
+        *page* is the export page, *inner* everything the margins place (the axes
+        with their tick labels, axis titles and colorbar). The rest of the page is
+        shaded and *inner* is outlined; *plot* (the axes alone, optional) gets a
+        dotted outline. Preview only: exports build their own figure.
         """
         self.clear_margin_mask()
         pl, pb, pw, ph = page
@@ -116,6 +117,11 @@ class CanvasPlotter(FigureCanvas):
         self._mask_artists.append(self.figure.add_artist(mpatches.Rectangle(
             (il, ib), iw, ih, transform=self.figure.transFigure, clip_on=False, zorder=291,
             facecolor='none', edgecolor=color, linewidth=1.2)))
+        if plot is not None:
+            self._mask_artists.append(self.figure.add_artist(mpatches.Rectangle(
+                (plot[0], plot[1]), plot[2], plot[3], transform=self.figure.transFigure,
+                clip_on=False, zorder=291, facecolor='none', edgecolor=color,
+                linewidth=0.8, linestyle=':')))
 
     def clear_margin_mask(self):
         for art in self._mask_artists:

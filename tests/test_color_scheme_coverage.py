@@ -134,5 +134,16 @@ class TestColorSchemeCoverage(unittest.TestCase):
         self.assertEqual(w2._cs_combo.currentText(), "(custom)")
 
 
+    def test_the_light_schemes_are_distinct(self):
+        from ui.tab_constants import COLOR_PALETTES
+        schemes = self.PlotVizApp._BUILTIN_COLOR_SCHEMES
+        self.assertEqual(schemes["Nature / print"]["color_palette"], "Nature")
+        self.assertEqual(schemes["Scientific (minimal)"]["color_palette"], "Colorblind")
+        for s in schemes.values():                       # every palette must exist
+            self.assertIn(s["color_palette"], COLOR_PALETTES)
+        light = [schemes[n] for n in ("Default (white)", "Nature / print", "Scientific (minimal)")]
+        self.assertEqual(len({tuple(sorted(s.items())) for s in light}), 3)
+
+
 if __name__ == "__main__":
     unittest.main()
