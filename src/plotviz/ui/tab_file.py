@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QSpinBox, QPushButton, QListWidget,
     QCheckBox, QScrollArea,
 )
-from PyQt6.QtCore import Qt
 from ui.tab_constants import (
     COLOR_PALETTES,
 )
@@ -197,30 +196,6 @@ class FileTabMixin:
         self._cs_combo.setToolTip('Choose a built-in or saved color scheme; it is applied at once')
         cs_sel_row.addWidget(self._cs_combo, 1)
         layout.addLayout(cs_sel_row)
-
-        # Swatch row — 5 colored squares showing bg / fg / plot / grid / accent
-        self._cs_swatches = []
-        sw_row = QHBoxLayout()
-        sw_row.setSpacing(3)
-        for _ in range(5):
-            sw = QLabel()
-            sw.setFixedSize(22, 16)
-            sw.setStyleSheet('background:#ccc; border:1px solid #888; border-radius:2px;')
-            self._cs_swatches.append(sw)
-            sw_row.addWidget(sw)
-        sw_labels = [QLabel(t) for t in ('Background', 'Plot', 'Foreground', 'Grid', 'Title')]
-        for lbl in sw_labels:
-            lbl.setStyleSheet('font-size:9px; color:#888;')
-        sw_detail = QHBoxLayout()
-        sw_detail.setSpacing(3)
-        for i, lbl in enumerate(sw_labels):
-            pair = QVBoxLayout()
-            pair.setSpacing(1)
-            pair.addWidget(self._cs_swatches[i], alignment=Qt.AlignmentFlag.AlignHCenter)
-            pair.addWidget(lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
-            sw_detail.addLayout(pair)
-        sw_detail.addStretch()
-        layout.addLayout(sw_detail)
 
         cs_btn_row = QHBoxLayout()
         cs_btn_row.setSpacing(4)

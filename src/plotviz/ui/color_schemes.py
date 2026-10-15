@@ -142,11 +142,11 @@ class ColorSchemeMixin:
         self._cs_combo.clear()
         self._cs_combo.addItems(list(self._COLOR_SCHEME_REGISTRY.keys()))
         self._cs_combo.blockSignals(False)
-        self._cs_combo.currentIndexChanged.connect(self._refresh_cs_swatches)
+        self._cs_combo.currentIndexChanged.connect(self._refresh_combo_icons)
         # `activated` fires only when the user picks an entry, never when the combo is
         # updated by code (loading a file, saving a scheme), so those never re-apply.
         self._cs_combo.activated.connect(lambda _i: self._apply_color_scheme_selected())
-        self._refresh_cs_swatches()
+        self._refresh_combo_icons()
 
     _CUSTOM_SCHEME = '(custom)'
 
@@ -205,22 +205,6 @@ class ColorSchemeMixin:
                         sch.get('chart_bg_color', '#ffffff'), sch.get('plot_bg_color', '#ffffff'),
                         sch.get('chart_fg_color', '#000000'), sch.get('grid_color', '#cccccc'),
                         sch.get('title_color', '#000000')]))
-
-    def _refresh_cs_swatches(self):
-        """Update the 5 preview swatches for the currently selected scheme."""
-        self._refresh_combo_icons()
-        name = self._cs_combo.currentText()
-        scheme = self._COLOR_SCHEME_REGISTRY.get(name, {})
-        colors = [
-            scheme.get('chart_bg_color', '#ffffff'),
-            scheme.get('plot_bg_color',  '#ffffff'),
-            scheme.get('chart_fg_color', '#000000'),
-            scheme.get('grid_color',     '#cccccc'),
-            scheme.get('title_color',    '#000000'),
-        ]
-        for sw, color in zip(self._cs_swatches, colors):
-            sw.setStyleSheet(
-                f'background:{color}; border:1px solid #888; border-radius:2px;')
 
     def _scheme_from_current_settings(self) -> dict:
         """Extract only the color-scheme keys from the current UI state."""
@@ -321,7 +305,7 @@ class ColorSchemeMixin:
             if self._cs_combo.findText(name) < 0:
                 self._cs_combo.addItem(name)
             self._cs_combo.setCurrentText(name)
-            self._refresh_cs_swatches()
+            self._refresh_combo_icons()
 
             reply = QMessageBox.question(
                 self, 'Apply?',
@@ -347,7 +331,6 @@ class ColorSchemeMixin:
             if self._cs_combo.findText(name) < 0:
                 self._cs_combo.addItem(name)
             self._cs_combo.setCurrentText(name)
-            self._refresh_cs_swatches()
             self._apply_color_scheme_dict(scheme)
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
