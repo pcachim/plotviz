@@ -1616,54 +1616,39 @@
 </thead>
 <tbody>
 <tr>
-<td>Chart</td>
-<td>Open/save files, export, subplot layout, color schemes, palette</td>
-</tr>
-<tr>
 <td>Data</td>
-<td>Load datasets, series table, chart type</td>
+<td>Loaded datasets, and the <strong>Generate</strong> page (function generators, data table)</td>
 </tr>
 <tr>
-<td>Style</td>
-<td>Figure size, margins, colors, grid, borders</td>
+<td>Layout &amp; Style</td>
+<td>Whole-figure settings: size, margins, title, subplot grid, colour scheme, palette</td>
 </tr>
 <tr>
-<td>Series</td>
-<td>Per-curve line style, marker, color, curve fitting</td>
-</tr>
-<tr>
-<td>Axes</td>
-<td>Labels, limits, scales, ticks, secondary Y axis</td>
-</tr>
-<tr>
-<td>Annotations</td>
-<td>Subplot titles, legend, text/arrow/image annotations</td>
-</tr>
-<tr>
-<td>Advanced</td>
-<td>Function generator, manual data entry table</td>
+<td>Plots</td>
+<td>Per-subplot settings, with a <strong>Editing</strong> selector at the top when there are several subplots</td>
 </tr>
 </tbody>
 </table>
+<p>The <strong>Plots</strong> tab has four pages: <strong>Plot</strong> (chart type, series table, options), <strong>Curves</strong> (per-curve line style, marker, colour, curve fitting), <strong>Axes</strong> (labels, limits, scales, ticks, secondary Y axis, canvas colours, borders, grid) and <strong>Annotations</strong> (subplot title, legend, text/arrow/image annotations). Opening, saving and exporting are in the <strong>File</strong> menu.</p>
 <p><strong>Right panel — canvas</strong></p>
 <p>The live chart preview updates as you change settings. Use the matplotlib toolbar at the top of the canvas to pan, zoom, and reset the view.</p>
 <hr />
 <h2 id="your-first-chart">Your first chart<a class="headerlink" href="#your-first-chart" title="Permanent link">&para;</a></h2>
 <h3 id="1-load-data">1. Load data<a class="headerlink" href="#1-load-data" title="Permanent link">&para;</a></h3>
-<p>Click <strong>Data</strong> tab → <strong>Browse Files</strong> and open a CSV, Excel, JSON or TXT file. plotviz reads all numeric and categorical columns and lists them in the dataset panel.</p>
+<p>Click the <strong>Data</strong> tab → <strong>Browse Files</strong> and open a CSV, Excel, JSON or TXT file. plotviz reads all numeric and categorical columns and lists them in the dataset panel.</p>
 <h3 id="2-assign-columns-to-series">2. Assign columns to series<a class="headerlink" href="#2-assign-columns-to-series" title="Permanent link">&para;</a></h3>
-<p>In the series table, use the <strong>X</strong> and <strong>Y</strong> dropdowns to pick which columns to plot. The <strong>Label</strong> column sets the legend entry. Add more rows with the <strong>+ Add series</strong> button.</p>
+<p>In <strong>Plots → Plot</strong>, in the series table, use the <strong>X</strong> and <strong>Y</strong> dropdowns to pick which columns to plot. The <strong>Label</strong> column sets the legend entry. Add more rows with the <strong>+ Add series</strong> button.</p>
 <h3 id="3-choose-a-chart-type">3. Choose a chart type<a class="headerlink" href="#3-choose-a-chart-type" title="Permanent link">&para;</a></h3>
-<p>In the <strong>Data</strong> tab, select a chart type from the dropdown — Line, Scatter, Bar, and so on. The canvas updates instantly.</p>
+<p>In <strong>Plots → Plot</strong>, select a chart type from the dropdown — Line, Scatter, Bar, and so on. The canvas updates instantly.</p>
 <h3 id="4-style-the-chart">4. Style the chart<a class="headerlink" href="#4-style-the-chart" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Style</strong> tab: set background color, grid, figure size.</li>
-<li><strong>Series</strong> tab: change line color, width, marker style.</li>
-<li><strong>Axes</strong> tab: set axis labels, limits and scale.</li>
-<li><strong>Annotations</strong> tab: add a legend, subplot title, or text annotations.</li>
+<li><strong>Layout &amp; Style</strong> tab: set background color, colour scheme, figure size.</li>
+<li><strong>Plots → Curves</strong>: change line color, width, marker style.</li>
+<li><strong>Plots → Axes</strong>: set axis labels, limits, scale, grid and canvas colours.</li>
+<li><strong>Plots → Annotations</strong>: add a legend, subplot title, or text annotations.</li>
 </ul>
 <h3 id="5-export">5. Export<a class="headerlink" href="#5-export" title="Permanent link">&para;</a></h3>
-<p>In the <strong>Chart</strong> tab, choose a format (PNG, SVG, PDF, JPEG) and click <strong>Export Chart</strong>. The DPI and figure dimensions set in the Style tab are used for the exported file.</p>
+<p>Choose <strong>File → Export Image…</strong>, pick a format (PNG, SVG, PDF, JPEG) and a DPI. The DPI and figure dimensions set in the Layout &amp; Style tab are used for the exported file.</p>
 <h3 id="6-save-your-work">6. Save your work<a class="headerlink" href="#6-save-your-work" title="Permanent link">&para;</a></h3>
 <p>Click <strong>Save Chart (.pviz)</strong> to save a <code>.pviz</code> project file. Reopening it restores your data, series assignments, and all style settings.</p>
 <hr />
