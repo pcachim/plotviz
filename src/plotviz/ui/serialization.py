@@ -1135,32 +1135,39 @@ class SerializationMixin:
         _cfg.remember_dir(fp)
         self._load_template_inner(fp)
 
-    def _save_project(self):
+    def _save_project(self, save_as=False):
         """
-        Save a full .pviz:
+        Save a full .pviz. With a file already open, plain Save rewrites that file
+        without asking (and remembers the "used columns / all columns" answer for
+        it); with none open, or with *save_as*, a file dialog asks where.
+
+        The file holds:
           settings.json  -- appearance/config (no column names)
           series.json    -- series table + subplot column assignments
           data.json      -- datasets (all or used-only, per user choice)
           images/<n>     -- any image files used in annotations
         """
         import os as _os
-        _default_dir = _get_dir()
-        if getattr(self, '_current_filepath', None):
-            _stem = _os.path.splitext(_os.path.basename(self._current_filepath))[0]
-            _default_dir = _os.path.join(_os.path.dirname(self._current_filepath), _stem)
+        _current = getattr(self, '_current_filepath', None)
+        _silent = (not save_as and bool(_current)
+                   and _current.endswith(('.pviz', '.zip')))
+        if _silent:
+            fp = _current
         else:
-            _default_dir = _os.path.join(_default_dir, 'new chart')
-        fp, _ = QFileDialog.getSaveFileName(
-            self, 'Save Chart', _default_dir,
-            'plotviz File (*.pviz);;zip Archive (*.zip);;All Files (*)')
-        if not fp: return
-        _remember_dir(fp)
-        # Accept .pviz or .zip; fall back to .pviz for any other extension
-        if not (fp.endswith('.pviz') or fp.endswith('.zip')):
-            fp += '.pviz'
-        self._current_filepath = fp
-        self._update_window_title()
-        self._is_dirty = False
+            _default_dir = _get_dir()
+            if _current:
+                _stem = _os.path.splitext(_os.path.basename(_current))[0]
+                _default_dir = _os.path.join(_os.path.dirname(_current), _stem)
+            else:
+                _default_dir = _os.path.join(_default_dir, 'new chart')
+            fp, _ = QFileDialog.getSaveFileName(
+                self, 'Save Chart As' if save_as else 'Save Chart', _default_dir,
+                'plotviz File (*.pviz);;zip Archive (*.zip);;All Files (*)')
+            if not fp: return
+            _remember_dir(fp)
+            # Accept .pviz or .zip; fall back to .pviz for any other extension
+            if not (fp.endswith('.pviz') or fp.endswith('.zip')):
+                fp += '.pviz'
 
         # ── Ask which columns to save ─────────────────────────────────────────
         # Collect the set of columns actually used in the series table
@@ -1202,9 +1209,12 @@ class SerializationMixin:
                     used_cols.add(_col)
 
         all_cols = set(self.datasets.keys())
+        _choice = getattr(self, '_save_choice', None)
         if used_cols >= all_cols:
             # All columns are in use — save everything silently, no dialog needed
             used_only = False
+        elif _silent and _choice and _choice[0] == fp:
+            used_only = _choice[1]          # asked on an earlier save of this file
         else:
             dlg = QMessageBox(self)
             dlg.setWindowTitle('Save data')
@@ -1223,6 +1233,7 @@ class SerializationMixin:
             if clicked is None or clicked not in (btn_used, btn_all):
                 return
             used_only = (clicked is btn_used)
+        self._save_choice = (fp, used_only)
 
         try:
             settings = self._collect_settings()
@@ -1273,9 +1284,20 @@ class SerializationMixin:
             image_paths = [ann.get('filepath', '')
                            for ann in self.canvas.annotations
                            if ann['type'] == 'image']
-            write_project_zip(fp, settings, series_meta, datasets,
-                              palette_json=self._custom_palettes_json(),
-                              image_paths=image_paths)
+            # Write beside the target and swap it in, so a failure part-way
+            # never leaves a half-written chart over the user's file.
+            tmp = fp + '.tmp'
+            try:
+                write_project_zip(tmp, settings, series_meta, datasets,
+                                  palette_json=self._custom_palettes_json(),
+                                  image_paths=image_paths)
+                _os.replace(tmp, fp)
+            finally:
+                if _os.path.exists(tmp):
+                    _os.remove(tmp)
+            self._current_filepath = fp
+            self._update_window_title()
+            self._is_dirty = False
 
             import config.settings as _cfg
             _cfg.add_recent_file(fp)
@@ -1284,9 +1306,16 @@ class SerializationMixin:
             saved_cols = len(datasets)
             total_cols = len(self.datasets)
             detail = f'{saved_cols} of {total_cols} column(s)' if used_only else f'all {total_cols} column(s)'
-            QMessageBox.information(self, 'Saved', f'Chart saved ({detail}):\n{fp}')
+            if _silent:
+                self.statusBar().showMessage(f'Saved {_os.path.basename(fp)} ({detail})', 4000)
+            else:
+                QMessageBox.information(self, 'Saved', f'Chart saved ({detail}):\n{fp}')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
+
+    def _save_project_as(self):
+        """Save the chart under a new name (always asks where)."""
+        self._save_project(save_as=True)
 
     def _load_project_from_path(self, fp: str):
         """Load a .pviz directly from *fp* (no file dialog — used by recent-files list and Finder open)."""

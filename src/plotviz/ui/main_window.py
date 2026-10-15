@@ -1050,10 +1050,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ── Save ──────────────────────────────────────────────────────────────
         file_menu.addSeparator()
 
-        act_save = QAction('Save Chart (.pviz)…', self)
+        act_save = QAction('Save Chart (.pviz)', self)
         act_save.setShortcut('Ctrl+S')
         act_save.triggered.connect(lambda: (_go_chart_tab(), self._save_project()))
         file_menu.addAction(act_save)
+
+        act_save_as = QAction('Save Chart As…', self)
+        act_save_as.setShortcut('Ctrl+Shift+S')
+        act_save_as.triggered.connect(lambda: (_go_chart_tab(), self._save_project_as()))
+        file_menu.addAction(act_save_as)
 
         act_save_tpl = QAction('Save Template (.pvizt)…', self)
         act_save_tpl.triggered.connect(lambda: (_go_chart_tab(), self._save_template()))

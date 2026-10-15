@@ -125,5 +125,72 @@ class TestProjectRoundTrip(unittest.TestCase):
             self.assertEqual(e["series_meta"], c["series_meta"])
             self.assertEqual(e["datasets_raw"], c["datasets_raw"])
 
+    # ── Save versus Save As ───────────────────────────────────────────────────
+    def _loaded_from_path(self, path):
+        w = self.PlotVizApp()
+        _app.processEvents()
+        with mock.patch("config.settings.add_recent_file"), \
+                mock.patch("config.settings.remember_dir"), \
+                mock.patch.object(QMessageBox, "information"):
+            w._load_project_from_path(path)
+        return w
+
+    def test_save_rewrites_the_open_file_without_asking(self):
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "a.pviz")
+            _write_pviz(fp)
+            w = self._loaded_from_path(fp)
+            w.title_input.setText("edited")
+            with mock.patch.object(QFileDialog, "getSaveFileName") as dialog, \
+                    mock.patch.object(QMessageBox, "information") as info, \
+                    mock.patch.object(QMessageBox, "critical", side_effect=AssertionError), \
+                    mock.patch("config.settings.add_recent_file"):
+                w._save_project()
+            dialog.assert_not_called()                      # no file dialog
+            info.assert_not_called()                        # no modal "Saved" box
+            self.assertEqual(read_project_zip(fp)["settings"]["title_text"], "edited")
+            self.assertEqual(os.listdir(d), ["a.pviz"])     # no temp file left behind
+            self.assertFalse(w._is_dirty)
+
+    def test_save_as_always_asks_and_switches_to_the_new_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            fp, other = os.path.join(d, "a.pviz"), os.path.join(d, "b.pviz")
+            _write_pviz(fp)
+            w = self._loaded_from_path(fp)
+            with mock.patch.object(QFileDialog, "getSaveFileName",
+                                   return_value=(other, "")) as dialog, \
+                    mock.patch.object(QMessageBox, "information"), \
+                    mock.patch("config.settings.add_recent_file"):
+                w._save_project_as()
+            dialog.assert_called_once()
+            self.assertTrue(os.path.exists(other))
+            self.assertEqual(w._current_filepath, other)
+
+    def test_a_failed_save_leaves_the_file_untouched(self):
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "a.pviz")
+            _write_pviz(fp)
+            before = open(fp, "rb").read()
+            w = self._loaded_from_path(fp)
+            with mock.patch("ui.serialization.write_project_zip", side_effect=OSError("disk full")), \
+                    mock.patch.object(QMessageBox, "critical") as err:
+                w._save_project()
+            err.assert_called_once()
+            self.assertEqual(open(fp, "rb").read(), before)
+            self.assertEqual(os.listdir(d), ["a.pviz"])
+
+    def test_save_without_a_file_asks_where(self):
+        with tempfile.TemporaryDirectory() as d:
+            w = self.PlotVizApp()
+            _app.processEvents()
+            fp = os.path.join(d, "new.pviz")
+            with mock.patch.object(QFileDialog, "getSaveFileName", return_value=(fp, "")) as dialog, \
+                    mock.patch.object(QMessageBox, "information"), \
+                    mock.patch("config.settings.add_recent_file"):
+                w._save_project()
+            dialog.assert_called_once()
+            self.assertTrue(os.path.exists(fp))
+
+
 if __name__ == "__main__":
     unittest.main()
