@@ -243,6 +243,11 @@ class DataMixin:
             self._btn_undo.setEnabled(len(self._undo_stack) >= 2)
         if hasattr(self, '_btn_redo'):
             self._btn_redo.setEnabled(bool(self._redo_stack))
+        # The Edit menu entries mirror the buttons
+        if getattr(self, '_act_undo', None) is not None:
+            self._act_undo.setEnabled(len(self._undo_stack) >= 2)
+        if getattr(self, '_act_redo', None) is not None:
+            self._act_redo.setEnabled(bool(self._redo_stack))
 
     def _default_settings(self) -> dict:
         """Return a settings dict matching widget construction defaults — used by New Plot."""

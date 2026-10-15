@@ -29,7 +29,6 @@ from PyQt6.QtWidgets import (
     QPushButton, QMessageBox, QSplitter, QFrame, QFileDialog,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
 from ui.nav_toolbar import NavigationToolbar2QT, SafeNavigationToolbar
 
@@ -669,9 +668,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._current_filepath = None
 
         # ── Keyboard shortcuts ────────────────────────────────────────────────
-        QShortcut(QKeySequence('Ctrl+Z'), self).activated.connect(self._undo)
-        QShortcut(QKeySequence('Ctrl+Y'), self).activated.connect(self._redo)
-        QShortcut(QKeySequence('Ctrl+Shift+Z'), self).activated.connect(self._redo)
+        # Undo / redo live in the Edit menu (built below), which owns their shortcuts.
 
         # Undo/redo buttons start disabled
         self._update_undo_buttons()
@@ -1013,6 +1010,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         # ── New ───────────────────────────────────────────────────────────────
         act_new = QAction('New Chart', self)
+        act_new.setStatusTip('Start a new, empty chart')
         act_new.setShortcut('Ctrl+N')
         act_new.triggered.connect(lambda: (_go_chart_tab(), self._reset_app()))
         file_menu.addAction(act_new)
@@ -1051,6 +1049,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         file_menu.addSeparator()
 
         act_load_data = QAction('Load Data…', self)
+        act_load_data.setStatusTip('Load a CSV, Excel, JSON or text data file')
         act_load_data.setShortcut('Ctrl+L')
         act_load_data.triggered.connect(lambda: (_go_data_tab(), self.load_data()))
         file_menu.addAction(act_load_data)
@@ -1096,6 +1095,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         file_menu.addSeparator()
 
         act_export_img = QAction('Export Image…', self)
+        act_export_img.setStatusTip('Export the chart as PNG, SVG, PDF, JPEG, TIFF or EPS')
         act_export_img.setShortcut('Ctrl+E')
         act_export_img.triggered.connect(
             lambda: (_go_chart_tab(),
@@ -1115,8 +1115,25 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         # ── Menu bar — Edit ───────────────────────────────────────────────────
         edit_menu = menubar.addMenu('Edit')
 
+        self._act_undo = QAction('Undo', self)
+        self._act_undo.setShortcut('Ctrl+Z')
+        self._act_undo.setStatusTip('Undo the last change')
+        self._act_undo.triggered.connect(self._undo)
+        edit_menu.addAction(self._act_undo)
+
+        self._act_redo = QAction('Redo', self)
+        self._act_redo.setShortcuts(['Ctrl+Y', 'Ctrl+Shift+Z'])
+        self._act_redo.setStatusTip('Redo the change that was undone')
+        self._act_redo.triggered.connect(self._redo)
+        edit_menu.addAction(self._act_redo)
+        self._act_undo.setEnabled(False)   # nothing to undo yet
+        self._act_redo.setEnabled(False)
+
+        edit_menu.addSeparator()
+
+        # Not Ctrl+C: that would steal "copy" from text fields and tables.
         act_copy_img = QAction('Copy Image to Clipboard', self)
-        act_copy_img.setShortcut('Ctrl+C')
+        act_copy_img.setShortcut('Ctrl+Shift+C')
         act_copy_img.setStatusTip('Copy the current chart as an image to the clipboard')
         act_copy_img.triggered.connect(self._copy_image_to_clipboard)
         edit_menu.addAction(act_copy_img)
@@ -1129,6 +1146,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             name = self.tabs.tabText(i)
             action = QAction(name, self)
             action.setCheckable(True)
+            action.setStatusTip(f'Show the {name} tab')
             action.setChecked(i == 0)
             action.triggered.connect(lambda checked, idx=i: self.tabs.setCurrentIndex(idx))
             view_menu.addAction(action)
@@ -1141,7 +1159,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from PyQt6.QtGui import QAction
         tools_menu = menubar.addMenu('Tools')
         sns_action = QAction('Seaborn Explorer…', self)
-        sns_action.setShortcut('Ctrl+Shift+S')
+        sns_action.setShortcut('Ctrl+Shift+B')    # Ctrl+Shift+S is Save Chart As
         sns_action.setStatusTip('Open the Seaborn statistical chart explorer')
         sns_action.triggered.connect(self._open_seaborn_explorer)
         tools_menu.addAction(sns_action)
