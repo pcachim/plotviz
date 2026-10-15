@@ -147,8 +147,10 @@ class TestTabLayout(unittest.TestCase):
             if fmt:
                 dlg.findChild(QComboBox).setCurrentText(fmt)
             btn = next(b for b in dlg.findChildren(QPushButton) if b.text() == text)
-            seen["copy_enabled"] = next(b for b in dlg.findChildren(QPushButton)
-                                        if b.text() == "Copy to clipboard").isEnabled()
+            copy_btn = next(b for b in dlg.findChildren(QPushButton)
+                            if b.text() == "Copy to clipboard")
+            seen["copy_enabled"] = copy_btn.isEnabled()
+            seen["tooltip"] = copy_btn.toolTip()
             if btn.isEnabled():
                 btn.click()
                 return QDialog.DialogCode.Accepted
@@ -159,8 +161,11 @@ class TestTabLayout(unittest.TestCase):
     def test_the_export_dialog_can_copy_instead_of_save(self):
         (fmt, dpi, action), _ = self._press("Copy to clipboard")
         self.assertEqual((fmt, action), ("png", "copy"))
-        (fmt, dpi, action), _ = self._press("Save…")
+        (fmt, dpi, action), seen = self._press("Save…")
         self.assertEqual(action, "save")
+        self.assertIn("PNG", seen["tooltip"])                  # says what it copies
+        self.assertIn(f"{dpi} dpi", seen["tooltip"])           # names the resolution
+        self.assertIn(f"{round(8 * dpi)} × {round(6 * dpi)} px", seen["tooltip"])
 
     def test_copy_is_not_offered_for_vector_formats(self):
         result, seen = self._press("Copy to clipboard", fmt="SVG")

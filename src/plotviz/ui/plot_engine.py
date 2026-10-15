@@ -2211,8 +2211,13 @@ class PlotEngineMixin:
             dpi_combo.setEnabled(not vec)
             dpi_spin.setEnabled(not vec)
             btn_copy.setEnabled(not vec)
-            btn_copy.setToolTip('The clipboard needs a raster format (PNG, JPEG, TIFF)' if vec
-                                else 'Copy the image instead of saving a file')
+            btn_copy.setToolTip(
+                'The clipboard takes pictures only: choose PNG, JPEG or TIFF to copy' if vec else
+                f'Copy the image to the clipboard instead of saving a file.\n'
+                f'It is always copied as PNG, at {dpi_spin.value()} dpi '
+                f'({round(wi * dpi_spin.value())} × {round(hi * dpi_spin.value())} px).\n'
+                f'The clipboard keeps pixels, not dpi, so the size it is pasted at '
+                f'depends on the receiving app.')
             px_label.setText(
                 'Vector format — DPI not applied' if vec
                 else f'{round(wi * dpi_spin.value())} × {round(hi * dpi_spin.value())} px')
