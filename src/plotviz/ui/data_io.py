@@ -653,6 +653,8 @@ class DataMixin(MixinBase):
         i_fn = self.fn_source_combo.findText(prev_fn)
         self.fn_source_combo.setCurrentIndex(i_fn if i_fn >= 0 else 0)
         self.fn_source_combo.blockSignals(False)
+        if hasattr(self, 'gen_preview'):
+            self.gen_preview.schedule()
         self._refresh_transform_combos(cols)
         for _fxy_attr, _fxy_prev in [
             ('fxy_x_combo', getattr(getattr(self, 'fxy_x_combo', None), 'currentText', lambda: '')()),

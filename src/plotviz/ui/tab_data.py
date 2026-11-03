@@ -75,13 +75,14 @@ class DataTabMixin(MixinBase):
         self.tabs.currentChanged.connect(self._on_outer_tab_changed)
 
     def _on_outer_tab_changed(self, index):
-        """Coming back to the Data tab with Transform open: the preview may be out of date."""
-        if (self.tabs.tabText(index) == 'Data'
-                and self.data_inner_tabs.tabText(self.data_inner_tabs.currentIndex()) == 'Transform'):
-            self._tf_schedule_preview()
+        """Coming back to the Data tab: the open page's preview may be out of date."""
+        if self.tabs.tabText(index) == 'Data':
+            self._on_data_page_changed(self.data_inner_tabs.currentIndex())
 
     def _on_data_page_changed(self, index):
         if self.data_inner_tabs.tabText(index) == 'Statistics':
             self._refresh_statistics()
         elif self.data_inner_tabs.tabText(index) == 'Transform':
-            self._tf_schedule_preview()
+            self.tf_preview.schedule()
+        elif self.data_inner_tabs.tabText(index) == 'Generate':
+            self.gen_preview.schedule()

@@ -70,7 +70,7 @@ class TestTransformPreview(unittest.TestCase):
         self.w.tf_op_combo.setCurrentIndex(self.w.tf_op_combo.findData(key))
 
     def labels(self):
-        return [l.get_label() for l in self.w.tf_preview_ax.get_lines()]
+        return [l.get_label() for l in self.w.tf_preview.ax.get_lines()]
 
     # ── what it draws ──────────────────────────────────────────────────────────
     def test_it_draws_the_original_and_the_result_and_says_what_would_be_created(self):
@@ -78,8 +78,8 @@ class TestTransformPreview(unittest.TestCase):
         self.op("savitzky_golay")
         self.settle()
         self.assertEqual(self.labels(), ["original", "result"])
-        self.assertIn("Savitzky-Golay: 400 points → would create \"v_SG11\"", w.tf_preview_info.text())
-        original, result = w.tf_preview_ax.get_lines()
+        self.assertIn("Savitzky-Golay: 400 points → would create \"v_SG11\"", w.tf_preview.info.text())
+        original, result = w.tf_preview.ax.get_lines()
         self.assertGreater(float(self.np.std(self.np.diff(original.get_ydata()))),
                            float(self.np.std(self.np.diff(result.get_ydata()))))      # smoothed
 
@@ -87,19 +87,19 @@ class TestTransformPreview(unittest.TestCase):
         w = self.w
         self.op("peaks")
         self.settle()
-        peaks = [l for l in w.tf_preview_ax.get_lines() if "peak" in str(l.get_label())]
+        peaks = [l for l in w.tf_preview.ax.get_lines() if "peak" in str(l.get_label())]
         self.assertEqual(len(peaks), 1)
         self.assertEqual(peaks[0].get_linestyle(), "None")
-        self.assertIn('"t_peaks" and "v_peaks"', w.tf_preview_info.text())
-        self.assertIn("x also changes", w.tf_preview_info.text())
+        self.assertIn('"t_peaks" and "v_peaks"', w.tf_preview.info.text())
+        self.assertIn("x also changes", w.tf_preview.info.text())
 
     def test_a_spectrum_is_drawn_alone_and_can_be_logarithmic(self):
         w = self.w
         self.op("fft_spectrum")
         self.settle()
         self.assertEqual(self.labels(), ["result"])          # the series has other axes
-        w.tf_log_check.setChecked(True)
-        self.assertEqual(w.tf_preview_ax.get_yscale(), "log")
+        w.tf_preview.log_check.setChecked(True)
+        self.assertEqual(w.tf_preview.ax.get_yscale(), "log")
 
     def test_a_date_x_is_labelled_with_dates(self):
         from core import dates as D
@@ -112,7 +112,7 @@ class TestTransformPreview(unittest.TestCase):
         self.op("moving_average")
         self.settle()
         import matplotlib.dates as mdates
-        self.assertIsInstance(w.tf_preview_ax.xaxis.get_major_locator(), mdates.DateLocator)
+        self.assertIsInstance(w.tf_preview.ax.xaxis.get_major_locator(), mdates.DateLocator)
 
     # ── it never changes anything ────────────────────────────────────────────────
     def test_previewing_changes_nothing(self):
@@ -123,7 +123,7 @@ class TestTransformPreview(unittest.TestCase):
         for key in ("moving_average", "peaks", "fft_spectrum", "resample_uniform", "derivative"):
             self.op(key)
             self.settle()
-        w.tf_preview_btn.click()
+        w.tf_preview.button.click()
         self.assertEqual(list(w.datasets), list(before))
         self.assertTrue(all(w.datasets[k] is before[k] for k in before))
         self.assertEqual((len(w._undo_stack), w.series_table.rowCount()), (steps, rows))
@@ -156,26 +156,26 @@ class TestTransformPreview(unittest.TestCase):
         w = self.w
         self.op("moving_average")
         self.settle()
-        before = len(w.tf_preview_ax.get_lines())
+        before = len(w.tf_preview.ax.get_lines())
         spin = w._tf_param_widgets[w._tf_op_index()]["window"]
         spin.setValue(9)
         spin.setValue(15)
-        self.assertTrue(w._tf_preview_timer.isActive())                 # a redraw is pending ...
-        self.assertNotIn("v_MA15", w.tf_preview_info.text())            # (not drawn yet)
+        self.assertTrue(w.tf_preview.timer.isActive())                 # a redraw is pending ...
+        self.assertNotIn("v_MA15", w.tf_preview.info.text())            # (not drawn yet)
         self.settle()
-        self.assertIn("v_MA15", w.tf_preview_info.text())               # ... and happened once, with the last value
-        self.assertEqual(len(w.tf_preview_ax.get_lines()), before)
-        w.tf_live_check.setChecked(False)
+        self.assertIn("v_MA15", w.tf_preview.info.text())               # ... and happened once, with the last value
+        self.assertEqual(len(w.tf_preview.ax.get_lines()), before)
+        w.tf_preview.live_check.setChecked(False)
         spin.setValue(21)
-        self.assertFalse(w._tf_preview_timer.isActive())
-        self.assertEqual(w.tf_preview_info.text(), "Changed: click Preview to update.")
+        self.assertFalse(w.tf_preview.timer.isActive())
+        self.assertEqual(w.tf_preview.info.text(), "Changed: click Preview to update.")
         self.settle()
-        self.assertIn("MA15", w._tf_last_plan.y_new)                    # nothing was redrawn
-        w.tf_preview_btn.click()
-        self.assertIn("v_MA21", w.tf_preview_info.text())
+        self.assertIn("MA15", w.tf_preview.last_plan.y_new)                    # nothing was redrawn
+        w.tf_preview.button.click()
+        self.assertIn("v_MA21", w.tf_preview.info.text())
 
     def test_live_pauses_for_very_long_series_but_the_button_still_draws(self):
-        from ui.tab_transform import PREVIEW_LIVE_LIMIT
+        from ui.preview_panel import PREVIEW_LIVE_LIMIT
         w = self.w
         n = PREVIEW_LIVE_LIMIT + 1000
         w.datasets.update({"big": self.np.sin(self.np.arange(n) / 100.0)})
@@ -184,11 +184,11 @@ class TestTransformPreview(unittest.TestCase):
         w.tf_y_combo.setCurrentText("big")
         self.op("moving_average")
         self.settle()
-        self.assertIn("Live is paused", w.tf_preview_info.text())
-        self.assertFalse(w._tf_preview_timer.isActive())
-        w.tf_preview_btn.click()
+        self.assertIn("Live is paused", w.tf_preview.info.text())
+        self.assertFalse(w.tf_preview.timer.isActive())
+        w.tf_preview.button.click()
         self.assertEqual(self.labels(), ["original", "result"])
-        self.assertLess(self.np.asarray(w.tf_preview_ax.get_lines()[0].get_xdata()).size, 2200)   # drawn with few points
+        self.assertLess(self.np.asarray(w.tf_preview.ax.get_lines()[0].get_xdata()).size, 2200)   # drawn with few points
 
     def test_a_problem_is_written_in_the_plot_not_raised(self):
         w = self.w
@@ -196,14 +196,14 @@ class TestTransformPreview(unittest.TestCase):
         widgets = w._tf_param_widgets[w._tf_op_index()]
         widgets["window"].setValue(2001)                                  # longer than the 400 points
         self.settle()
-        self.assertTrue(w.tf_preview_info.text().startswith("❌"))
-        self.assertIn("longer than the series", w.tf_preview_info.text())
-        self.assertEqual(w.tf_preview_ax.get_lines(), [])
+        self.assertTrue(w.tf_preview.info.text().startswith("❌"))
+        self.assertIn("longer than the series", w.tf_preview.info.text())
+        self.assertEqual(w.tf_preview.ax.get_lines(), [])
         w._apply_transform()
         self.assertIn("longer than the series", w.tf_status.text())      # Apply says the same
         widgets["window"].setValue(11)
         self.settle()
-        self.assertFalse(w.tf_preview_info.text().startswith("❌"))
+        self.assertFalse(w.tf_preview.info.text().startswith("❌"))
 
     # ── layout ───────────────────────────────────────────────────────────────────
     def test_the_parameter_area_is_as_tall_as_the_operation_shown(self):

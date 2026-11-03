@@ -9,6 +9,8 @@ PlotVizApp so its methods share the series table, fit state and widgets via
 """
 import csv
 import io
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -20,7 +22,25 @@ from data.scientific import (
     CurveFitter, CUSTOM_CHOICE, LOWESS_CHOICE, POLYNOMIAL_CHOICE, POLYNOMIAL_PREFIX, parse_start_values,
 )
 from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
+from data.transforms import downsample_minmax
 from ui.mixin_base import MixinBase
+
+
+@dataclass
+class GeneratePlan:
+    """What Generate would create, worked out without changing anything (the preview draws it)."""
+    label: str
+    expr: str
+    x: Any                    # the generated x (range mode), else None
+    source: str | None        # the source column (column mode)
+    y: Any
+    x_new: str | None         # the names the results would be stored under
+    y_new: str
+    log_x: bool = False       # logspace / geomspace
+
+    @property
+    def made(self):
+        return ([self.x_new] if self.x_new else []) + [self.y_new]
 
 
 class FitPresetMixin(MixinBase):
@@ -33,60 +53,126 @@ class FitPresetMixin(MixinBase):
         if ok and name.strip():
             self.data_table.setHorizontalHeaderItem(col_idx, QTableWidgetItem(name.strip()))
 
+    # ── y = f(x): compute (no side effects, shared with the preview) and apply ───────
+
+    def _gen_seed_value(self):
+        """The seed of the random spacings: kept until Apply, so the preview is what Apply makes."""
+        if getattr(self, '_gen_seed', None) is None:
+            self._gen_seed = int(np.random.default_rng().integers(2**32))
+        return self._gen_seed
+
+    @staticmethod
+    def _gen_eval(expr, var, arr):
+        ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
+        ns.update({var: arr, 'pi': np.pi, 'e': np.e,
+                   'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
+                   'exp': np.exp, 'log': np.log, 'log10': np.log10,
+                   'sqrt': np.sqrt, 'abs': np.abs})
+        return eval(expr, {'__builtins__': {}}, ns)
+
+    def _gen_unique(self, base, taken=()):
+        name, cnt = base, 1
+        while name in self.datasets or name in taken:
+            name = f'{base}_{cnt}'
+            cnt += 1
+        return name
+
+    def _gen_x_array(self, spacing, x_min, x_max, n):
+        if spacing != 'logspace' and x_min >= x_max:
+            raise ValueError('x_min must be less than x_max')
+        if spacing == 'logspace' and x_min >= x_max:
+            raise ValueError('exponent start must be less than stop')
+        if spacing == 'logspace':
+            return np.logspace(x_min, x_max, n)
+        if spacing == 'geomspace':
+            if x_min <= 0 or x_max <= 0:
+                raise ValueError('geomspace requires start and stop > 0')
+            return np.geomspace(x_min, x_max, n)
+        if spacing == 'random':
+            rng = np.random.default_rng(self._gen_seed_value())
+            return np.sort(rng.normal((x_min + x_max) / 2, (x_max - x_min) / 6, n))
+        if spacing == 'uniform':
+            rng = np.random.default_rng(self._gen_seed_value())
+            return np.sort(rng.uniform(x_min, x_max, n))
+        return np.linspace(x_min, x_max, n)
+
+    def _compute_generate(self):
+        """What the Generate button would create, without changing anything: a GeneratePlan.
+        Raises ValueError with a message for the panel when it cannot be done."""
+        expr = self.gen_expr.text().strip()
+        if not expr:
+            raise ValueError('Type an expression')
+        if self._adv_mode_range.isChecked():
+            spacing = self.gen_x_spacing.currentText() if hasattr(self, 'gen_x_spacing') else 'linspace'
+            n = self.gen_x_n.value()
+            x = self._gen_x_array(spacing, self.gen_x_min.value(), self.gen_x_max.value(), n)
+            y = np.asarray(self._gen_eval(expr, 'x', x), dtype=float)
+            if y.shape == ():
+                y = np.full(n, float(y))
+            x_new = self._gen_unique(self.gen_x_name.text().strip() or 'x')
+            y_new = self._gen_unique(self.gen_y_name.text().strip() or 'y', {x_new})
+            return GeneratePlan('y = f(x)', expr, x, None, y, x_new, y_new, spacing in ('logspace', 'geomspace'))
+        source = self.fn_source_combo.currentText()
+        if source not in self.datasets:
+            raise ValueError('No source column selected')
+        src = self.datasets[source]
+        result = np.asarray(self._gen_eval(expr, self.fn_var_name.text().strip() or 'x', src))
+        if result.shape == ():
+            result = np.full(len(src), float(result))
+        y_new = self._gen_unique(self.gen_y_name.text().strip() or 'result')
+        return GeneratePlan('f(column)', expr, None, source, result, None, y_new, False)
+
+    def _gen_draw_plan(self, ax, plan, fg):
+        y = np.asarray(plan.y, dtype=float)
+        colour = self._palette_color(1)
+        n = len(y)
+        if plan.x is not None:
+            x = np.asarray(plan.x, dtype=float)
+        else:
+            x = np.arange(n, dtype=float)             # a column: drawn against the point number
+            src = np.asarray(self.datasets[plan.source], dtype=float) if plan.source else None
+            if src is not None and len(src) == n:
+                ax.plot(*downsample_minmax(x, src), color='#9a9a9a', lw=0.9, label=plan.source)
+            ax.set_xlabel('point', fontsize=7, color=fg)
+        ax.plot(*downsample_minmax(x, y), color=colour, lw=1.3, marker='.' if n <= 200 else None,
+                ms=3.5, label=plan.y_new)
+        finite = y[np.isfinite(y)]
+        if self.gen_preview.log_check.isChecked() and len(finite) and finite.min() > 0:
+            ax.set_yscale('log')
+        if plan.log_x and len(x) and x.min() > 0:
+            ax.set_xscale('log')
+        leg = ax.legend(fontsize=7, loc='best', frameon=False)
+        for text in leg.get_texts():
+            text.set_color(fg)
+        names = ' and '.join(f'"{n}"' for n in plan.made)
+        return f'{plan.label}: {n:,} points → would create {names}.'
+
+    def _gen_size(self):
+        if self._adv_mode_range.isChecked():
+            return self.gen_x_n.value()
+        return len(self.datasets.get(self.fn_source_combo.currentText(), ()))
+
+    def _gen_connect_preview_triggers(self):
+        schedule = self.gen_preview.schedule
+        for edit in (self.gen_expr, self.gen_x_name, self.gen_y_name, self.fn_var_name):
+            edit.textChanged.connect(schedule)
+        for spin in (self.gen_x_min, self.gen_x_max, self.gen_x_n):
+            spin.valueChanged.connect(schedule)
+        self.gen_x_spacing.currentTextChanged.connect(schedule)
+        self.fn_source_combo.currentTextChanged.connect(schedule)
+        self._adv_mode_range.toggled.connect(schedule)
+
     def _generate_fx(self):
         try:
-            x_min = self.gen_x_min.value()
-            x_max = self.gen_x_max.value()
-            n     = self.gen_x_n.value()
-            expr  = self.gen_expr.text().strip()
-            xname = self.gen_x_name.text().strip() or 'x'
-            yname = self.gen_y_name.text().strip() or 'y'
-            spacing = self.gen_x_spacing.currentText() if hasattr(self, 'gen_x_spacing') else 'linspace'
-            if spacing != 'logspace' and x_min >= x_max:
-                self.gen_status.setText('❌  x_min must be less than x_max')
-                return
-            if spacing == 'logspace' and x_min >= x_max:
-                self.gen_status.setText('❌  exponent start must be less than stop')
-                return
-
-            if spacing == 'linspace':
-                xarr = np.linspace(x_min, x_max, n)
-            elif spacing == 'logspace':
-                xarr = np.logspace(x_min, x_max, n)
-            elif spacing == 'geomspace':
-                if x_min <= 0 or x_max <= 0:
-                    self.gen_status.setText('❌  geomspace requires start and stop > 0')
-                    return
-                xarr = np.geomspace(x_min, x_max, n)
-            elif spacing == 'random':
-                mid   = (x_min + x_max) / 2
-                sigma = (x_max - x_min) / 6
-                xarr  = np.sort(np.random.normal(mid, sigma, n))
-            elif spacing == 'uniform':
-                xarr = np.sort(np.random.uniform(x_min, x_max, n))
-            else:
-                xarr = np.linspace(x_min, x_max, n)
-            ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
-            ns.update({'x': xarr, 'pi': np.pi, 'e': np.e,
-                       'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
-                       'exp': np.exp, 'log': np.log, 'log10': np.log10,
-                       'sqrt': np.sqrt, 'abs': np.abs})
-            yarr = eval(expr, {'__builtins__': {}}, ns)
-            yarr = np.asarray(yarr, dtype=float)
-            if yarr.shape == (): yarr = np.full(n, float(yarr))
-
-            stored_x, stored_y = xname, yname
-            for attr, nm, arr in (('stored_x', xname, xarr), ('stored_y', yname, yarr)):
-                base, cnt = nm, 1
-                while base in self.datasets:
-                    base = f'{nm}_{cnt}'
-                    cnt += 1
-                self.datasets[base] = arr
-                if attr == 'stored_x': stored_x = base
-                else: stored_y = base
-            self._schedule_undo_snapshot('Generate y = f(x)')
+            plan = self._compute_generate()
+            if plan.x_new:
+                self.datasets[plan.x_new] = plan.x
+            self.datasets[plan.y_new] = plan.y
+            self._gen_seed = None                    # the next random spacing is a new draw
+            self._schedule_undo_snapshot('Generate y = f(x)' if plan.x_new else 'Apply function to column')
             self.update_lists()
-            self.gen_status.setText(f'✓  Created "{stored_x}" and "{stored_y}"  ({n} points)')
+            names = ', '.join(f'"{n}"' for n in plan.made)
+            self.gen_status.setText(f'✓  Created {names}  ({len(plan.y)} points)')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             self.gen_status.setText(f'❌  {e}')
 
@@ -330,34 +416,7 @@ class FitPresetMixin(MixinBase):
                 self.fuv_status.setText(f'\u274c  {e}')
 
     def _apply_col_function(self):
-        try:
-            src_col = self.fn_source_combo.currentText()
-            var     = self.fn_var_name.text().strip() or 'x'
-            expr    = self.fn_expr.text().strip()
-            out_nm  = self.fn_out_name.text().strip() or 'result'
-            if src_col not in self.datasets:
-                self.fn_status.setText('❌  No source column selected')
-                return
-            src_arr = self.datasets[src_col]
-            ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
-            ns.update({var: src_arr, 'pi': np.pi, 'e': np.e,
-                       'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
-                       'exp': np.exp, 'log': np.log, 'log10': np.log10,
-                       'sqrt': np.sqrt, 'abs': np.abs})
-            result = eval(expr, {'__builtins__': {}}, ns)
-            result = np.asarray(result)
-            if result.shape == (): result = np.full(len(src_arr), float(result))
-            base, cnt = out_nm, 1
-            stored_nm = base
-            while stored_nm in self.datasets:
-                stored_nm = f'{base}_{cnt}'
-                cnt += 1
-            self.datasets[stored_nm] = result
-            self._schedule_undo_snapshot('Apply function to column')
-            self.update_lists()
-            self.fn_status.setText(f'✓  Created "{stored_nm}"  ({len(result)} points)')
-        except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
-            self.fn_status.setText(f'❌  {e}')
+        self._generate_fx()
 
     # ── Inspect loaded series values ───────────────────────────────────────────
 

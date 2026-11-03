@@ -13,24 +13,18 @@ from typing import Any
 
 import numpy as np
 from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QComboBox, QLabel, QLineEdit,
-    QSpinBox, QDoubleSpinBox, QPushButton, QStackedWidget, QScrollArea, QCheckBox, QSizePolicy,
+    QSpinBox, QDoubleSpinBox, QPushButton, QStackedWidget, QScrollArea, QSizePolicy,
 )
-try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-except ImportError:                                   # matplotlib < 3.5
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
 
 from core.dates import DateArray, is_date, parse_date
 from data.transforms import OPERATIONS, apply_operation, default_suffix, downsample_minmax
 from ui.mixin_base import MixinBase
+from ui.preview_panel import PreviewPanel
 
 _NO_X = '(none: use index)'
-PREVIEW_LIVE_LIMIT = 50_000       # above this many points the preview waits for the button
-PREVIEW_DELAY_MS = 300            # live preview: wait this long after the last change
 
 
 @dataclass
@@ -137,7 +131,7 @@ class TransformTabMixin(MixinBase):
         self.tf_op_combo.currentIndexChanged.connect(self._tf_op_changed)
         self._tf_size_param_stack()
         self._tf_connect_preview_triggers()
-        self._tf_draw_hint('Choose a series and an operation; the preview shows here.')
+        self.tf_preview.hint('Choose a series and an operation; the preview shows here.')
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -225,7 +219,8 @@ class TransformTabMixin(MixinBase):
                     w.clear()
                     w.addItems(list(cols))
                     w.setCurrentIndex(max(w.findText(prev), 0))
-        self._tf_schedule_preview()
+        if hasattr(self, 'tf_preview'):
+            self.tf_preview.schedule()
 
     def _tf_parse_x_value(self, text):
         if not text:
@@ -308,114 +303,28 @@ class TransformTabMixin(MixinBase):
 
     def _tf_build_preview(self, layout):
         layout.addWidget(self._sec_label('Preview'))
-        row = QHBoxLayout()
-        row.setSpacing(6)
-        self.tf_preview_btn = QPushButton('👁  Preview')
-        self.tf_preview_btn.setToolTip('Draw the result of the operation, without creating anything')
-        self.tf_preview_btn.clicked.connect(lambda: self._tf_update_preview(forced=True))
-        row.addWidget(self.tf_preview_btn)
-        self.tf_live_check = QCheckBox('Live')
-        self.tf_live_check.setChecked(True)
-        self.tf_live_check.setToolTip(f'Redraw as you change the series, the operation or a parameter '
-                                      f'(paused above {PREVIEW_LIVE_LIMIT:,} points: use the button)')
-        row.addWidget(self.tf_live_check)
-        self.tf_log_check = QCheckBox('log y')
-        self.tf_log_check.setToolTip('Logarithmic y axis for the preview (useful for a spectrum)')
-        row.addWidget(self.tf_log_check)
-        row.addStretch()
-        layout.addLayout(row)
-        self.tf_preview_canvas = FigureCanvas(Figure(figsize=(3.6, 2.2)))
-        self.tf_preview_canvas.setMinimumHeight(170)
-        self.tf_preview_ax = self.tf_preview_canvas.figure.add_subplot(111)
-        layout.addWidget(self.tf_preview_canvas)
-        self.tf_preview_info = QLabel('')
-        self.tf_preview_info.setWordWrap(True)
-        self.tf_preview_info.setStyleSheet('color:#555;font-size:11px;')
-        layout.addWidget(self.tf_preview_info)
-        self._tf_last_plan = None
-        self._tf_preview_timer = QTimer(self)
-        self._tf_preview_timer.setSingleShot(True)
-        self._tf_preview_timer.setInterval(PREVIEW_DELAY_MS)
-        self._tf_preview_timer.timeout.connect(lambda: self._tf_update_preview(forced=False))
+        self.tf_preview = PreviewPanel(
+            self._compute_transform, self._tf_draw_plan,
+            lambda: len(self.datasets.get(self.tf_y_combo.currentText(), ())),
+            what='the result of the operation')
+        layout.addWidget(self.tf_preview)
 
     def _tf_connect_preview_triggers(self):
         """Any change of what the operation depends on asks for a (live) preview."""
+        schedule = self.tf_preview.schedule
         for combo in (self.tf_y_combo, self.tf_x_combo):
-            combo.currentTextChanged.connect(self._tf_schedule_preview)
-        self.tf_op_combo.currentIndexChanged.connect(self._tf_schedule_preview)
-        self.tf_live_check.toggled.connect(self._tf_schedule_preview)
-        self.tf_log_check.toggled.connect(self._tf_redraw_last)
+            combo.currentTextChanged.connect(schedule)
+        self.tf_op_combo.currentIndexChanged.connect(schedule)
         for widgets in self._tf_param_widgets:
             for w in widgets.values():
                 if isinstance(w, QComboBox):
-                    w.currentTextChanged.connect(self._tf_schedule_preview)
+                    w.currentTextChanged.connect(schedule)
                 elif isinstance(w, QLineEdit):
-                    w.textChanged.connect(self._tf_schedule_preview)
+                    w.textChanged.connect(schedule)
                 else:
-                    w.valueChanged.connect(self._tf_schedule_preview)
+                    w.valueChanged.connect(schedule)
 
-    def _tf_schedule_preview(self, *_):
-        """A live preview a moment after the last change (not for very long series)."""
-        if not hasattr(self, '_tf_preview_timer'):
-            return
-        if not self.tf_live_check.isChecked():
-            self._tf_preview_timer.stop()
-            if self._tf_last_plan is not None or self.tf_preview_info.text():
-                self.tf_preview_info.setText('Changed: click Preview to update.')
-            return
-        n = len(self.datasets.get(self.tf_y_combo.currentText(), ()))
-        if n > PREVIEW_LIVE_LIMIT:
-            self._tf_preview_timer.stop()
-            self.tf_preview_info.setText(f'Live is paused for {n:,} points: click Preview.')
-            return
-        self._tf_preview_timer.start()
-
-    def _tf_update_preview(self, forced):
-        """Compute the plan and draw it; problems are written in the plot, not raised."""
-        self._tf_preview_timer.stop()
-        if not forced and not (self.tf_live_check.isChecked() and self.tf_preview_canvas.isVisible()):
-            return                                       # no drawing for a page nobody is looking at
-        try:
-            plan = self._compute_transform()
-        except Exception as e:  # noqa: BLE001 - any failure of the operation is shown to the user
-            self._tf_last_plan = None
-            self._tf_draw_hint(str(e), error=True)
-            return
-        self._tf_last_plan = plan
-        self._tf_draw_plan(plan)
-
-    def _tf_redraw_last(self, *_):
-        if self._tf_last_plan is not None:
-            self._tf_draw_plan(self._tf_last_plan)
-
-    def _tf_style_axes(self):
-        """The mini plot follows the window's colours."""
-        pal = self.palette()
-        bg, fg = pal.window().color().name(), pal.windowText().color().name()
-        fig, ax = self.tf_preview_canvas.figure, self.tf_preview_ax
-        fig.patch.set_facecolor(bg)
-        ax.set_facecolor(bg)
-        ax.tick_params(colors=fg, labelsize=7)
-        for spine in ax.spines.values():
-            spine.set_edgecolor(fg)
-        fig.subplots_adjust(left=0.15, right=0.97, top=0.95, bottom=0.17)
-        return fg
-
-    def _tf_draw_hint(self, message, error=False):
-        ax = self.tf_preview_ax
-        ax.clear()
-        fg = self._tf_style_axes()
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.text(0.5, 0.5, message, transform=ax.transAxes, ha='center', va='center', wrap=True,
-                fontsize=8, color='#c0392b' if error else fg)
-        self.tf_preview_info.setText('❌  ' + message if error else '')
-        self.tf_preview_canvas.draw_idle()
-
-    def _tf_draw_plan(self, plan):
-        ax = self.tf_preview_ax
-        ax.clear()
-        fg = self._tf_style_axes()
+    def _tf_draw_plan(self, ax, plan, fg):
         n_in, n_out = len(plan.y), len(plan.y_out)
         x_in = plan.x if plan.x is not None else np.arange(n_in, dtype=float)
         if plan.x_out is not None:
@@ -434,7 +343,7 @@ class TransformTabMixin(MixinBase):
             ax.plot(rx, ry, color=result_colour, lw=1.3, marker='.' if n_out <= 200 else None,
                     ms=3.5, label='result')
         finite = plan.y_out[np.isfinite(plan.y_out)]
-        if self.tf_log_check.isChecked() and len(finite) and finite.min() > 0:
+        if self.tf_preview.log_check.isChecked() and len(finite) and finite.min() > 0:
             ax.set_yscale('log')
         if plan.x_is_date:
             import matplotlib.dates as mdates
@@ -445,5 +354,4 @@ class TransformTabMixin(MixinBase):
             text.set_color(fg)
         names = ' and '.join(f'"{n}"' for n in plan.made)
         extra = f'; x also changes, in "{plan.x_new}"' if plan.x_new else ''
-        self.tf_preview_info.setText(f'{plan.label}: {n_out:,} points → would create {names}{extra}.')
-        self.tf_preview_canvas.draw_idle()
+        return f'{plan.label}: {n_out:,} points → would create {names}{extra}.'

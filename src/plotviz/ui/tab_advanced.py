@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QTabWidget, QSizePolicy,
 )
 from ui.mixin_base import MixinBase
+from ui.preview_panel import PreviewPanel
 
 
 class AdvancedTabMixin(MixinBase):
@@ -145,6 +146,11 @@ class AdvancedTabMixin(MixinBase):
         out_row.addStretch()
         fg_lay.addLayout(out_row)
 
+        fg_lay.addWidget(self._sec_label('Preview'))
+        self.gen_preview = PreviewPanel(self._compute_generate, self._gen_draw_plan, self._gen_size,
+                                        what='what would be created')
+        fg_lay.addWidget(self.gen_preview)
+
         btn_gen = QPushButton('▶  Generate / Apply')
         btn_gen.clicked.connect(self._adv_generate_or_apply)
         fg_lay.addWidget(btn_gen)
@@ -158,6 +164,8 @@ class AdvancedTabMixin(MixinBase):
             self._adv_range_widget.setVisible(use_range)
             self._adv_col_widget.setVisible(not use_range)
         self._adv_mode_range.toggled.connect(_on_mode_toggle)
+        self._gen_connect_preview_triggers()
+        self.gen_preview.hint('Type an expression; the preview shows here.')
         fg_lay.addStretch()
         inner_tabs.addTab(fg_content, 'y=f(x)')
 

@@ -45,7 +45,18 @@ log(x + 1) / (1 + cos(x))
 3. Name the X and Y columns.
 4. Click **Generate** — the columns appear in the Datasets list and can be assigned to series in **Plots → Plot**.
 
-Clicking **Generate** again with the same column names replaces the previous data.
+Clicking **Generate** again with the same column names does not replace the previous data: the new columns get a numeric suffix (`x_1`, `y_1`, …).
+
+### Preview
+
+Below the expression, a small plot shows what **Generate** would create, without creating anything. It uses the same calculation as the button, so what you see is what you get.
+
+- **Preview** draws it once. **Live** (on by default) redraws shortly after any change: expression, range, number of points, spacing or names.
+- With the **column** input, the source column is drawn in grey and the result over it.
+- `logspace` and `geomspace` get a logarithmic x axis; **log y** is optional.
+- With `random` or `uniform` spacing the preview keeps the same random draw until you click **Generate**, and the columns created are exactly the ones shown. The next preview is a new draw.
+- Problems (syntax errors, unknown names, an empty range) are written in the plot area instead of showing a dialog.
+- A line under the plot gives the number of points and the names of the columns that would be created. Above 50,000 points Live pauses; use **Preview**.
 
 ---
 
