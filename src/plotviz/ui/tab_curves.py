@@ -10,10 +10,10 @@ CurvesTabMixin: create_curves_tab(): the Plots > Curves page (per-curve options 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QDoubleSpinBox, QPushButton, QCheckBox, QScrollArea, QGroupBox, QSizePolicy, QPlainTextEdit,
-    QTableWidget, QAbstractItemView,
+    QTableWidget, QAbstractItemView, QSpinBox, QLineEdit,
 )
 from PyQt6.QtGui import QFont
-from data.scientific import CurveFitter
+from data.scientific import CurveFitter, CUSTOM_CHOICE, LOWESS_CHOICE, MAX_DEGREE, POLYNOMIAL_CHOICE
 from ui.tab_constants import (
     _CMAP_LIST, DEFAULT_FIT_BAND_OPACITY,
 )
@@ -299,9 +299,91 @@ class CurvesTabMixin(MixinBase):
         self.fit_combo = QComboBox()
         self.fit_combo.addItem('None')
         self.fit_combo.addItems(CurveFitter.MODELS.keys())
+        self.fit_combo.addItems([POLYNOMIAL_CHOICE, CUSTOM_CHOICE, LOWESS_CHOICE])
         fr.addWidget(self.fit_combo)
         fr.addStretch()
         layout.addLayout(fr)
+
+        # Options of the two models that are made from them
+        self.fit_degree_row = QWidget()
+        dg = QHBoxLayout(self.fit_degree_row)
+        dg.setContentsMargins(0, 0, 0, 0)
+        dg.addWidget(QLabel('Degree:'))
+        self.fit_degree_spin = QSpinBox()
+        self.fit_degree_spin.setRange(1, MAX_DEGREE)
+        self.fit_degree_spin.setValue(4)
+        self.fit_degree_spin.setToolTip('Highest power of x. A higher degree always fits the data '
+                                        'better (R²), so compare the fits by their AIC.')
+        dg.addWidget(self.fit_degree_spin)
+        dg.addStretch()
+        layout.addWidget(self.fit_degree_row)
+        self.fit_custom_box = QWidget()
+        cu = QVBoxLayout(self.fit_custom_box)
+        cu.setContentsMargins(0, 0, 0, 0)
+        cu.setSpacing(2)
+        hint = QLabel('y = f(x). Any letter other than x is a parameter to fit; functions: sin, cos, '
+                      'exp, log, sqrt, abs … and pi, e.')
+        hint.setWordWrap(True)
+        hint.setStyleSheet('color:#888; font-size:10px;')
+        cu.addWidget(hint)
+        self.fit_expr_edit = QLineEdit()
+        self.fit_expr_edit.setPlaceholderText('a*exp(-x/b) + c')
+        cu.addWidget(self.fit_expr_edit)
+        self.fit_start_edit = QLineEdit()
+        self.fit_start_edit.setPlaceholderText('start values (optional):  a=3, b=2, c=1')
+        self.fit_start_edit.setToolTip('Where the search for each parameter starts; help it when the fit '
+                                       'does not converge. Unlisted parameters start at 1.')
+        cu.addWidget(self.fit_start_edit)
+        layout.addWidget(self.fit_custom_box)
+        self.fit_span_row = QWidget()
+        sp = QHBoxLayout(self.fit_span_row)
+        sp.setContentsMargins(0, 0, 0, 0)
+        sp.addWidget(QLabel('Span:'))
+        self.fit_span_spin = QDoubleSpinBox()
+        self.fit_span_spin.setRange(0.05, 1.0)
+        self.fit_span_spin.setSingleStep(0.05)
+        self.fit_span_spin.setValue(0.3)
+        self.fit_span_spin.setToolTip('LOWESS: the share of the points used around each point. A small span '
+                                      'follows the data closely; a large one gives a smoother trend.')
+        sp.addWidget(self.fit_span_spin)
+        sp.addWidget(QLabel('of the points (no equation, no bands)'))
+        sp.addStretch()
+        layout.addWidget(self.fit_span_row)
+
+        # What to fit: a stretch of x, with weights from the error column, resistant to outliers
+        self.fit_options_box = QWidget()
+        ob = QVBoxLayout(self.fit_options_box)
+        ob.setContentsMargins(0, 0, 0, 0)
+        ob.setSpacing(2)
+        xr = QHBoxLayout()
+        xr.addWidget(QLabel('Fit only x from'))
+        self.fit_xfrom_edit = QLineEdit()
+        self.fit_xfrom_edit.setPlaceholderText('start')
+        self.fit_xfrom_edit.setFixedWidth(80)
+        xr.addWidget(self.fit_xfrom_edit)
+        xr.addWidget(QLabel('to'))
+        self.fit_xto_edit = QLineEdit()
+        self.fit_xto_edit.setPlaceholderText('end')
+        self.fit_xto_edit.setFixedWidth(80)
+        xr.addWidget(self.fit_xto_edit)
+        xr.addStretch()
+        for edit in (self.fit_xfrom_edit, self.fit_xto_edit):
+            edit.setToolTip('Leave a box empty for no limit (a date when x is a date). The curve is still '
+                            'drawn over all of x; only these points decide the fit.')
+        ob.addLayout(xr)
+        self.fit_weight_check = QCheckBox('Weight by the error column')
+        self.fit_weight_check.setToolTip('Points with a larger error count less. Uses the Error column of '
+                                         'the Plot tab, read as the standard deviation of each y.')
+        ob.addWidget(self.fit_weight_check)
+        self.fit_robust_check = QCheckBox('Robust (reduce the effect of outliers)')
+        self.fit_robust_check.setToolTip('A fit that gives less weight to points far from the curve, '
+                                         'and flags the ones that stand out. The parameter errors are approximate.')
+        ob.addWidget(self.fit_robust_check)
+        layout.addWidget(self.fit_options_box)
+        self.fit_combo.currentTextChanged.connect(self._on_fit_model_changed)
+        self.combo_err.currentTextChanged.connect(self._refresh_fit_weight_option)
+        self._on_fit_model_changed(self.fit_combo.currentText())
+        self._refresh_fit_weight_option()
 
         btn_fit = QPushButton('▶  Apply Fit')
         btn_fit.clicked.connect(self.apply_fit)

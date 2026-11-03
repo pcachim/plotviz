@@ -29,6 +29,21 @@ The **View** menu lists the three tabs as checkable items; the active one is tic
 | View → Layout & Style | Figure size, margins, title, subplot grid, colour scheme, palette |
 | View → Plots | Per-subplot settings: Plot, Curves, Axes, Canvas & Grid, Legend & Notes |
 
+## Undo and redo
+
+**Edit → Undo** and **Redo** (and the two buttons in the top bar) step through up to 50 changes. Hover over a button to see what it will undo or redo ("Undo: Apply fit"), and the status bar says what was undone.
+
+A step is recorded about half a second after the last change, so a burst of edits (typing, dragging a spin box) is one step. Everything that makes up the chart is in it:
+
+- every setting, per subplot, including the style of each curve;
+- the datasets (loading, removing, **Generate**, **Transform**, the data table);
+- the series table and the fits (with their bands, and whether each is shown);
+- the annotations (adding, moving, editing, deleting).
+
+After an undo you stay on the same subplot and curve, and the lists keep their selection. Undo does not cover zooming or panning with the toolbar, the open/save state of the file, or the palettes you saved to disk.
+
+The history starts again when you open a file or start a new chart. The datasets in the history are not copied: a step only holds the arrays that changed, so a long history does not multiply the memory used by large data.
+
 ## Canvas (matplotlib toolbar)
 
 The toolbar above the chart canvas provides standard matplotlib navigation:

@@ -219,6 +219,19 @@ class SerializationMixin(MixinBase):
                     'ci_idx': fit.get('ci_idx', 0),
                     'pi_idx': fit.get('pi_idx', 0),
                     'visible': bool(fit.get('visible', True)),
+                    'tag':     fit.get('tag', ''),
+                    'x_range': list(fit['x_range']) if fit.get('x_range') is not None else None,
+                    'range_text': list(fit.get('range_text') or ('', '')),
+                    'n_excluded': int(fit.get('n_excluded') or 0),
+                    'used':    [bool(v) for v in fit['used']] if fit.get('used') is not None else None,
+                    'weighted': bool(fit.get('weighted')),
+                    'err_col': fit.get('err_col', ''),
+                    'robust':  bool(fit.get('robust')),
+                    'n_outliers': int(fit.get('n_outliers') or 0),
+                    'outliers': ([bool(v) for v in fit['outliers']]
+                                 if fit.get('outliers') is not None else None),
+                    'curve':   ({'x': [float(v) for v in fit['curve'][0]], 'y': [float(v) for v in fit['curve'][1]]}
+                                if fit.get('curve') is not None else None),
                 }
         s['fits']       = _fits_raw
         s['fit_result'] = None  # legacy sentinel
@@ -674,11 +687,16 @@ class SerializationMixin(MixinBase):
             if _nm_leg not in _fits_saved:
                 _fits_saved[_nm_leg] = _legacy_fr
         for _nm, fr in _fits_saved.items():
-            if not (fr.get('model') and fr.get('popt')): continue
+            if not (fr.get('model') and (fr.get('popt') or fr.get('curve'))): continue
             try:
                 model = fr['model']
                 x0 = float(fr.get('x0') or 0.0)
-                func = _CF.make_func(model, x0)
+                curve = fr.get('curve')
+                if curve:                                    # a smoothing: the curve itself is the model
+                    func = _CF.lowess_func(curve['x'], curve['y'])
+                    curve = (_np.array(curve['x']), _np.array(curve['y']))
+                else:
+                    func = _CF.make_func(model, x0)
                 popt  = _np.array(fr['popt'])
                 pcov  = _np.array(fr['pcov']) if fr.get('pcov') else _np.zeros((len(popt), len(popt)))
                 xd    = _np.array(fr['xd'])
@@ -688,7 +706,16 @@ class SerializationMixin(MixinBase):
                     xd=xd, yd=yd, xc=fr.get('xc',''), yc=fr.get('yc',''), lbl=fr.get('lbl',''),
                     eq_str=fr.get('eq_str',''), r2=fr.get('r2'), stats=fr.get('stats',{}),
                     ci_idx=fr.get('ci_idx',0), pi_idx=fr.get('pi_idx',0),
-                    visible=bool(fr.get('visible', True)))
+                    visible=bool(fr.get('visible', True)),
+                    tag=fr.get('tag', ''),
+                    x_range=tuple(fr['x_range']) if fr.get('x_range') is not None else None,
+                    range_text=tuple(fr.get('range_text') or ('', '')),
+                    n_excluded=int(fr.get('n_excluded') or 0),
+                    used=_np.array(fr['used'], dtype=bool) if fr.get('used') is not None else None,
+                    weighted=bool(fr.get('weighted')), err_col=fr.get('err_col', ''),
+                    robust=bool(fr.get('robust')), n_outliers=int(fr.get('n_outliers') or 0),
+                    outliers=_np.array(fr['outliers'], dtype=bool) if fr.get('outliers') is not None else None,
+                    curve=curve)
             except (KeyError, ValueError, TypeError, IndexError, AttributeError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         for _nm in list(self._fits):
@@ -1190,6 +1217,42 @@ class SerializationMixin(MixinBase):
         _cfg.remember_dir(fp)
         self._load_template_inner(fp)
 
+    def _make_save_columns_dialog(self):
+        """The "which columns to save" question: returns (dialog, used button, all button, cancel).
+
+        Cancel, Used series only and All columns, left to right, All columns on the right and
+        the default (Enter).  The roles are chosen for that order: the platform decides where a
+        button goes from its role, and with the usual Accept / Reject roles macOS puts
+        All columns on the left.  (Escape is set to Cancel explicitly.)
+        """
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle('Save data')
+        dlg.setText('Which dataset columns do you want to save?')
+        dlg.setInformativeText(
+            '<b>Used series only</b> saves the columns currently assigned '
+            'in the Series table — keeps the file small.<br><br>'
+            '<b>All columns</b> preserves every loaded column so you can '
+            'reassign axes after reopening.'
+        )
+        role = QMessageBox.ButtonRole
+        btn_used = dlg.addButton('Used series only', role.ActionRole)
+        btn_all = dlg.addButton('All columns', role.ActionRole)
+        btn_cancel = dlg.addButton('Cancel', role.ResetRole)
+        dlg.setDefaultButton(btn_all)
+        dlg.setEscapeButton(btn_cancel)
+        return dlg, btn_used, btn_all, btn_cancel
+
+    def _ask_columns_to_save(self):
+        """True to save the used series only, False to save all columns, None if cancelled."""
+        dlg, btn_used, btn_all, _cancel = self._make_save_columns_dialog()
+        dlg.exec()
+        clicked = dlg.clickedButton()
+        if clicked is btn_used:
+            return True
+        if clicked is btn_all:
+            return False
+        return None
+
     def _save_project(self, save_as=False):
         """
         Save a full .pviz. With a file already open, plain Save rewrites that file
@@ -1271,23 +1334,9 @@ class SerializationMixin(MixinBase):
         elif _silent and _choice and _choice[0] == fp:
             used_only = _choice[1]          # asked on an earlier save of this file
         else:
-            dlg = QMessageBox(self)
-            dlg.setWindowTitle('Save data')
-            dlg.setText('Which dataset columns do you want to save?')
-            dlg.setInformativeText(
-                '<b>Used series only</b> saves the columns currently assigned '
-                'in the Series table — keeps the file small.<br><br>'
-                '<b>All columns</b> preserves every loaded column so you can '
-                'reassign axes after reopening.'
-            )
-            btn_used = dlg.addButton('Used series only', QMessageBox.ButtonRole.AcceptRole)
-            btn_all  = dlg.addButton('All columns',      QMessageBox.ButtonRole.AcceptRole)
-            dlg.addButton(QMessageBox.StandardButton.Cancel)
-            dlg.exec()
-            clicked = dlg.clickedButton()
-            if clicked is None or clicked not in (btn_used, btn_all):
+            used_only = self._ask_columns_to_save()
+            if used_only is None:
                 return
-            used_only = (clicked is btn_used)
         self._save_choice = (fp, used_only)
 
         try:

@@ -485,6 +485,30 @@ def peaks(x, y, min_height=None, min_prominence=None, min_distance=1, min_height
     return (idx.astype(float) if x is None else _as_float(x)[idx]), y[idx]
 
 
+# ── For drawing a long series ────────────────────────────────────────────────
+
+def downsample_minmax(x, y, max_points=2000):
+    """At most about *max_points* of the points to draw: the lowest and the highest point of every
+    block of the series, in order, so no peak or dip is lost.  (Drawing only; never for results.)"""
+    y = np.asarray(y, dtype=float)
+    x = np.asarray(x, dtype=float)
+    n = len(y)
+    if n <= max_points:
+        return x, y
+    edges = np.linspace(0, n, max(max_points // 2, 1) + 1).astype(int)
+    keep = []
+    for a, b in zip(edges[:-1], edges[1:]):
+        if b <= a:
+            continue
+        segment = y[a:b]
+        if np.all(np.isnan(segment)):
+            keep.append(a)
+            continue
+        keep.extend((a + int(np.nanargmin(segment)), a + int(np.nanargmax(segment))))
+    index = np.array(sorted(set(keep)))
+    return x[index], y[index]
+
+
 # ── Registry (drives the UI) ─────────────────────────────────────────────────
 # param = (name, label, kind, default, extra[, show_when]): kind 'int'/'float' -> extra=(min, max);
 # show_when = {other_param: [values]} shows the row only while that choice parameter has one of them;

@@ -19,6 +19,23 @@ The Transform page applies an operation (smoothing, decimation, calculus, scalin
 
 The status line under the button says what was created and how many points it has. New series appear at once in the Datasets list and in the series table.
 
+### Preview
+
+Below the parameters, a small plot shows what **Apply** would create, without
+creating anything: the original series in grey and the result on top of it.
+It uses the same calculation as Apply, so what you see is what you get.
+
+- **Preview** draws it once. **Live** (on by default) redraws shortly after
+  any change — series, operation or parameter.
+- Peaks are drawn as markers. A spectrum is drawn alone, since its x axis is
+  different. Date columns get a date axis. **log y** helps with spectra.
+- Long series are drawn with a reduced number of points (the highs and lows
+  are kept). Above 50,000 points Live pauses; use **Preview**.
+- Problems (a window longer than the series, no x for a resample, ...) are
+  written in the plot area instead of showing a dialog.
+- Under the plot, a line says how many points go in and the name of the
+  series that would be created.
+
 ### Dates
 
 When x is a date column, the operations that keep or select x values keep it as dates: the new x series from cropping, decimating, resampling, aligning, removing NaN or finding peaks is a date series, and plots with a date axis. Notes:

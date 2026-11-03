@@ -46,17 +46,49 @@ The curve fitting section lets you fit a mathematical model to any series and ov
 
 ### Available models
 
-| Model | Equation |
-|-------|---------|
-| Linear | y = a·x + b |
-| Quadratic | y = a·x² + b·x + c |
-| Cubic | y = a·x³ + b·x² + c·x + d |
-| Exponential | y = a·e^(b·x) |
-| Power Law | y = a·x^b |
-| Logarithmic | y = a·ln(x) + b |
-| Sigmoid | y = a / (1 + e^(−(x − b)/c)) |
+| Model | Equation | Typical use |
+|-------|---------|-------------|
+| Linear | y = a·x + b | |
+| Quadratic | y = a·x² + b·x + c | |
+| Cubic | y = a·x³ + b·x² + c·x + d | |
+| **Polynomial (degree n)** | y = c*n*·xⁿ + … + c1·x + c0 | any degree from 1 to 10; choose the **Degree** below the list |
+| Exponential | y = a·e^(b·x) | decay or growth towards 0 |
+| **Exponential + offset** | y = a·e^(b·x) + c | charging or discharging (a capacitor, cooling): it settles at c instead of 0 |
+| Power Law | y = a·x^b | needs x > 0 |
+| Logarithmic | y = a·ln(x) + b | needs x > 0 |
+| Sigmoid | y = a / (1 + e^(−(x − b)/c)) | rising or falling step |
+| **Gaussian** | y = a·e^(−(x − μ)²/2σ²) + c | a peak (or, with a < 0, a dip) on a baseline: centre μ, width σ, height a |
+| **Sinusoid** | y = a·sin(2π·f·x + φ) + c | a periodic signal: amplitude, frequency (cycles per x unit), phase |
+| **Custom expression** | whatever you type | see below |
+| **Smoothing (LOWESS)** | no equation | a smooth trend through noisy data, to see its shape; see below |
 
 Fitted parameters are shown in the results box along with R², RMSE, and other statistics.
+
+#### Custom expression
+
+Type the formula in **Custom expression**, for example `a*exp(-x/b) + c` or `a*x/(b+x)`:
+
+- `x` is the independent variable; **every other letter or word is a parameter to fit**. The results list them in the order they first appear.
+- You can use numbers, `+ - * / ** %`, parentheses, the constants `pi` and `e`, and the functions `sin cos tan arcsin arccos arctan arctan2 sinh cosh tanh exp expm1 log log10 log2 log1p sqrt cbrt abs sign minimum maximum`. Nothing else is accepted (no attributes, no other function calls, no conditions).
+- **Start values** (optional): `a=3, b=2, c=1`. The search starts at 1 for the parameters you do not list (and also tries 0.1 and 10). Give them when the fit does not converge.
+- The F-test is not defined for custom models; use the AIC to compare.
+
+Polynomials, the Gaussian, the sinusoid and the offset exponential find their own starting values from the data (the sinusoid from the spectrum, so a frequency is found without being given). A negative width or amplitude is reported in its usual form: σ > 0, a > 0 with the phase turned half a cycle.
+
+
+### What to fit
+
+Below the model, three options decide *which points* count and *how much*:
+
+- **Fit only x from … to …**: only the points in that stretch decide the fit, to leave out a transient or a zone without interest. Leave a box empty for no limit; write a date when x is a date. The curve is still drawn over all of x, and the results say how many points were left out.
+- **Weight by the error column**: points with a larger error count less. It uses the **Error** column chosen in the Plot tab (so it is available only when one is chosen), read as the standard deviation of each y. The results show χ² and the reduced χ² (near 1 when the errors match the scatter), the parameter errors are absolute, and there is no F test. Points whose error is missing or not positive are left out.
+- **Robust (reduce the effect of outliers)**: points far from the curve count less, so a few wild values do not drag the fit, and the ones that stand out (more than 3 robust standard deviations from it) are counted as outliers in the results. R² and RMSE still include them, and the parameter errors are approximate.
+
+Each combination is a fit of its own: its name carries what was chosen (`Series 1 (Linear, x 2–…, robust fit)`), so you can fit a series with and without an option and compare them in the Fits list. The prediction band uses the scatter of the points that were fitted.
+
+#### Smoothing (LOWESS)
+
+LOWESS draws a smooth trend through the data by fitting a short line around each point, using the share of points set by **Span** (0.05 to 1; small follows the data closely, large is smoother). It is for *seeing* a trend without choosing a model: it has no equation, parameters, bands or tests, and it is not drawn outside the range of the data. It is saved with the chart and shows in the Fits list with its R² and RMSE.
 
 ### How the data are handled
 

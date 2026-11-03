@@ -9,6 +9,8 @@ widgets via `self`.
 """
 import logging
 import sys
+from dataclasses import dataclass
+from typing import Any
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -21,6 +23,17 @@ from ui.dialogs import DataImportDialog
 from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
 from ui.mixin_base import MixinBase
 from ui.tab_constants import DEFAULT_FIT_BAND_OPACITY
+
+
+@dataclass
+class UndoState:
+    """One step of the undo history."""
+    settings: dict[str, Any]
+    series: dict[str, Any]
+    datasets: dict[str, Any]          # name -> array, shared with the live app
+    annotations: list[dict[str, Any]]
+    fits: dict[str, Any]
+    label: str = ''
 
 
 class DataMixin(MixinBase):
@@ -186,40 +199,111 @@ class DataMixin(MixinBase):
         dlg.exec()
 
     # ── Undo / Redo ─────────────────────────────────────────────────────────────
+    def _schedule_undo_snapshot(self, label=None):
+        """Record the state as an undo step 400 ms from now.
+
+        Every call restarts the wait, so a burst of changes (typing, dragging a spin box)
+        is one step.  *label* names the step ("Apply Linear fit"); without one the step
+        is called "change".  Dataset changes call this through update_lists(), annotations
+        through the canvas, and update_preview() for everything drawn from the controls.
+        """
+        if (not hasattr(self, '_undo_stack') or getattr(self, '_undo_suspended', False)
+                or getattr(self, '_applying_settings', False)):
+            return
+        if label:
+            self._pending_undo_label = label
+        if not hasattr(self, '_snapshot_timer'):
+            from PyQt6.QtCore import QTimer
+            self._snapshot_timer = QTimer(self)
+            self._snapshot_timer.setSingleShot(True)
+            self._snapshot_timer.timeout.connect(self._snapshot)
+        self._snapshot_timer.start(400)
+
+    def _capture_undo_state(self):
+        """Everything an undo step has to bring back, independent of what happens next."""
+        import copy
+        # The fit arrays are large and never edited in place: keep them out of the settings
+        # (a cheap collect, no copy) and hold the fits themselves instead.
+        fits, self._fits = self._fits, {}
+        try:
+            settings = self._collect_settings()
+        finally:
+            self._fits = fits
+        annotations = [{k: copy.deepcopy(v) for k, v in a.items() if k != 'artist'}
+                       for a in self.canvas.annotations]
+        return UndoState(
+            settings=copy.deepcopy(settings),            # curve styles etc. are live objects: copy
+            series=copy.deepcopy(self._collect_series_meta()),
+            datasets=dict(self.datasets),                # arrays are replaced, never edited: share them
+            annotations=annotations,
+            fits={name: dict(f) for name, f in fits.items()},
+        )
+
+    @staticmethod
+    def _same_undo_state(a, b):
+        if not (isinstance(a, UndoState) and isinstance(b, UndoState)):
+            return False
+        if a.settings != b.settings or a.series != b.series or a.annotations != b.annotations:
+            return False
+        if a.datasets.keys() != b.datasets.keys() or any(a.datasets[k] is not b.datasets[k] for k in a.datasets):
+            return False
+        if a.fits.keys() != b.fits.keys():
+            return False
+        keys = ('model', 'lbl', 'xc', 'yc', 'x0', 'ci_idx', 'pi_idx', 'visible')
+        return all(tuple(a.fits[n].get(k) for k in keys) == tuple(b.fits[n].get(k) for k in keys)
+                   and a.fits[n]['popt'] is b.fits[n]['popt'] for n in a.fits)
+
     def _snapshot(self):
-        """Capture current full state for undo.  Called by update_preview."""
-        if not hasattr(self, '_undo_suspended') or self._undo_suspended:
+        """Record the current state as an undo step (unless nothing changed)."""
+        if getattr(self, '_undo_suspended', True) or not hasattr(self, '_undo_stack'):
             return
         if not hasattr(self, '_collect_settings') or not hasattr(self, 'datasets'):
             return
-        if not hasattr(self, '_undo_stack'):
+        state = self._capture_undo_state()
+        state.label = getattr(self, '_pending_undo_label', '') or 'change'
+        self._pending_undo_label = ''
+        if self._undo_stack and self._same_undo_state(self._undo_stack[-1], state):
             return
-        import copy
-        snap = (
-            self._collect_settings(),
-            self._collect_series_meta(),
-            copy.deepcopy(self.datasets),
-        )
-        # Avoid duplicate consecutive snapshots
-        if self._undo_stack and self._undo_stack[-1][0] == snap[0]                 and self._undo_stack[-1][1] == snap[1]:
-            return
-        self._undo_stack.append(snap)
+        self._undo_stack.append(state)
         if len(self._undo_stack) > self._MAX_UNDO:
             self._undo_stack.pop(0)
         self._redo_stack.clear()
         self._update_undo_buttons()
 
-    def _restore_snapshot(self, snap):
-        """Apply a (settings, series_meta, datasets) snapshot without pushing to undo."""
+    def _restore_snapshot(self, state):
+        """Bring the app back to *state* without recording a step."""
         import copy
+        sp_before = self.sp_active.currentIndex() if hasattr(self, 'sp_active') else 0
+        curve_before = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        data_before = [i.text() for i in self.dataset_list.selectedItems()] if hasattr(self, 'dataset_list') else []
         self._undo_suspended = True
         self._applying_settings = True
         try:
-            settings_d, series_d, datasets_d = snap
-            self.datasets = copy.deepcopy(datasets_d)
+            self.datasets = dict(state.datasets)
             self.update_lists(keep_selections=False)
-            self._apply_settings(settings_d)
-            self._apply_series_meta(series_d)
+            self._apply_settings(copy.deepcopy(state.settings))
+            self._apply_series_meta(copy.deepcopy(state.series))
+            # The fits (kept apart from the settings); their band datasets are in the datasets
+            self._fits = {name: dict(f) for name, f in state.fits.items()}
+            self._last_fit = next(iter(self._fits.values()), None)
+            # Annotations
+            self.canvas.clear_annotations()
+            self.canvas.annotations = [dict(copy.deepcopy(a)) for a in state.annotations]
+            # The interface where the user was: same subplot, same curve, same datasets selected
+            n = self.subplot_rows * self.subplot_cols
+            if hasattr(self, 'sp_active'):
+                self.sp_active.blockSignals(True)
+                self.sp_active.setCurrentIndex(sp_before if 0 <= sp_before < n else 0)
+                self.sp_active.blockSignals(False)
+            self.on_active_subplot_changed()             # loads every per-subplot widget (plot mode too)
+            if hasattr(self, 'curve_select') and curve_before and self.curve_select.findText(curve_before) >= 0:
+                self.curve_select.setCurrentText(curve_before)
+            self._refresh_fit_table()
+            self._on_fit_series_changed()
+            if hasattr(self, 'dataset_list'):
+                for i in range(self.dataset_list.count()):
+                    if self.dataset_list.item(i).text() in data_before:
+                        self.dataset_list.item(i).setSelected(True)
         finally:
             self._applying_settings = False
             self._undo_suspended = False
@@ -229,6 +313,7 @@ class DataMixin(MixinBase):
         # the timer fire would push a near-duplicate snapshot and wipe the redo stack.
         if hasattr(self, '_snapshot_timer'):
             self._snapshot_timer.stop()
+        self._pending_undo_label = ''
         self._update_undo_buttons()
 
     def _undo(self):
@@ -238,24 +323,39 @@ class DataMixin(MixinBase):
         current = self._undo_stack.pop()
         self._redo_stack.append(current)
         self._restore_snapshot(self._undo_stack[-1])
+        self._say_step('Undid', getattr(current, 'label', ''))
 
     def _redo(self):
         if not self._redo_stack:
             return
-        snap = self._redo_stack.pop()
-        self._undo_stack.append(snap)
-        self._restore_snapshot(snap)
+        state = self._redo_stack.pop()
+        self._undo_stack.append(state)
+        self._restore_snapshot(state)
+        self._say_step('Redid', getattr(state, 'label', ''))
+
+    def _say_step(self, verb, label):
+        if hasattr(self, 'statusBar') and label:
+            self.statusBar().showMessage(f'{verb}: {label}', 3000)
 
     def _update_undo_buttons(self):
+        can_undo, can_redo = len(self._undo_stack) >= 2, bool(self._redo_stack)
+        undo_label = getattr(self._undo_stack[-1], 'label', '') if can_undo else ''
+        redo_label = getattr(self._redo_stack[-1], 'label', '') if can_redo else ''
+        undo_tip = f'Undo: {undo_label}' if undo_label else 'Undo the last change'
+        redo_tip = f'Redo: {redo_label}' if redo_label else 'Redo the change that was undone'
         if hasattr(self, '_btn_undo'):
-            self._btn_undo.setEnabled(len(self._undo_stack) >= 2)
+            self._btn_undo.setEnabled(can_undo)
+            self._btn_undo.setToolTip(undo_tip)
         if hasattr(self, '_btn_redo'):
-            self._btn_redo.setEnabled(bool(self._redo_stack))
+            self._btn_redo.setEnabled(can_redo)
+            self._btn_redo.setToolTip(redo_tip)
         # The Edit menu entries mirror the buttons
         if getattr(self, '_act_undo', None) is not None:
-            self._act_undo.setEnabled(len(self._undo_stack) >= 2)
+            self._act_undo.setEnabled(can_undo)
+            self._act_undo.setStatusTip(undo_tip)
         if getattr(self, '_act_redo', None) is not None:
-            self._act_redo.setEnabled(bool(self._redo_stack))
+            self._act_redo.setEnabled(can_redo)
+            self._act_redo.setStatusTip(redo_tip)
 
     def _default_settings(self) -> dict:
         """Return a settings dict matching widget construction defaults — used by New Plot."""
@@ -446,6 +546,7 @@ class DataMixin(MixinBase):
                     self.datasets[name] = arr
             except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
                 QMessageBox.critical(self, 'Error', f'Failed: {fp}\n{e}')
+        self._schedule_undo_snapshot('Load data')
         self.update_lists()
         if self.series_table.rowCount() == 0:
             self._add_series_row()
@@ -459,6 +560,7 @@ class DataMixin(MixinBase):
             return
         for name in selected:
             self.datasets.pop(name, None)
+        self._schedule_undo_snapshot('Remove datasets')
         self.update_lists()
         self.update_preview()
         self._notify_sns_explorer()
@@ -569,6 +671,7 @@ class DataMixin(MixinBase):
 
         # Notify Seaborn Explorer if it is open
         self._notify_sns_explorer()
+        self._schedule_undo_snapshot()      # a change of the datasets is an undo step of its own
 
     def _refresh_series_combos(self):
         """Re-populate the X/Y QComboBox widgets in every series row and sync Plot spin ranges."""

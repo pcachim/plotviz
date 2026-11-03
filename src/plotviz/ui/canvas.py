@@ -651,6 +651,10 @@ class CanvasPlotter(FigureCanvas):
             try: self.main_window.refresh_annotation_list()
             except Exception:
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+            # every add / move / delete of an annotation is an undo step
+            schedule = getattr(self.main_window, '_schedule_undo_snapshot', None)
+            if schedule is not None:
+                schedule('Annotation')
 
     # ─── Status bar helper ────────────────────────────────────────────────────
     def _show_status(self, msg: str, timeout: int = 4000) -> None:

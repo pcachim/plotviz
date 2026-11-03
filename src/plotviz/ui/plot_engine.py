@@ -1951,15 +1951,9 @@ class PlotEngineMixin(MixinBase):
                 return
             if hasattr(self, '_sync_active_scheme'):
                 self._sync_active_scheme()
-            # Schedule snapshot on a debounce timer so it never blocks the render path.
-            # _snapshot() calls _collect_settings() + deepcopy(datasets) which is expensive.
-            if hasattr(self, '_snapshot'):
-                if not hasattr(self, '_snapshot_timer'):
-                    from PyQt6.QtCore import QTimer
-                    self._snapshot_timer = QTimer(self)
-                    self._snapshot_timer.setSingleShot(True)
-                    self._snapshot_timer.timeout.connect(self._snapshot)
-                self._snapshot_timer.start(400)   # 400 ms after last change
+            # Schedule an undo step on a debounce timer so it never blocks the render path.
+            if hasattr(self, '_schedule_undo_snapshot'):
+                self._schedule_undo_snapshot()
             # Mark dirty (unsaved changes)
             if hasattr(self, '_undo_stack') and not getattr(self, '_undo_suspended', False):
                 self._is_dirty = True

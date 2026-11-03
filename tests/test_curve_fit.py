@@ -77,6 +77,236 @@ class TestFitsAtAnyScale(unittest.TestCase):
         self.assertNotIn("₀", r["eq_str"])
 
 
+class TestMoreModels(unittest.TestCase):
+    """Exponential + offset, Gaussian, Sinusoid, Polynomial deg n and a custom expression."""
+
+    def check(self, model, x, y, truth, rtol=0.05, atol=0.05, **kw):
+        r = CF.fit_ex(x, y, model, **kw)
+        np.testing.assert_allclose(r["popt"], truth, rtol=rtol, atol=atol, err_msg=model)
+        return r
+
+    def test_exponential_with_an_offset(self):
+        x = np.linspace(0, 10, 80)
+        M = "Exponential + offset"
+        self.check(M, x, noisy(lambda x: 3 * np.exp(-0.5 * x) + 2, x, 0.03), [3, -0.5, 2])          # discharge
+        self.check(M, x, noisy(lambda x: -4 * np.exp(-0.7 * x) + 5, x, 0.03, 1), [-4, -0.7, 5])     # charge
+        self.check(M, x, noisy(lambda x: 0.5 * np.exp(0.4 * x) - 1, x, 0.1, 2), [0.5, 0.4, -1])     # growth
+        self.check(M, x, noisy(lambda x: 100 + 2 * np.exp(-x), x, 0.02, 3), [2, -1, 100])           # small on big
+
+    def test_gaussian_peak_dip_and_baseline(self):
+        x = np.linspace(-5, 15, 120)
+        g = lambda a, mu, s, c: (lambda x: a * np.exp(-(x - mu) ** 2 / (2 * s ** 2)) + c)           # noqa: E731
+        self.check("Gaussian", x, noisy(g(5, 4, 1.2, 1), x, 0.05), [5, 4, 1.2, 1])
+        self.check("Gaussian", x, noisy(g(-3, 6, 0.8, 2), x, 0.05, 1), [-3, 6, 0.8, 2])
+        self.check("Gaussian", x, noisy(g(10, 7, 0.3, 100), x, 0.1, 2), [10, 7, 0.3, 100])
+
+    def test_gaussian_width_is_reported_positive(self):
+        x = np.linspace(-5, 5, 100)
+        r = CF.fit_ex(x, 4 * np.exp(-x ** 2 / 2), "Gaussian")
+        self.assertGreater(r["popt"][2], 0)
+        self.assertTrue(np.all(np.diag(r["pcov"]) >= 0))
+
+    def test_sinusoid_frequency_phase_and_a_positive_amplitude(self):
+        x = np.linspace(0, 2, 200)
+        r = self.check("Sinusoid", x, noisy(lambda x: 3 * np.sin(2 * np.pi * 5 * x + 0.8) + 1, x, 0.1),
+                       [3, 5, 0.8, 1])
+        r = self.check("Sinusoid", x, noisy(lambda x: -2 * np.sin(2 * np.pi * 3 * x), x, 0.05, 1),
+                       [2, 3, np.pi, 0])                         # -a is the same curve as a, phase + pi
+        self.assertGreater(r["popt"][0], 0)
+        self.assertTrue(-np.pi < r["popt"][2] <= np.pi)
+        t = np.arange(1000) / 1000                              # 50 Hz mains sampled at 1 kHz
+        r = CF.fit_ex(t, 325 * np.sin(2 * np.pi * 50 * t + 1.1) + np.random.default_rng(2).normal(0, 5, 1000),
+                      "Sinusoid")
+        self.assertAlmostEqual(r["popt"][1], 50.0, delta=0.02)
+        self.assertAlmostEqual(r["popt"][0], 325, delta=2)
+
+    def test_sinusoid_on_dates_uses_a_shifted_x(self):
+        days = 19800 + np.arange(120.0)
+        r = CF.fit_ex(days, noisy(lambda d: 4 * np.sin(2 * np.pi * d / 7 + 0.5), days, 0.3), "Sinusoid")
+        self.assertAlmostEqual(r["popt"][1], 1 / 7, delta=0.001)          # a weekly cycle
+        self.assertGreater(r["x0"], 19000)
+
+    def test_polynomial_of_any_degree(self):
+        x = np.linspace(0, 10, 80)
+        y = noisy(lambda x: 0.02 * x ** 4 - 0.3 * x ** 3 + x ** 2, x, 0.05)
+        r = self.check(CF.polynomial_key(4), x, y, [0.02, -0.3, 1.0, 0, 0], atol=0.15)
+        self.assertIn("x⁴", r["eq_str"])
+        stats = {d: CF.full_stats(x, y, *[CF.fit_ex(x, y, CF.polynomial_key(d))[k] for k in ("popt", "pcov", "func")],
+                                  CF.polynomial_key(d)) for d in (2, 4, 6)}
+        self.assertEqual(stats[4]["param_names"], ["c4", "c3", "c2", "c1", "c0"])
+        self.assertLess(stats[4]["aic"], stats[2]["aic"] - 20)            # the right degree wins clearly
+        self.assertLess(stats[4]["aic"] - stats[6]["aic"], 6)             # and a higher one gains little
+        self.assertFalse(np.isnan(stats[4]["f_stat"]))                    # a polynomial has the F test
+        self.assertTrue(CF.has_f_test(CF.polynomial_key(3)) and not CF.has_f_test("Gaussian"))
+
+    def test_polynomial_degree_limits(self):
+        x = np.linspace(0, 1, 30)
+        for degree in (0, 11):
+            with self.assertRaisesRegex(ValueError, "between 1 and 10"):
+                CF.fit_ex(x, x, CF.polynomial_key(degree))
+        with self.assertRaisesRegex(ValueError, "needs at least 6 points"):
+            CF.fit_ex(x[:5], x[:5], CF.polynomial_key(5))
+
+    def test_a_custom_expression(self):
+        x = np.linspace(0, 10, 80)
+        r = self.check(CF.custom_key("a*exp(-x/b)+c"), x, noisy(lambda x: 3 * np.exp(-x / 2) + 1, x, 0.03), [3, 2, 1])
+        self.assertEqual(r["eq_str"].split(" = ")[0], "y")
+        self.assertIn("exp(-x/", r["eq_str"])                             # the expression with the values
+        self.assertEqual(CF.spec(CF.custom_key("a*exp(-x/b)+c")).param_names, ["a", "b", "c"])
+        self.check(CF.custom_key("a*x/(b+x)"), x, noisy(lambda x: 8 * x / (2 + x), x, 0.05, 1), [8, 2])
+        self.check(CF.custom_key("a*x**n/(k**n+x**n)"), x, noisy(lambda x: 10 * x ** 2 / (4 ** 2 + x ** 2), x, 0.05, 2),
+                   [10, 2, 4], start={"a": 8, "n": 1.5, "k": 3})
+        xs = np.linspace(0, 2, 200)
+        self.check(CF.custom_key("A*exp(-x/tau)*sin(2*pi*f*x+phi)"), xs,
+                   noisy(lambda x: 3 * np.exp(-x / 0.8) * np.sin(2 * np.pi * 4 * x + 0.5), xs, 0.03),
+                   [3, 0.8, 4, 0.5], start={"A": 3, "tau": 1, "f": 4, "phi": 0.5})
+
+    def test_a_custom_expression_is_checked_and_cannot_run_code(self):
+        x = np.linspace(0, 10, 30)
+        for bad, why in (("", "empty"), ("a*sin(x", "not valid"), ("x**2", "no parameter"),
+                         ('a*__import__("os").system("echo")', "only these functions"),
+                         ("a.real*x", "not allowed"), ("[a for a in x]", "not allowed"),
+                         ("a if x else b", "not allowed"), ("lambda: a", "not allowed"),
+                         ("a*foo(x)", "only these functions"), ("a*'text'", "only numbers"),
+                         ("a" * 400, "too long")):
+            with self.subTest(bad=bad[:30]):
+                with self.assertRaisesRegex(ValueError, why):
+                    CF.fit_ex(x, x, CF.custom_key(bad))
+        import time
+        start = time.perf_counter()                            # integers would make this never end
+        with self.assertRaises(ValueError):
+            CF.fit_ex(x, x, CF.custom_key("a*x*10**10**10"))
+        self.assertLess(time.perf_counter() - start, 5)
+        with self.assertRaisesRegex(ValueError, "start value"):
+            CF.fit_ex(x, x, CF.custom_key("a*x+b"), start={"zz": 1})
+
+    def test_start_values_text(self):
+        from data.scientific import parse_start_values
+        self.assertEqual(parse_start_values(" a=3, b = 2.5 ;c=-1e-3 "), {"a": 3.0, "b": 2.5, "c": -0.001})
+        self.assertEqual(parse_start_values(""), {})
+        for bad in ("a", "a=", "a=x", "1=2"):
+            with self.assertRaisesRegex(ValueError, "written like"):
+                parse_start_values(bad)
+
+    def test_equations_do_not_show_plus_minus(self):
+        x = np.linspace(0, 10, 50)
+        r = CF.fit_ex(x, 2 * x - 5, "Linear")
+        self.assertIn("− 5", r["eq_str"])
+        self.assertNotIn("+ -", r["eq_str"])
+
+
+class TestWhatToFit(unittest.TestCase):
+    """A stretch of x, weights from errors, a robust fit, and the LOWESS smoothing."""
+
+    def test_only_the_chosen_range_decides_the_fit(self):
+        rng = np.random.default_rng(8)
+        x = np.linspace(0, 10, 100)
+        y = 2 * x + 1 + rng.normal(0, 0.3, 100)
+        y[:15] += 20 * np.exp(-x[:15] * 2)                      # a transient that is not part of the line
+        whole = CF.fit_ex(x, y, "Linear")
+        part = CF.fit_ex(x, y, "Linear", x_range=(2, None))
+        np.testing.assert_allclose(part["popt"], [2, 1], atol=0.15)
+        self.assertGreater(abs(whole["popt"][0] - 2), 0.3)       # the transient bent the whole fit
+        self.assertEqual((part["n"], part["n_excluded"]), (80, 20))
+        self.assertEqual(int(part["used"].sum()), 80)
+        both = CF.fit_ex(x, y, "Linear", x_range=(2, 6))
+        self.assertTrue(np.all((x[both["used"]] >= 2) & (x[both["used"]] <= 6)))
+        # the curve is a function of all of x, not only of the range
+        self.assertEqual(np.shape(part["func"](x, *part["popt"])), x.shape)
+        with self.assertRaisesRegex(ValueError, "no point in the chosen x range"):
+            CF.fit_ex(x, y, "Linear", x_range=(50, 60))
+        with self.assertRaisesRegex(ValueError, "needs at least 3 points"):
+            CF.fit_ex(x, y, "Quadratic", x_range=(0, 0.1))
+
+    def test_weights_make_the_precise_points_count_more(self):
+        rng = np.random.default_rng(8)
+        x = np.linspace(0, 10, 100)
+        sigma = np.where(x < 5, 0.1, 3.0)
+        y = 2 * x + 1 + rng.normal(0, sigma)
+        plain, weighted = CF.fit_ex(x, y, "Linear"), CF.fit_ex(x, y, "Linear", sigma=sigma)
+        self.assertLess(abs(weighted["popt"][0] - 2), abs(plain["popt"][0] - 2))
+        self.assertLess(np.sqrt(weighted["pcov"][0, 0]), np.sqrt(plain["pcov"][0, 0]) / 3)   # a far better slope
+        st = CF.full_stats(x, y, weighted["popt"], weighted["pcov"], weighted["func"], "Linear", sigma=sigma)
+        self.assertTrue(st["weighted"])
+        self.assertAlmostEqual(st["chi2_red"], 1.0, delta=0.3)       # errors that match the scatter
+        self.assertAlmostEqual(st["chi2"], st["sse"])
+        self.assertTrue(np.isnan(st["f_stat"]))                      # no F test for a weighted fit
+        self.assertGreater(st["rmse"], 0)                            # still in y units
+        # invalid errors are dropped, a column of the wrong length is refused
+        bad = sigma.copy()
+        bad[[3, 7]] = [0, np.nan]
+        r = CF.fit_ex(x, y, "Linear", sigma=bad)
+        self.assertEqual((r["n"], r["n_dropped"]), (98, 2))
+        with self.assertRaisesRegex(ValueError, "error column has 5 points"):
+            CF.fit_ex(x, y, "Linear", sigma=np.ones(5))
+
+    def test_weights_change_the_information_criteria_consistently(self):
+        x = np.linspace(0, 10, 60)
+        sigma = np.full(60, 0.5)
+        y = 2 * x + 1 + np.random.default_rng(1).normal(0, 0.5, 60)
+        a = CF.fit_ex(x, y, "Linear", sigma=sigma)
+        b = CF.fit_ex(x, y, "Quadratic", sigma=sigma)
+        sa = CF.full_stats(x, y, a["popt"], a["pcov"], a["func"], "Linear", sigma=sigma)
+        sb = CF.full_stats(x, y, b["popt"], b["pcov"], b["func"], "Quadratic", sigma=sigma)
+        self.assertLess(sa["aic"], sb["aic"])                        # the line is enough: the curve does not pay off
+
+    def test_a_robust_fit_resists_outliers_and_flags_them(self):
+        rng = np.random.default_rng(8)
+        x = np.linspace(0, 10, 100)
+        y = 2 * x + 1 + rng.normal(0, 0.3, 100)
+        y[[10, 40, 70, 85]] += [15, -12, 18, 25]
+        plain, robust = CF.fit_ex(x, y, "Linear"), CF.fit_ex(x, y, "Linear", robust=True)
+        self.assertLess(abs(robust["popt"][0] - 2), abs(plain["popt"][0] - 2))
+        np.testing.assert_allclose(robust["popt"], [2, 1], atol=0.12)
+        self.assertEqual(robust["n_outliers"], 4)
+        self.assertEqual(sorted(np.flatnonzero(robust["outliers"])), [10, 40, 70, 85])
+        self.assertTrue(robust["robust"] and not plain["robust"])
+        clean = CF.fit_ex(x, 2 * x + 1 + rng.normal(0, 0.3, 100), "Linear", robust=True)
+        self.assertLessEqual(clean["n_outliers"], 3)                 # very few on good data
+
+    def test_robust_works_with_any_model_and_with_weights(self):
+        rng = np.random.default_rng(2)
+        x = np.linspace(0, 10, 100)
+        y = 3 * np.exp(-x / 2) + 1 + rng.normal(0, 0.05, 100)
+        y[[5, 50]] += [3, -2]
+        r = CF.fit_ex(x, y, CF.custom_key("a*exp(-x/b)+c"), robust=True)
+        np.testing.assert_allclose(r["popt"], [3, 2, 1], atol=0.12)
+        r = CF.fit_ex(x, y, "Exponential + offset", sigma=np.full(100, 0.05), robust=True)
+        self.assertTrue(r["weighted"] and r["robust"] and r["n_outliers"] >= 2)
+
+    def test_lowess_is_a_trend_without_an_equation(self):
+        rng = np.random.default_rng(8)
+        x = np.linspace(0, 10, 100)
+        y = np.sin(x) + 0.2 * x + rng.normal(0, 0.25, 100)
+        r = CF.fit_ex(x, y, CF.lowess_key(0.3))
+        self.assertEqual((len(r["popt"]), r["pcov"].shape), (0, (0, 0)))
+        self.assertIn("no equation", r["eq_str"])
+        self.assertGreater(r["r2"], 0.85)
+        smooth = r["func"](x)
+        self.assertLess(np.std(np.diff(smooth)), np.std(np.diff(y)))           # smoother than the data
+        self.assertTrue(np.isnan(r["func"](-1.0)) and np.isnan(r["func"](11.0)))   # nothing outside the data
+        wide, narrow = CF.fit_ex(x, y, CF.lowess_key(0.9)), CF.fit_ex(x, y, CF.lowess_key(0.1))
+        self.assertLess(np.var(np.diff(wide["func"](x))), np.var(np.diff(narrow["func"](x))))
+        for bad in (0, 1.5):
+            with self.assertRaisesRegex(ValueError, "between 0 and 1"):
+                CF.fit_ex(x, y, CF.lowess_key(bad))
+        st = CF.full_stats(x, y, r["popt"], r["pcov"], r["func"], CF.lowess_key(0.3))
+        self.assertEqual((st["p"], st["param_names"], st["param_values"]), (0, [], []))
+        self.assertTrue(np.isnan(st["aic"]) and np.isnan(st["f_stat"]))
+        self.assertGreater(st["rmse"], 0)
+        part = CF.fit_ex(x, y, CF.lowess_key(0.5), x_range=(2, 8))
+        self.assertTrue(np.isnan(part["func"](1.0)) and not np.isnan(part["func"](5.0)))
+
+    def test_the_prediction_band_uses_only_the_fitted_points(self):
+        x = np.linspace(0, 10, 100)
+        y = 2 * x + np.random.default_rng(3).normal(0, 0.3, 100)
+        y[:15] += 20                                              # a transient left out of the fit
+        r = CF.fit_ex(x, y, "Linear", x_range=(2, None))
+        every = CF.prediction_band(x, y, r["popt"], r["pcov"], r["func"], 1)
+        fitted = CF.prediction_band(x, y, r["popt"], r["pcov"], r["func"], 1, used=r["used"])
+        self.assertLess(np.mean(fitted[0] - fitted[1]), np.mean(every[0] - every[1]) / 3)
+
+
 class TestFailuresAreReported(unittest.TestCase):
     def test_domain_of_log_and_power(self):
         x = np.linspace(0, 10, 20)
@@ -424,6 +654,273 @@ class TestCurvesTab(unittest.TestCase):
         self.fit(w, "Linear")
         self.assertIn("replaces the previous fit", w.fit_results_text.toPlainText())
         self.assertEqual(len(w._fits), 1)
+
+    def test_the_model_list_has_the_new_models_and_their_options_show_only_when_needed(self):
+        w = self.window({"x": np.linspace(0, 1, 5), "y": np.linspace(0, 1, 5)})
+        items = [w.fit_combo.itemText(i) for i in range(w.fit_combo.count())]
+        for name in ("Exponential + offset", "Gaussian", "Sinusoid", "Polynomial (degree n)", "Custom expression"):
+            self.assertIn(name, items)
+        w.fit_combo.setCurrentText("Linear")
+        self.assertTrue(w.fit_degree_row.isHidden() and w.fit_custom_box.isHidden())
+        w.fit_combo.setCurrentText("Polynomial (degree n)")
+        self.assertFalse(w.fit_degree_row.isHidden())
+        self.assertTrue(w.fit_custom_box.isHidden())
+        w.fit_combo.setCurrentText("Custom expression")
+        self.assertFalse(w.fit_custom_box.isHidden())
+        self.assertTrue(w.fit_degree_row.isHidden())
+
+    def test_polynomial_and_custom_fits_from_the_interface_save_and_open_again(self):
+        from core.serialize import encode_datasets, write_project_zip
+        rng = np.random.default_rng(4)
+        x = np.linspace(0, 10, 60)
+        w = self.window({"x": x, "y": 3 * np.exp(-x / 2) + 1 + rng.normal(0, 0.03, 60)})
+        w.fit_combo.setCurrentText("Polynomial (degree n)")
+        w.fit_degree_spin.setValue(3)
+        w.apply_fit()
+        w.fit_combo.setCurrentText("Custom expression")
+        w.fit_expr_edit.setText("a*exp(-x/b) + c")
+        w.fit_start_edit.setText("a=2, b=1")
+        w.apply_fit()
+        self.assertEqual(self.messages, [])
+        self.assertEqual(list(w._fits), ["Series 1 (Polynomial deg 3 fit)", "Series 1 (Custom: a*exp(-x/b) + c fit)"])
+        custom = w._fits["Series 1 (Custom: a*exp(-x/b) + c fit)"]
+        np.testing.assert_allclose(custom["popt"], [3, 2, 1], atol=0.1)
+        self.assertEqual([w.fit_table.item(r, 1).text() for r in range(2)],
+                         ["Polynomial deg 3", "Custom: a*exp(-x/b) + c"])
+        w.curve_select.setCurrentText("Series 1 (Polynomial deg 3 fit)")
+        text = w.fit_results_text.toPlainText()
+        self.assertIn("c3", text)
+        self.assertIn("F-statistic  = ", text)
+        self.assertNotIn("not defined", text.split("F-statistic")[1].split("\n")[0])          # a polynomial has it
+        w.curve_select.setCurrentText("Series 1 (Custom: a*exp(-x/b) + c fit)")
+        self.assertIn("not defined for this model", w.fit_results_text.toPlainText())
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "m.pviz")
+            write_project_zip(fp, w._collect_settings(), w._collect_series_meta(), encode_datasets(w.datasets))
+            w2 = self.PlotVizApp()
+            w2._load_project_inner(fp, silent=True)
+        self.assertEqual(list(w2._fits), list(w._fits))
+        for name in w._fits:
+            np.testing.assert_allclose(w2._fits[name]["func"](x, *w2._fits[name]["popt"]),
+                                       w._fits[name]["func"](x, *w._fits[name]["popt"]))
+
+    def test_a_bad_expression_or_start_value_is_reported_not_raised(self):
+        x = np.linspace(0, 10, 30)
+        w = self.window({"x": x, "y": x})
+        w.fit_combo.setCurrentText("Custom expression")
+        for expr, start, why in (("a*sin(x", "", "not valid"), ("x**2", "", "no parameter"),
+                                 ("a*x", "a=oops", "written like"), ("a*x + b", "zz=1", "start value")):
+            self.messages.clear()
+            w.fit_expr_edit.setText(expr)
+            w.fit_start_edit.setText(start)
+            w.apply_fit()
+            self.assertEqual(len(self.messages), 1, expr)
+            self.assertIn(why, self.messages[0][1])
+        self.assertEqual(w._fits, {})
+
+    def test_exporting_results_knows_every_kind_of_model(self):
+        # the glossary lists the parameters of the new models, the polynomial and the custom one
+        x = np.linspace(0, 10, 40)
+        rng = np.random.default_rng(1)
+        w = self.window({"x": x, "y": 2 * np.exp(-x / 3) + 0.5 + rng.normal(0, 0.02, 40)})
+        w.fit_combo.setCurrentText("Exponential + offset")
+        w.apply_fit()
+        self.assertIn("c (offset)", w.fit_results_text.toPlainText())
+
+    def noisy_line(self, n=100, seed=8, **extra):
+        rng = np.random.default_rng(seed)
+        x = np.linspace(0, 10, n)
+        data = {"x": x, "y": 2 * x + 1 + rng.normal(0, 0.3, n)}
+        data.update(extra)
+        return x, data
+
+    def test_the_options_show_for_the_models_they_apply_to(self):
+        x, data = self.noisy_line(10)
+        w = self.window(data)
+        for choice in ("Linear", "Custom expression", "Polynomial (degree n)"):
+            w.fit_combo.setCurrentText(choice)
+            self.assertFalse(w.fit_weight_check.isHidden() or w.fit_robust_check.isHidden(), choice)
+            self.assertTrue(w.fit_span_row.isHidden(), choice)
+        w.fit_combo.setCurrentText("Smoothing (LOWESS)")
+        self.assertFalse(w.fit_span_row.isHidden())
+        self.assertTrue(w.fit_weight_check.isHidden() and w.fit_robust_check.isHidden())
+        self.assertFalse(w.fit_options_box.isHidden())                   # the x range stays
+
+    def test_weighting_needs_an_error_column(self):
+        x, data = self.noisy_line(20, err=np.full(20, 0.3))
+        w = self.window(data)
+        w.combo_err.setCurrentText("(none)")
+        self.assertFalse(w.fit_weight_check.isEnabled())
+        self.assertIn("choose one in Plot", w.fit_weight_check.text())
+        w.combo_err.setCurrentText("err")
+        self.assertTrue(w.fit_weight_check.isEnabled())
+        self.assertIn("(err)", w.fit_weight_check.text())
+        w.fit_weight_check.setChecked(True)
+        w.combo_err.setCurrentText("(none)")
+        self.assertFalse(w.fit_weight_check.isChecked())                  # cannot stay on without a column
+
+    def test_fitting_only_a_range_from_the_interface(self):
+        from matplotlib.figure import Figure
+        x, data = self.noisy_line()
+        data["y"][:15] += 20 * np.exp(-x[:15] * 2)
+        w = self.window(data)
+        w.fit_combo.setCurrentText("Linear")
+        w.fit_xfrom_edit.setText("2")
+        w.apply_fit()
+        self.assertEqual(self.messages, [])
+        name = next(iter(w._fits))
+        self.assertEqual(name, "Series 1 (Linear, x 2–… fit)")             # the range is in the name
+        fit = w._fits[name]
+        np.testing.assert_allclose(fit["popt"], [2, 1], atol=0.15)
+        self.assertEqual((fit["stats"]["n"], fit["n_excluded"]), (80, 20))
+        self.assertEqual(len(w.datasets[name]), 100)                        # the curve covers all of x
+        text = w.fit_results_text.toPlainText()
+        self.assertIn("Fitted only for x from 2 to the end; 20 point(s) outside it were left out", text)
+        self.assertIn("n            = 80", text)
+        self.assertEqual(w.fit_table.item(0, 1).text(), "Linear, x 2–…")
+        # a second fit of the same model over the whole range does not replace it
+        w.fit_xfrom_edit.setText("")
+        w.curve_select.setCurrentText("Series 1")
+        w.apply_fit()
+        self.assertEqual(len(w._fits), 2)
+        fig = Figure()
+        w._render_axes(fig)
+        self.assertEqual(len([l for l in fig.axes[0].get_lines() if "fit" in str(l.get_label())]), 2)
+        # bands of the range fit use only its points
+        w.curve_select.setCurrentText(name)
+        w.fit_pi_combo.setCurrentIndex(2)
+        width = w.datasets[f"{name} PI upper"] - w.datasets[f"{name} PI lower"]
+        self.assertLess(float(np.mean(width)), 4.0)                         # not inflated by the transient
+
+    def test_the_fit_range_can_be_written_as_dates(self):
+        from core import dates as D
+        days = D.from_iso(["2024-01-%02d" % d for d in range(1, 31)])
+        x = np.asarray(days)
+        y = 2 * (x - x[0]) + 1 + np.random.default_rng(1).normal(0, 0.2, 30)
+        y[:5] += 30
+        w = self.window({"x": days, "y": y})
+        w.fit_combo.setCurrentText("Linear")
+        w.fit_xfrom_edit.setText("2024-01-08")
+        w.apply_fit()
+        fit = next(iter(w._fits.values()))
+        self.assertEqual((fit["n_excluded"], fit["stats"]["n"]), (7, 23))
+        np.testing.assert_allclose(fit["popt"][0], 2, atol=0.1)
+
+    def test_a_bad_range_or_error_column_is_reported(self):
+        x, data = self.noisy_line(20, short=np.ones(5))
+        w = self.window(data)
+        w.fit_combo.setCurrentText("Linear")
+        for lo, hi, why in (("abc", "", "not a valid x value"), ("8", "2", "starts after it ends"),
+                            ("50", "60", "no point in the chosen x range")):
+            self.messages.clear()
+            w.fit_xfrom_edit.setText(lo)
+            w.fit_xto_edit.setText(hi)
+            w.apply_fit()
+            self.assertEqual(len(self.messages), 1, (lo, hi))
+            self.assertIn(why, self.messages[0][1])
+        w.fit_xfrom_edit.setText("")
+        w.fit_xto_edit.setText("")
+        w.combo_err.setCurrentText("short")
+        w.fit_weight_check.setChecked(True)
+        self.messages.clear()
+        w.apply_fit()
+        self.assertIn("has 5 points but the series has 20", self.messages[0][1])
+        self.assertEqual(w._fits, {})
+
+    def test_a_weighted_fit_from_the_interface(self):
+        rng = np.random.default_rng(8)
+        x = np.linspace(0, 10, 100)
+        sigma = np.where(x < 5, 0.1, 3.0)
+        w = self.window({"x": x, "y": 2 * x + 1 + rng.normal(0, sigma), "err": sigma})
+        w.combo_err.setCurrentText("err")
+        w.fit_weight_check.setChecked(True)
+        w.fit_combo.setCurrentText("Linear")
+        w.apply_fit()
+        name = next(iter(w._fits))
+        self.assertEqual(name, "Series 1 (Linear, weighted fit)")
+        text = w.fit_results_text.toPlainText()
+        self.assertIn('Weighted by the error column "err"', text)
+        self.assertIn("reduced χ²", text)
+        self.assertIn("F-statistic  = — (not defined for a weighted fit)", text)
+        self.assertIn("χ² / DoF", text)
+        np.testing.assert_allclose(w._fits[name]["popt"], [2, 1], atol=0.1)
+        self.assertTrue(w._fits[name]["stats"]["weighted"])
+
+    def test_a_robust_fit_from_the_interface_names_the_outliers(self):
+        x, data = self.noisy_line()
+        data["y"][[10, 40, 70, 85]] += [15, -12, 18, 25]
+        w = self.window(data)
+        w.fit_combo.setCurrentText("Linear")
+        w.fit_robust_check.setChecked(True)
+        w.apply_fit()
+        name = next(iter(w._fits))
+        self.assertEqual(name, "Series 1 (Linear, robust fit)")
+        self.assertEqual(w._fits[name]["n_outliers"], 4)
+        np.testing.assert_allclose(w._fits[name]["popt"], [2, 1], atol=0.12)
+        self.assertIn("4 point(s) flagged as outliers", w.fit_results_text.toPlainText())
+
+    def test_a_lowess_smoothing_has_no_bands_and_survives_save_and_open(self):
+        from core.serialize import encode_datasets, write_project_zip
+        from matplotlib.figure import Figure
+        x = np.linspace(0, 10, 100)
+        rng = np.random.default_rng(8)
+        w = self.window({"x": x, "y": np.sin(x) + 0.2 * x + rng.normal(0, 0.25, 100)})
+        w.fit_combo.setCurrentText("Smoothing (LOWESS)")
+        w.fit_span_spin.setValue(0.25)
+        w.apply_fit()
+        self.assertEqual(self.messages, [])
+        name = next(iter(w._fits))
+        self.assertEqual(name, "Series 1 (LOWESS span 0.25 fit)")
+        w.curve_select.setCurrentText(name)
+        self.assertFalse(w.fit_ci_combo.isEnabled() or w.fit_pi_combo.isEnabled())
+        w.fit_ci_combo.setCurrentIndex(2)                                   # forced: still no band
+        self.assertNotIn(f"{name} CI upper", w.datasets)
+        text = w.fit_results_text.toPlainText()
+        self.assertIn("A smoothing: no parameters, no bands, no tests.", text)
+        self.assertIn("Parameters   = 0", text)
+        self.assertEqual(w.fit_table.item(0, 5).text(), "")                 # no AIC for a smoothing
+        before = w.datasets[name].copy()
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "l.pviz")
+            write_project_zip(fp, w._collect_settings(), w._collect_series_meta(), encode_datasets(w.datasets))
+            w2 = self.PlotVizApp()
+            w2._load_project_inner(fp, silent=True)
+        self.assertEqual(list(w2._fits), [name])
+        np.testing.assert_allclose(w2._fits[name]["func"](x), before, equal_nan=True)
+        fig = Figure()
+        w2._render_axes(fig)
+        self.assertIn(name, [l.get_label() for l in fig.axes[0].get_lines()])
+        # export of results copes with a smoothing
+        from PyQt6.QtWidgets import QFileDialog
+        out = os.path.join(tempfile.mkdtemp(), "r.txt")
+        self.addCleanup(setattr, QFileDialog, "getSaveFileName", QFileDialog.getSaveFileName)
+        QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (out, ""))
+        w2.fit_export_all_check.setChecked(True)
+        w2._export_fit_results()
+        self.assertIn("LOWESS", open(out, encoding="utf-8").read())
+
+    def test_the_new_options_survive_save_and_open(self):
+        from core.serialize import encode_datasets, write_project_zip
+        x, data = self.noisy_line()
+        data["y"][[10, 40]] += [15, -12]
+        w = self.window(data)
+        w.fit_combo.setCurrentText("Linear")
+        w.fit_xfrom_edit.setText("1")
+        w.fit_robust_check.setChecked(True)
+        w.apply_fit()
+        name = next(iter(w._fits))
+        with tempfile.TemporaryDirectory() as d:
+            fp = os.path.join(d, "o.pviz")
+            write_project_zip(fp, w._collect_settings(), w._collect_series_meta(), encode_datasets(w.datasets))
+            w2 = self.PlotVizApp()
+            w2._load_project_inner(fp, silent=True)
+        a, b = w._fits[name], w2._fits[name]
+        self.assertEqual((b["x_range"], b["range_text"], b["robust"], b["n_outliers"], b["tag"]),
+                         (a["x_range"], a["range_text"], True, a["n_outliers"], ", x 1–…, robust"))
+        np.testing.assert_array_equal(b["used"], a["used"])
+        np.testing.assert_array_equal(b["outliers"], a["outliers"])
+        w2.curve_select.setCurrentText(name)
+        self.assertIn("Fitted only for x from 1", w2.fit_results_text.toPlainText())
 
     def test_the_fit_of_a_secondary_axis_series_is_drawn_on_that_axis_with_its_bands(self):
         from PyQt6.QtCore import Qt

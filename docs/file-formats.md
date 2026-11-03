@@ -18,7 +18,7 @@ A `.pviz` file is a complete saved chart. It contains:
 
 ### Saving
 
-Choose **File → Save Chart** (Ctrl+S). It rewrites the open file without asking; the first time, or with **Save Chart As…** (Ctrl+Shift+S), a dialog asks where to save. A dialog asks whether to save **Used series only** (keeps only the columns currently assigned in the series table) or **All columns** (preserves every loaded column for future reassignment). Used-only files are smaller; all-columns files are more portable.
+Choose **File → Save Chart** (Ctrl+S). It rewrites the open file without asking; the first time, or with **Save Chart As…** (Ctrl+Shift+S), a dialog asks where to save. A dialog asks whether to save **Used series only** (keeps only the columns currently assigned in the series table) or **All columns** (preserves every loaded column for future reassignment). Used-only files are smaller; all-columns files are more portable. **All columns** is the default button (Enter) and sits on the right, with **Cancel** on the left. If every loaded column is already used, nothing is asked.
 
 ### Loading
 

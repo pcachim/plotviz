@@ -16,7 +16,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QMessageBox, QSpinBox, QTableWidgetItem,
 )
-from data.scientific import CurveFitter
+from data.scientific import (
+    CurveFitter, CUSTOM_CHOICE, LOWESS_CHOICE, POLYNOMIAL_CHOICE, POLYNOMIAL_PREFIX, parse_start_values,
+)
 from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
 from ui.mixin_base import MixinBase
 
@@ -82,6 +84,7 @@ class FitPresetMixin(MixinBase):
                 self.datasets[base] = arr
                 if attr == 'stored_x': stored_x = base
                 else: stored_y = base
+            self._schedule_undo_snapshot('Generate y = f(x)')
             self.update_lists()
             self.gen_status.setText(f'✓  Created "{stored_x}" and "{stored_y}"  ({n} points)')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
@@ -196,6 +199,7 @@ class FitPresetMixin(MixinBase):
             stored_y = _store(y_col_out, y_eval) if y_use_range or meshgrid else y_col_out
             if y_use_range: self.datasets[stored_y] = y_eval
             stored_z = _store(z_name, z_arr)
+            self._schedule_undo_snapshot('Generate z = f(x, y)')
             self.update_lists()
             mode_str = 'meshgrid ' if meshgrid else ''
             self.fxy_status.setText(f'\u2713  {mode_str}Created x={stored_x}, y={stored_y}, z={stored_z}  ({n} pts)')
@@ -315,6 +319,7 @@ class FitPresetMixin(MixinBase):
             if y_use_range: self.datasets[stored_y] = y_eval
             stored_u = _store(u_name, u_arr)
             stored_v = _store(v_name, v_arr)
+            self._schedule_undo_snapshot('Generate (u, v) = f(x, y)')
             self.update_lists()
             mode_str = 'meshgrid ' if meshgrid else ''
             self.fuv_status.setText(
@@ -348,6 +353,7 @@ class FitPresetMixin(MixinBase):
                 stored_nm = f'{base}_{cnt}'
                 cnt += 1
             self.datasets[stored_nm] = result
+            self._schedule_undo_snapshot('Apply function to column')
             self.update_lists()
             self.fn_status.setText(f'✓  Created "{stored_nm}"  ({len(result)} points)')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
@@ -498,6 +504,7 @@ class FitPresetMixin(MixinBase):
                     if cb is not None:
                         _rename_item(cb, renamed)
 
+                self._schedule_undo_snapshot('Edit values')
                 self.update_lists()
                 parts = ', '.join(f'"{o}" → "{n}"' for o, n in renamed.items())
                 info.setText(f'✓  Renamed: {parts}')
@@ -634,6 +641,7 @@ class FitPresetMixin(MixinBase):
                     cnt += 1
                 self.datasets[base] = arr
                 loaded.append(base)
+            self._schedule_undo_snapshot('Data table')
             self.update_lists()
             if self.series_table.rowCount() == 0:
                 self._add_series_row()
@@ -713,7 +721,7 @@ class FitPresetMixin(MixinBase):
             show.setToolTip('Show or hide this fit (and its bands) on the chart')
             t.setItem(r, 0, show)
             aic = st.get('aic')
-            cells = [f.get('model', ''), f.get('lbl', ''),
+            cells = [f.get('model', '') + f.get('tag', ''), f.get('lbl', ''),
                      f'{st["r2"]:.4f}' if st.get('r2') is not None else '',
                      f'{st["rmse"]:.4g}' if st.get('rmse') is not None else '',
                      f'{aic:.1f}' if aic is not None and aic == aic else '']
@@ -772,7 +780,58 @@ class FitPresetMixin(MixinBase):
         name = item.data(Qt.ItemDataRole.UserRole)
         if name in self._fits:
             self._fits[name]['visible'] = item.checkState() == Qt.CheckState.Checked
+            self._schedule_undo_snapshot('Show / hide fit')
             self.update_preview()
+
+    def _on_fit_model_changed(self, choice):
+        """Show the options that belong to the chosen model."""
+        smoothing = choice == LOWESS_CHOICE
+        self.fit_degree_row.setVisible(choice == POLYNOMIAL_CHOICE)
+        self.fit_custom_box.setVisible(choice == CUSTOM_CHOICE)
+        self.fit_span_row.setVisible(smoothing)
+        self.fit_weight_check.setVisible(not smoothing)
+        self.fit_robust_check.setVisible(not smoothing)
+
+    def _refresh_fit_weight_option(self, *_):
+        """Weighting needs an error column chosen in the Plot tab."""
+        name = self.combo_err.currentText()
+        has_errors = name in self.datasets
+        self.fit_weight_check.setEnabled(has_errors)
+        if not has_errors:
+            self.fit_weight_check.setChecked(False)
+        self.fit_weight_check.setText('Weight by the error column' + (f'  ({name})' if has_errors else '  (choose one in Plot)'))
+
+    def _fit_x_range(self, xd):
+        """((lo, hi) or None, (typed lo, typed hi)) from the two boxes; dates when x is a date."""
+        from core.dates import is_date, parse_date
+        texts = (self.fit_xfrom_edit.text().strip(), self.fit_xto_edit.text().strip())
+        if not any(texts):
+            return None, ('', '')
+        values = []
+        for text in texts:
+            if not text:
+                values.append(None)
+                continue
+            try:
+                values.append(parse_date(text) if is_date(xd) else float(text))
+            except ValueError:
+                raise ValueError(f'"{text}" is not a valid x value for the fit range') from None
+        lo, hi = values
+        if lo is not None and hi is not None and lo > hi:
+            raise ValueError('the fit range starts after it ends')
+        return (lo, hi), texts
+
+    def _fit_sigma(self, yd):
+        """(the error column's values, its name) when weighting is on, else (None, '')."""
+        if not self.fit_weight_check.isChecked():
+            return None, ''
+        name = self.combo_err.currentText()
+        if name not in self.datasets:
+            return None, ''
+        sigma = np.asarray(self.datasets[name], dtype=float)
+        if len(sigma) != len(yd):
+            raise ValueError(f'the error column "{name}" has {len(sigma)} points but the series has {len(yd)}')
+        return sigma, name
 
     def _selected_curve_text(self):
         return self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
@@ -800,13 +859,28 @@ class FitPresetMixin(MixinBase):
         if label and label in self._fits:
             self._fits[label]['ci_idx'] = self.fit_ci_combo.currentIndex()
             self._fits[label]['pi_idx'] = self.fit_pi_combo.currentIndex()
+        self._schedule_undo_snapshot('Fit confidence / prediction band')
         self._update_confidence_band_for(label)
         self.update_preview()
 
     def apply_fit(self):
         try:
-            model = self.fit_combo.currentText()
-            if model == 'None': return
+            choice = self.fit_combo.currentText()
+            if choice == 'None': return
+            start = None
+            try:
+                if choice == POLYNOMIAL_CHOICE:
+                    model = CurveFitter.polynomial_key(self.fit_degree_spin.value())
+                elif choice == CUSTOM_CHOICE:
+                    model = CurveFitter.custom_key(self.fit_expr_edit.text())
+                    start = parse_start_values(self.fit_start_edit.text())
+                elif choice == LOWESS_CHOICE:
+                    model = CurveFitter.lowess_key(self.fit_span_spin.value())
+                else:
+                    model = choice
+            except ValueError as err:
+                QMessageBox.warning(self, 'Fit Failed', str(err))
+                return
             series = self._get_series_full()
             if not series:
                 QMessageBox.warning(self, 'Warning', 'Add at least one series in the Data tab first.')
@@ -844,19 +918,37 @@ class FitPresetMixin(MixinBase):
                     y2_src = self.series_table.item(row, 5)
                     source_y2 = bool(y2_src and y2_src.checkState() == Qt.CheckState.Checked)
                     break
+            smoothing = choice == LOWESS_CHOICE
             try:
-                result = CurveFitter.fit_ex(xd, yd, model)     # skips NaN points, explains failures
+                x_range, range_text = self._fit_x_range(xd)
+                sigma, err_col = (None, '') if smoothing else self._fit_sigma(yd)
+                robust = self.fit_robust_check.isChecked() and not smoothing
+                result = CurveFitter.fit_ex(xd, yd, model, start, x_range=x_range, sigma=sigma,
+                                            robust=robust)       # skips NaN points, explains failures
             except ValueError as err:
                 QMessageBox.warning(self, 'Fit Failed', f'Could not fit {model}: {err}.')
                 return
             popt, pcov, func = result['popt'], result['pcov'], result['func']
             eq_str, r2, x0 = result['eq_str'], result['r2'], result['x0']
+            used = result['used']
 
-            # Full statistics (over the valid points)
-            stats = CurveFitter.full_stats(xd, yd, popt, pcov, func, model)
+            # Full statistics (over the points that were fitted)
+            stats = CurveFitter.full_stats(np.asarray(xd, dtype=float)[used], np.asarray(yd, dtype=float)[used],
+                                           popt, pcov, func, model,
+                                           sigma=None if sigma is None else sigma[used])
+
+            # What distinguishes this fit from another of the same model on the same series
+            tag_parts = []
+            if x_range is not None:
+                tag_parts.append(f'x {range_text[0] or "…"}–{range_text[1] or "…"}')
+            if sigma is not None:
+                tag_parts.append('weighted')
+            if robust:
+                tag_parts.append('robust')
+            tag = ''.join(f', {t}' for t in tag_parts)
 
             # Add fit curve as a new dataset (NaN where the data have a NaN x)
-            nm = f'{lbl} ({model} fit)'
+            nm = f'{lbl} ({model}{tag} fit)'
             with np.errstate(all='ignore'):
                 self.datasets[nm] = func(xd, *popt)
 
@@ -864,7 +956,11 @@ class FitPresetMixin(MixinBase):
             existing = self._fits.get(nm, {})
             replaced = nm in self._fits                  # the same model on the same series again
             self._fits[nm] = dict(xd=xd, yd=yd, popt=popt, pcov=pcov, func=func, x0=x0,
-                                  n_dropped=result['n_dropped'],
+                                  n_dropped=result['n_dropped'], n_excluded=result['n_excluded'],
+                                  used=used, x_range=x_range, range_text=range_text,
+                                  weighted=result['weighted'], err_col=err_col, robust=result['robust'],
+                                  outliers=result['outliers'], n_outliers=result['n_outliers'],
+                                  tag=tag, curve=result.get('curve'),
                                   model=model, xc=xc, yc=yc, lbl=lbl,
                                   eq_str=eq_str, r2=r2, stats=stats,
                                   ci_idx=existing.get('ci_idx', 0),
@@ -888,6 +984,7 @@ class FitPresetMixin(MixinBase):
                     'color_locked': False,
                 }
 
+            self._schedule_undo_snapshot('Apply fit')
             self.update_lists()
 
             # Add fit curve as a new series row if not already present
@@ -975,6 +1072,19 @@ class FitPresetMixin(MixinBase):
         lines.append(f'Equation:  {fit.get("eq_str", "")}')
         if fit.get('replaced'):
             lines.append('  (replaces the previous fit of this model on this series)')
+        if fit.get('curve') is not None:
+            lines.append('  A smoothing: no parameters, no bands, no tests.')
+        if fit.get('x_range') is not None:
+            lo, hi = fit.get('range_text') or ('', '')
+            lines.append(f'  Fitted only for x from {lo or "the start"} to {hi or "the end"}; '
+                         f'{fit.get("n_excluded", 0)} point(s) outside it were left out')
+        if fit.get('weighted'):
+            lines.append(f'  Weighted by the error column "{fit.get("err_col", "")}" '
+                         f'(χ² = {st.get("chi2", float("nan")):.4g}, reduced χ² = '
+                         f'{st.get("chi2_red", float("nan")):.3g}; near 1 when the errors match the scatter)')
+        if fit.get('robust'):
+            lines.append(f'  Robust fit: {fit.get("n_outliers", 0)} point(s) flagged as outliers; '
+                         f'R² and RMSE below still include them')
         if fit.get('x0'):
             lines.append(f'  x₀ = {fit["x0"]:.10g}   (the parameters refer to x − x₀; the fit is '
                          f'done on x − x₀ because x is far from 0)')
@@ -988,13 +1098,21 @@ class FitPresetMixin(MixinBase):
         lines.append(f'  R²           = {st["r2"]:.6f}')
         lines.append(f'  Adj. R²      = {st["r2_adj"]:.6f}')
         lines.append(f'  RMSE         = {st["rmse"]:.6g}')
-        lines.append(f'  MSE          = {st["mse"]:.6g}')
-        lines.append(f'  SSE          = {st["sse"]:.6g}')
-        lines.append(f'  SST          = {st["sst"]:.6g}')
+        if st.get('weighted'):                           # the sums are of weighted squares
+            lines.append(f'  χ² / DoF     = {st["mse"]:.6g}   (reduced χ²)')
+            lines.append(f'  χ²           = {st["sse"]:.6g}')
+            lines.append(f'  Weighted SST = {st["sst"]:.6g}')
+        else:
+            lines.append(f'  MSE          = {st["mse"]:.6g}')
+            lines.append(f'  SSE          = {st["sse"]:.6g}')
+            lines.append(f'  SST          = {st["sst"]:.6g}')
         fv = st.get('f_stat', float('nan'))
         fp = st.get('f_pvalue', float('nan'))
         import math
-        no_f = ' (not defined for this model)' if fit.get('model') not in CurveFitter.F_TEST_MODELS else ''
+        if st.get('weighted'):
+            no_f = ' (not defined for a weighted fit)'
+        else:
+            no_f = '' if CurveFitter.has_f_test(fit.get('model', '')) else ' (not defined for this model)'
         lines.append(f'  F-statistic  = {fv:.4g}' if not math.isnan(fv) else f'  F-statistic  = —{no_f}')
         lines.append(f'  F p-value    = {fp:.4g}' if not math.isnan(fp) else f'  F p-value    = —{no_f}')
         lines.append(f'  AIC          = {st["aic"]:.4g}')
@@ -1044,6 +1162,8 @@ class FitPresetMixin(MixinBase):
         for suffix in (' CI upper', ' CI lower', ' PI upper', ' PI lower'):
             self.datasets.pop(base + suffix, None)
         dof = (fit.get('stats') or {}).get('dof')
+        if len(fit['popt']) == 0:                       # a smoothing has no parameters, so no bands
+            return
         if ci_idx > 0:
             y_ci_hi, y_ci_lo = CurveFitter.confidence_band(
                 fit['xd'], fit['popt'], fit['pcov'], fit['func'], ci_idx, dof)
@@ -1051,7 +1171,8 @@ class FitPresetMixin(MixinBase):
             self.datasets[base + ' CI lower'] = y_ci_lo
         if pi_idx > 0 and 'yd' in fit:
             y_pi_hi, y_pi_lo = CurveFitter.prediction_band(
-                fit['xd'], fit['yd'], fit['popt'], fit['pcov'], fit['func'], pi_idx)
+                fit['xd'], fit['yd'], fit['popt'], fit['pcov'], fit['func'], pi_idx,
+                used=fit.get('used'))
             self.datasets[base + ' PI upper'] = y_pi_hi
             self.datasets[base + ' PI lower'] = y_pi_lo
 
@@ -1064,6 +1185,10 @@ class FitPresetMixin(MixinBase):
         self.fit_pi_combo.setCurrentIndex(fit['pi_idx'] if fit else 0)
         self.fit_ci_combo.blockSignals(False)
         self.fit_pi_combo.blockSignals(False)
+        has_bands = fit is None or len(fit['popt']) > 0       # a smoothing has no bands
+        for combo in (self.fit_ci_combo, self.fit_pi_combo):
+            combo.setEnabled(has_bands)
+            combo.setToolTip('' if has_bands else 'A smoothing has no parameters, so no bands')
 
     def _on_fit_series_changed(self):
         """Called when curve_select changes — refresh CI/PI combos and results panel."""
@@ -1141,6 +1266,7 @@ class FitPresetMixin(MixinBase):
                 'To remove just one, select that fit curve first.')
             if answer != QMessageBox.StandardButton.Yes:
                 return
+        self._schedule_undo_snapshot('Remove fit')
         self._remove_fits_for_labels(targets)
 
         self.update_lists()
@@ -1180,6 +1306,23 @@ class FitPresetMixin(MixinBase):
                 ('a', 'Log coefficient — steepness of the log curve'),
                 ('b', 'Offset — vertical shift'),
             ],
+            'Exponential + offset': [
+                ('a', 'Amplitude of the exponential part (its value at x = 0, above the offset)'),
+                ('b (rate)', 'Rate — negative: decays towards the offset; positive: grows away from it'),
+                ('c (offset)', 'Offset — the value the curve settles at when b < 0'),
+            ],
+            'Gaussian': [
+                ('a (amplitude)', 'Height of the peak above the offset (negative for a dip)'),
+                ('μ (centre)', 'x position of the peak'),
+                ('σ (width)', 'Standard deviation; the full width at half maximum is 2.355·σ'),
+                ('c (offset)', 'Baseline the peak sits on'),
+            ],
+            'Sinusoid': [
+                ('a (amplitude)', 'Half the peak-to-peak size of the oscillation'),
+                ('f (frequency)', 'Cycles per x unit; the period is 1/f'),
+                ('φ (phase, rad)', 'Shift of the oscillation (a sine starts at phase 0)'),
+                ('c (offset)', 'Mean level the oscillation is centred on'),
+            ],
             'Sigmoid': [
                 ('a', 'Ceiling — upper asymptote (maximum value the curve approaches)'),
                 ('b (midpoint)', 'Midpoint — x value at 50% of the ceiling (inflection point)'),
@@ -1208,15 +1351,27 @@ class FitPresetMixin(MixinBase):
             ('CI',          'Confidence interval — range likely to contain the true parameter value at the stated confidence level'),
         ]
 
+        def _glossary_entries(model):
+            if model in _MODEL_GLOSSARY:
+                return _MODEL_GLOSSARY[model]
+            try:
+                names = CurveFitter.spec(model).param_names
+            except ValueError:
+                return []
+            if model.startswith(POLYNOMIAL_PREFIX):
+                return [(n, f'Coefficient of x^{n[1:]}') for n in names]
+            return [(n, 'Parameter of the expression') for n in names]
+
         def _build_glossary(models_used):
             gl = ['', '═' * 52, 'GLOSSARY', '═' * 52]
             shown = set()
             for model in models_used:
-                if model in _MODEL_GLOSSARY and model not in shown:
+                entries = _glossary_entries(model)
+                if entries and model not in shown:
                     shown.add(model)
                     gl.append('')
                     gl.append(f'── Model parameters  ({model}) ──────────────')
-                    for name, meaning in _MODEL_GLOSSARY[model]:
+                    for name, meaning in entries:
                         gl.append(f'  {name:<20}  {meaning}')
             gl.append('')
             gl.append('── Goodness-of-fit statistics ────────────────')

@@ -322,6 +322,33 @@ class TestNoiseThresholdAndSteps(unittest.TestCase):
             tf.resample_uniform(x, x, step=1e-9)                         # absurdly many points
 
 
+class TestDownsample(unittest.TestCase):
+    def test_a_short_series_is_left_alone(self):
+        x, y = np.arange(100.0), np.arange(100.0)
+        xo, yo = tf.downsample_minmax(x, y, 2000)
+        self.assertIs(xo, x)
+        self.assertIs(yo, y)
+
+    def test_a_long_series_keeps_its_peaks_and_dips_in_order(self):
+        n = 1_000_000
+        x = np.arange(n, dtype=float)
+        y = np.sin(x / 5000)
+        y[123_456] = 50.0                                   # one spike
+        y[777_777] = -40.0                                  # one dip
+        xo, yo = tf.downsample_minmax(x, y, 2000)
+        self.assertLessEqual(len(yo), 2100)
+        self.assertEqual((yo.max(), yo.min()), (50.0, -40.0))
+        self.assertTrue(np.all(np.diff(xo) > 0))            # still in order
+        self.assertEqual(len(xo), len(yo))
+
+    def test_nan_blocks_do_not_break_it(self):
+        y = np.sin(np.arange(10_000) / 50)
+        y[2000:4000] = np.nan
+        xo, yo = tf.downsample_minmax(np.arange(10_000.0), y, 500)
+        self.assertLessEqual(len(yo), 600)
+        self.assertGreater(np.isfinite(yo).sum(), 100)
+
+
 class TestRegistry(unittest.TestCase):
     def test_groups_are_contiguous_and_every_operation_has_one(self):
         seen, last = [], None
