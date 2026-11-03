@@ -8,9 +8,10 @@ PlotVizApp so it shares the option widgets and series state via `self`.
 """
 
 from ui.tab_builders import TYPE_TO_PLOT_MODE
+from ui.mixin_base import MixinBase
 
 
-class ChartOptionsMixin:
+class ChartOptionsMixin(MixinBase):
     def _update_option_group_visibility(self, ct):
         """Show/hide chart-type option groups (Data tab) and series-type option
         groups (Series tab) for the given chart type."""
@@ -333,11 +334,20 @@ class ChartOptionsMixin:
             'minor_lw': 0.3, 'minor_alpha': 0.2,
         }
 
-    def _save_canvas_grid_opts(self, idx):
-        """Persist current widget values → subplot_canvas_opts[idx] / subplot_grid_opts[idx]."""
-        if not all(hasattr(self, a) for a in ('border_top', 'grid_check', 'grid_linestyle')):
-            return
-        self.subplot_canvas_opts[idx] = {
+    def _has_canvas_grid_widgets(self):
+        return all(hasattr(self, a) for a in ('border_top', 'grid_check', 'grid_linestyle'))
+
+    def _inherited_canvas_opts(self):
+        """Canvas options for a subplot that does not have any yet: the current ones, so a
+        new subplot (or one in a chart loaded from a file, which stores a single set)
+        looks like the rest instead of falling back to white."""
+        return self._current_canvas_opts() if self._has_canvas_grid_widgets() else self._default_canvas_opts()
+
+    def _inherited_grid_opts(self):
+        return self._current_grid_opts() if self._has_canvas_grid_widgets() else self._default_grid_opts()
+
+    def _current_canvas_opts(self):
+        return {
             'bg':            getattr(self, 'chart_bg_color', '#ffffff'),
             'fg':            getattr(self, 'chart_fg_color', '#000000'),
             'plot_bg':       getattr(self, 'plot_bg_color',  '#ffffff'),
@@ -348,7 +358,9 @@ class ChartOptionsMixin:
             '3d_elev':       self.view3d_elev_spin.value() if hasattr(self, 'view3d_elev_spin') else 30,
             '3d_azim':       self.view3d_azim_spin.value() if hasattr(self, 'view3d_azim_spin') else -60,
         }
-        self.subplot_grid_opts[idx] = {
+
+    def _current_grid_opts(self):
+        return {
             'enabled':       self.grid_check.isChecked(),
             'color':         getattr(self, 'grid_color',       '#cccccc'),
             'ls':            self.grid_linestyle.currentText(),
@@ -360,6 +372,13 @@ class ChartOptionsMixin:
             'minor_lw':      self.minor_grid_linewidth.value(),
             'minor_alpha':   self.minor_grid_alpha.value(),
         }
+
+    def _save_canvas_grid_opts(self, idx):
+        """Persist current widget values → subplot_canvas_opts[idx] / subplot_grid_opts[idx]."""
+        if not self._has_canvas_grid_widgets():
+            return
+        self.subplot_canvas_opts[idx] = self._current_canvas_opts()
+        self.subplot_grid_opts[idx] = self._current_grid_opts()
 
     def _load_canvas_grid_opts(self, idx):
         """Load subplot_canvas_opts[idx] / subplot_grid_opts[idx] → widgets."""

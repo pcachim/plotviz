@@ -19,9 +19,10 @@ from PyQt6.QtWidgets import (
 from ui.helpers import _get_dir, _remember_dir
 from ui.dialogs import DataImportDialog
 from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
+from ui.mixin_base import MixinBase
 
 
-class DataMixin:
+class DataMixin(MixinBase):
     def _open_app_settings_dialog(self):
         """App-level settings dialog: paths, defaults, UI options."""
         from PyQt6.QtGui import QDesktopServices
@@ -167,7 +168,7 @@ class DataMixin:
             tb = self.canvas.toolbar
             if tb:
                 tb.setVisible(chk_toolbar.isChecked())
-        _cfg.MAX_RECENT = max_recent_spin.value()
+        setattr(_cfg, 'MAX_RECENT', max_recent_spin.value())
 
     def _show_about(self):
         """Display the About dialog."""
@@ -548,6 +549,7 @@ class DataMixin:
         i_fn = self.fn_source_combo.findText(prev_fn)
         self.fn_source_combo.setCurrentIndex(i_fn if i_fn >= 0 else 0)
         self.fn_source_combo.blockSignals(False)
+        self._refresh_transform_combos(cols)
         for _fxy_attr, _fxy_prev in [
             ('fxy_x_combo', getattr(getattr(self, 'fxy_x_combo', None), 'currentText', lambda: '')()),
             ('fxy_y_combo', getattr(getattr(self, 'fxy_y_combo', None), 'currentText', lambda: '')()),
@@ -684,6 +686,19 @@ class DataMixin:
         self.load_curve_style()
         self._on_fit_series_changed()
 
+    def _new_series_label(self, row):
+        """'Series N' for a new row, skipping labels already in use (rows can be deleted
+        from the middle, so the row number alone would repeat one)."""
+        used = set()
+        for r in range(self.series_table.rowCount()):
+            item = self.series_table.item(r, 2)
+            if item and r != row:
+                used.add(item.text())
+        n = row + 1
+        while f'Series {n}' in used:
+            n += 1
+        return f'Series {n}'
+
     def _add_series_row(self):
         cols = sorted(self.datasets)
         row = self.series_table.rowCount()
@@ -742,7 +757,8 @@ class DataMixin:
         self.series_table.setCellWidget(row, 1, cb_y)
 
         # Label — explicitly set editable flag so double-click editing works reliably
-        _lbl_item = QTableWidgetItem(f'Series {row+1}')
+        new_label = self._new_series_label(row)
+        _lbl_item = QTableWidgetItem(new_label)
         _lbl_item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsEnabled)
         self.series_table.setItem(row, 2, _lbl_item)
 
@@ -777,7 +793,7 @@ class DataMixin:
         self.series_table.setItem(row, 5, y2_item)
 
         # Auto-assign a palette color to this series (stored in curve_styles)
-        lbl = f'Series {row+1}'
+        lbl = new_label
         auto_color = self._palette_color(self._local_palette_index(row))
         existing = self.curve_styles.get(lbl, {})
         if not existing.get('color_locked', False):

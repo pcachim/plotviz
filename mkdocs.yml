@@ -68,10 +68,11 @@ nav:
   - Getting Started: getting-started.md
   - User Guide:
     - Loading Data: data.md
+    - Transform & Statistics: transform.md
     - Chart Types: chart-types.md
     - Style & Appearance: style.md
     - Axes: axes.md
-    - Annotations: annotations.md
+    - Legend & Notes: annotations.md
     - Series & Curve Fitting: series.md
     - Subplots: subplots.md
     - Advanced Tools: advanced.md

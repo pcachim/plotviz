@@ -62,6 +62,7 @@ def load_module(relpath: str, modname: str):
         return sys.modules[modname]
     path = os.path.join(_SRC, relpath)
     spec = importlib.util.spec_from_file_location(modname, path)
+    assert spec is not None and spec.loader is not None, path
     mod = importlib.util.module_from_spec(spec)
     sys.modules[modname] = mod
     spec.loader.exec_module(mod)

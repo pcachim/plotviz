@@ -19,11 +19,13 @@ import logging
 import io, os, zipfile
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
+from core.dates import is_date, to_iso
 from core.script_gen import (
     generate_plot_script,
     _build_readme,
     _build_pyproject_toml,
 )
+from ui.mixin_base import MixinBase
 
 
 def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
@@ -251,7 +253,7 @@ def generate_sns_plot_script(explorer, chart_name: str, datasets: dict) -> str:
 
 
 
-class PythonExportMixin:
+class PythonExportMixin(MixinBase):
     """Mixin that adds _export_python_bundle() to PlotVizApp."""
 
     def _export_python_bundle(self):
@@ -322,6 +324,8 @@ class PythonExportMixin:
             # ── Build CSVs ─────────────────────────────────────────────────────
             lengths   = {len(v) for v in datasets_to_export.values() if v is not None}
             use_combined = len(lengths) == 1
+            # date columns go into the CSVs as ISO text; the script reads them back as dates
+            csv_cols = {k: (to_iso(v) if is_date(v) else v) for k, v in datasets_to_export.items()}
 
             with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr('plot.py', script)
@@ -349,14 +353,14 @@ class PythonExportMixin:
                     n_rows = len(next(iter(datasets_to_export.values())))
                     for row_idx in range(n_rows):
                         writer.writerow([
-                            datasets_to_export[c][row_idx]
-                            if row_idx < len(datasets_to_export[c]) else ''
+                            csv_cols[c][row_idx]
+                            if row_idx < len(csv_cols[c]) else ''
                             for c in col_names
                         ])
                     zf.writestr('data/data.csv', buf.getvalue())
                 else:
                     # One CSV per column
-                    for col_name, arr in datasets_to_export.items():
+                    for col_name, arr in csv_cols.items():
                         buf = io.StringIO()
                         writer = _csv.writer(buf)
                         writer.writerow([col_name])
@@ -437,6 +441,8 @@ class PythonExportMixin:
             # ── Build CSVs ─────────────────────────────────────────────────────
             lengths      = {len(v) for v in datasets_to_export.values() if v is not None}
             use_combined = len(lengths) == 1
+            # date columns go into the CSVs as ISO text; the script reads them back as dates
+            csv_cols = {k: (to_iso(v) if is_date(v) else v) for k, v in datasets_to_export.items()}
 
             # Write to a named temp file that persists until the Code Runner
             # extracts and runs it (Code Runner manages its own cleanup via
@@ -469,13 +475,13 @@ class PythonExportMixin:
                     n_rows = len(next(iter(datasets_to_export.values())))
                     for row_idx in range(n_rows):
                         writer.writerow([
-                            datasets_to_export[c][row_idx]
-                            if row_idx < len(datasets_to_export[c]) else ''
+                            csv_cols[c][row_idx]
+                            if row_idx < len(csv_cols[c]) else ''
                             for c in col_names
                         ])
                     zf.writestr('data/data.csv', buf.getvalue())
                 else:
-                    for col_name, arr in datasets_to_export.items():
+                    for col_name, arr in csv_cols.items():
                         buf = io.StringIO()
                         writer = _csv.writer(buf)
                         writer.writerow([col_name])

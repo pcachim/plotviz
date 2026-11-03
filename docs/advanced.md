@@ -1,6 +1,6 @@
 # Advanced
 
-The **Data** tab's **Generate** page provides tools for generating data without loading a file: the **Function Generator** and the **Data Table**.
+The **Data** tab's **Generate** page provides tools for generating data without loading a file: the **Function Generator** and the **Data Table**. To derive new series from loaded ones, see the **Transform** page in [Transform and Statistics](transform.md).
 
 ---
 

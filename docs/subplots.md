@@ -75,7 +75,7 @@ Shared axes keep panels visually aligned and make comparisons easier.
 
 In the **Data** tab series table, the **Plot #** column sets which subplot (1-based) a series appears in. Increment the number to move a series to a different panel.
 
-The **Axes** and **Annotations** tabs both have a **Subplot** selector at the top that lets you configure each panel independently. All three selectors (Axes, Annotations, Series) stay in sync — changing one updates the others.
+The **Axes** and **Legend & Notes** tabs both have a **Subplot** selector at the top that lets you configure each panel independently. All three selectors (Axes, Legend & Notes, Series) stay in sync — changing one updates the others.
 
 ---
 
@@ -91,4 +91,4 @@ Each subplot has its own independent settings for:
 - Legend (show/hide, position, style)
 - Annotation visibility
 
-Changes made in the **Axes** and **Annotations** tabs always apply to the subplot currently shown in the selector.
+Changes made in the **Axes** and **Legend & Notes** tabs always apply to the subplot currently shown in the selector.

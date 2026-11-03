@@ -10,6 +10,8 @@ Shared constants live in ui.tab_constants and are re-exported here.
 """
 from ui.tab_helpers import WidgetHelpersMixin
 from ui.tab_data import DataTabMixin
+from ui.tab_transform import TransformTabMixin
+from ui.tab_statistics import StatisticsTabMixin
 from ui.tab_plot import PlotTabMixin
 from ui.tab_chart_options import ChartOptionGroupsMixin
 from ui.tab_axes import AxesTabMixin
@@ -35,5 +37,5 @@ from ui.tab_constants import (  # noqa: F401  (re-exported for existing importer
 )
 
 
-class TabBuildersMixin(WidgetHelpersMixin, DataTabMixin, PlotTabMixin, ChartOptionGroupsMixin, AxesTabMixin, StyleTabMixin, CurvesTabMixin, AnnotationsTabMixin, PlotsTabMixin, AdvancedTabMixin):
+class TabBuildersMixin(WidgetHelpersMixin, DataTabMixin, TransformTabMixin, StatisticsTabMixin, PlotTabMixin, ChartOptionGroupsMixin, AxesTabMixin, StyleTabMixin, CurvesTabMixin, AnnotationsTabMixin, PlotsTabMixin, AdvancedTabMixin):
     """All create_*_tab() builders for PlotVizApp, one mixin per tab."""

@@ -74,11 +74,11 @@ The plotviz window has two main areas:
 
 | Tab | Purpose |
 |-----|---------|
-| Data | Loaded datasets, and the **Generate** page (function generators, data table) |
+| Data | Loaded datasets, and the **Transform**, **Statistics** and **Generate** pages |
 | Layout & Style | Whole-figure settings: size, margins, title, subplot grid, colour scheme, palette |
 | Plots | Per-subplot settings, with a **Editing** selector at the top when there are several subplots |
 
-The **Plots** tab has five pages: **Plot** (chart type, series table, options), **Curves** (per-curve line style, marker, colour, curve fitting), **Axes** (labels, limits, scales, ticks, secondary Y axis, Z axis and 3D viewpoint), **Canvas & Grid** (plot-area colour, borders, major and minor grid) and **Annotations** (subplot title, legend, text/arrow/image annotations). Opening, saving and exporting are in the **File** menu.
+The **Plots** tab has five pages: **Plot** (chart type, series table, options), **Curves** (per-curve line style, marker, colour, curve fitting), **Axes** (subplot title, axis labels, limits, scales, ticks, secondary Y axis, Z axis and 3D viewpoint), **Canvas & Grid** (plot-area colour, borders, major and minor grid) and **Legend & Notes** (legend, text/arrow/image annotations). Opening, saving and exporting are in the **File** menu.
 
 **Right panel — canvas**
 
@@ -105,7 +105,7 @@ In **Plots → Plot**, select a chart type from the dropdown — Line, Scatter, 
 - **Layout & Style** tab: set background color, colour scheme, figure size.
 - **Plots → Curves**: change line color, width, marker style.
 - **Plots → Axes**: set axis labels, limits, scale, grid and canvas colours.
-- **Plots → Annotations**: add a legend, subplot title, or text annotations.
+- **Plots → Legend & Notes**: add a legend or text annotations. The subplot title is in **Plots → Axes**.
 
 ### 5. Export
 

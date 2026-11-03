@@ -16,9 +16,10 @@ from ui.collapsible import CollapsibleSection
 from ui.tab_constants import (
     _FONTS,
 )
+from ui.mixin_base import MixinBase
 
 
-class AxesTabMixin:
+class AxesTabMixin(MixinBase):
     def _refresh_axes_summaries(self):
         for sec in getattr(self, '_axes_sections', ()):
             sec.refresh_summary()
@@ -31,6 +32,84 @@ class AxesTabMixin:
         else:
             lim = f'{getattr(self, prefix + "_min").value():g} – {getattr(self, prefix + "_max").value():g}'
         return f'{label} · {lim}'
+
+    def _title_summary(self):
+        """Text shown next to the closed Subplot Title section."""
+        if not hasattr(self, 'sp_title_input'):      # called while the section is being built
+            return ''
+        if not self.title_show_check.isChecked():
+            return 'hidden'
+        return self.sp_title_input.text().strip() or self.sp_title_input.placeholderText()
+
+    def _build_subplot_title_section(self):
+        """The Subplot Title section: shown only when there is more than one subplot
+        (with one, the figure title is the title)."""
+        section = CollapsibleSection('Subplot Title', 'axes_title', True, self._title_summary)
+        _ts_lay = section.body_layout
+        title_row = QHBoxLayout()
+        self.title_show_check = QCheckBox('Show title')
+        self.title_show_check.setChecked(True)
+        self.title_show_check.stateChanged.connect(self._on_sp_title_show_changed)
+        title_row.addWidget(self.title_show_check)
+        title_row.addStretch()
+        _ts_lay.addLayout(title_row)
+        self.sp_title_input = QLineEdit()
+        self.sp_title_input.setPlaceholderText('Subplot 1')
+        self.sp_title_input.editingFinished.connect(self._on_sp_title_changed)
+        _ts_lay.addWidget(self.sp_title_input)
+        sp_tf_row = QHBoxLayout()
+        sp_tf_row.setSpacing(4)
+        self.sp_title_font = QComboBox()
+        self.sp_title_font.addItems(_FONTS)
+        self.sp_title_font.currentTextChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_tf_row.addWidget(self.sp_title_font)
+        self.sp_title_size = QSpinBox()
+        self.sp_title_size.setRange(6, 32)
+        self.sp_title_size.setValue(11)
+        self.sp_title_size.setFixedWidth(46)
+        self.sp_title_size.valueChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_tf_row.addWidget(self.sp_title_size)
+        self.sp_title_color = '#000000'
+        self.sp_title_color_label = self._color_sw('#000000')
+        btn_sp_tc = QPushButton('…')
+        btn_sp_tc.setFixedWidth(28)
+        btn_sp_tc.clicked.connect(lambda: self._pick_sp_title_color())
+        sp_tf_row.addWidget(QLabel('Color:'))
+        sp_tf_row.addWidget(self.sp_title_color_label)
+        sp_tf_row.addWidget(btn_sp_tc)
+        sp_tf_row.addStretch()
+        _ts_lay.addLayout(sp_tf_row)
+
+        # ── Subplot title extra: pad + rotation + alignment ──────────────────
+        sp_textra_row = QHBoxLayout()
+        sp_textra_row.setSpacing(4)
+        sp_textra_row.addWidget(QLabel('Pad:'))
+        self.sp_title_pad = QSpinBox()
+        self.sp_title_pad.setRange(0, 50)
+        self.sp_title_pad.setValue(6)
+        self.sp_title_pad.setFixedWidth(46)
+        self.sp_title_pad.setToolTip('Distance between subplot title and top of axes (points)')
+        self.sp_title_pad.valueChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_textra_row.addWidget(self.sp_title_pad)
+        sp_textra_row.addWidget(QLabel('Rot:'))
+        self.sp_title_rotation = QSpinBox()
+        self.sp_title_rotation.setRange(-180, 180)
+        self.sp_title_rotation.setValue(0)
+        self.sp_title_rotation.setFixedWidth(52)
+        self.sp_title_rotation.setToolTip('Rotation of the subplot title text in degrees')
+        self.sp_title_rotation.valueChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_textra_row.addWidget(self.sp_title_rotation)
+        sp_textra_row.addWidget(QLabel('Align:'))
+        self.sp_title_ha = QComboBox()
+        self.sp_title_ha.addItems(['center', 'left', 'right'])
+        self.sp_title_ha.setFixedWidth(70)
+        self.sp_title_ha.setToolTip('Horizontal alignment of the subplot title text')
+        self.sp_title_ha.currentTextChanged.connect(lambda _: self._on_sp_title_changed())
+        sp_textra_row.addWidget(self.sp_title_ha)
+        sp_textra_row.addStretch()
+        _ts_lay.addLayout(sp_textra_row)
+
+        return section
 
     # ─── Axes tab ─────────────────────────────────────────────────────────────
     def create_axes_tab(self):
@@ -82,6 +161,12 @@ class AxesTabMixin:
         layout.addWidget(self.equal_scale_check)
 
         layout.addWidget(self._hline())
+
+        # ── Subplot title (hidden when n == 1) ────────────────────────────────
+        self._axes_title_section = self._build_subplot_title_section()
+        main.addWidget(self._axes_title_section)
+        sections.append(self._axes_title_section)
+        self._axes_title_section.setVisible(False)
 
         # ══════════════════════════════════════════════════════════════════════
         # ── X Axis ────────────────────────────────────────────────────────────
@@ -282,7 +367,9 @@ class AxesTabMixin:
         xfmt_row.setSpacing(4)
         xfmt_row.addWidget(QLabel('Format:'))
         self.x_formatter = QComboBox()
-        self.x_formatter.addItems(['auto', 'plain', 'sci', 'percent', '{x:.2f}', '{x:.0f}'])
+        self.x_formatter.addItems(['auto', 'plain', 'sci', 'percent', '{x:.2f}', '{x:.0f}',
+                                   '%Y-%m-%d', '%d/%m/%Y', '%b %Y', '%H:%M'])
+        self.x_formatter.setToolTip('Number formats, or a date format (e.g. %Y-%m-%d) on a date axis')
         self.x_formatter.setEditable(True)
         self.x_formatter.currentTextChanged.connect(self._save_axes_state)
         xfmt_row.addWidget(self.x_formatter, 1)
@@ -496,7 +583,9 @@ class AxesTabMixin:
         yfmt_row.setSpacing(4)
         yfmt_row.addWidget(QLabel('Format:'))
         self.y_formatter = QComboBox()
-        self.y_formatter.addItems(['auto', 'plain', 'sci', 'percent', '{x:.2f}', '{x:.0f}'])
+        self.y_formatter.addItems(['auto', 'plain', 'sci', 'percent', '{x:.2f}', '{x:.0f}',
+                                   '%Y-%m-%d', '%d/%m/%Y', '%b %Y', '%H:%M'])
+        self.y_formatter.setToolTip('Number formats, or a date format (e.g. %Y-%m-%d) on a date axis')
         self.y_formatter.setEditable(True)
         self.y_formatter.currentTextChanged.connect(self._save_axes_state)
         yfmt_row.addWidget(self.y_formatter, 1)

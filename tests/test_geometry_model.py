@@ -499,7 +499,7 @@ class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
         w = self.PlotVizApp()
         w.setGeometry(50, 50, 1400, 900)
         w.show()
-        QTest.qWait(300)
+        QTest.qWait(300)  # ty: ignore[missing-argument, invalid-argument-type]
         return w
 
     def _chart_state(self, w):
@@ -513,7 +513,7 @@ class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
         before = self._chart_state(w)
         for size in ((1800, 950), (1100, 700), (1500, 1000), (900, 650), (1400, 900)):
             w.resize(*size)
-            QTest.qWait(250)          # longer than the 80 ms resize debounce
+            QTest.qWait(250)  # ty: ignore[missing-argument, invalid-argument-type]          # longer than the 80 ms resize debounce
             self.assertEqual(self._chart_state(w), before, size)
 
     def test_moving_the_splitter_never_changes_the_figure(self):
@@ -523,9 +523,9 @@ class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
         from PyQt6.QtWidgets import QSplitter
         splitter = w.findChildren(QSplitter)[0]
         splitter.setSizes([300, 1100])
-        QTest.qWait(250)
+        QTest.qWait(250)  # ty: ignore[missing-argument, invalid-argument-type]
         splitter.setSizes([700, 700])
-        QTest.qWait(250)
+        QTest.qWait(250)  # ty: ignore[missing-argument, invalid-argument-type]
         self.assertEqual(self._chart_state(w), before)
 
     def test_resizing_does_not_mark_the_chart_as_modified(self):
@@ -533,7 +533,7 @@ class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
         w = self._shown_window()
         w._is_dirty = False
         w.resize(1700, 950)
-        QTest.qWait(250)
+        QTest.qWait(250)  # ty: ignore[missing-argument, invalid-argument-type]
         self.assertFalse(w._is_dirty)
 
     def test_the_preview_page_keeps_the_figure_aspect_after_a_resize(self):
@@ -543,7 +543,7 @@ class TestWindowSizeDoesNotChangeTheChart(unittest.TestCase):
         w.fig_height.setValue(10.0)
         for size in ((1700, 950), (1000, 700)):
             w.resize(*size)
-            QTest.qWait(250)
+            QTest.qWait(250)  # ty: ignore[missing-argument, invalid-argument-type]
             rect = w.canvas._border_rect
             fw, fh = w.canvas.figure.get_size_inches()
             page_aspect = (rect.get_width() * fw) / (rect.get_height() * fh)

@@ -13,6 +13,7 @@ import os
 import sys
 import tempfile
 import unittest
+from typing import Any
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("MPLBACKEND", "Agg")
@@ -41,16 +42,16 @@ class TestMarginFractions(unittest.TestCase):
     """Pure: how the generator reads the margins out of the settings."""
 
     def test_exact_fractions_win(self):
-        s = {"margin_fractions": [0.2, 0.9, 0.15, 0.8], "fig_left": 99, "margin_format": "physical"}
+        s: Any = {"margin_fractions": [0.2, 0.9, 0.15, 0.8], "fig_left": 99, "margin_format": "physical"}
         self.assertEqual(_margin_fractions(s, 20, 15), (0.2, 0.9, 0.15, 0.8))
 
     def test_physical_values_are_divided_by_the_figure_size(self):
-        s = {"fig_left": 3.0, "fig_right": 27.0, "fig_bottom": 2.0, "fig_top": 9.0,
+        s: Any = {"fig_left": 3.0, "fig_right": 27.0, "fig_bottom": 2.0, "fig_top": 9.0,
              "margin_format": "physical"}
         self.assertEqual(_margin_fractions(s, 30.0, 10.0), (0.1, 0.9, 0.2, 0.9))
 
     def test_old_files_hold_plain_fractions(self):
-        s = {"fig_left": 0.12, "fig_right": 0.88, "fig_bottom": 0.11, "fig_top": 0.93}
+        s: Any = {"fig_left": 0.12, "fig_right": 0.88, "fig_bottom": 0.11, "fig_top": 0.93}
         self.assertEqual(_margin_fractions(s, 20, 15), (0.12, 0.88, 0.11, 0.93))
 
     def test_defaults(self):

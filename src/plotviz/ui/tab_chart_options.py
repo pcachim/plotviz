@@ -14,9 +14,10 @@ from PyQt6.QtWidgets import (
 from ui.tab_constants import (
     _CMAP_LIST,
 )
+from ui.mixin_base import MixinBase
 
 
-class ChartOptionGroupsMixin:
+class ChartOptionGroupsMixin(MixinBase):
     def _build_chart_option_groups(self, layout):
         def _row(*widgets):
             h = QHBoxLayout()

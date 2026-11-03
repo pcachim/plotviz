@@ -16,9 +16,10 @@ from data.scientific import CurveFitter
 from ui.tab_constants import (
     _CMAP_LIST,
 )
+from ui.mixin_base import MixinBase
 
 
-class CurvesTabMixin:
+class CurvesTabMixin(MixinBase):
     # ─── Series tab ───────────────────────────────────────────────────────────
     def create_curves_tab(self):
         widget = QWidget()

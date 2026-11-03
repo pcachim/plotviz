@@ -1,6 +1,21 @@
 # Axes
 
-The **Axes** tab controls per-subplot axis configuration: labels, limits, scale, ticks, and the secondary Y axis. When the chart has more than one subplot, a **Subplot** selector at the top lets you switch between panels. Changing the selector in the Axes tab automatically syncs with the selectors in the other Plots pages.
+The **Axes** tab controls per-subplot axis configuration: the subplot title, axis labels, limits, scale, ticks, and the secondary Y axis. When the chart has more than one subplot, a **Subplot** selector at the top lets you switch between panels. Changing the selector in the Axes tab automatically syncs with the selectors in the other Plots pages.
+
+---
+
+## Subplot title
+
+The **Subplot Title** section is at the top of the tab and only appears when the chart has more than one panel. For a single-panel chart, the chart title is set in the **Layout & Style** tab.
+
+| Control | Description |
+|---------|-------------|
+| **Show title** | Checkbox: toggle title visibility |
+| **Text field** | Title text for this subplot |
+| **Font / Size / Color** | Typography |
+| **Pad** | Distance between the title and the top of the axes (points) |
+| **Rot** | Rotation in degrees |
+| **Align** | center, left or right |
 
 ---
 
@@ -64,9 +79,11 @@ The **Formatter** dropdown on each axis controls how tick values are displayed:
 | auto | matplotlib default |
 | plain | `1234567` (no scientific notation) |
 | sci | `1.23 × 10⁶` |
-| eng | `1.23 M` (SI prefix) |
 | percent | `12.3%` |
-| date | `2024-01` (for date-encoded floats) |
+| `{x:.2f}`, `{x:.0f}`, … | any Python format string with `{x}`: `3.14`, `3` |
+| `%Y-%m-%d`, `%d/%m/%Y`, `%b %Y`, `%H:%M`, … | a [date format](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes), for an axis that shows dates |
+
+The dropdown is editable, so you can type any format. Date formats only make sense on an axis that shows a date column; see [Date and time columns](data.md#date-and-time-columns). With **auto**, a date axis picks sensible ticks and labels by itself (years, months, days or hours, depending on the range).
 
 ---
 

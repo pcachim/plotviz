@@ -12,7 +12,7 @@ A `.pviz` file is a complete saved chart. It contains:
 |-------|---------|
 | `settings.json` | All style, axis, and layout settings |
 | `series.json` | Series table rows, subplot assignments, Z and error column selections |
-| `data.json` | Dataset columns (all columns or used-only, depending on save choice) |
+| `data.json` | Dataset columns (all columns or used-only, depending on save choice). Date columns are stored as ISO 8601 text |
 | `palette.json` | The active palette's definition, when it is one of your own |
 | `images/` | Embedded image files referenced by image annotations |
 

@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QLabel, QComboBox,
     QSpinBox, QDoubleSpinBox,
 )
+from ui.mixin_base import MixinBase
 
 _CMAP_ICON_SIZE = (72, 12)
 _cmap_icons: dict = {}
@@ -37,7 +38,7 @@ def cmap_icon(name: str) -> QIcon:
     return _cmap_icons[name]
 
 
-class WidgetHelpersMixin:
+class WidgetHelpersMixin(MixinBase):
     # ── Widget factory helpers ─────────────────────────────────────────────────
     def _make_spin(self, attr, lo, hi, val):
         w = QSpinBox()

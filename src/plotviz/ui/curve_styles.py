@@ -6,9 +6,10 @@ CurveStyleMixin: per-series style editing (colour, marker, line) and the
 canvas->Series-tab selection bridge. Split out of main_window; mixed into
 PlotVizApp so it shares the series table and curve widgets via `self`.
 """
+from ui.mixin_base import MixinBase
 
 
-class CurveStyleMixin:
+class CurveStyleMixin(MixinBase):
     def on_y_selection_changed(self):
         self.update_preview()
 

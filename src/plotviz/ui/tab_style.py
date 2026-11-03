@@ -14,11 +14,12 @@ from PyQt6.QtWidgets import (
 )
 from ui.collapsible import CollapsibleSection
 from ui.tab_constants import (
-    _FONTS, COLOR_PALETTES,
+    _FONTS,
 )
+from ui.mixin_base import MixinBase
 
 
-class StyleTabMixin:
+class StyleTabMixin(MixinBase):
     def _refresh_style_summaries(self):
         """Update the one-line summary each closed Layout & Style section shows."""
         for sec in getattr(self, '_style_sections', ()):

@@ -67,7 +67,7 @@ class CollapsibleSection(QWidget):
         if self._summary is not None and not self.is_open():
             try:
                 text = self._summary()
-            except Exception:
+            except Exception:  # noqa: BLE001 - a summary callback must never break the panel
                 text = ''
         self._summary_lbl.setText(text)
 

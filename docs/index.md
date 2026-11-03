@@ -62,7 +62,7 @@ See [Getting Started](getting-started.md) for full setup instructions.
 
     Labels, limits, scales, ticks, formatters, secondary Y axis.
 
-- :material-text-box: **[Annotations](annotations.md)**
+- :material-text-box: **[Legend and Notes](annotations.md)**
 
     Subplot titles, legends, text, arrows, and images.
 

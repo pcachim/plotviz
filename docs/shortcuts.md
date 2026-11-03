@@ -25,9 +25,9 @@ The **View** menu lists the three tabs as checkable items; the active one is tic
 
 | Menu item | Tab |
 |-----------|-----|
-| View → Data | Datasets and the Generate page |
+| View → Data | Datasets, Transform, Statistics and Generate pages |
 | View → Layout & Style | Figure size, margins, title, subplot grid, colour scheme, palette |
-| View → Plots | Per-subplot settings: Plot, Curves, Axes, Annotations |
+| View → Plots | Per-subplot settings: Plot, Curves, Axes, Canvas & Grid, Legend & Notes |
 
 ## Canvas (matplotlib toolbar)
 
@@ -45,7 +45,7 @@ The toolbar above the chart canvas provides standard matplotlib navigation:
 
 ## Annotation mode shortcuts
 
-While in the Annotations tab:
+While in the Legend & Notes tab:
 
 | Key | Action |
 |-----|--------|

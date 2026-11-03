@@ -121,7 +121,7 @@ class SeabornExplorer(QDialog):
             Qt.WindowType.WindowMinMaxButtonsHint
         )
         self.datasets = datasets
-        self.palette  = palette
+        self.palette_colors = palette      # not `palette`: QWidget already has a palette() method
         self._build_ui()
         self._populate_col_combos()
         self._on_type_changed()
@@ -512,14 +512,14 @@ class SeabornExplorer(QDialog):
         """Return a list of colours honoring the selected colour theme."""
         theme = self._theme_combo.currentText() if hasattr(self, '_theme_combo') else 'plotviz'
         if theme == 'plotviz':
-            pal = self.palette[:n] if len(self.palette) >= n else self.palette
+            pal = self.palette_colors[:n] if len(self.palette_colors) >= n else self.palette_colors
             return pal
         try:
             import seaborn as _sns
             pal = _sns.color_palette(theme, n)
             return [f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}' for r,g,b in pal]
         except (ImportError, ValueError, TypeError):
-            return self.palette[:n] if len(self.palette) >= n else self.palette
+            return self.palette_colors[:n] if len(self.palette_colors) >= n else self.palette_colors
 
     def _sns_palette_name(self):
         """Return the seaborn palette name, or None if using plotviz colours."""
@@ -679,7 +679,8 @@ class SeabornExplorer(QDialog):
         name, datasets_to_export = result
 
         main_win = self.parent()
-        if main_win is None or not hasattr(main_win, '_open_pvizx_in_code_runner'):
+        open_in_runner = getattr(main_win, '_open_pvizx_in_code_runner', None)
+        if open_in_runner is None:
             QMessageBox.warning(self, 'Code Runner unavailable',
                 'Cannot reach the main window Code Runner from here.')
             return
@@ -690,7 +691,7 @@ class SeabornExplorer(QDialog):
             os.close(tmp_fd)
             with open(tmp_fp, 'wb') as fh:
                 fh.write(data)
-            main_win._open_pvizx_in_code_runner(tmp_fp)
+            open_in_runner(tmp_fp)
         except Exception as exc:  # noqa: BLE001 - error boundary: the failure is reported to the user
             import traceback as _tb
             QMessageBox.critical(self, 'Code Runner export error',
@@ -831,7 +832,7 @@ class SeabornExplorer(QDialog):
         import matplotlib.image as mpimg
         img = mpimg.imread(buf)
         self._canvas_fig.clear()
-        ax = self._canvas_fig.add_axes([0, 0, 1, 1])
+        ax = self._canvas_fig.add_axes((0, 0, 1, 1))
         ax.imshow(img, aspect='equal', interpolation='lanczos')
         ax.axis('off')
         self._canvas.draw()
@@ -944,10 +945,10 @@ class SeabornExplorer(QDialog):
         """Route Escape → hide (not destroy) so the window can be re-opened."""
         self.hide()
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         """Hide instead of destroy so state is preserved between opens."""
         self.hide()
-        event.ignore()
+        a0.ignore()
 
     def _export(self):
         fp, _ = QFileDialog.getSaveFileName(
@@ -986,5 +987,5 @@ class SeabornExplorer(QDialog):
 
     def refresh_datasets(self, datasets: dict, palette: list[str]):
         self.datasets = datasets
-        self.palette  = palette
+        self.palette_colors = palette      # not `palette`: QWidget already has a palette() method
         self._populate_col_combos()

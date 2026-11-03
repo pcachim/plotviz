@@ -124,6 +124,50 @@ class TestGuiSmoke(unittest.TestCase):
             fig.savefig(out)
             self.assertGreater(os.path.getsize(out), 0)
 
+    def test_reloaded_subplots_restart_the_palette_in_each_subplot(self):
+        # Series are coloured by their position inside their own subplot, and a
+        # reload must give them the same colours (not the global row order).
+        from core.serialize import read_project_zip, write_project_zip
+        w = self._make_window()
+        with tempfile.TemporaryDirectory() as d:
+            base = os.path.join(d, "base.pviz")
+            _write_pviz(base, rows=2, cols=2)
+            parts = read_project_zip(base)
+            meta = parts["series_meta"]
+            meta["series"] = [
+                {"x_col": "x", "y_col": c, "label": f"Series {i + 1}", "series_type": "Line",
+                 "plot_num": n, "y2": False}
+                for i, (c, n) in enumerate([("y", 1), ("z", 2), ("y", 3), ("z", 4), ("z", 1), ("y", 3)])]
+            parts["settings"]["curve_styles"] = {}
+            fp = os.path.join(d, "grid.pviz")
+            write_project_zip(fp, parts["settings"], meta, parts["datasets_raw"])
+            w._load_project_inner(fp, silent=True)
+            colour = lambda n: w.curve_styles[f"Series {n}"]["color"]          # noqa: E731
+            first, second = w._palette_color(0), w._palette_color(1)
+            self.assertEqual([colour(1), colour(2), colour(3), colour(4)], [first] * 4)
+            self.assertEqual([colour(5), colour(6)], [second] * 2)
+
+    def test_every_subplot_of_a_loaded_chart_gets_the_saved_background(self):
+        # A .pviz stores one set of canvas colours; all the subplots must use it,
+        # not only the first one (the others used to fall back to white).
+        from matplotlib.colors import to_hex
+        from core.serialize import read_project_zip, write_project_zip
+        w = self._make_window()
+        with tempfile.TemporaryDirectory() as d:
+            base = os.path.join(d, "base.pviz")
+            _write_pviz(base, rows=2, cols=2)
+            parts = read_project_zip(base)
+            parts["settings"].update(plot_bg_color="#fff1e5", chart_bg_color="#e5f1ff",
+                                     grid_color="#ff0000")
+            fp = os.path.join(d, "bg.pviz")
+            write_project_zip(fp, parts["settings"], parts["series_meta"], parts["datasets_raw"])
+            w._load_project_inner(fp, silent=True)
+            axes_list, *_ = w._render_axes(Figure())
+            self.assertEqual(len(axes_list), 4)
+            self.assertEqual({to_hex(a.get_facecolor()) for a in axes_list}, {"#fff1e5"})
+            self.assertEqual({o["plot_bg"] for o in w.subplot_canvas_opts.values()}, {"#fff1e5"})
+            self.assertEqual({o["color"] for o in w.subplot_grid_opts.values()}, {"#ff0000"})
+
     def test_multi_subplot_layout(self):
         w = self._make_window()
         with tempfile.TemporaryDirectory() as d:

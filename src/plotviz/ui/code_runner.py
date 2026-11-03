@@ -129,7 +129,9 @@ class _PythonHighlighter(QSyntaxHighlighter):
             (re.compile(r'\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[jJ]?\b'),   num_fmt),
         ]
 
-    def highlightBlock(self, text: str):
+    def highlightBlock(self, text: str | None):
+        if text is None:
+            return
         for pattern, fmt in self._RULES:
             for m in pattern.finditer(text):
                 start = m.start(1) if m.lastindex else m.start()
@@ -152,19 +154,19 @@ class _CodeEditor(QPlainTextEdit):
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         _PythonHighlighter(self.document())
 
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Tab:
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key.Key_Tab:
             cursor = self.textCursor()
             if cursor.hasSelection():
                 self._indent_selection(cursor, dedent=False)
             else:
                 cursor.insertText('    ')
             return
-        if event.key() == Qt.Key.Key_Backtab:
+        if e.key() == Qt.Key.Key_Backtab:
             cursor = self.textCursor()
             self._indent_selection(cursor, dedent=True)
             return
-        super().keyPressEvent(event)
+        super().keyPressEvent(e)
 
     def _indent_selection(self, cursor, dedent: bool):
         start = cursor.selectionStart()
@@ -579,7 +581,7 @@ class CodeRunnerDialog(QDialog):
         # The generated standalone script keeps plt.show() so it still displays
         # when run on its own outside plotviz.
         _orig_show = plt.show
-        plt.show = lambda *a, **k: None
+        setattr(plt, 'show', lambda *a, **k: None)
         try:
             with matplotlib.rc_context({'text.usetex': False}):
                 try:
@@ -619,7 +621,7 @@ class CodeRunnerDialog(QDialog):
         import matplotlib.image as mpimg
         img = mpimg.imread(buf)
         self._canvas_fig.clear()
-        ax = self._canvas_fig.add_axes([0, 0, 1, 1])
+        ax = self._canvas_fig.add_axes((0, 0, 1, 1))
         ax.imshow(img, aspect='equal', interpolation='lanczos')
         ax.axis('off')
         self._canvas.draw()
@@ -681,9 +683,9 @@ class CodeRunnerDialog(QDialog):
         """Escape → hide (not destroy) so window can be re-opened with state intact."""
         self.hide()
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         self.hide()
-        event.ignore()
+        a0.ignore()
 
     def refresh_datasets(self, datasets: dict):
         """Called by main window when datasets change."""

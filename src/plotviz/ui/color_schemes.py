@@ -12,6 +12,7 @@ import re
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from ui.mixin_base import MixinBase
 
 
 def swatch_icon(colors, cell=11, height=12) -> QIcon:
@@ -27,7 +28,7 @@ def swatch_icon(colors, cell=11, height=12) -> QIcon:
     return QIcon(pm)
 
 
-class ColorSchemeMixin:
+class ColorSchemeMixin(MixinBase):
     # Keys extracted from a full settings dict that constitute a "color scheme".
     # Anything not in this list is left untouched when a scheme is applied.
     _COLOR_SCHEME_KEYS = [
@@ -296,7 +297,7 @@ class ColorSchemeMixin:
             return
         base.update(cur)
         origin = self._scheme_origin.get(name)
-        if origin in self._COLOR_SCHEME_REGISTRY and self._scheme_matches(
+        if origin is not None and origin in self._COLOR_SCHEME_REGISTRY and self._scheme_matches(
                 self._COLOR_SCHEME_REGISTRY[origin], cur):
             self._remove_scheme(name)
             self._select_scheme(origin)

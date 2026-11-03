@@ -15,9 +15,10 @@ from PyQt6.QtWidgets import (
 from ui.tab_constants import (
     _FONTS,
 )
+from ui.mixin_base import MixinBase
 
 
-class AnnotationsTabMixin:
+class AnnotationsTabMixin(MixinBase):
     # ─── Annotations tab ──────────────────────────────────────────────────────
     def create_annotations_tab(self):
         widget = QWidget()
@@ -68,79 +69,6 @@ class AnnotationsTabMixin:
         layout.addWidget(self._ann_sp_row_widget)
 
         layout.addWidget(self._hline())
-
-        # ── Subplot Title (moved from Axes; hidden when n==1) ─────────────────
-        self._axes_title_section = QWidget()
-        _ts_lay = QVBoxLayout(self._axes_title_section)
-        _ts_lay.setContentsMargins(0, 0, 0, 0)
-        _ts_lay.setSpacing(4)
-        _ts_lay.addWidget(self._sec_label('Subplot Title'))
-        title_row = QHBoxLayout()
-        self.title_show_check = QCheckBox('Show title')
-        self.title_show_check.setChecked(True)
-        self.title_show_check.stateChanged.connect(self._on_sp_title_show_changed)
-        title_row.addWidget(self.title_show_check)
-        title_row.addStretch()
-        _ts_lay.addLayout(title_row)
-        self.sp_title_input = QLineEdit()
-        self.sp_title_input.setPlaceholderText('Subplot 1')
-        self.sp_title_input.editingFinished.connect(self._on_sp_title_changed)
-        _ts_lay.addWidget(self.sp_title_input)
-        sp_tf_row = QHBoxLayout()
-        sp_tf_row.setSpacing(4)
-        self.sp_title_font = QComboBox()
-        self.sp_title_font.addItems(_FONTS)
-        self.sp_title_font.currentTextChanged.connect(lambda _: self._on_sp_title_changed())
-        sp_tf_row.addWidget(self.sp_title_font)
-        self.sp_title_size = QSpinBox()
-        self.sp_title_size.setRange(6, 32)
-        self.sp_title_size.setValue(11)
-        self.sp_title_size.setFixedWidth(46)
-        self.sp_title_size.valueChanged.connect(lambda _: self._on_sp_title_changed())
-        sp_tf_row.addWidget(self.sp_title_size)
-        self.sp_title_color = '#000000'
-        self.sp_title_color_label = self._color_sw('#000000')
-        btn_sp_tc = QPushButton('…')
-        btn_sp_tc.setFixedWidth(28)
-        btn_sp_tc.clicked.connect(lambda: self._pick_sp_title_color())
-        sp_tf_row.addWidget(QLabel('Color:'))
-        sp_tf_row.addWidget(self.sp_title_color_label)
-        sp_tf_row.addWidget(btn_sp_tc)
-        sp_tf_row.addStretch()
-        _ts_lay.addLayout(sp_tf_row)
-
-        # ── Subplot title extra: pad + rotation + alignment ──────────────────
-        sp_textra_row = QHBoxLayout()
-        sp_textra_row.setSpacing(4)
-        sp_textra_row.addWidget(QLabel('Pad:'))
-        self.sp_title_pad = QSpinBox()
-        self.sp_title_pad.setRange(0, 50)
-        self.sp_title_pad.setValue(6)
-        self.sp_title_pad.setFixedWidth(46)
-        self.sp_title_pad.setToolTip('Distance between subplot title and top of axes (points)')
-        self.sp_title_pad.valueChanged.connect(lambda _: self._on_sp_title_changed())
-        sp_textra_row.addWidget(self.sp_title_pad)
-        sp_textra_row.addWidget(QLabel('Rot:'))
-        self.sp_title_rotation = QSpinBox()
-        self.sp_title_rotation.setRange(-180, 180)
-        self.sp_title_rotation.setValue(0)
-        self.sp_title_rotation.setFixedWidth(52)
-        self.sp_title_rotation.setToolTip('Rotation of the subplot title text in degrees')
-        self.sp_title_rotation.valueChanged.connect(lambda _: self._on_sp_title_changed())
-        sp_textra_row.addWidget(self.sp_title_rotation)
-        sp_textra_row.addWidget(QLabel('Align:'))
-        self.sp_title_ha = QComboBox()
-        self.sp_title_ha.addItems(['center', 'left', 'right'])
-        self.sp_title_ha.setFixedWidth(70)
-        self.sp_title_ha.setToolTip('Horizontal alignment of the subplot title text')
-        self.sp_title_ha.currentTextChanged.connect(lambda _: self._on_sp_title_changed())
-        sp_textra_row.addWidget(self.sp_title_ha)
-        sp_textra_row.addStretch()
-        _ts_lay.addLayout(sp_textra_row)
-
-        _ts_lay.addWidget(self._hline())
-        layout.addWidget(self._axes_title_section)
-        self._axes_title_section.setVisible(False)  # shown only when n > 1
 
         # ── Legend (moved from Axes; full styling) ────────────────────────────
         layout.addWidget(self._sec_label('Legend'))
@@ -362,4 +290,4 @@ class AnnotationsTabMixin:
         scroll.setWidget(content)
         mlay = QVBoxLayout(widget)
         mlay.addWidget(scroll)
-        self.plots_inner_tabs.addTab(widget, 'Annotations')
+        self.plots_inner_tabs.addTab(widget, 'Legend && Notes')

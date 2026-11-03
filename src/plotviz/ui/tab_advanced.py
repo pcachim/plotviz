@@ -13,9 +13,10 @@ from PyQt6.QtWidgets import (
     QTableWidget, QHeaderView,
     QTabWidget, QSizePolicy,
 )
+from ui.mixin_base import MixinBase
 
 
-class AdvancedTabMixin:
+class AdvancedTabMixin(MixinBase):
     # ─── Advanced tab ─────────────────────────────────────────────────────────
     def create_advanced_tab(self):
         # Outer scroll wraps everything so the whole tab is scrollable

@@ -75,3 +75,27 @@ no_implicit_optional = true
 warn_return_any = true
 warn_unused_ignores = true
 warn_redundant_casts = true
+
+[tool.ty.environment]
+# The app puts src/plotviz on sys.path, so `core`, `data` and `ui` are top-level
+# modules (also for the tests); without this ty cannot resolve those imports.
+extra-paths = ["src/plotviz"]
+
+# The ui/ classes are mixins: they use attributes and methods that the final window
+# class (PlotVizApp) gets from its other mixins and from QMainWindow, which a type
+# checker cannot see from inside one mixin.  That one pattern is ~2,700 of the ty
+# diagnostics, so the rule is off there (it still applies to core/ and data/).
+[[tool.ty.overrides]]
+include = ["src/plotviz/ui/**"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
+# Tests monkeypatch methods (`_load_on_startup`) and poke at Qt widgets that the stubs
+# type as Optional, which is what these two rules complain about.
+[[tool.ty.overrides]]
+include = ["tests/**"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+invalid-assignment = "ignore"

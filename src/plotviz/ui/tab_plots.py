@@ -13,9 +13,11 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QPushButton, QCheckBox, QGroupBox, QTabWidget, QSlider, QScrollArea,
 )
 from PyQt6.QtCore import Qt
+from ui.mixin_base import MixinBase
+from ui.tab_constants import INNER_TAB_QSS
 
 
-class PlotsTabMixin:
+class PlotsTabMixin(MixinBase):
     # ─── Canvas & Grid tab (per subplot) ───────────────────────────────────────
     def create_canvas_grid_tab(self):
         """Build the per-subplot canvas, border and grid controls, and the 3D viewpoint.
@@ -249,6 +251,7 @@ class PlotsTabMixin:
 
         # ── Inner tab widget ──────────────────────────────────────────────────
         self.plots_inner_tabs = QTabWidget()
+        self.plots_inner_tabs.tabBar().setStyleSheet(INNER_TAB_QSS)
         self.create_plot_tab()
         self.create_canvas_grid_tab()
         self.create_curves_tab()

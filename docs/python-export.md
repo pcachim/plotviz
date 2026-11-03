@@ -54,7 +54,7 @@ The main script is completely standalone — it imports only standard scientific
 
 ### data/
 
-Only the columns actually assigned to series in the chart are exported. If all exported columns share the same row count, they are written to a single `data/data.csv`. If they differ in length, each column gets its own CSV file (e.g. `data/pressure.csv`) to avoid NaN padding.
+Date columns are written to the CSV as ISO 8601 text (`2024-03-01`, `2024-03-01T12:30:00`), and the script converts them back with `pd.to_datetime`, so the exported chart has a date axis too. Only the columns actually assigned to series in the chart are exported. If all exported columns share the same row count, they are written to a single `data/data.csv`. If they differ in length, each column gets its own CSV file (e.g. `data/pressure.csv`) to avoid NaN padding.
 
 ### pyproject.toml
 

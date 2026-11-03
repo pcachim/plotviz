@@ -18,7 +18,7 @@ import os
 
 # ── 1. sys.path ───────────────────────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
-    _pkg_dir = sys._MEIPASS                                # type: ignore[attr-defined]
+    _pkg_dir = getattr(sys, '_MEIPASS')                    # set by PyInstaller
 else:
     _pkg_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -43,7 +43,7 @@ if getattr(sys, 'frozen', False):
 # ── 3. Import matplotlib and lock data path ───────────────────────────────────
 import matplotlib
 if getattr(sys, 'frozen', False) and os.path.isdir(_mpl_data):
-    matplotlib.get_data_path = lambda: _mpl_data   # type: ignore[method-assign]
+    setattr(matplotlib, 'get_data_path', lambda: _mpl_data)
 
 matplotlib.use('Qt5Agg')
 
@@ -51,7 +51,7 @@ matplotlib.use('Qt5Agg')
 if getattr(sys, 'frozen', False):
     try:
         import matplotlib.font_manager as _fm
-        _fm._load_fontmanager(try_read_cache=False)
+        getattr(_fm, '_load_fontmanager')(try_read_cache=False)
     except (AttributeError, TypeError, OSError):
         logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
@@ -62,7 +62,7 @@ freeze_support()
 # ── 6. Application ────────────────────────────────────────────────────────────
 from pathlib import Path
 from PyQt6.QtCore import QEvent
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QFileOpenEvent, QIcon
 from PyQt6.QtWidgets import QApplication
 from ui.main_window import PlotVizApp
 
@@ -81,7 +81,7 @@ def _app_icon() -> QIcon:
     Falls back gracefully if neither is found.
     """
     if getattr(sys, 'frozen', False):
-        base = Path(sys._MEIPASS)           # type: ignore[attr-defined]
+        base = Path(getattr(sys, '_MEIPASS'))
     else:
         base = Path(__file__).parent.parent.parent  # repo root
 
@@ -130,9 +130,9 @@ class PlotVizQApplication(QApplication):
     def set_window(self, window: PlotVizApp) -> None:
         self._window = window
 
-    def event(self, e: QEvent) -> bool:
-        if e.type() == QEvent.Type.FileOpen and self._window is not None:
-            fp = e.file()                           # type: ignore[attr-defined]
+    def event(self, a0: QEvent | None) -> bool:
+        if isinstance(a0, QFileOpenEvent) and self._window is not None:
+            fp = a0.file()
             if fp.endswith(_CHART_EXT) or fp.endswith('.zip'):
                 self._window._load_project_from_path(fp)
             elif fp.endswith(_TEMPLATE_EXT):
@@ -144,7 +144,7 @@ class PlotVizQApplication(QApplication):
             elif fp.endswith(_PYTHON_EXT):
                 self._window._open_pvizx_in_code_runner(fp)
             return True
-        return super().event(e)
+        return super().event(a0)
 
 def _ensure_user_data(log_dir: 'Path') -> None:
     """Seed the user data directories from the bundled data/ folder.
@@ -160,7 +160,7 @@ def _ensure_user_data(log_dir: 'Path') -> None:
     # Locate the bundled data/ directory
     if getattr(sys, 'frozen', False):
         # PyInstaller bundle: data/ lands at the root of _MEIPASS
-        bundled_data = Path(sys._MEIPASS) / 'data'       # type: ignore[attr-defined]
+        bundled_data = Path(getattr(sys, '_MEIPASS')) / 'data'
     else:
         # Running from source: data/ is at repo root (three levels up from main.py)
         bundled_data = Path(__file__).parent.parent.parent / 'data'

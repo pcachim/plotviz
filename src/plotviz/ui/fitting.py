@@ -18,9 +18,10 @@ from PyQt6.QtWidgets import (
 )
 from data.scientific import CurveFitter
 from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
+from ui.mixin_base import MixinBase
 
 
-class FitPresetMixin:
+class FitPresetMixin(MixinBase):
 
     def _rename_table_col(self, col_idx):
         from PyQt6.QtWidgets import QInputDialog

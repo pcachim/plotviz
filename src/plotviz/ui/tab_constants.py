@@ -10,6 +10,16 @@ Shared constants, palettes and small helpers for the tab-builder mixins.
 """
 from PyQt6.QtCore import QObject, QEvent
 
+# Compact tabs for the inner tab bars (Data and Plots).  The native tab padding is wide
+# enough that the five Plots tabs do not fit the side panel and scroll; this keeps the
+# text and puts a coloured line under the selected tab.  Colours come from the palette,
+# so it follows the light/dark scheme.
+INNER_TAB_QSS = '''
+QTabBar::tab { padding: 5px 7px; margin: 0; border: none; border-bottom: 2px solid transparent; }
+QTabBar::tab:selected { border-bottom: 2px solid palette(highlight); }
+QTabBar::tab:!selected:hover { border-bottom: 2px solid palette(mid); }
+'''
+
 ALL_CHART_TYPES = [
     # ── Per-series mixable ────────────────────────────────────────────
     'Line', 'Scatter', 'Bar', 'Errorbar', 'Area', 'Fill Between',
@@ -132,7 +142,7 @@ class _ClampWidth(QObject):
     def __init__(self, target, parent=None):
         super().__init__(parent)
         self._target = target
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.Resize:
-            self._target.setMaximumWidth(obj.width())
+    def eventFilter(self, a0, a1):
+        if a1.type() == QEvent.Type.Resize:
+            self._target.setMaximumWidth(a0.width())
         return False

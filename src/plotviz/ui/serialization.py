@@ -18,9 +18,10 @@ from PyQt6.QtWidgets import (
     QFileDialog, QMessageBox, QComboBox, QTableWidgetItem, QSpinBox,
 )
 from PyQt6.QtCore import Qt
+from ui.mixin_base import MixinBase
 
 
-class SerializationMixin:
+class SerializationMixin(MixinBase):
     def _collect_settings(self):
         """Gather all UI settings into a JSON-serialisable dict.
         Series, column assignments and dataset references are NOT stored here —
@@ -969,7 +970,7 @@ class SerializationMixin:
             lbl = lbl_item.text() if lbl_item else f'Series {row+1}'
             entry = self.curve_styles.get(lbl, {})
             if not entry.get('color_locked', False):
-                auto_color = self._palette_color(row)
+                auto_color = self._palette_color(self._local_palette_index(row))   # each subplot restarts at 0
                 entry['color'] = auto_color
                 entry['marker_color'] = auto_color
                 self.curve_styles[lbl] = entry

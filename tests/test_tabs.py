@@ -52,7 +52,7 @@ class TestTabLayout(unittest.TestCase):
         return widget is page or page.isAncestorOf(widget)
 
     def test_inner_tab_order_follows_the_workflow(self):
-        self.assertEqual(self._inner(), ["Plot", "Curves", "Axes", "Canvas && Grid", "Annotations"])
+        self.assertEqual(self._inner(), ["Plot", "Curves", "Axes", "Canvas && Grid", "Legend && Notes"])
 
     def test_canvas_borders_and_grid_have_their_own_tab(self):
         w = self.w
@@ -71,7 +71,7 @@ class TestTabLayout(unittest.TestCase):
         self.assertEqual(self._inner()[CanvasPlotter._INNER_AXES], "Axes")
         self.assertEqual(self._inner()[CanvasPlotter._INNER_LAYOUT], "Canvas && Grid")
         self.assertEqual(self._inner()[CanvasPlotter._INNER_SERIES], "Curves")
-        self.assertEqual(self._inner()[CanvasPlotter._INNER_ANNOTATIONS], "Annotations")
+        self.assertEqual(self._inner()[CanvasPlotter._INNER_ANNOTATIONS], "Legend && Notes")
 
     def test_the_subplot_selector_is_always_shown(self):
         w = self.w
@@ -82,6 +82,34 @@ class TestTabLayout(unittest.TestCase):
         self.assertTrue(w.global_sp_active.isEnabled())
         self.assertEqual(w.global_sp_active.count(), 2)
 
+
+    def test_the_plots_tabs_fit_the_panel_without_scroll_arrows(self):
+        w = self.w
+        w.show()
+        self._app.processEvents()
+        w.tabs.setCurrentIndex([w.tabs.tabText(i) for i in range(w.tabs.count())].index("Plots"))
+        self._app.processEvents()
+        bar = w.plots_inner_tabs.tabBar()
+        needed = sum(bar.tabRect(i).width() for i in range(bar.count()))
+        self.assertLessEqual(needed, w.plots_inner_tabs.width())
+
+    def test_the_subplot_title_is_in_the_axes_tab_and_only_with_several_subplots(self):
+        w = self.w
+        for widget in (w.sp_title_input, w.title_show_check, w.sp_title_font, w.sp_title_size,
+                       w.sp_title_pad, w.sp_title_rotation, w.sp_title_ha):
+            self.assertTrue(self._in_tab(widget, "Axes"), widget)
+            self.assertFalse(self._in_tab(widget, "Legend && Notes"), widget)
+        self.assertTrue(w._axes_title_section.isHidden())             # one subplot: figure title only
+        w.sp_cols.setValue(2)
+        self.assertFalse(w._axes_title_section.isHidden())
+        w.sp_active.setCurrentIndex(1)                                # a title per subplot
+        w.sp_title_input.setText("second")
+        w.sp_title_input.editingFinished.emit()
+        w.sp_active.setCurrentIndex(0)
+        self.assertEqual(w.sp_title_input.text(), "")
+        w.sp_active.setCurrentIndex(1)
+        self.assertEqual(w.sp_title_input.text(), "second")
+        self.assertEqual(w.sp_titles[1], "second")
 
     def _in_outer(self, widget, name):
         t = self.w.tabs
@@ -103,8 +131,77 @@ class TestTabLayout(unittest.TestCase):
         self.assertTrue(self._in_outer(w.gen_x_min, "Data"))      # the generators
         self.assertFalse(self._in_outer(w.palette_combo, "Data"))
 
+    def test_the_data_tab_has_a_transform_page_that_creates_series(self):
+        w = self.w
+        t = w.data_inner_tabs
+        self.assertEqual([t.tabText(i) for i in range(t.count())],
+                         ["Datasets", "Transform", "Statistics", "Generate"])
+        w.datasets.clear()
+        w.datasets["t"] = list(range(10))
+        w.datasets["v"] = [float(i * i) for i in range(10)]
+        w.update_lists()
+        w.tf_y_combo.setCurrentText("v")
+        w.tf_x_combo.setCurrentText("t")
+        self.assertLess(w.tf_x_combo.y(), w.tf_y_combo.y())            # x is asked before y
+        w.tf_op_combo.setCurrentIndex(w.tf_op_combo.findData("every_n"))
+        w._tf_param_widgets[w._tf_op_index()]["step"].setValue(3)
+        w._apply_transform()
+        self.assertEqual(list(w.datasets["v_every3"]), [0.0, 9.0, 36.0, 81.0])
+        self.assertEqual(list(w.datasets["t_every3"]), [0, 3, 6, 9])
+        self.assertEqual(len(w.datasets["v"]), 10)           # original untouched
+        self.assertEqual(w.tf_op_combo.itemText(0), "Smoothing")     # group headers, not selectable
+        self.assertIsNone(w.tf_op_combo.itemData(0))
+        w.datasets["p"] = [0.0, 3.0, 0.0, 1.0, 0.0, 5.0, 0.0]
+        w.update_lists()
+        w.tf_x_combo.setCurrentIndex(0)                              # no x: peaks makes its own
+        w.tf_y_combo.setCurrentText("p")
+        w.tf_op_combo.setCurrentIndex(w.tf_op_combo.findData("peaks"))
+        w.tf_out_name.setText("")
+        w._apply_transform()
+        self.assertEqual(list(w.datasets["p_x_peaks"]), [1.0, 3.0, 5.0])
+        self.assertEqual(list(w.datasets["p_peaks"]), [3.0, 1.0, 5.0])
+        # Statistics page: summary of the selected series, or all of them
+        w.data_inner_tabs.setCurrentIndex(2)
+        t = w.stats_table                                    # series in columns, statistics in rows
+        self.assertEqual(t.columnCount(), len(w.datasets))
+        series = [t.horizontalHeaderItem(c).text() for c in range(t.columnCount())]
+        self.assertEqual(series, sorted(w.datasets))
+        stats = [t.verticalHeaderItem(r).text() for r in range(t.rowCount())]
+        self.assertEqual(t.item(stats.index("max"), series.index("v")).text(), "81")
+        self.assertEqual(w.corr_table.rowCount(), len(w.datasets))
+        w.data_inner_tabs.setCurrentIndex(1)
+        # "series" parameter: align onto another series' x, which is reused, not duplicated
+        w.datasets["grid"] = [0.0, 4.5, 9.0]
+        w.update_lists()
+        w.tf_y_combo.setCurrentText("v")
+        w.tf_x_combo.setCurrentText("t")
+        w.tf_op_combo.setCurrentIndex(w.tf_op_combo.findData("align_to_x"))
+        w._tf_param_widgets[w._tf_op_index()]["target_x"].setCurrentText("grid")
+        w.tf_out_name.setText("")
+        w._apply_transform()
+        self.assertEqual(list(w.datasets["v_al"]), [0.0, 20.5, 81.0])
+        self.assertNotIn("t_al", w.datasets)
+        self.assertIn("v_every3", [w.y_list.item(i).text() for i in range(w.y_list.count())])
+
 
     # ── top bar: New / Open / Save ... Undo / Redo ───────────────────────────
+    def test_new_series_never_repeat_a_label_after_a_row_is_deleted(self):
+        w = self.w
+        w.datasets.clear()
+        w.datasets["x"] = [0.0, 1.0]
+        w.datasets["y"] = [0.0, 1.0]
+        w.update_lists()
+        w.series_table.setRowCount(0)
+        for _ in range(5):
+            w._add_series_row()
+        label = lambda r: w.series_table.item(r, 2).text()                    # noqa: E731
+        self.assertEqual([label(r) for r in range(5)], [f"Series {n}" for n in range(1, 6)])
+        w.series_table.removeRow(1)                                           # delete "Series 2"
+        w._add_series_row()
+        w._add_series_row()
+        labels = [label(r) for r in range(w.series_table.rowCount())]
+        self.assertEqual(len(labels), len(set(labels)), labels)
+
     def test_the_top_bar_has_open_and_save(self):
         w = self.w
         for btn in (w._btn_open, w._btn_save, w._btn_export, w._btn_undo, w._btn_redo):
@@ -227,7 +324,7 @@ class TestTabLayout(unittest.TestCase):
         def fake_exec(dlg):
             label = next(lbl for lbl in dlg.findChildren(QLabel) if " px" in lbl.text())
             seen["before"] = label.text()
-            QTest.qWait(450)                                  # past the 200 ms debounce
+            QTest.qWait(450)  # ty: ignore[missing-argument, invalid-argument-type]                                  # past the 200 ms debounce
             seen["after"] = label.text()
             return QDialog.DialogCode.Rejected
         with mock.patch.object(QDialog, "exec", new=fake_exec):

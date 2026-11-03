@@ -134,6 +134,8 @@ jobs:
         with:
           name: macos-dmg
           path: dist/${{ steps.meta.outputs.dmg }}
+          # Só passa o instalador ao job da release; a Release guarda o ficheiro.
+          retention-days: 1
 
 
   # ── Windows NSIS installer + portable .zip ───────────────────────────────────
@@ -190,6 +192,8 @@ jobs:
           path: |
             dist/plotviz-*-setup.exe
             dist/plotviz-*-win.zip
+          # Só passa os instaladores ao job da release; a Release guarda os ficheiros.
+          retention-days: 1
 
 
   # ── GitHub Release ───────────────────────────────────────────────────────────

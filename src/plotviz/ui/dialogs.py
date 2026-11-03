@@ -4,6 +4,7 @@ ui/dialogs.py — AnnotationEditDialog and DataImportDialog
 """
 import logging
 import os, csv
+from typing import Any
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit,
     QSpinBox, QDoubleSpinBox, QPushButton, QDialogButtonBox, QComboBox,
@@ -12,6 +13,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
+from core.dates import is_date
 from ui.helpers import _show_color_dialog
 
 class PaletteColorDialog:
@@ -155,8 +157,8 @@ class AnnotationEditDialog(QDialog):
         cur = self.fields[field_key].text() if field_key in self.fields else '#000000'
         # Pull active palette from main window if available
         mw = QApplication.activeWindow()
-        pal_colors = (mw._active_palette_colors()
-                      if mw and hasattr(mw, '_active_palette_colors') else None)
+        palette_of = getattr(mw, '_active_palette_colors', None)
+        pal_colors = palette_of() if palette_of else None
         color = PaletteColorDialog.getColor(QColor(cur), self, palette_colors=pal_colors)
         if color.isValid():
             self.fields[field_key].setText(color.name())
@@ -210,6 +212,11 @@ class DataImportDialog(QDialog):
     _SEP_LABELS = ['Auto-detect', 'Comma  (,)', 'Semicolon  (;)',
                    'Tab  (\\t)', 'Space / whitespace', 'Pipe  (|)', 'Custom…']
     _SEP_CHARS  = [None, ',', ';', '\t', r'\s+', '|', None]
+
+    # ── decimal separator and text encoding for CSV / TXT ────────────────────
+    _DECIMAL_LABELS = ['Point  (1.5)', 'Comma  (1,5)']
+    _DECIMAL_CHARS  = ['.', ',']
+    _ENCODINGS      = ['utf-8-sig', 'utf-8', 'latin-1', 'cp1252', 'utf-16']
 
     def __init__(self, filepath: str, parent=None):
         super().__init__(parent)
@@ -290,6 +297,33 @@ class DataImportDialog(QDialog):
             self._sep_combo.blockSignals(True)
             self._sep_combo.setCurrentIndex(1 if self.ext == '.csv' else 4)
             self._sep_combo.blockSignals(False)
+
+        # Decimal separator and encoding (CSV / TXT only)
+        self._dec_label = QLabel('Decimal:')
+        self._dec_combo = QComboBox()
+        self._dec_combo.addItems(self._DECIMAL_LABELS)
+        self._dec_combo.currentIndexChanged.connect(self._refresh)
+        self._enc_label = QLabel('Encoding:')
+        self._enc_combo = QComboBox()
+        self._enc_combo.addItems(self._ENCODINGS)
+        self._enc_combo.setToolTip('utf-8-sig reads plain UTF-8 and the BOM that Excel adds; '
+                                   'try latin-1 / cp1252 if accents look wrong')
+        self._enc_combo.currentIndexChanged.connect(self._refresh)
+        for w in (self._dec_label, self._dec_combo, self._enc_label, self._enc_combo):
+            opt_lay.addWidget(w)
+            w.setVisible(is_text)
+
+        # Date/time columns (all formats)
+        self._dates_combo = QComboBox()
+        self._dates_combo.addItems(['Dates: auto-detect', 'Dates: off'])
+        self._dates_combo.setToolTip('Auto-detect turns columns of dates/times into date columns '
+                                     '(shown with 📅). Turn it off to keep them as text.')
+        self._dates_combo.currentIndexChanged.connect(self._refresh)
+        self._dayfirst_check = QCheckBox('Day first')
+        self._dayfirst_check.setToolTip('Read 03/04/2024 as 3 April instead of March 4')
+        self._dayfirst_check.stateChanged.connect(self._refresh)
+        opt_lay.addWidget(self._dates_combo)
+        opt_lay.addWidget(self._dayfirst_check)
 
         # JSON orientation
         self._json_label = QLabel('Orientation:')
@@ -430,6 +464,7 @@ class DataImportDialog(QDialog):
         ext  = self.ext
         hdr  = self._header_spin.value()
         skip = self._skip_spin.value()
+        kw: dict[str, Any]       # keyword arguments for the pandas reader
 
         if ext in ('.xlsx', '.xls'):
             sheet = self._sheet_combo.currentText() or 0
@@ -454,12 +489,14 @@ class DataImportDialog(QDialog):
         sep = self._current_sep()
         if sep is None:                       # auto-detect
             try:
-                with open(self.filepath, newline='') as f:
+                with open(self.filepath, newline='', encoding=self._enc_combo.currentText()) as f:
                     dialect = csv.Sniffer().sniff(f.read(4096))
                 sep = dialect.delimiter
             except (csv.Error, OSError, UnicodeError):
                 sep = ','
-        kw = dict(header=hdr, skiprows=skip or None)
+        kw = dict(header=hdr, skiprows=skip or None,
+                  decimal=self._DECIMAL_CHARS[self._dec_combo.currentIndex()],
+                  encoding=self._enc_combo.currentText())
         if sep == r'\s+':
             return pd.read_csv(self.filepath, sep=r'\s+', engine='python', **kw)
         return pd.read_csv(self.filepath, sep=sep, **kw)
@@ -479,9 +516,16 @@ class DataImportDialog(QDialog):
     # ─── dtype inference ─────────────────────────────────────────────────────
     def _infer_col_data(self, df):
         import numpy as np, pandas as pd
+        from core.dates import parse_series
         self._col_data = {}
+        parse_dates = self._dates_combo.currentIndex() == 0
         for col in df.columns:
             series = df[col]
+            if parse_dates:
+                dates = parse_series(series, dayfirst=self._dayfirst_check.isChecked())
+                if dates is not None:
+                    self._col_data[str(col)] = dates
+                    continue
             numeric = pd.to_numeric(series, errors='coerce')
             non_null = series.notna().sum()
             if non_null > 0 and numeric.notna().sum() == non_null:
@@ -503,7 +547,7 @@ class DataImportDialog(QDialog):
         self._col_renames.clear()
 
         cols = [str(c) for c in df.columns]
-        dtype_icons = {'float': '🔢', 'str': '🔤'}
+        dtype_icons = {'float': '🔢', 'str': '🔤', 'date': '📅'}
 
         # Header row
         hdr_w = QWidget()
@@ -531,7 +575,10 @@ class DataImportDialog(QDialog):
         # One row per column
         for col in cols:
             arr = self._col_data.get(col)
-            dtype_icon = dtype_icons['float'] if (arr is not None and arr.dtype != object) else dtype_icons['str']
+            if is_date(arr):
+                dtype_icon = dtype_icons['date']
+            else:
+                dtype_icon = dtype_icons['float'] if (arr is not None and arr.dtype != object) else dtype_icons['str']
 
             row_w = QWidget()
             row_l = QHBoxLayout(row_w)
@@ -549,7 +596,8 @@ class DataImportDialog(QDialog):
 
             type_lbl = QLabel(dtype_icon)
             type_lbl.setFixedWidth(42)
-            type_lbl.setToolTip('Numeric' if dtype_icon == dtype_icons['float'] else 'Text/categorical')
+            type_lbl.setToolTip({dtype_icons['float']: 'Numeric', dtype_icons['date']: 'Date/time',
+                                 dtype_icons['str']: 'Text/categorical'}[dtype_icon])
 
             rename_edit = QLineEdit(prev_renames.get(col, col))
             rename_edit.setMinimumWidth(160)

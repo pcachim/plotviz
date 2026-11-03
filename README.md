@@ -40,7 +40,7 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | [Chart Types](docs/chart-types.md) | All 22 chart types and their options |
 | [Style & Appearance](docs/style.md) | Colors, fonts, grid, figure size, color schemes |
 | [Axes](docs/axes.md) | Labels, limits, scales, ticks, formatters |
-| [Annotations](docs/annotations.md) | Subplot titles, legends, text, arrows, images |
+| [Legend and Notes](docs/annotations.md) | Legends, text, arrows, images |
 | [Series](docs/series.md) | Per-curve style, markers, curve fitting |
 | [Subplots](docs/subplots.md) | Multi-panel layouts, mosaic, shared axes |
 | [Advanced](docs/advanced.md) | Function generator, manual data entry table |

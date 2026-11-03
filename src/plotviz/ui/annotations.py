@@ -11,9 +11,10 @@ import os
 from PyQt6.QtWidgets import QDialog, QFileDialog, QMessageBox
 from ui.helpers import _get_dir, _remember_dir
 from ui.dialogs import AnnotationEditDialog
+from ui.mixin_base import MixinBase
 
 
-class AnnotationUIMixin:
+class AnnotationUIMixin(MixinBase):
     def set_annotation_mode(self, mode):
         self.canvas.annotation_mode = mode
         self.canvas._arrow_start    = None

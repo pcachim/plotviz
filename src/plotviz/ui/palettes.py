@@ -18,9 +18,10 @@ from ui.helpers import _show_color_dialog
 from ui.tab_builders import (
     COLOR_PALETTES, get_all_palettes, add_custom_palette, _CUSTOM_PALETTES,
 )
+from ui.mixin_base import MixinBase
 
 
-class PaletteColorMixin:
+class PaletteColorMixin(MixinBase):
     # ── Palette registry ──────────────────────────────────────────────────────
     # Built-in palettes are read-only. Your own live only in this session (marked with a
     # *) until saved to a .pvizp file, exactly like colour schemes.

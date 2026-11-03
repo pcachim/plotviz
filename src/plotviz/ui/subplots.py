@@ -8,12 +8,14 @@ entry helpers. Split out of main_window; mixed into PlotVizApp so its methods
 share the series table, subplot dicts and widgets via `self`.
 """
 import logging
+from typing import Any
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from ui.helpers import _show_color_dialog
+from ui.mixin_base import MixinBase
 
 
-class SubplotMixin:
+class SubplotMixin(MixinBase):
     def _get_series_for_subplot(self, subplot_idx):
         """Return (primary_series, y2_series) 4-tuples for the given subplot (0-based).
         Series rows are filtered by their Plot spinbox value (1-based == subplot_idx+1).
@@ -166,8 +168,10 @@ class SubplotMixin:
             self.subplot_xticks_show.setdefault(i, True)
             self.subplot_yticks_show.setdefault(i, True)
             self.subplot_ann_visible.setdefault(i, True)
-            self.subplot_canvas_opts.setdefault(i, self._default_canvas_opts())
-            self.subplot_grid_opts.setdefault(i, self._default_grid_opts())
+            if i not in self.subplot_canvas_opts:
+                self.subplot_canvas_opts[i] = self._inherited_canvas_opts()
+            if i not in self.subplot_grid_opts:
+                self.subplot_grid_opts[i] = self._inherited_grid_opts()
             self.subplot_xaxis_pos.setdefault(i, 'bottom')
             self.subplot_yaxis_pos.setdefault(i, 'left')
             self.subplot_xlabel_rotation.setdefault(i, 0)
@@ -951,7 +955,7 @@ class SubplotMixin:
             'Cells with the same colour/letter form one panel.'))
 
         # State for the custom editor
-        custom_state = {
+        custom_state: dict[str, Any] = {
             'rows': 2, 'cols': 2,
             'grid': [['A','B'],['C','D']],   # current letter assignments
             'painting': False,

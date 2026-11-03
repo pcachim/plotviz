@@ -14,6 +14,7 @@ import textwrap
 from collections.abc import Callable, Mapping
 from typing import Any, cast
 
+from core.dates import is_date
 from core.constants import (
     _3D_TYPES, _POLAR_TYPES, _NO_X_TYPES, _NO_LEGEND_TYPES, WHOLE_CHART_TYPES,
     _DECOR_NO_SCALE, _DECOR_NO_LIMITS, _DECOR_NO_TICKS,
@@ -1321,6 +1322,8 @@ def _gen_decoration(settings: Settings, idx: int, ax_var: str, sub_ct: str,
                 L.append(f"{ax_var}.{axis_attr}.set_major_formatter(_PercentFormatter(xmax=1.0))")
             elif isinstance(fmt, str) and '{x' in fmt:
                 L.append(f"{ax_var}.{axis_attr}.set_major_formatter(_StrMethodFormatter('{_esc(fmt)}'))")
+            elif isinstance(fmt, str) and '%' in fmt:      # a date format, e.g. %Y-%m-%d
+                L.append(f"{ax_var}.{axis_attr}.set_major_formatter(_mdates.DateFormatter('{_esc(fmt)}'))")
 
     # ── Spines (borders) ───────────────────────────────────────────────────
     if sub_ct not in _DECOR_NO_TICKS:
@@ -1508,6 +1511,7 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
         "import pandas as pd",
         "import matplotlib",
         "import matplotlib.pyplot as plt",
+        "import matplotlib.dates as _mdates",
         "from matplotlib.figure import Figure",
         "from matplotlib.ticker import (AutoMinorLocator as _AutoMinorLocator,",
         "                               MultipleLocator as _MultipleLocator,",
@@ -1521,12 +1525,16 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
         "# ── Data loading ─────────────────────────────────────────────────────",
     ]
 
+    date_cols = [c for c in ds_names if is_date(datasets.get(c))]
     if use_combined:
         lines += [
             "_here = os.path.dirname(os.path.abspath(__file__))",
             "df = pd.read_csv(os.path.join(_here, 'data', 'data.csv'))",
-            "",
         ]
+        if date_cols:
+            lines.append("# Date columns are stored as ISO text in the CSV")
+        lines += [f"df['{_esc(c)}'] = pd.to_datetime(df['{_esc(c)}'])" for c in date_cols]
+        lines.append("")
     else:
         lines += [
             "_here = os.path.dirname(os.path.abspath(__file__))",
@@ -1536,6 +1544,8 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
         for col in ds_names:
             safe_var = col.replace(' ', '_').replace('-', '_')
             lines.append(f"_df_{safe_var} = pd.read_csv(os.path.join(_here, 'data', '{col}.csv'))")
+            if col in date_cols:
+                lines.append(f"_df_{safe_var}['{_esc(col)}'] = pd.to_datetime(_df_{safe_var}['{_esc(col)}'])")
         lines += [
             "# Build a combined df from all single-column frames for convenience:",
             "df = pd.concat([" +

@@ -36,8 +36,8 @@ from ui.nav_toolbar import NavigationToolbar2QT, SafeNavigationToolbar
 class _NavToolbar(SafeNavigationToolbar):
     """Standard matplotlib toolbar with the Save button removed.
     The app has its own export workflow that controls DPI and format."""
-    toolitems = [t for t in NavigationToolbar2QT.toolitems
-                 if t[0] != 'Save']
+    toolitems = tuple(t for t in NavigationToolbar2QT.toolitems
+                      if t[0] != 'Save')
 
 from ui.canvas import CanvasPlotter
 from ui.tab_builders import (
@@ -832,8 +832,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
     # ═══════════════════════════════════════════════════════════════════════════
     # ═══════════════════════════════════════════════════════════════════════════
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
+    def resizeEvent(self, a0):
+        super().resizeEvent(a0)
         self._on_canvas_resized()
 
     def _on_canvas_resized(self):
@@ -928,7 +928,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from config.settings import datasets_dir
         self._load_data_files('Open Sample Dataset', str(datasets_dir()), remember_dir=False)
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         """Persist window state and prefs before closing."""
         geo = self.geometry()
         settings.set('window_geometry', [geo.x(), geo.y(), geo.width(), geo.height()])
@@ -942,7 +942,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             settings.set('export_dpi', self.dpi_spin.value())
         if hasattr(self, 'fig_preset_combo'):
             settings.set('fig_preset', self.fig_preset_combo.currentText())
-        event.accept()
+        a0.accept()
 
     def _restore_prefs_from_settings(self):
         """Apply persisted preferences to UI widgets after init_ui() has run."""
@@ -1343,7 +1343,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # ═══════════════════════════════════════════════════════════════════════════
     # DARK MODE
     # ═══════════════════════════════════════════════════════════════════════════
-    def _apply_colour_scheme(self, scheme: str = None):
+    def _apply_colour_scheme(self, scheme: str | None = None):
         """Apply Light / Dark / System colour scheme using Qt's native API."""
         app = QApplication.instance()
 

@@ -22,14 +22,22 @@ import json
 import os
 import zipfile
 from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
 
+from core.dates import from_iso, is_date, to_iso
+
 
 def encode_datasets(datasets: dict) -> dict:
-    """Convert {name: array-like} into the JSON-friendly {name: {dtype, values}}."""
+    """Convert {name: array-like} into the JSON-friendly {name: {dtype, values}}.
+
+    Date columns are written as ISO 8601 strings (dtype 'date')."""
     out = {}
     for k, v in datasets.items():
+        if is_date(v):
+            out[k] = {"dtype": "date", "values": to_iso(v)}
+            continue
         is_cat = hasattr(v, "dtype") and v.dtype.kind in ("U", "S", "O")
         out[k] = {
             "dtype": "object" if is_cat else "float",
@@ -41,15 +49,17 @@ def encode_datasets(datasets: dict) -> dict:
 def decode_datasets(raw: dict) -> dict:
     """Inverse of encode_datasets, with backwards compatibility.
 
-    New format: {'dtype': 'float'|'object', 'values': [...]}.
+    New format: {'dtype': 'float'|'object'|'date', 'values': [...]}.
     Old format: a plain list (dtype inferred).
     Returns {name: numpy.ndarray}.
     """
-    out = {}
+    out: dict[str, Any] = {}
     for k, v in raw.items():
         if isinstance(v, dict) and "values" in v:
             vals = v["values"]
-            if v.get("dtype") == "object":
+            if v.get("dtype") == "date":
+                out[k] = from_iso(vals)
+            elif v.get("dtype") == "object":
                 out[k] = np.array(vals, dtype=object)
             else:
                 out[k] = np.array(vals, dtype=float)

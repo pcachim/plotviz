@@ -1,21 +1,8 @@
-# Annotations
+# Legend and Notes
 
-The **Annotations** tab manages everything that sits above and around the data: subplot titles, legend configuration, and free-form text, arrow, and image annotations placed directly on the chart.
+The **Legend & Notes** tab manages what is drawn on and around the data: the legend, and free-form text, arrow and image annotations placed directly on the chart. (The title of each subplot is in the [Axes](axes.md#subplot-title) tab.)
 
-When the chart has more than one subplot, the **Subplot** selector at the top of the tab switches context. All controls — titles, legend, annotation visibility — apply to the currently selected subplot.
-
----
-
-## Subplot title
-
-The subplot title section is only visible when the chart has more than one panel. For a single-panel chart, the global chart title is set in the **Layout & Style** tab.
-
-| Control | Description |
-|---------|-------------|
-| **Show title** | Checkbox — toggle title visibility |
-| **Text field** | Title text for this subplot |
-| **Font / Size** | Typography |
-| **Color** | Title text color |
+When the chart has more than one subplot, the **Subplot** selector at the top of the tab switches context. All controls — legend, annotation visibility — apply to the currently selected subplot.
 
 ---
 

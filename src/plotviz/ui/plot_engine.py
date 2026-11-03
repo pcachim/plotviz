@@ -13,6 +13,8 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 import numpy as np
 import matplotlib
+import matplotlib.dates  # noqa: F401  used for date-axis formats
+import matplotlib.transforms  # noqa: F401  Bbox.union below
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  side-effect: registers the 3D projection
 from matplotlib.figure import Figure as MplFigure
@@ -52,14 +54,16 @@ def _latex_safe(text: str) -> str:
     return text.translate(_LATEX_SPECIAL)
 
 
+from core.dates import is_date
 from core.mpl_compat import box_kwargs, violin_kwargs
 from core.constants import (
     _3D_TYPES, _NO_LEGEND_TYPES, _DECOR_NO_SCALE, _DECOR_NO_LIMITS,
     _AXSCALE_SKIP_TYPES, _HEATMAP_GROUP_TYPES,
 )
+from ui.mixin_base import MixinBase
 
 
-class PlotEngineMixin:
+class PlotEngineMixin(MixinBase):
     @staticmethod
     def _safe_set_scale(ax, axis, name, chart_type=None):
         """Apply an axis scale ('log', 'symlog', ...); 'inverted' is handled separately.
@@ -68,6 +72,8 @@ class PlotEngineMixin:
         set_*scale('linear') would replace their group tick labels (the series
         names) with numbers.
         """
+        if axis in getattr(ax, '_plotviz_date_axes', ()):
+            return      # set_*scale would reset a date axis to numbers; a log scale of dates is meaningless
         if name == 'inverted':
             name = 'linear'
         if name == 'linear' and chart_type in ('Boxplot', 'Violin'):
@@ -197,6 +203,15 @@ class PlotEngineMixin:
             plot_series = self._SERIES_PLOTTERS.get(sct)
             if plot_series:
                 getattr(self, plot_series)(ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st)
+
+        # Date columns: the data are days since 1970 (matplotlib date numbers), so the
+        # axis only has to be told to label them as dates.
+        if not any_cat_x and not bar_horiz:
+            date_axes = {a for a, i in (('x', 0), ('y', 1))
+                         if any(is_date(s_[i]) for s_ in series)}
+            for a in date_axes:
+                getattr(ax, f'{a}axis_date')()
+            ax._plotviz_date_axes = date_axes       # read by _safe_set_scale
 
         # Return categorical tick info — caller must apply AFTER set_xscale/set_yscale
         # so scale changes don't wipe out the FixedLocator set here.
@@ -1222,6 +1237,10 @@ class PlotEngineMixin:
                 axis_obj.set_major_formatter(PercentFormatter(xmax=1.0))
             elif '{x' in fmt_str:
                 try: axis_obj.set_major_formatter(StrMethodFormatter(fmt_str))
+                except (TypeError, ValueError):
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+            elif '%' in fmt_str:          # a date format such as %Y-%m-%d (date axes)
+                try: axis_obj.set_major_formatter(matplotlib.dates.DateFormatter(fmt_str))
                 except (TypeError, ValueError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         _apply_fmt(ax.xaxis, x_fmt)

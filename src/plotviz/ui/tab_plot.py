@@ -18,9 +18,10 @@ from ui.tab_constants import (
     PLOT_MODE_GROUPS,
     _ClampWidth,
 )
+from ui.mixin_base import MixinBase
 
 
-class PlotTabMixin:
+class PlotTabMixin(MixinBase):
     def create_plot_tab(self):
         widget = QWidget()
         scroll = QScrollArea()

@@ -10,6 +10,7 @@ ui/canvas.py – Matplotlib canvas
 • Text / arrow / image annotations with drag-to-move
 """
 import logging
+from typing import Any
 import matplotlib.image as mpimg
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 try:
@@ -105,7 +106,7 @@ class CanvasPlotter(FigureCanvas):
         self.clear_margin_mask()
         pl, pb, pw, ph = page
         il, ib, iw, ih = inner
-        kw = dict(transform=self.figure.transFigure, clip_on=False, zorder=290,
+        kw: dict[str, Any] = dict(transform=self.figure.transFigure, clip_on=False, zorder=290,
                   linewidth=0, facecolor=color, alpha=0.13)
         strips = [(pl, pb, il - pl, ph),                              # left
                   (il + iw, pb, pl + pw - il - iw, ph),               # right

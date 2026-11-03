@@ -97,7 +97,7 @@ def _make_recent_widget(dialog, cell_w=_CELL_W, cell_h=_CELL_H):
             i = x // cell_w
             return i if 0 <= i < _MAX_RECENT else -1
 
-        def paintEvent(self, _):
+        def paintEvent(self, a0):
             p = QPainter(self)
 
             # Use the dialog's Window palette colour for the gap areas —
@@ -131,19 +131,19 @@ def _make_recent_widget(dialog, cell_w=_CELL_W, cell_h=_CELL_H):
                 # Draw coloured fill
                 p.fillRect(bx + BORDER, by + BORDER, FILL_W, FILL_H, fill)
 
-        def mouseMoveEvent(self, event):
-            idx = self._idx(event.position().toPoint().x())
+        def mouseMoveEvent(self, a0):
+            idx = self._idx(a0.position().toPoint().x())
             if idx != self._hovered:
                 self._hovered = idx
                 self.update()
 
-        def leaveEvent(self, _):
+        def leaveEvent(self, a0):
             self._hovered = -1
             self.update()
 
-        def mousePressEvent(self, event):
-            if event.button() == Qt.MouseButton.LeftButton:
-                idx = self._idx(event.position().toPoint().x())
+        def mousePressEvent(self, a0):
+            if a0.button() == Qt.MouseButton.LeftButton:
+                idx = self._idx(a0.position().toPoint().x())
                 if 0 <= idx < len(self._colors):
                     dialog.setCurrentColor(self._colors[idx])
 
