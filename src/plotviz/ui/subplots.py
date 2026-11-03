@@ -31,6 +31,7 @@ class SubplotMixin(MixinBase):
             plot_spin = self.series_table.cellWidget(row, 4)
             y2_item  = self.series_table.item(row, 5)
             if xcb is None or ycb is None: continue
+            if self._fit_row_is_hidden(row): continue      # a fit switched off in the Fits list
             # Plot assignment filter (1-based; all go to 0 when n==1)
             row_plot = (plot_spin.value() - 1) if (plot_spin and n > 1) else 0
             if row_plot != subplot_idx: continue
@@ -75,6 +76,7 @@ class SubplotMixin(MixinBase):
         the given subplot. Used to build default axis labels when none are set."""
         n = self.subplot_rows * self.subplot_cols
         x_cols, y_cols, y2_cols = [], [], []
+        fit_y, fit_y2 = [], []          # fit curves: kept apart, the default titles name the data
         for row in range(self.series_table.rowCount()):
             xcb  = self.series_table.cellWidget(row, 0)
             ycb  = self.series_table.cellWidget(row, 1)
@@ -88,11 +90,13 @@ class SubplotMixin(MixinBase):
             if xc not in self.datasets or yc not in self.datasets: continue
             is_y2 = bool(y2_item and y2_item.checkState() == Qt.CheckState.Checked)
             if xc not in x_cols: x_cols.append(xc)
+            is_fit = yc in self._fits
             if is_y2:
-                if yc not in y2_cols: y2_cols.append(yc)
+                target = fit_y2 if is_fit else y2_cols
             else:
-                if yc not in y_cols: y_cols.append(yc)
-        return x_cols, y_cols, y2_cols
+                target = fit_y if is_fit else y_cols
+            if yc not in target: target.append(yc)
+        return x_cols, y_cols or fit_y, y2_cols or fit_y2
 
     def _update_label_placeholders(self):
         """Update placeholder text on Axes tab inputs to reflect auto-derived defaults.
@@ -118,70 +122,78 @@ class SubplotMixin(MixinBase):
         if n_override is None:
             self._subplot_mosaic = None
         n = n_override if n_override is not None else r * c
+        # A new subplot takes the look of the active one (fonts, sizes, tick and legend
+        # style, label layout); what depends on the data (texts, limits, scales, tick steps,
+        # number formats, chart type) starts empty or at its default.
+        active = max(self.sp_active.currentIndex(), 0) if hasattr(self, 'sp_active') else 0
+
+        def look(store, default):
+            return store.get(active, default)
+
         # Ensure all dicts have entries for every subplot slot
         for i in range(n):
             self.subplot_chart_opts.setdefault(i, self._default_chart_opts())
             self.subplot_chart_types.setdefault(i, 'Line')
             self.subplot_plot_modes.setdefault(i, 'Standard')
             self.sp_titles.setdefault(i, '')
-            self.subplot_title_show.setdefault(i, True)
-            self.subplot_title_font.setdefault(i, 'sans-serif')
-            self.subplot_title_size.setdefault(i, 11)
-            self.subplot_title_color.setdefault(i, '#000000')
-            self.subplot_title_pad.setdefault(i, 6)
-            self.subplot_title_rotation.setdefault(i, 0)
-            self.subplot_title_ha.setdefault(i, 'center')
+            self.subplot_title_show.setdefault(i, look(self.subplot_title_show, True))
+            self.subplot_title_font.setdefault(i, look(self.subplot_title_font, 'sans-serif'))
+            self.subplot_title_size.setdefault(i, look(self.subplot_title_size, 11))
+            self.subplot_title_color.setdefault(i, look(self.subplot_title_color, '#000000'))
+            self.subplot_title_pad.setdefault(i, look(self.subplot_title_pad, 6))
+            self.subplot_title_rotation.setdefault(i, look(self.subplot_title_rotation, 0))
+            self.subplot_title_ha.setdefault(i, look(self.subplot_title_ha, 'center'))
             self.subplot_xlabels.setdefault(i, '')
-            self.subplot_xlabel_show.setdefault(i, True)
+            self.subplot_xlabel_show.setdefault(i, look(self.subplot_xlabel_show, True))
             self.subplot_ylabels.setdefault(i, '')
-            self.subplot_ylabel_show.setdefault(i, True)
+            self.subplot_ylabel_show.setdefault(i, look(self.subplot_ylabel_show, True))
             self.subplot_y2labels.setdefault(i, '')
-            self.subplot_y2label_show.setdefault(i, True)
-            self.subplot_legends.setdefault(i, True)
-            self.subplot_legend_locs.setdefault(i, 'best')
-            self.subplot_legend_x.setdefault(i, 0.01)
-            self.subplot_legend_y.setdefault(i, 0.99)
-            self.subplot_legend_fontsize.setdefault(i, 9)
-            self.subplot_legend_ncols.setdefault(i, 1)
-            self.subplot_legend_frameon.setdefault(i, True)
-            self.subplot_legend_color.setdefault(i, '#000000')
-            self.subplot_legend_facecolor.setdefault(i, '#ffffff')
-            self.subplot_legend_alpha.setdefault(i, 0.8)
-            self.subplot_legend_edgecolor.setdefault(i, '#cccccc')
+            self.subplot_y2label_show.setdefault(i, look(self.subplot_y2label_show, True))
+            self.subplot_legends.setdefault(i, look(self.subplot_legends, True))
+            self.subplot_legend_locs.setdefault(i, look(self.subplot_legend_locs, 'best'))
+            self.subplot_legend_x.setdefault(i, look(self.subplot_legend_x, 0.01))
+            self.subplot_legend_y.setdefault(i, look(self.subplot_legend_y, 0.99))
+            self.subplot_legend_fontsize.setdefault(i, look(self.subplot_legend_fontsize, 9))
+            self.subplot_legend_ncols.setdefault(i, look(self.subplot_legend_ncols, 1))
+            self.subplot_legend_frameon.setdefault(i, look(self.subplot_legend_frameon, True))
+            self.subplot_legend_color.setdefault(i, look(self.subplot_legend_color, '#000000'))
+            self.subplot_legend_facecolor.setdefault(i, look(self.subplot_legend_facecolor, '#ffffff'))
+            self.subplot_legend_alpha.setdefault(i, look(self.subplot_legend_alpha, 0.8))
+            self.subplot_legend_edgecolor.setdefault(i, look(self.subplot_legend_edgecolor, '#cccccc'))
             self.subplot_xlims.setdefault(i, None)
             self.subplot_ylims.setdefault(i, None)
             self.subplot_y2lims.setdefault(i, None)
             self.subplot_xscales.setdefault(i, 'linear')
             self.subplot_yscales.setdefault(i, 'linear')
-            self.subplot_xtick_sizes.setdefault(i, 9)
-            self.subplot_ytick_sizes.setdefault(i, 9)
-            self.subplot_xtick_dir.setdefault(i, 'out')
-            self.subplot_ytick_dir.setdefault(i, 'out')
-            self.subplot_xtick_minor.setdefault(i, False)
-            self.subplot_ytick_minor.setdefault(i, False)
-            self.subplot_xtick_rotation.setdefault(i, 0)
-            self.subplot_ytick_rotation.setdefault(i, 0)
+            self.subplot_xtick_sizes.setdefault(i, look(self.subplot_xtick_sizes, 9))
+            self.subplot_ytick_sizes.setdefault(i, look(self.subplot_ytick_sizes, 9))
+            self.subplot_xtick_dir.setdefault(i, look(self.subplot_xtick_dir, 'out'))
+            self.subplot_ytick_dir.setdefault(i, look(self.subplot_ytick_dir, 'out'))
+            self.subplot_xtick_minor.setdefault(i, look(self.subplot_xtick_minor, False))
+            self.subplot_ytick_minor.setdefault(i, look(self.subplot_ytick_minor, False))
+            self.subplot_xtick_rotation.setdefault(i, look(self.subplot_xtick_rotation, 0))
+            self.subplot_ytick_rotation.setdefault(i, look(self.subplot_ytick_rotation, 0))
             self.subplot_xtick_step.setdefault(i, 0.0)
             self.subplot_ytick_step.setdefault(i, 0.0)
             self.subplot_x_formatter.setdefault(i, 'auto')
             self.subplot_y_formatter.setdefault(i, 'auto')
-            self.subplot_xticks_show.setdefault(i, True)
-            self.subplot_yticks_show.setdefault(i, True)
+            self.subplot_xticks_show.setdefault(i, look(self.subplot_xticks_show, True))
+            self.subplot_yticks_show.setdefault(i, look(self.subplot_yticks_show, True))
             self.subplot_ann_visible.setdefault(i, True)
             if i not in self.subplot_canvas_opts:
                 self.subplot_canvas_opts[i] = self._inherited_canvas_opts()
             if i not in self.subplot_grid_opts:
                 self.subplot_grid_opts[i] = self._inherited_grid_opts()
-            self.subplot_xaxis_pos.setdefault(i, 'bottom')
-            self.subplot_yaxis_pos.setdefault(i, 'left')
-            self.subplot_xlabel_rotation.setdefault(i, 0)
-            self.subplot_xlabel_labelpad.setdefault(i, 4)
-            self.subplot_xlabel_loc.setdefault(i, 'center')
-            self.subplot_xlabel_ha.setdefault(i, 'center')
-            self.subplot_ylabel_rotation.setdefault(i, 90)
-            self.subplot_ylabel_labelpad.setdefault(i, 4)
-            self.subplot_ylabel_loc.setdefault(i, 'center')
-            self.subplot_ylabel_ha.setdefault(i, 'center')
+            self.subplot_xaxis_pos.setdefault(i, look(self.subplot_xaxis_pos, 'bottom'))
+            self.subplot_yaxis_pos.setdefault(i, look(self.subplot_yaxis_pos, 'left'))
+            self.subplot_xlabel_rotation.setdefault(i, look(self.subplot_xlabel_rotation, 0))
+            self.subplot_xlabel_labelpad.setdefault(i, look(self.subplot_xlabel_labelpad, 4))
+            self.subplot_xlabel_loc.setdefault(i, look(self.subplot_xlabel_loc, 'center'))
+            self.subplot_xlabel_ha.setdefault(i, look(self.subplot_xlabel_ha, 'center'))
+            self.subplot_ylabel_rotation.setdefault(i, look(self.subplot_ylabel_rotation, 90))
+            self.subplot_ylabel_labelpad.setdefault(i, look(self.subplot_ylabel_labelpad, 4))
+            self.subplot_ylabel_loc.setdefault(i, look(self.subplot_ylabel_loc, 'center'))
+            self.subplot_ylabel_ha.setdefault(i, look(self.subplot_ylabel_ha, 'center'))
         # Prune entries beyond current grid
         all_dicts = (self.subplot_chart_types, self.subplot_plot_modes, self.subplot_chart_opts,
                      self.sp_titles, self.subplot_title_show,

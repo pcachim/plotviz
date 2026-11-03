@@ -197,12 +197,23 @@ class PlotEngineMixin(MixinBase):
             s = self.curve_styles.get(lbl, {})
             color = s.get('color', C[i])
             is_cat = self._is_categorical(xd)
+            fit_name = self._fit_name_of_series(yd, lbl)
+            if fit_name and not is_cat:
+                # A fitted curve is drawn left to right even when the data are not in x order
+                # (otherwise the line zig-zags); its bands are sorted the same way.
+                try:
+                    order = np.argsort(np.asarray(xd, dtype=float), kind='stable')
+                    xd, yd = xd[order], yd[order]
+                except (TypeError, ValueError):
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             # Per-series type options stored by _save_series_options
             o = s.get('opts', {})
 
             plot_series = self._SERIES_PLOTTERS.get(sct)
             if plot_series:
                 getattr(self, plot_series)(ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st)
+            if fit_name and not is_cat:
+                self._plot_fit_bands(ax, xd, fit_name, lbl, color)   # whatever type the fit curve has
 
         # Date columns: the data are days since 1970 (matplotlib date numbers), so the
         # axis only has to be told to label them as dates.
@@ -219,21 +230,44 @@ class PlotEngineMixin(MixinBase):
             return (all_x_cats, bar_horiz)
         return None
 
-    def _plot_fit_bands(self, ax, xd, lbl, color, is_cat):
-        """Shade the confidence / prediction bands the curve fitter stored for *lbl*.
+    def _fit_name_of_series(self, yd, label):
+        """The key in self._fits of the fit curve this series is, else None.  A fit curve is
+        recognised by the dataset it plots, so renaming its label does not lose its bands."""
+        fits = getattr(self, '_fits', None)
+        if not fits:
+            return None
+        for name in fits:
+            data = self.datasets.get(name)
+            # the series arrive trimmed (a view of the dataset), so compare memory, not identity
+            if data is yd or (isinstance(data, np.ndarray) and isinstance(yd, np.ndarray)
+                              and np.may_share_memory(data, yd)):
+                return name
+        return label if label in fits else None
 
-        The fitter saves them as the datasets '<lbl> CI upper/lower' and
-        '<lbl> PI upper/lower'. Not drawn for categorical X.
+    def _plot_fit_bands(self, ax, xd, name, lbl, color):
+        """Shade the confidence / prediction bands the curve fitter stored for the fit *name*.
+
+        The fitter saves them as the datasets '<name> CI upper/lower' and
+        '<name> PI upper/lower'; *lbl* is the label shown in the legend.
         """
-        upper_key = lbl + ' CI upper'
-        lower_key = lbl + ' CI lower'
-        if upper_key in self.datasets and lower_key in self.datasets and not is_cat:
-            ax.fill_between(xd, self.datasets[lower_key], self.datasets[upper_key],
+        fit = getattr(self, '_fits', {}).get(name)
+
+        def band(key):
+            """A band dataset, in the same left-to-right order as the (sorted) curve."""
+            values = np.asarray(self.datasets[key], dtype=float)
+            if fit is not None and len(fit['xd']) == len(values):
+                values = values[np.argsort(np.asarray(fit['xd'], dtype=float), kind='stable')]
+            return values
+
+        upper_key = name + ' CI upper'
+        lower_key = name + ' CI lower'
+        if upper_key in self.datasets and lower_key in self.datasets:
+            ax.fill_between(xd, band(lower_key), band(upper_key),
                             alpha=self.fit_ci_alpha_spin.value(), color=color, linewidth=0, label=f'{lbl} CI')
-        pi_upper_key = lbl + ' PI upper'
-        pi_lower_key = lbl + ' PI lower'
-        if pi_upper_key in self.datasets and pi_lower_key in self.datasets and not is_cat:
-            ax.fill_between(xd, self.datasets[pi_lower_key], self.datasets[pi_upper_key],
+        pi_upper_key = name + ' PI upper'
+        pi_lower_key = name + ' PI lower'
+        if pi_upper_key in self.datasets and pi_lower_key in self.datasets:
+            ax.fill_between(xd, band(pi_lower_key), band(pi_upper_key),
                             alpha=self.fit_ci_alpha_spin.value() * 0.5, color=color, linewidth=0,
                             label=f'{lbl} PI')
 
@@ -256,7 +290,6 @@ class PlotEngineMixin(MixinBase):
             plot_kw['markeredgecolor'] = mk_color
         _lines = ax.plot(xplot, yd, **plot_kw)
         for _l in _lines: _l.set_pickradius(6)
-        self._plot_fit_bands(ax, xd, lbl, color, is_cat)
 
     def _plot_series_scatter(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
         """Draw one 'Scatter' series onto *ax*."""
@@ -285,7 +318,6 @@ class PlotEngineMixin(MixinBase):
                    edgecolors=sc_ec,
                    linewidths=o.get('sc_lw', self.scatter_lw.value()))
         _sc.set_picker(True)
-        self._plot_fit_bands(ax, xd, lbl, color, is_cat)
 
     def _plot_series_bar(self, ax, xd, yd, lbl, color, s, o, is_cat, _o, _cmap, _cat_xplot, st):
         """Draw one 'Bar' series onto *ax*."""
@@ -1391,7 +1423,9 @@ class PlotEngineMixin(MixinBase):
                 _yc_default = _ycb.currentText() if _ycb else ''
                 yl = self.subplot_ylabels.get(subplot_idx, '') or _yc_default
             else:
-                yl = self.subplot_ylabels.get(subplot_idx, '') or ('' if ct in _NO_X_TYPES else ', '.join(yd.keys()))
+                fit_labels = self._fit_series_labels()          # the default title names the data, not each fit
+                names = [k for k in yd.keys() if k not in fit_labels] or list(yd.keys())
+                yl = self.subplot_ylabels.get(subplot_idx, '') or ('' if ct in _NO_X_TYPES else ', '.join(names))
             ax.set_ylabel(_latex_safe(yl),
                           fontsize=self.ylabel_size.value(),
                           color=self.ylabel_color,
@@ -1446,7 +1480,8 @@ class PlotEngineMixin(MixinBase):
                 if y2_series:
                     self._plot_on(ax2, y2_series, ct, row_offset=self._get_series_row_offset(0), subplot_idx=0)
                 if self.subplot_y2label_show.get(subplot_idx, True):
-                    y2l = self.subplot_y2labels.get(subplot_idx, '') or ', '.join(y2_cols)
+                    y2_data = [c for c in y2_cols if c not in self._fits] or y2_cols
+                    y2l = self.subplot_y2labels.get(subplot_idx, '') or ', '.join(y2_data)
                     if y2l:
                         ax2.set_ylabel(_latex_safe(y2l),
                                        fontsize=self.y2label_size.value(),

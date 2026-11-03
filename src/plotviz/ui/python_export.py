@@ -265,7 +265,7 @@ class PythonExportMixin(MixinBase):
         # Annotations (text / arrow / image) are not part of _collect_settings();
         # add them so the generated script can reproduce them.
         settings['annotations'] = self._collect_annotations_meta()
-        series_meta = self._collect_series_meta()
+        series_meta = self._without_hidden_fits(self._collect_series_meta())
         series_list = series_meta.get('series', [])
 
         # Determine which columns are used
@@ -393,7 +393,7 @@ class PythonExportMixin(MixinBase):
         # Annotations are not part of _collect_settings(); add them so the
         # generated script reproduces them in the Code Runner.
         settings['annotations'] = self._collect_annotations_meta()
-        series_meta = self._collect_series_meta()
+        series_meta = self._without_hidden_fits(self._collect_series_meta())
         series_list = series_meta.get('series', [])
 
         # Determine which columns are used (mirrors _export_python_bundle logic)

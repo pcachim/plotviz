@@ -643,8 +643,160 @@ class FitPresetMixin(MixinBase):
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             self.table_status.setText(f'❌  {e}')
 
+    # ── Fits list: every fit, side by side ────────────────────────────────────
+
+    def _next_fit_color(self, source_label, name):
+        """A colour for a new fit curve that neither the series nor its other fits use, so
+        several fits of one series can be told apart (they used to share the series colour)."""
+        used = {str(self.curve_styles.get(source_label, {}).get('color', '')).lower()}
+        used |= {str(self.curve_styles.get(k, {}).get('color', '')).lower()
+                 for k, f in self._fits.items() if f.get('lbl') == source_label and k != name}
+        for i in range(16):
+            colour = self._palette_color(i)
+            if colour.lower() not in used:
+                return colour
+        return self._palette_color(0)
+
+    def _fit_label(self, name):
+        """The label of the series row that plots the fit *name* (it may have been renamed)."""
+        for row in range(self.series_table.rowCount()):
+            ycb = self.series_table.cellWidget(row, 1)
+            item = self.series_table.item(row, 2)
+            if ycb is not None and ycb.currentText() == name and item:
+                return item.text()
+        return name
+
+    def _fit_series_labels(self):
+        """Labels of the series rows that plot a fit curve."""
+        return {self.series_table.item(row, 2).text()
+                for row in range(self.series_table.rowCount())
+                if self.series_table.item(row, 2) is not None
+                and self.series_table.cellWidget(row, 1) is not None
+                and self.series_table.cellWidget(row, 1).currentText() in self._fits}
+
+    def _fit_row_is_hidden(self, row):
+        """True for a series row that plots a fit the user has switched off in the Fits list."""
+        ycb = self.series_table.cellWidget(row, 1)
+        fit = self._fits.get(ycb.currentText()) if ycb is not None else None
+        return bool(fit) and not fit.get('visible', True)
+
+    def _without_hidden_fits(self, series_meta):
+        """series_meta without the series of hidden fits (for the exported script)."""
+        hidden = {name for name, f in self._fits.items() if not f.get('visible', True)}
+        if not hidden:
+            return series_meta
+        out = dict(series_meta)
+        out['series'] = [s for s in series_meta.get('series', []) if s.get('y_col') not in hidden]
+        return out
+
+    def _refresh_fit_table(self):
+        """Rebuild the Fits list: one row per fit, with the numbers to compare them by."""
+        if not hasattr(self, 'fit_table'):
+            return
+        t = self.fit_table
+        selected = self._selected_curve_key()
+        best = {}                                      # lowest AIC among the fits of each series
+        for f in self._fits.values():
+            aic = (f.get('stats') or {}).get('aic')
+            if aic is not None and aic == aic:
+                src = f.get('lbl')
+                best[src] = min(best.get(src, aic), aic)
+        t.blockSignals(True)
+        t.setRowCount(len(self._fits))
+        for r, (name, f) in enumerate(self._fits.items()):
+            st = f.get('stats') or {}
+            show = QTableWidgetItem()
+            show.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
+                          | Qt.ItemFlag.ItemIsSelectable)
+            show.setCheckState(Qt.CheckState.Checked if f.get('visible', True) else Qt.CheckState.Unchecked)
+            show.setData(Qt.ItemDataRole.UserRole, name)
+            show.setToolTip('Show or hide this fit (and its bands) on the chart')
+            t.setItem(r, 0, show)
+            aic = st.get('aic')
+            cells = [f.get('model', ''), f.get('lbl', ''),
+                     f'{st["r2"]:.4f}' if st.get('r2') is not None else '',
+                     f'{st["rmse"]:.4g}' if st.get('rmse') is not None else '',
+                     f'{aic:.1f}' if aic is not None and aic == aic else '']
+            for c, text in enumerate(cells, start=1):
+                item = QTableWidgetItem(text)
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                if c >= 3:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if c == 5 and aic is not None and aic == best.get(f.get('lbl')) \
+                        and sum(1 for g in self._fits.values() if g.get('lbl') == f.get('lbl')) > 1:
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
+                    item.setToolTip('Lowest AIC of the fits of this series')
+                t.setItem(r, c, item)
+        t.resizeColumnsToContents()
+        t.setMaximumHeight(34 + 24 * max(1, min(len(self._fits), 5)))
+        t.blockSignals(False)
+        self._select_fit_table_row(selected if selected in self._fits else None)
+
+    def _select_fit_table_row(self, name):
+        """Highlight the row of fit *name* (or none) without triggering the selection handler."""
+        if not hasattr(self, 'fit_table'):
+            return
+        t = self.fit_table
+        t.blockSignals(True)
+        t.clearSelection()
+        for r in range(t.rowCount()):
+            item = t.item(r, 0)
+            if name is not None and item and item.data(Qt.ItemDataRole.UserRole) == name:
+                t.selectRow(r)
+                break
+        t.blockSignals(False)
+
+    def _on_fit_table_selected(self):
+        """A row of the Fits list was clicked: make that fit the selected curve."""
+        rows = self.fit_table.selectionModel().selectedRows()
+        if not rows:
+            return
+        name = self.fit_table.item(rows[0].row(), 0).data(Qt.ItemDataRole.UserRole)
+        label = self._fit_label(name)
+        if self.curve_select.findText(label) < 0:        # it is on another subplot than the selector shows
+            for row in range(self.series_table.rowCount()):
+                ycb = self.series_table.cellWidget(row, 1)
+                spin = self.series_table.cellWidget(row, 4)
+                if ycb is not None and ycb.currentText() == name and spin is not None \
+                        and hasattr(self, 'series_curve_sp_active'):
+                    self.series_curve_sp_active.setCurrentIndex(spin.value() - 1)
+                    break
+        self.curve_select.setCurrentText(label)
+
+    def _on_fit_table_item_changed(self, item):
+        """The Show box of a fit was ticked or cleared."""
+        if item.column() != 0:
+            return
+        name = item.data(Qt.ItemDataRole.UserRole)
+        if name in self._fits:
+            self._fits[name]['visible'] = item.checkState() == Qt.CheckState.Checked
+            self.update_preview()
+
+    def _selected_curve_text(self):
+        return self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+
+    def _fit_key_of_label(self, label):
+        """The key in self._fits of the series row labelled *label* when that row is a fit curve:
+        the label itself, or the dataset the row plots when the row was renamed.  Else None."""
+        if label in self._fits:
+            return label
+        for row in range(self.series_table.rowCount()):
+            item = self.series_table.item(row, 2)
+            if item and item.text() == label:
+                combo = self.series_table.cellWidget(row, 1)
+                name = combo.currentText() if combo else ''
+                return name if name in self._fits else None
+        return None
+
+    def _selected_curve_key(self):
+        """The selected curve's key in self._fits if it is a fit curve, else its label."""
+        label = self._selected_curve_text()
+        return self._fit_key_of_label(label) or label
+
     def _on_ci_changed(self):
-        label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        label = self._selected_curve_key()
         if label and label in self._fits:
             self._fits[label]['ci_idx'] = self.fit_ci_combo.currentIndex()
             self._fits[label]['pi_idx'] = self.fit_pi_combo.currentIndex()
@@ -661,45 +813,63 @@ class FitPresetMixin(MixinBase):
                 return
 
             # Find the series the user selected in the per-curve selector
-            target_label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
-            matched = next((s for s in series if s[2] == target_label), None)
-            if matched is None:
-                matched = series[0]
+            target_label = self._selected_curve_key()
+            fit_key = self._fit_key_of_label(target_label)
+            if fit_key is not None:
+                # A fit curve is selected (the app selects it after a fit, to style it): fit the
+                # series it came from, not the curve, which would fit a fit and give bands of no width.
+                source = self._fits[fit_key]
+                matched = (next((s for s in series if s[2] == source.get('lbl')), None)
+                           or next((s for s in series
+                                    if (s[3], s[4]) == (source.get('xc'), source.get('yc'))), None))
+                if matched is None:
+                    QMessageBox.warning(self, 'Fit Failed',
+                                        'The series this curve was fitted to is no longer in the table.')
+                    return
+            else:
+                matched = next((s for s in series if s[2] == target_label), None)
+                if matched is None:
+                    matched = series[0]
             xd, yd, lbl, xc, yc = matched
 
             # Find the subplot (Plot spin value) of the source series row
             source_plot_num = 1
+            source_y2 = False          # the fit goes on the same Y axis as its series
             for row in range(self.series_table.rowCount()):
                 item = self.series_table.item(row, 2)
                 if item and item.text() == lbl:
                     spin = self.series_table.cellWidget(row, 4)
                     if spin:
                         source_plot_num = spin.value()
+                    y2_src = self.series_table.item(row, 5)
+                    source_y2 = bool(y2_src and y2_src.checkState() == Qt.CheckState.Checked)
                     break
-            popt, pcov, func, eq_str, r2 = CurveFitter.fit(xd, yd, model)
-            if popt is None:
-                QMessageBox.warning(self, 'Fit Failed', f'Could not fit {model} to the data.')
+            try:
+                result = CurveFitter.fit_ex(xd, yd, model)     # skips NaN points, explains failures
+            except ValueError as err:
+                QMessageBox.warning(self, 'Fit Failed', f'Could not fit {model}: {err}.')
                 return
+            popt, pcov, func = result['popt'], result['pcov'], result['func']
+            eq_str, r2, x0 = result['eq_str'], result['r2'], result['x0']
 
-            # Full statistics
+            # Full statistics (over the valid points)
             stats = CurveFitter.full_stats(xd, yd, popt, pcov, func, model)
 
-            # Store everything for CI/PI plotting and serialization
-            self._last_fit = dict(xd=xd, yd=yd, popt=popt, pcov=pcov, func=func,
-                                  model=model, xc=xc, yc=yc, lbl=lbl,
-                                  eq_str=eq_str, r2=r2, stats=stats)
-
-            # Add fit curve as a new dataset
+            # Add fit curve as a new dataset (NaN where the data have a NaN x)
             nm = f'{lbl} ({model} fit)'
-            self.datasets[nm] = func(xd, *popt)
+            with np.errstate(all='ignore'):
+                self.datasets[nm] = func(xd, *popt)
 
             # Store per-series fit for independent CI/PI bands
             existing = self._fits.get(nm, {})
-            self._fits[nm] = dict(xd=xd, yd=yd, popt=popt, pcov=pcov, func=func,
+            replaced = nm in self._fits                  # the same model on the same series again
+            self._fits[nm] = dict(xd=xd, yd=yd, popt=popt, pcov=pcov, func=func, x0=x0,
+                                  n_dropped=result['n_dropped'],
                                   model=model, xc=xc, yc=yc, lbl=lbl,
                                   eq_str=eq_str, r2=r2, stats=stats,
                                   ci_idx=existing.get('ci_idx', 0),
-                                  pi_idx=existing.get('pi_idx', 0))
+                                  pi_idx=existing.get('pi_idx', 0),
+                                  visible=existing.get('visible', True), replaced=replaced)
             self._last_fit = self._fits[nm]
 
             # Seed a default style for the fit curve if it has none yet.
@@ -707,7 +877,7 @@ class FitPresetMixin(MixinBase):
             # without any ambiguity. Use dashed orange to visually distinguish
             # fit curves from raw data series.
             if nm not in self.curve_styles:
-                src_color = self.curve_styles.get(lbl, {}).get('color', '#ff7f0e')
+                src_color = self._next_fit_color(lbl, nm)
                 self.curve_styles[nm] = {
                     'color':        src_color,
                     'linestyle':    '--',
@@ -750,7 +920,7 @@ class FitPresetMixin(MixinBase):
                 self.series_table.setCellWidget(row, 4, plot_spin)
                 y2_item = QTableWidgetItem()
                 y2_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-                y2_item.setCheckState(Qt.CheckState.Unchecked)
+                y2_item.setCheckState(Qt.CheckState.Checked if source_y2 else Qt.CheckState.Unchecked)
                 self.series_table.setItem(row, 5, y2_item)
             else:
                 # Row already exists — keep its subplot in sync with the source
@@ -762,6 +932,10 @@ class FitPresetMixin(MixinBase):
                             spin.blockSignals(True)
                             spin.setValue(source_plot_num)
                             spin.blockSignals(False)
+                        y2_cell = self.series_table.item(row, 5)
+                        if y2_cell:
+                            y2_cell.setCheckState(Qt.CheckState.Checked if source_y2
+                                                  else Qt.CheckState.Unchecked)
                         break
 
             self._update_confidence_band_for(nm)
@@ -775,6 +949,7 @@ class FitPresetMixin(MixinBase):
                 if idx >= 0:
                     self.curve_select.setCurrentIndex(idx)
             self._load_fit_combos_for(nm)
+            self._refresh_fit_table()
             self.update_preview()
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             QMessageBox.critical(self, 'Error', str(e))
@@ -782,9 +957,12 @@ class FitPresetMixin(MixinBase):
     def _refresh_fit_results_panel(self, label=None):
         """Populate the fit results QTextEdit with full regression output."""
         if label is None:
-            label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
-        fit = self._fits.get(label) or self._last_fit
+            label = self._selected_curve_key()
+        fit = self._fits.get(label)
         if fit is None:
+            self.fit_results_text.setPlainText(
+                'Select a fit curve (in the list above, or in Per-Curve) to see its results.'
+                if self._fits else 'Run a fit to see results.')
             return
         st   = fit.get('stats', {})
         if not st:
@@ -795,6 +973,13 @@ class FitPresetMixin(MixinBase):
         lines = []
         lines.append(f'Model:  {fit["model"]}')
         lines.append(f'Equation:  {fit.get("eq_str", "")}')
+        if fit.get('replaced'):
+            lines.append('  (replaces the previous fit of this model on this series)')
+        if fit.get('x0'):
+            lines.append(f'  x₀ = {fit["x0"]:.10g}   (the parameters refer to x − x₀; the fit is '
+                         f'done on x − x₀ because x is far from 0)')
+        if fit.get('n_dropped'):
+            lines.append(f'  {fit["n_dropped"]} point(s) with a NaN x or y were ignored')
         lines.append('')
         lines.append('── Goodness of Fit ──────────────────')
         lines.append(f'  n            = {st["n"]}')
@@ -809,10 +994,21 @@ class FitPresetMixin(MixinBase):
         fv = st.get('f_stat', float('nan'))
         fp = st.get('f_pvalue', float('nan'))
         import math
-        lines.append(f'  F-statistic  = {fv:.4g}' if not math.isnan(fv) else '  F-statistic  = —')
-        lines.append(f'  F p-value    = {fp:.4g}' if not math.isnan(fp) else '  F p-value    = —')
+        no_f = ' (not defined for this model)' if fit.get('model') not in CurveFitter.F_TEST_MODELS else ''
+        lines.append(f'  F-statistic  = {fv:.4g}' if not math.isnan(fv) else f'  F-statistic  = —{no_f}')
+        lines.append(f'  F p-value    = {fp:.4g}' if not math.isnan(fp) else f'  F p-value    = —{no_f}')
         lines.append(f'  AIC          = {st["aic"]:.4g}')
         lines.append(f'  BIC          = {st["bic"]:.4g}')
+        yd_ok = np.asarray(fit.get('yd') if fit.get('yd') is not None else [], dtype=float)
+        yd_ok = yd_ok[np.isfinite(yd_ok)]
+        scale = max(1.0, abs(float(yd_ok.mean()))) if len(yd_ok) else 1.0
+        if st.get('rmse', 1.0) <= 1e-9 * scale:
+            lines.append('  The data lie exactly on the curve: the confidence and prediction')
+            lines.append('  bands have no width, so they cannot be seen.')
+        pcov = fit.get('pcov')
+        if pcov is not None and len(pcov) and not np.all(np.isfinite(np.asarray(pcov, dtype=float))):
+            lines.append('  The uncertainty of the parameters could not be estimated (too few points')
+            lines.append('  for this model, or the data do not follow it): no bands can be drawn.')
         lines.append('')
         lines.append(f'── Parameters  ({ci_pct}% CI) ──────────────')
         names  = st['param_names']
@@ -847,9 +1043,10 @@ class FitPresetMixin(MixinBase):
         pi_idx = fit.get('pi_idx', 0)
         for suffix in (' CI upper', ' CI lower', ' PI upper', ' PI lower'):
             self.datasets.pop(base + suffix, None)
+        dof = (fit.get('stats') or {}).get('dof')
         if ci_idx > 0:
             y_ci_hi, y_ci_lo = CurveFitter.confidence_band(
-                fit['xd'], fit['popt'], fit['pcov'], fit['func'], ci_idx)
+                fit['xd'], fit['popt'], fit['pcov'], fit['func'], ci_idx, dof)
             self.datasets[base + ' CI upper'] = y_ci_hi
             self.datasets[base + ' CI lower'] = y_ci_lo
         if pi_idx > 0 and 'yd' in fit:
@@ -870,16 +1067,19 @@ class FitPresetMixin(MixinBase):
 
     def _on_fit_series_changed(self):
         """Called when curve_select changes — refresh CI/PI combos and results panel."""
-        label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        label = self._selected_curve_key()
         is_fit = label in self._fits
         has_any_fits = bool(self._fits)
         if hasattr(self, '_fit_controls_widget'):
             self._fit_controls_widget.setEnabled(is_fit)
         if hasattr(self, '_fit_export_widget'):
             self._fit_export_widget.setEnabled(has_any_fits)
+        self._select_fit_table_row(label if is_fit else None)
         if not is_fit:
             if hasattr(self, 'fit_results_text'):
-                self.fit_results_text.setPlainText('Run a fit to see results.')
+                self.fit_results_text.setPlainText(
+                    'Select a fit curve (in the list above, or in Per-Curve) to see its results.'
+                    if has_any_fits else 'Run a fit to see results.')
             self._load_fit_combos_for('')
             return
         self._load_fit_combos_for(label)
@@ -908,24 +1108,40 @@ class FitPresetMixin(MixinBase):
             self.curve_styles.pop(nm, None)
             for row in range(self.series_table.rowCount() - 1, -1, -1):
                 item = self.series_table.item(row, 2)
-                if item and item.text() == nm:
+                ycb = self.series_table.cellWidget(row, 1)
+                # the row of the fit curve, even if its label was renamed (it still plots nm)
+                if (item and item.text() == nm) or (ycb is not None and ycb.currentText() == nm):
                     self.series_table.removeRow(row)
                     break
 
         if hasattr(self, 'fit_results_text'):
-            self.fit_results_text.setPlainText('Run a fit to see results.')
+            self.fit_results_text.setPlainText(
+                'Select a fit curve (in the list above, or in Per-Curve) to see its results.'
+                if self._fits else 'Run a fit to see results.')
+        self._refresh_fit_table()
         return True
 
     def _remove_fit(self):
         """Remove the fitted curve(s) associated with the currently selected series."""
-        label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
+        label = self._selected_curve_key()
         if not label:
             return
 
-        removed = self._remove_fits_for_labels([label])
-        if not removed:
+        if label in self._fits:
+            targets = [label]                              # a fit curve is selected: only that one
+        else:
+            targets = [nm for nm, f in self._fits.items() if f.get('lbl') == label]
+        if not targets:
             QMessageBox.information(self, 'No Fit', 'No fitted curve found for the selected series.')
             return
+        if len(targets) > 1:
+            answer = QMessageBox.question(
+                self, 'Remove fits',
+                f'Remove all {len(targets)} fits of "{label}"?\n\n'
+                'To remove just one, select that fit curve first.')
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        self._remove_fits_for_labels(targets)
 
         self.update_lists()
         self.update_preview()
@@ -1075,10 +1291,11 @@ class FitPresetMixin(MixinBase):
             fits_to_export = list(self._fits.items())
             default_name = 'all_fits_results.txt'
         else:
-            label = self.curve_select.currentText() if hasattr(self, 'curve_select') else ''
-            fit = self._fits.get(label) or self._last_fit
+            label = self._selected_curve_key()
+            fit = self._fits.get(label)
             if fit is None or not fit.get('stats'):
-                QMessageBox.information(self, 'No Results', 'Run a fit first.')
+                QMessageBox.information(self, 'No Results',
+                                        'Select a fit curve first, or tick "All fits".')
                 return
             fits_to_export = [(label, fit)]
             safe = ''.join(c if c.isalnum() or c in ' _-' else '_' for c in label).strip() or 'fit'

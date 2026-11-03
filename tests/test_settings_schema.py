@@ -24,6 +24,34 @@ class TestSubplotGet(unittest.TestCase):
         self.assertEqual(subplot_get({"d": None}, "d", 0, 7), 7)
 
 
+class TestSubplotCanvasAndGrid(unittest.TestCase):
+    """Canvas colours, borders and grid belong to each subplot; old files only have global keys."""
+
+    SETTINGS = {
+        "plot_bg_color": "#111111", "border_top": True, "grid_on": False, "grid_color": "#222222",
+        "subplot_canvas_opts": {"1": {"plot_bg": "#fff1e5", "fg": "#333333", "border_top": False}},
+        "subplot_grid_opts": {"1": {"enabled": True, "color": "#ff0000", "ls": ":", "lw": 2.0,
+                                    "alpha": 0.5, "minor_enabled": True, "minor_color": "#00ff00"}},
+    }
+
+    def test_a_subplot_uses_its_own_options(self):
+        st = SubplotStyle.from_settings(self.SETTINGS, 1)
+        self.assertEqual((st.plot_bg, st.fg, st.border_top), ("#fff1e5", "#333333", False))
+        self.assertEqual((st.grid_on, st.grid_color, st.grid_linestyle, st.grid_linewidth, st.grid_alpha),
+                         (True, "#ff0000", ":", 2.0, 0.5))
+        self.assertEqual((st.minor_grid_on, st.minor_grid_color), (True, "#00ff00"))
+
+    def test_a_subplot_without_options_and_old_files_use_the_global_keys(self):
+        for idx in (0, 2):
+            st = SubplotStyle.from_settings(self.SETTINGS, idx)
+            self.assertEqual((st.plot_bg, st.border_top, st.grid_on, st.grid_color),
+                             ("#111111", True, False, "#222222"))
+
+    def test_options_with_missing_keys_fall_back_per_key(self):
+        st = SubplotStyle.from_settings(self.SETTINGS, 1)
+        self.assertTrue(st.border_bottom)                 # not in the subplot's options
+
+
 class TestSubplotStyleDefaults(unittest.TestCase):
     def test_empty_settings_gives_documented_defaults(self):
         st = SubplotStyle.from_settings({}, 0)

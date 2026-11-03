@@ -10,6 +10,10 @@ Shared constants, palettes and small helpers for the tab-builder mixins.
 """
 from PyQt6.QtCore import QObject, QEvent
 
+# Opacity of the fit confidence band by default; the prediction band is drawn at half of it.
+# (0.25 left the prediction band at 0.125, which was too faint to see on a light background.)
+DEFAULT_FIT_BAND_OPACITY = 0.35
+
 # Compact tabs for the inner tab bars (Data and Plots).  The native tab padding is wide
 # enough that the five Plots tabs do not fit the side panel and scroll; this keeps the
 # text and puts a coloured line under the selected tab.  Colours come from the palette,

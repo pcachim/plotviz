@@ -168,6 +168,34 @@ class TestGuiSmoke(unittest.TestCase):
             self.assertEqual({o["plot_bg"] for o in w.subplot_canvas_opts.values()}, {"#fff1e5"})
             self.assertEqual({o["color"] for o in w.subplot_grid_opts.values()}, {"#ff0000"})
 
+    def test_each_subplot_keeps_its_own_canvas_and_grid_when_saved(self):
+        from matplotlib.colors import to_hex
+        from core.serialize import encode_datasets, write_project_zip
+        w = self._make_window()
+        with tempfile.TemporaryDirectory() as d:
+            base = os.path.join(d, "base.pviz")
+            _write_pviz(base, rows=2, cols=2)
+            w._load_project_inner(base, silent=True)
+            colours = ["#ffe0e0", "#e0ffe0", "#e0e0ff", "#fffbe0"]
+            for i in range(4):
+                co = w._default_canvas_opts()
+                co.update(plot_bg=colours[i], border_top=bool(i % 2))
+                go = w._default_grid_opts()
+                go.update(enabled=bool(i % 2), color=colours[3 - i])
+                w.subplot_canvas_opts[i], w.subplot_grid_opts[i] = co, go
+            w._load_canvas_grid_opts(0)                  # the widgets show the active subplot
+            fp = os.path.join(d, "per.pviz")
+            write_project_zip(fp, w._collect_settings(), w._collect_series_meta(),
+                              encode_datasets(w.datasets))
+            w2 = self._make_window()
+            w2._load_project_inner(fp, silent=True)
+            self.assertEqual([w2.subplot_canvas_opts[i]["plot_bg"] for i in range(4)], colours)
+            self.assertEqual([w2.subplot_canvas_opts[i]["border_top"] for i in range(4)],
+                             [False, True, False, True])
+            self.assertEqual([w2.subplot_grid_opts[i]["color"] for i in range(4)], colours[::-1])
+            axes_list, *_ = w2._render_axes(Figure())
+            self.assertEqual([to_hex(a.get_facecolor()) for a in axes_list], colours)
+
     def test_multi_subplot_layout(self):
         w = self._make_window()
         with tempfile.TemporaryDirectory() as d:

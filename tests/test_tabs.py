@@ -111,6 +111,30 @@ class TestTabLayout(unittest.TestCase):
         self.assertEqual(w.sp_title_input.text(), "second")
         self.assertEqual(w.sp_titles[1], "second")
 
+    def test_a_new_subplot_takes_the_look_of_the_active_one_but_not_its_content(self):
+        w = self.w
+        w.subplot_xtick_sizes[0] = 14
+        w.subplot_legend_frameon[0] = False
+        w.subplot_title_font[0] = "serif"
+        w.subplot_xaxis_pos[0] = "top"
+        w.subplot_xlabel_rotation[0] = 30
+        w.subplot_xlabels[0] = "time"                  # content: must not be copied
+        w.subplot_xlims[0] = (0.0, 5.0)
+        w.subplot_yscales[0] = "log"
+        w.subplot_xtick_step[0] = 2.0
+        w.sp_titles[0] = "first"
+        w.sp_cols.setValue(2)
+        self.assertEqual(w.subplot_xtick_sizes[1], 14)
+        self.assertFalse(w.subplot_legend_frameon[1])
+        self.assertEqual(w.subplot_title_font[1], "serif")
+        self.assertEqual(w.subplot_xaxis_pos[1], "top")
+        self.assertEqual(w.subplot_xlabel_rotation[1], 30)
+        self.assertEqual(w.subplot_xlabels[1], "")
+        self.assertIsNone(w.subplot_xlims[1])
+        self.assertEqual(w.subplot_yscales[1], "linear")
+        self.assertEqual(w.subplot_xtick_step[1], 0.0)
+        self.assertEqual(w.sp_titles[1], "")
+
     def _in_outer(self, widget, name):
         t = self.w.tabs
         names = [t.tabText(i) for i in range(t.count())]
@@ -131,11 +155,44 @@ class TestTabLayout(unittest.TestCase):
         self.assertTrue(self._in_outer(w.gen_x_min, "Data"))      # the generators
         self.assertFalse(self._in_outer(w.palette_combo, "Data"))
 
+    def _data_page(self, name):
+        t = self.w.data_inner_tabs
+        return [t.tabText(i) for i in range(t.count())].index(name)
+
+    def test_baseline_options_appear_with_the_method_and_use_the_value(self):
+        w = self.w
+        w.datasets.clear()
+        w.datasets["t"] = [float(i) for i in range(10)]
+        w.datasets["v"] = [5.0, 5, 5, 5, 9, 5, 5, 5, 5, 5]
+        w.update_lists()
+        w.data_inner_tabs.setCurrentIndex(self._data_page("Transform"))
+        w.tf_y_combo.setCurrentText("v")
+        w.tf_x_combo.setCurrentText("t")
+        w.tf_op_combo.setCurrentIndex(w.tf_op_combo.findData("subtract_baseline"))
+        p = w._tf_param_widgets[w._tf_op_index()]
+        self.assertTrue(p["value"].isHidden() and p["x_from"].isHidden() and p["x_to"].isHidden())
+        p["method"].setCurrentText("value")
+        self.assertFalse(p["value"].isHidden())
+        self.assertTrue(p["x_from"].isHidden())
+        p["method"].setCurrentText("median of range")
+        self.assertTrue(p["value"].isHidden())
+        self.assertFalse(p["x_from"].isHidden() or p["x_to"].isHidden())
+        p["method"].setCurrentText("value")
+        p["value"].setValue(4.5)
+        w.tf_out_name.setText("")
+        w._apply_transform()
+        self.assertEqual(list(w.datasets["v_bl"])[:2], [0.5, 0.5])
+        p["method"].setCurrentText("mean of range")                    # a stretch, typed as numbers
+        p["x_from"].setText("0")
+        p["x_to"].setText("3")
+        w._apply_transform()
+        self.assertEqual(list(w.datasets["v_bl_1"])[:5], [0.0, 0.0, 0.0, 0.0, 4.0])
+
     def test_the_data_tab_has_a_transform_page_that_creates_series(self):
         w = self.w
         t = w.data_inner_tabs
         self.assertEqual([t.tabText(i) for i in range(t.count())],
-                         ["Datasets", "Transform", "Statistics", "Generate"])
+                         ["Datasets", "Generate", "Statistics", "Transform"])
         w.datasets.clear()
         w.datasets["t"] = list(range(10))
         w.datasets["v"] = [float(i * i) for i in range(10)]
@@ -161,7 +218,7 @@ class TestTabLayout(unittest.TestCase):
         self.assertEqual(list(w.datasets["p_x_peaks"]), [1.0, 3.0, 5.0])
         self.assertEqual(list(w.datasets["p_peaks"]), [3.0, 1.0, 5.0])
         # Statistics page: summary of the selected series, or all of them
-        w.data_inner_tabs.setCurrentIndex(2)
+        w.data_inner_tabs.setCurrentIndex(self._data_page("Statistics"))
         t = w.stats_table                                    # series in columns, statistics in rows
         self.assertEqual(t.columnCount(), len(w.datasets))
         series = [t.horizontalHeaderItem(c).text() for c in range(t.columnCount())]
@@ -169,7 +226,7 @@ class TestTabLayout(unittest.TestCase):
         stats = [t.verticalHeaderItem(r).text() for r in range(t.rowCount())]
         self.assertEqual(t.item(stats.index("max"), series.index("v")).text(), "81")
         self.assertEqual(w.corr_table.rowCount(), len(w.datasets))
-        w.data_inner_tabs.setCurrentIndex(1)
+        w.data_inner_tabs.setCurrentIndex(self._data_page("Transform"))
         # "series" parameter: align onto another series' x, which is reused, not duplicated
         w.datasets["grid"] = [0.0, 4.5, 9.0]
         w.update_lists()

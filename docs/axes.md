@@ -29,6 +29,8 @@ Each axis (X, Y, Y2) has three controls:
 | **Text field** | The label text (placeholder shows the column name when empty) |
 | **Font / Size / Color** | Typography for the label |
 
+When the text is empty the axis is titled with the names of the data series; fitted curves are left out of that default, so adding several fits does not lengthen the title (type a label if you want the fits named).
+
 X and Y label fonts and colors are global — they apply to all subplots. Per-subplot overrides are not available for axis labels.
 
 ---

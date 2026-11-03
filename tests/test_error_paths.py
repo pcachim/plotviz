@@ -32,10 +32,12 @@ class TestCurveFitterFailures(unittest.TestCase):
     def test_length_mismatch_is_reported_not_raised(self):
         self.assertEqual(CurveFitter.fit(X, X[:-3], 'Linear'), NO_FIT)
 
-    def test_nan_data_is_reported_not_raised(self):
-        y = X.copy()
+    def test_nan_points_are_ignored_and_all_nan_is_reported(self):
+        y = 2 * X + 1
         y[3] = np.nan
-        self.assertEqual(CurveFitter.fit(X, y, 'Linear'), NO_FIT)
+        popt, _, _, _, r2 = CurveFitter.fit(X, y, 'Linear')
+        self.assertAlmostEqual(float(popt[0]), 2.0, places=6)
+        self.assertEqual(CurveFitter.fit(X, np.full_like(X, np.nan), 'Linear'), NO_FIT)
 
     def test_non_numeric_data_is_reported_not_raised(self):
         self.assertEqual(CurveFitter.fit(['a', 'b', 'c'], [1, 2, 3], 'Linear'), NO_FIT)

@@ -109,6 +109,10 @@ class SubplotStyle:
         def g(key: str, default: Any) -> Any:
             return settings.get(key, default)
 
+        # Canvas, borders and grid are per subplot; older files only have the global keys.
+        co = subplot_get(settings, "subplot_canvas_opts", idx, None) or {}
+        go = subplot_get(settings, "subplot_grid_opts", idx, None) or {}
+
         return cls(
             xlabel_show=sp("subplot_xlabel_show", True),
             xlabel_size=g("xlabel_size", 11),
@@ -137,8 +141,8 @@ class SubplotStyle:
             xlim=sp("subplot_xlims", None),
             ylim=sp("subplot_ylims", None),
             equal_aspect=sp("subplot_equal_aspect", False),
-            fg=g("chart_fg_color", "#000000"),
-            plot_bg=g("plot_bg_color", "#ffffff"),
+            fg=co.get("fg", g("chart_fg_color", "#000000")),
+            plot_bg=co.get("plot_bg", g("plot_bg_color", "#ffffff")),
             xtick_size=sp("subplot_xtick_sizes", g("xtick_size", 9)),
             ytick_size=sp("subplot_ytick_sizes", g("ytick_size", 9)),
             xtick_dir=sp("subplot_xtick_dir", "out"),
@@ -153,18 +157,18 @@ class SubplotStyle:
             ytick_step=sp("subplot_ytick_step", 0.0),
             x_formatter=sp("subplot_x_formatter", "auto"),
             y_formatter=sp("subplot_y_formatter", "auto"),
-            grid_on=g("grid_on", False),
-            grid_color=g("grid_color", "#cccccc"),
-            grid_linestyle=g("grid_linestyle", "-"),
-            grid_linewidth=g("grid_linewidth", 0.8),
-            grid_alpha=g("grid_alpha", 1.0),
-            minor_grid_on=g("minor_grid_on", False),
-            minor_grid_color=g("minor_grid_color", "#e8e8e8"),
-            minor_grid_linestyle=g("minor_grid_linestyle", "-"),
-            minor_grid_linewidth=g("minor_grid_linewidth", 0.5),
-            minor_grid_alpha=g("minor_grid_alpha", 1.0),
-            border_top=g("border_top", True),
-            border_bottom=g("border_bottom", True),
-            border_left=g("border_left", True),
-            border_right=g("border_right", True),
+            grid_on=go.get("enabled", g("grid_on", False)),
+            grid_color=go.get("color", g("grid_color", "#cccccc")),
+            grid_linestyle=go.get("ls", g("grid_linestyle", "-")),
+            grid_linewidth=go.get("lw", g("grid_linewidth", 0.8)),
+            grid_alpha=go.get("alpha", g("grid_alpha", 1.0)),
+            minor_grid_on=go.get("minor_enabled", g("minor_grid_on", False)),
+            minor_grid_color=go.get("minor_color", g("minor_grid_color", "#e8e8e8")),
+            minor_grid_linestyle=go.get("minor_ls", g("minor_grid_linestyle", "-")),
+            minor_grid_linewidth=go.get("minor_lw", g("minor_grid_linewidth", 0.5)),
+            minor_grid_alpha=go.get("minor_alpha", g("minor_grid_alpha", 1.0)),
+            border_top=co.get("border_top", g("border_top", True)),
+            border_bottom=co.get("border_bottom", g("border_bottom", True)),
+            border_left=co.get("border_left", g("border_left", True)),
+            border_right=co.get("border_right", g("border_right", True)),
         )

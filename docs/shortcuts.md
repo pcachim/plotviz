@@ -25,7 +25,7 @@ The **View** menu lists the three tabs as checkable items; the active one is tic
 
 | Menu item | Tab |
 |-----------|-----|
-| View → Data | Datasets, Transform, Statistics and Generate pages |
+| View → Data | Datasets, Generate, Statistics and Transform pages |
 | View → Layout & Style | Figure size, margins, title, subplot grid, colour scheme, palette |
 | View → Plots | Per-subplot settings: Plot, Curves, Axes, Canvas & Grid, Legend & Notes |
 

@@ -102,6 +102,27 @@ class TestGeneratorEmission(unittest.TestCase):
         self.assertIn("spines['top'].set_visible(False)", script)
         self.assertIn("set_facecolor('#fafafa')", script)  # plot_bg on axes
 
+    def test_each_subplot_gets_its_own_background_and_grid(self):
+        settings, meta, datasets = _grid_mixed()
+        settings["subplot_canvas_opts"] = {"0": {"plot_bg": "#ffe0e0"}, "1": {"plot_bg": "#e0ffe0"}}
+        settings["subplot_grid_opts"] = {"0": {"enabled": True, "color": "#ff0000"},
+                                         "1": {"enabled": False}}
+        script = pe.generate_plot_script(settings, meta, datasets, PALETTE, "c")
+        self.assertIn("set_facecolor('#ffe0e0')", script)
+        self.assertIn("set_facecolor('#e0ffe0')", script)
+        self.assertIn("#ff0000", script)
+
+    def test_default_axis_titles_leave_out_the_fit_curves(self):
+        settings, meta, datasets = _single_line()
+        datasets["fit"] = [0, 1, 4, 9, 16]
+        meta["series"].append({"x_col": "x", "y_col": "fit", "label": "sq (Linear fit)",
+                               "series_type": "Line", "plot_num": 1})
+        with_fit = dict(settings, fits={"fit": {"model": "Linear"}})
+        script = pe.generate_plot_script(with_fit, meta, datasets, PALETTE, "c")
+        self.assertIn("set_ylabel('sq'", script)
+        script = pe.generate_plot_script(settings, meta, datasets, PALETTE, "c")      # not marked as a fit
+        self.assertIn("set_ylabel('sq, sq (Linear fit)'", script)
+
     def test_default_labels_match_the_live_chart(self):
         # Single axes: X is the X column, Y is the series label ("sq", not the
         # column "y") - except grid-type charts, which use the Y column name.

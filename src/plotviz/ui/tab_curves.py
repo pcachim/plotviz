@@ -10,11 +10,12 @@ CurvesTabMixin: create_curves_tab(): the Plots > Curves page (per-curve options 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QDoubleSpinBox, QPushButton, QCheckBox, QScrollArea, QGroupBox, QSizePolicy, QPlainTextEdit,
+    QTableWidget, QAbstractItemView,
 )
 from PyQt6.QtGui import QFont
 from data.scientific import CurveFitter
 from ui.tab_constants import (
-    _CMAP_LIST,
+    _CMAP_LIST, DEFAULT_FIT_BAND_OPACITY,
 )
 from ui.mixin_base import MixinBase
 
@@ -306,12 +307,30 @@ class CurvesTabMixin(MixinBase):
         btn_fit.clicked.connect(self.apply_fit)
         btn_remove_fit = QPushButton('✕  Remove Fit')
         btn_remove_fit.clicked.connect(self._remove_fit)
-        btn_remove_fit.setToolTip('Remove the fitted curve for the currently selected series')
+        btn_remove_fit.setToolTip('Remove the selected fit curve; with a data series selected, '
+                                  'remove all its fits (after asking)')
         fit_btn_row = QHBoxLayout()
         fit_btn_row.setSpacing(4)
         fit_btn_row.addWidget(btn_fit)
         fit_btn_row.addWidget(btn_remove_fit)
         layout.addLayout(fit_btn_row)
+
+        # ── All the fits side by side: pick one, show or hide it, compare them ──
+        lbl_fits = QLabel('Fits  (click one to select it; the bold AIC is the lowest for its series):')
+        lbl_fits.setWordWrap(True)
+        lbl_fits.setStyleSheet('color:#888; font-size:10px;')
+        layout.addWidget(lbl_fits)
+        self.fit_table = QTableWidget(0, 6)
+        self.fit_table.setHorizontalHeaderLabels(['Show', 'Model', 'Series', 'R²', 'RMSE', 'AIC'])
+        self.fit_table.verticalHeader().setVisible(False)
+        self.fit_table.verticalHeader().setDefaultSectionSize(22)
+        self.fit_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.fit_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.fit_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.fit_table.setMaximumHeight(58)
+        self.fit_table.itemSelectionChanged.connect(self._on_fit_table_selected)
+        self.fit_table.itemChanged.connect(self._on_fit_table_item_changed)
+        layout.addWidget(self.fit_table)
 
         # ── Fit-specific controls (disabled when an original series is selected) ──
         self._fit_controls_widget = QWidget()
@@ -342,7 +361,7 @@ class CurvesTabMixin(MixinBase):
         self.fit_ci_alpha_spin = QDoubleSpinBox()
         self.fit_ci_alpha_spin.setRange(0.05, 1.0)
         self.fit_ci_alpha_spin.setSingleStep(0.05)
-        self.fit_ci_alpha_spin.setValue(0.25)
+        self.fit_ci_alpha_spin.setValue(DEFAULT_FIT_BAND_OPACITY)
         self.fit_ci_alpha_spin.valueChanged.connect(self.update_preview)
         ci_alpha_row = QHBoxLayout()
         ci_alpha_row.setSpacing(6)

@@ -30,6 +30,20 @@ def _need_x(x):
     return _as_float(x)
 
 
+def _range_values(x, y, x_from, x_to, what='range'):
+    """y inside x_from <= x <= x_to (either limit may be None); the index stands in for x."""
+    y = _as_float(y)
+    pos = np.arange(len(y), dtype=float) if x is None else _as_float(x)
+    keep = np.isfinite(y) & np.isfinite(pos)
+    if x_from is not None:
+        keep &= pos >= x_from
+    if x_to is not None:
+        keep &= pos <= x_to
+    if not keep.any():
+        raise ValueError(f'no points inside the {what} (x from {x_from} to {x_to})')
+    return y[keep]
+
+
 def _spacing(x, n):
     return np.arange(n, dtype=float) if x is None else _as_float(x)
 
@@ -178,15 +192,24 @@ def block_average(x, y, size=5):
     return np.add.reduceat(x, starts) / np.diff(np.append(starts, len(x))), ycol
 
 
-def resample_uniform(x, y, points=200):
-    """Linear interpolation onto ``points`` equally spaced x values."""
+def resample_uniform(x, y, points=200, step=None):
+    """Linear interpolation onto equally spaced x values: ``points`` of them, or, when
+    ``step`` is given, one every ``step`` x units from the first x (step wins)."""
     x, y = _need_x(x), _as_float(y)
-    points = int(points)
-    if points < 2:
-        raise ValueError('need at least 2 points')
     order = np.argsort(x, kind='stable')
     xs, ys = x[order], y[order]
-    grid = np.linspace(xs[0], xs[-1], points)
+    if step is not None:
+        if step <= 0:
+            raise ValueError('step must be positive')
+        count = int(np.floor((xs[-1] - xs[0]) / step + 1e-9)) + 1
+        if count > 5_000_000:
+            raise ValueError(f'a step of {step:g} would give {count} points')
+        grid = xs[0] + step * np.arange(count)
+    else:
+        points = int(points)
+        if points < 2:
+            raise ValueError('need at least 2 points')
+        grid = np.linspace(xs[0], xs[-1], points)
     return grid, np.interp(grid, xs, ys)
 
 
@@ -223,10 +246,10 @@ def derivative(x, y):
     return (None if x is None else _as_float(x)), np.gradient(y, _spacing(x, len(y)))
 
 
-def cumulative_integral(x, y):
-    """Running integral by the trapezoid rule, starting at 0."""
+def cumulative_integral(x, y, start=0.0):
+    """Running integral by the trapezoid rule, starting at ``start`` (the constant of integration)."""
     y = _as_float(y)
-    out = integrate.cumulative_trapezoid(y, _spacing(x, len(y)), initial=0)
+    out = integrate.cumulative_trapezoid(y, _spacing(x, len(y)), initial=0) + start
     return (None if x is None else _as_float(x)), out
 
 
@@ -267,8 +290,9 @@ def cumulative_sum(x, y):
 
 # ── Scaling ──────────────────────────────────────────────────────────────────
 
-def normalize(x, y, method='min-max'):
-    """min-max -> [0, 1]; z-score -> mean 0, std 1; first -> y/y[0]; max -> y/max|y|."""
+def normalize(x, y, method='min-max', value=1.0, x_from=None, x_to=None):
+    """min-max -> [0, 1]; z-score -> mean 0, std 1; first -> y/y[0]; max -> y/max|y|;
+    value -> y/value; mean of range -> y divided by its mean between x_from and x_to."""
     y = _as_float(y)
     if method == 'min-max':
         lo, hi = np.nanmin(y), np.nanmax(y)
@@ -285,16 +309,29 @@ def normalize(x, y, method='min-max'):
         if m == 0:
             raise ValueError('series is all zeros')
         out = y / m
+    elif method == 'value':
+        if value == 0:
+            raise ValueError('cannot divide by 0')
+        out = y / value
+    elif method == 'mean of range':
+        ref = np.mean(_range_values(x, y, x_from, x_to))
+        if ref == 0:
+            raise ValueError('the mean of the range is 0')
+        out = y / ref
     else:
         raise ValueError(f'unknown method: {method}')
     return (None if x is None else _as_float(x)), out
 
 
-def subtract_baseline(x, y, method='first'):
-    """Subtract the first value, last value, mean, median or minimum."""
+def subtract_baseline(x, y, method='first', value=0.0, x_from=None, x_to=None):
+    """Subtract the first value, last value, mean, median or minimum; a fixed ``value``;
+    or the mean / median of the points between x_from and x_to (a quiet stretch)."""
     y = _as_float(y)
     base = {'first': lambda: y[0], 'last': lambda: y[-1], 'mean': lambda: np.nanmean(y),
-            'median': lambda: np.nanmedian(y), 'min': lambda: np.nanmin(y)}.get(method)
+            'median': lambda: np.nanmedian(y), 'min': lambda: np.nanmin(y),
+            'value': lambda: value,
+            'mean of range': lambda: np.mean(_range_values(x, y, x_from, x_to)),
+            'median of range': lambda: np.median(_range_values(x, y, x_from, x_to))}.get(method)
     if base is None:
         raise ValueError(f'unknown baseline: {method}')
     return (None if x is None else _as_float(x)), y - base()
@@ -372,11 +409,16 @@ def hampel(x, y, window=7, n_sigmas=3.0):
 
 # ── Baseline ─────────────────────────────────────────────────────────────────
 
-def detrend(x, y, degree=1):
-    """Subtract a least-squares polynomial of the given degree (1 = straight line)."""
+def detrend(x, y, degree=1, x_from=None, x_to=None):
+    """Subtract a least-squares polynomial of the given degree (1 = straight line).  The fit
+    can be limited to x_from..x_to (so that a peak does not pull it); it is subtracted everywhere."""
     y = _as_float(y)
     pos = np.arange(len(y), dtype=float) if x is None else _as_float(x)
     ok = np.isfinite(y) & np.isfinite(pos)
+    if x_from is not None:
+        ok &= pos >= x_from
+    if x_to is not None:
+        ok &= pos <= x_to
     degree = int(degree)
     if ok.sum() <= degree:
         raise ValueError(f'need more than {degree} valid points for a degree-{degree} fit')
@@ -415,18 +457,37 @@ def fft_spectrum(x, y, remove_mean='yes'):
     return np.fft.rfftfreq(len(y), dt), amp
 
 
-def peaks(x, y, min_height=None, min_prominence=None, min_distance=1):
-    """Local maxima of y.  Returns (x, y) of the peaks only (x = point index without an x series)."""
+def noise_sigma(y):
+    """Noise level of a series: the median absolute deviation about the median, scaled to a
+    standard deviation.  A few peaks do not inflate it, but a drift does (remove it first)."""
     y = _as_float(y)
-    idx, _ = signal.find_peaks(y, height=min_height, prominence=min_prominence,
+    y = y[np.isfinite(y)]
+    if not len(y):
+        raise ValueError('every point is NaN')
+    return float(1.4826 * np.median(np.abs(y - np.median(y))))
+
+
+def peaks(x, y, min_height=None, min_prominence=None, min_distance=1, min_height_noise=None):
+    """Local maxima of y.  Returns (x, y) of the peaks only (x = point index without an x series).
+
+    ``min_height_noise`` sets the height threshold as median + k * noise (see noise_sigma); with
+    ``min_height`` as well, the higher of the two applies."""
+    y = _as_float(y)
+    height = min_height
+    if min_height_noise is not None:
+        limit = float(np.nanmedian(y)) + min_height_noise * noise_sigma(y)
+        height = limit if height is None else max(height, limit)
+    idx, _ = signal.find_peaks(y, height=height, prominence=min_prominence,
                                distance=max(int(min_distance), 1))
     if not len(idx):
-        raise ValueError('no peaks found; try lower thresholds')
+        where = '' if height is None else f' above {height:.6g}'
+        raise ValueError(f'no peaks found{where}; try lower thresholds')
     return (idx.astype(float) if x is None else _as_float(x)[idx]), y[idx]
 
 
 # ── Registry (drives the UI) ─────────────────────────────────────────────────
-# param = (name, label, kind, default, extra): kind 'int'/'float' -> extra=(min, max);
+# param = (name, label, kind, default, extra[, show_when]): kind 'int'/'float' -> extra=(min, max);
+# show_when = {other_param: [values]} shows the row only while that choice parameter has one of them;
 # 'optfloat' is a float that may be left unset (None); 'optx' is an optional x value (the UI
 # accepts a date when x is a date column); 'choice' -> extra=list of values;
 # 'series' -> another loaded series, passed to the function as an array.
@@ -464,7 +525,8 @@ OPERATIONS = [
     _op('Reduce and resample', 'block_average', 'Block average', block_average, 'blk{size}', [
         ('size', 'Block size', 'int', 5, (1, 1000000))]),
     _op('Reduce and resample', 'resample_uniform', 'Resample (uniform x)', resample_uniform, 'rs', [
-        ('points', 'Points', 'int', 200, (2, 10000000))], needs_x=True),
+        ('points', 'Points', 'int', 200, (2, 10000000)),
+        ('step', 'Step (instead of points)', 'optfloat', None, (1e-12, 1e12))], needs_x=True),
     _op('Reduce and resample', 'decimate', 'Decimate (anti-aliased)', decimate, 'dec{factor}', [
         ('factor', 'Factor', 'int', 2, (1, 1000))]),
     _op('Reduce and resample', 'align_to_x', 'Align to another x', align_to_x, 'al', [
@@ -475,7 +537,8 @@ OPERATIONS = [
         ('xmax', 'x max', 'optx', None, None)], needs_x=True),
 
     _op('Calculus', 'derivative', 'Derivative dy/dx', derivative, 'd'),
-    _op('Calculus', 'cumulative_integral', 'Integral (cumulative)', cumulative_integral, 'int'),
+    _op('Calculus', 'cumulative_integral', 'Integral (cumulative)', cumulative_integral, 'int', [
+        ('start', 'Starts at', 'float', 0.0, (-1e12, 1e12))]),
     _op('Calculus', 'second_derivative', 'Second derivative d2y/dx2', second_derivative, 'd2'),
     _op('Calculus', 'percent_change', 'Percent change', percent_change, 'pct'),
     _op('Calculus', 'log_return', 'Log return', log_return, 'logret'),
@@ -483,15 +546,25 @@ OPERATIONS = [
     _op('Calculus', 'cumulative_sum', 'Cumulative sum', cumulative_sum, 'cumsum'),
 
     _op('Scale and baseline', 'normalize', 'Normalize', normalize, 'norm', [
-        ('method', 'Method', 'choice', 'min-max', ['min-max', 'z-score', 'first', 'max'])]),
+        ('method', 'Method', 'choice', 'min-max',
+         ['min-max', 'z-score', 'first', 'max', 'value', 'mean of range']),
+        ('value', 'Divide by', 'float', 1.0, (-1e12, 1e12), {'method': ['value']}),
+        ('x_from', 'x from', 'optx', None, None, {'method': ['mean of range']}),
+        ('x_to', 'x to', 'optx', None, None, {'method': ['mean of range']})]),
     _op('Scale and baseline', 'scale_shift', 'Scale and shift (a·y + b)', scale_shift, 'ab', [
         ('a', 'a', 'float', 1.0, (-1e12, 1e12)),
         ('b', 'b', 'float', 0.0, (-1e12, 1e12))]),
     _op('Scale and baseline', 'subtract_baseline', 'Subtract baseline', subtract_baseline, 'bl', [
-        ('method', 'Baseline', 'choice', 'first', ['first', 'last', 'mean', 'median', 'min'])]),
+        ('method', 'Baseline', 'choice', 'first',
+         ['first', 'last', 'mean', 'median', 'min', 'value', 'mean of range', 'median of range']),
+        ('value', 'Value', 'float', 0.0, (-1e12, 1e12), {'method': ['value']}),
+        ('x_from', 'x from', 'optx', None, None, {'method': ['mean of range', 'median of range']}),
+        ('x_to', 'x to', 'optx', None, None, {'method': ['mean of range', 'median of range']})]),
     _op('Scale and baseline', 'absolute', 'Absolute value', absolute, 'abs'),
     _op('Scale and baseline', 'detrend', 'Remove trend (polynomial)', detrend, 'detr', [
-        ('degree', 'Degree', 'int', 1, (0, 20))]),
+        ('degree', 'Degree', 'int', 1, (0, 20)),
+        ('x_from', 'Fit from x', 'optx', None, None),
+        ('x_to', 'Fit to x', 'optx', None, None)]),
 
     _op('Cleaning', 'remove_nan', 'Remove NaN', remove_nan, 'noNaN'),
     _op('Cleaning', 'interpolate_nan', 'Interpolate NaN', interpolate_nan, 'interp'),
@@ -512,6 +585,7 @@ OPERATIONS = [
     _op('Signal analysis', 'fft_spectrum', 'FFT amplitude spectrum', fft_spectrum, 'fft', [
         ('remove_mean', 'Remove mean', 'choice', 'yes', ['yes', 'no'])]),
     _op('Signal analysis', 'peaks', 'Find peaks', peaks, 'peaks', [
+        ('min_height_noise', 'Min height (× noise)', 'optfloat', None, (0.0, 1e6)),
         ('min_height', 'Min height', 'optfloat', None, (-1e12, 1e12)),
         ('min_prominence', 'Min prominence', 'optfloat', None, (0.0, 1e12)),
         ('min_distance', 'Min distance', 'int', 1, (1, 1000000))]),

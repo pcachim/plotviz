@@ -20,6 +20,7 @@ from ui.helpers import _get_dir, _remember_dir
 from ui.dialogs import DataImportDialog
 from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
 from ui.mixin_base import MixinBase
+from ui.tab_constants import DEFAULT_FIT_BAND_OPACITY
 
 
 class DataMixin(MixinBase):
@@ -331,7 +332,7 @@ class DataMixin(MixinBase):
             'minor_grid_on':  False, 'minor_grid_color': '#e8e8e8',
             'minor_grid_linestyle': ':', 'minor_grid_linewidth': 0.3, 'minor_grid_alpha': 0.2,
             'dpi':           300,
-            'fit_ci_index': 0, 'fit_pi_index': 0, 'fit_ci_alpha': 0.25,
+            'fit_ci_index': 0, 'fit_pi_index': 0, 'fit_ci_alpha': DEFAULT_FIT_BAND_OPACITY,
             'fit_result':    None,
             'subplot_rows':  1,    'subplot_cols': 1,
             'subplot_mosaic':None, 'sp_sharex':    False, 'sp_sharey': False,
@@ -386,6 +387,7 @@ class DataMixin(MixinBase):
         self.canvas.annotations.clear()
         self._last_fit = None
         self._fits = {}
+        self._refresh_fit_table()
         self._subplot_mosaic = None
         # Clear series table BEFORE _apply_settings triggers any redraws,
         # otherwise stale rows referencing cleared datasets cause a crash.
@@ -641,6 +643,16 @@ class DataMixin(MixinBase):
                     fallback_key = f'Series {row + 1}'
                     if fallback_key in self.curve_styles:
                         self.curve_styles[new_label] = self.curve_styles.pop(fallback_key)
+                # Keep the fits attached to the series they were made from: a fit remembers
+                # its source by label, so a label that no row has any more is the old one.
+                labels = {(self.series_table.item(r, 2).text() if self.series_table.item(r, 2) else '')
+                          for r in range(self.series_table.rowCount())}
+                stale = {f.get('lbl') for f in self._fits.values()} - labels
+                if len(stale) == 1:
+                    old_source = stale.pop()
+                    for f in self._fits.values():
+                        if f.get('lbl') == old_source:
+                            f['lbl'] = new_label
             # When Y2 is checked for the first time, preserve the series color
             if item.column() == 5 and item.checkState() == Qt.CheckState.Checked:
                 lbl_item = self.series_table.item(row, 2)
@@ -953,6 +965,7 @@ class DataMixin(MixinBase):
             ycb = self.series_table.cellWidget(row, 1)
             lbl_item = self.series_table.item(row, 2)
             if xcb is None or ycb is None: continue
+            if self._fit_row_is_hidden(row): continue          # a fit switched off in the Fits list
             if primary_only:
                 y2_item = self.series_table.item(row, 5)
                 if y2_item and y2_item.checkState() == Qt.CheckState.Checked:

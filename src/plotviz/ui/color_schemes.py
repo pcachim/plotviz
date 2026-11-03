@@ -437,6 +437,8 @@ class ColorSchemeMixin(MixinBase):
         full = self._collect_settings()
         full.pop('color_scheme_name', None)         # the active scheme is set by the caller;
         full.pop('color_scheme', None)              # settings then only match it by colours
+        full.pop('subplot_canvas_opts', None)       # the scheme sets every subplot's canvas and grid:
+        full.pop('subplot_grid_opts', None)         # the old per-subplot values must not win
         full.update(scheme)
         if 'zlabel_color' not in scheme and 'ylabel_color' in scheme:
             full['zlabel_color'] = scheme['ylabel_color']  # 3D z-label follows y-label

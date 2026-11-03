@@ -65,10 +65,15 @@ class TransformTabMixin(MixinBase):
             pform.setContentsMargins(0, 0, 0, 0)
             pform.setSpacing(4)
             widgets = {}
-            for name, label, kind, default, extra in op['params']:
+            conditions = {}
+            for name, label, kind, default, extra, *rest in op['params']:
                 w = self._tf_make_param_widget(kind, default, extra)
                 widgets[name] = w
                 pform.addRow(label + ':', w)
+                if rest:                         # shown only for some choices of another parameter
+                    conditions[name] = rest[0]
+            for name, condition in conditions.items():
+                self._tf_show_when(pform, widgets, name, condition)
             if not op['params']:
                 pform.addRow(QLabel('No parameters'))
             self.tf_param_stack.addWidget(page)
@@ -111,6 +116,18 @@ class TransformTabMixin(MixinBase):
             self.tf_param_stack.setCurrentIndex(self._tf_op_index())
 
     @staticmethod
+    def _tf_show_when(form, widgets, name, condition):
+        """Show the row of parameter *name* only while the choice parameter(s) in
+        *condition* ({param: [values]}) have one of the listed values."""
+        def update(*_):
+            visible = all(widgets[other].currentText() in values
+                          for other, values in condition.items())
+            form.setRowVisible(widgets[name], visible)
+        for other in condition:
+            widgets[other].currentTextChanged.connect(update)
+        update()
+
+    @staticmethod
     def _tf_make_param_widget(kind, default, extra):
         if kind == 'optx':                   # a number, or a date on a date x; blank = open
             w = QLineEdit()
@@ -123,7 +140,7 @@ class TransformTabMixin(MixinBase):
             return w
         if kind == 'optfloat':               # the minimum shows "auto" and means "not set"
             w = QDoubleSpinBox()
-            w.setDecimals(4)
+            w.setDecimals(6)
             w.setRange(*extra)
             w.setSpecialValueText('auto')
             w.setValue(extra[0])
@@ -133,7 +150,7 @@ class TransformTabMixin(MixinBase):
             w.setRange(*extra)
         elif kind == 'float':
             w = QDoubleSpinBox()
-            w.setDecimals(4)
+            w.setDecimals(6)
             w.setRange(*extra)
             w.setSingleStep(0.1)
         else:

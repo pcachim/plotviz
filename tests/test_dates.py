@@ -281,7 +281,8 @@ class TestDatesInTheApp(unittest.TestCase):
     def test_statistics_show_dates_as_dates(self):
         w = self.w
         self._plot_dates(w)
-        w.data_inner_tabs.setCurrentIndex(2)
+        tabs = w.data_inner_tabs
+        tabs.setCurrentIndex([tabs.tabText(i) for i in range(tabs.count())].index("Statistics"))
         t = w.stats_table
         series = [t.horizontalHeaderItem(c).text() for c in range(t.columnCount())]
         stats = [t.verticalHeaderItem(r).text() for r in range(t.rowCount())]

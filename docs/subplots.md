@@ -90,5 +90,8 @@ Each subplot has its own independent settings for:
 - Tick configuration (size, direction, minor ticks, rotation, step, formatter)
 - Legend (show/hide, position, style)
 - Annotation visibility
+- Canvas background, borders, grid and 3D view (**Canvas & Grid** tab)
 
 Changes made in the **Axes** and **Legend & Notes** tabs always apply to the subplot currently shown in the selector.
+
+When you add subplots, the new ones start with the **look** of the active subplot: fonts and sizes, tick and legend style, label layout, canvas colours and grid. What depends on the data (titles and labels, limits, scale, tick step, number format, chart type) starts empty or at its default.

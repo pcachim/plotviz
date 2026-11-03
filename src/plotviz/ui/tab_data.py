@@ -5,7 +5,7 @@ You may obtain a copy of the License in the LICENSE.md file in the root
 of this repository or at https://www.gnu.org/licenses/gpl-3.0.html.
 
 ui/tab_data.py  –  plotviz
-DataTabMixin: create_data_tab(): the Data tab (Datasets page, plus the Transform, Statistics and Generate pages).
+DataTabMixin: create_data_tab(): the Data tab (Datasets page, plus the Generate, Statistics and Transform pages).
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
@@ -63,13 +63,13 @@ class DataTabMixin(MixinBase):
         mlay = QVBoxLayout(widget)
         mlay.addWidget(scroll)
 
-        # Data tab = the loaded datasets, transforms and statistics of them, and the generators that create new ones
+        # Data tab, in working order: get data (load, generate), look at it, derive new series
         self.data_inner_tabs = QTabWidget()
         self.data_inner_tabs.tabBar().setStyleSheet(INNER_TAB_QSS)
         self.data_inner_tabs.addTab(widget, 'Datasets')
-        self.data_inner_tabs.addTab(self.create_transform_page(), 'Transform')
-        self.data_inner_tabs.addTab(self.create_statistics_page(), 'Statistics')
         self.data_inner_tabs.addTab(self._advanced_panel, 'Generate')
+        self.data_inner_tabs.addTab(self.create_statistics_page(), 'Statistics')
+        self.data_inner_tabs.addTab(self.create_transform_page(), 'Transform')
         self.data_inner_tabs.currentChanged.connect(self._on_data_page_changed)
         self.tabs.addTab(self.data_inner_tabs, 'Data')
 

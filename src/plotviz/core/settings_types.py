@@ -208,6 +208,8 @@ class UiSettings(TypedDict, total=False):
     subplot_xaxis_pos: dict[str, Any]
     subplot_yaxis_pos: dict[str, Any]
     subplot_ann_visible: dict[str, Any]
+    subplot_canvas_opts: dict[str, Any]
+    subplot_grid_opts: dict[str, Any]
     xlabel_font: str
     xlabel_size: int
     xlabel_color: str

@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from ui.mixin_base import MixinBase
+from ui.tab_constants import DEFAULT_FIT_BAND_OPACITY
 
 
 class SerializationMixin(MixinBase):
@@ -102,6 +103,17 @@ class SerializationMixin(MixinBase):
         s['subplot_xaxis_pos']     = _ser(self.subplot_xaxis_pos)
         s['subplot_yaxis_pos']     = _ser(self.subplot_yaxis_pos)
         s['subplot_ann_visible']   = _ser(self.subplot_ann_visible)
+        # Canvas colours, borders, 3D view and grid of every subplot (the widgets show the
+        # active one, so bring its entry up to date first).
+        # (Read only: collecting must not change the state, it also runs mid-way through
+        # applying a colour scheme, when the widgets are not yet in step with the dicts.)
+        canvas_opts, grid_opts = dict(self.subplot_canvas_opts), dict(self.subplot_grid_opts)
+        if self._has_canvas_grid_widgets():
+            active = max(self.layout_sp_active.currentIndex(), 0)
+            canvas_opts[active] = self._current_canvas_opts()
+            grid_opts[active] = self._current_grid_opts()
+        s['subplot_canvas_opts']   = _ser(canvas_opts)
+        s['subplot_grid_opts']     = _ser(grid_opts)
 
         # Axis label fonts/colors (global – same for all subplots, stored in Axes tab)
         s['xlabel_font']  = self.xlabel_font.currentText()
@@ -197,6 +209,8 @@ class SerializationMixin(MixinBase):
                     'xc':     fit.get('xc', ''),
                     'yc':     fit.get('yc', ''),
                     'lbl':    fit.get('lbl', ''),
+                    'x0':     float(fit.get('x0') or 0.0),
+                    'n_dropped': int(fit.get('n_dropped') or 0),
                     'popt':   [float(v) for v in fit['popt']],
                     'pcov':   [[float(v) for v in row] for row in fit['pcov']] if fit.get('pcov') is not None else [],
                     'xd':     [float(v) for v in fit['xd']] if fit.get('xd') is not None else [],
@@ -204,6 +218,7 @@ class SerializationMixin(MixinBase):
                     'stats':  fit.get('stats', {}),
                     'ci_idx': fit.get('ci_idx', 0),
                     'pi_idx': fit.get('pi_idx', 0),
+                    'visible': bool(fit.get('visible', True)),
                 }
         s['fits']       = _fits_raw
         s['fit_result'] = None  # legacy sentinel
@@ -636,6 +651,12 @@ class SerializationMixin(MixinBase):
         self.subplot_xaxis_pos     = _di('subplot_xaxis_pos',    {'0': 'bottom'})
         self.subplot_yaxis_pos     = _di('subplot_yaxis_pos',    {'0': 'left'})
         self.subplot_ann_visible   = _di('subplot_ann_visible', {'0': True})
+        # Per-subplot canvas / grid (newer files).  Older files hold a single set, which the
+        # subplots without an entry inherit when the grid is built.
+        if s.get('subplot_canvas_opts'):
+            self.subplot_canvas_opts = _di('subplot_canvas_opts')
+        if s.get('subplot_grid_opts'):
+            self.subplot_grid_opts = _di('subplot_grid_opts')
         self.sp_sharex.setChecked(s.get('sp_sharex', False))
         self.sp_sharey.setChecked(s.get('sp_sharey', False))
         # Reload Axes tab widgets for subplot 0
@@ -656,15 +677,18 @@ class SerializationMixin(MixinBase):
             if not (fr.get('model') and fr.get('popt')): continue
             try:
                 model = fr['model']
-                func = _CF.MODELS.get(model)
+                x0 = float(fr.get('x0') or 0.0)
+                func = _CF.make_func(model, x0)
                 popt  = _np.array(fr['popt'])
                 pcov  = _np.array(fr['pcov']) if fr.get('pcov') else _np.zeros((len(popt), len(popt)))
                 xd    = _np.array(fr['xd'])
                 yd    = _np.array(fr['yd']) if fr.get('yd') else _np.zeros_like(xd)
-                self._fits[_nm] = dict(model=model, func=func, popt=popt, pcov=pcov,
+                self._fits[_nm] = dict(model=model, func=func, popt=popt, pcov=pcov, x0=x0,
+                    n_dropped=int(fr.get('n_dropped') or 0),
                     xd=xd, yd=yd, xc=fr.get('xc',''), yc=fr.get('yc',''), lbl=fr.get('lbl',''),
                     eq_str=fr.get('eq_str',''), r2=fr.get('r2'), stats=fr.get('stats',{}),
-                    ci_idx=fr.get('ci_idx',0), pi_idx=fr.get('pi_idx',0))
+                    ci_idx=fr.get('ci_idx',0), pi_idx=fr.get('pi_idx',0),
+                    visible=bool(fr.get('visible', True)))
             except (KeyError, ValueError, TypeError, IndexError, AttributeError):
                 logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
         for _nm in list(self._fits):
@@ -674,10 +698,11 @@ class SerializationMixin(MixinBase):
             self._last_fit = next(iter(self._fits.values()))
             if hasattr(self, '_refresh_fit_results_panel'):
                 self._refresh_fit_results_panel()
+        self._refresh_fit_table()
         # CI/PI combo display state
         self.fit_ci_combo.blockSignals(True)
         self.fit_pi_combo.blockSignals(True)
-        self.fit_ci_alpha_spin.setValue(s.get('fit_ci_alpha', 0.25))
+        self.fit_ci_alpha_spin.setValue(s.get('fit_ci_alpha', DEFAULT_FIT_BAND_OPACITY))
         self.fit_ci_combo.blockSignals(False)
         self.fit_pi_combo.blockSignals(False)
 

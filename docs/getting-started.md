@@ -74,7 +74,7 @@ The plotviz window has two main areas:
 
 | Tab | Purpose |
 |-----|---------|
-| Data | Loaded datasets, and the **Transform**, **Statistics** and **Generate** pages |
+| Data | Loaded datasets, and the **Generate**, **Statistics** and **Transform** pages |
 | Layout & Style | Whole-figure settings: size, margins, title, subplot grid, colour scheme, palette |
 | Plots | Per-subplot settings, with a **Editing** selector at the top when there are several subplots |
 

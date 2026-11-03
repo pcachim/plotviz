@@ -1,6 +1,6 @@
 # Transform and Statistics
 
-The **Data** tab has four pages: **Datasets**, **Transform**, **Statistics** and **Generate**. This page covers the two that work on series you have already loaded: **Transform** creates new series from existing ones, and **Statistics** summarises them.
+The **Data** tab has four pages: **Datasets**, **Generate**, **Statistics** and **Transform**. This page covers the two that work on series you have already loaded: **Transform** creates new series from existing ones, and **Statistics** summarises them.
 
 ---
 
@@ -57,7 +57,7 @@ Some operations change the number or position of the points (decimating, croppin
 |-----------|-----------|-------|
 | Every N points | N, start at | Keeps one point out of every N |
 | Block average | Block size | Replaces each block by its mean, x included; a short last block is kept |
-| Resample (uniform x) | Points | Linear interpolation onto equally spaced x; needs x |
+| Resample (uniform x) | Points, step | Linear interpolation onto equally spaced x. Give a **step** (for example `0.001` for a sample every millisecond) to fix the spacing instead of the number of points; the step wins when both are set. Needs x |
 | Decimate (anti-aliased) | Factor | Low-pass filters first, then keeps every N-th point. y must have no NaN |
 | Align to another x | Series, interpolation | Interpolates y onto the x of another series (`linear` or `pchip`); NaN outside the range of the original x. Needs x |
 | Crop x range | x min, x max | Keeps `x min ≤ x ≤ x max`; leave a bound on `auto` to leave it open. Needs x |
@@ -68,7 +68,7 @@ Some operations change the number or position of the points (decimating, croppin
 |-----------|-------|
 | Derivative dy/dx | Central differences |
 | Second derivative d2y/dx2 | Needs at least 3 points |
-| Integral (cumulative) | Trapezoid rule, starting at 0 |
+| Integral (cumulative) | Starts at | Trapezoid rule; the running total starts at the value you give (the constant of integration, 0 by default) |
 | Difference | `y[i] − y[i−1]`; the first point is NaN |
 | Percent change | `100·(y[i] − y[i−1]) / abs(y[i−1])`; the first point is NaN |
 | Log return | `ln(y[i] / y[i−1])`; all values must be positive |
@@ -78,11 +78,11 @@ Some operations change the number or position of the points (decimating, croppin
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
-| Normalize | Method | `min-max` → 0 to 1; `z-score` → mean 0, std 1; `first` → divide by the first value; `max` → divide by the largest absolute value |
+| Normalize | Method | `min-max` → 0 to 1; `z-score` → mean 0, std 1; `first` → divide by the first value; `max` → divide by the largest absolute value; `value` → divide by a number you type; `mean of range` → divide by the mean over an x range (for example the resting reading) |
 | Scale and shift | a, b | `a·y + b` |
-| Subtract baseline | Baseline | First value, last value, mean, median or minimum |
+| Subtract baseline | Baseline | First value, last value, mean, median or minimum; a fixed **value**; or the **mean / median of a range** of x (a quiet stretch, so a peak does not pull the baseline up). The *Value* and *x from / x to* boxes appear only for the methods that use them; leave a limit empty to leave it open |
 | Absolute value | — | |
-| Remove trend (polynomial) | Degree | Subtracts a least-squares polynomial; degree 1 is a straight line |
+| Remove trend (polynomial) | Degree, fit from x, fit to x | Subtracts a least-squares polynomial; degree 1 is a straight line. Limit the fit to a stretch of x (without the peak) so the peak does not tilt it; the result is subtracted over the whole series |
 
 #### Cleaning
 
@@ -107,12 +107,13 @@ Some operations change the number or position of the points (decimating, croppin
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
 | FFT amplitude spectrum | Remove mean | Single-sided amplitude. x gives the sampling interval, so it should be evenly spaced; y must have no NaN. Output: frequency and amplitude |
-| Find peaks | Min height, min prominence, min distance | Local maxima. Output: only the peak points. An error is shown if there are none |
+| Find peaks | Min height (× noise), min height, min prominence, min distance | Local maxima. Output: only the peak points. **Min height (× noise)** sets the threshold at the median plus *k* times the noise of the series (estimated robustly, so a few peaks do not inflate it; remove any drift first). With *Min height* as well, the higher limit applies. Prominence is measured against the valleys around a peak, so with noise it needs about 8 times the noise level; a height threshold of about 5 times is simpler. An error is shown if there are no peaks |
 
 !!! tip "Recipes"
     - **Remove spikes, then smooth:** *Outlier filter (Hampel)*, then *Savitzky-Golay* on the result.
     - **Find the dominant frequency:** *Remove trend*, then *FFT amplitude spectrum*, and plot the spectrum.
     - **Uneven sampling:** *Resample (uniform x)* before a Butterworth filter or an FFT.
+    - **Pulse in a stable signal with noise:** *Subtract baseline* (**median of range**, over a stretch without the pulse), then *Savitzky-Golay* with a window no longer than the pulse (in points), then *Find peaks* with **Min height (× noise)** of 5 or 6 and a *Min distance* of the pulse width. Do not use the moving median or the outlier filter: they treat the pulse as noise and remove it. For a negative pulse, *Scale and shift* with a = −1 first.
     - **Compare two series with different x:** *Align to another x* puts one on the x of the other.
 
 ---

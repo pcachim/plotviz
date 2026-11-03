@@ -83,6 +83,14 @@ def _first_label(series: list[SeriesDict]) -> str:
     return str(series[0].get('label', '')) if series else ''
 
 
+def _data_series(settings: Mapping[str, Any], series: list[Any]) -> list[Any]:
+    """The series that are not fit curves: the default axis titles name the data, not each
+    fit (all of them if every series is a fit).  Fit curves are the keys of settings['fits']."""
+    fits = settings.get('fits') or {}
+    kept = [s for s in series if s.get('y_col') not in fits]
+    return kept or list(series)
+
+
 def _is_cat_data(arr: Any) -> bool:
     """True for string/object columns (categorical), mirroring the engine."""
     if arr is None:
@@ -1189,7 +1197,8 @@ def _y2_axis_lines(settings: Settings, idx: int, ax_var: str, ax2_var: str, sub_
     lines += gen(sub_settings, y2_series, datasets, palette, ax2_var)
     if subplot_get(settings, 'subplot_y2label_show', idx, True):
         y2l = (subplot_get(settings, 'subplot_y2labels', idx, '')
-               or ', '.join(dict.fromkeys(s.get('y_col', '') for s in y2_series if s.get('y_col'))))
+               or ', '.join(dict.fromkeys(s.get('y_col', '') for s in _data_series(settings, y2_series)
+                                          if s.get('y_col'))))
         if y2l:
             lines.append(
                 f"{ax2_var}.set_ylabel('{_esc(y2l)}', fontsize={settings.get('y2label_size', 11)}, "
@@ -1596,7 +1605,8 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
         if ct in ('Heatmap', 'Contour', 'Tricontour', '3D Surface'):
             _yc0 = series_list[0].get('y_col', '') if series_list else ''
         else:
-            _yc0 = ', '.join(dict.fromkeys(s.get('label', s.get('y_col', '')) for s in series_list if s.get('y_col')))
+            _yc0 = ', '.join(dict.fromkeys(s.get('label', s.get('y_col', ''))
+                                           for s in _data_series(settings, series_list) if s.get('y_col')))
         xl = settings.get('subplot_xlabels', {}).get('0', '') or ('' if ct in _NO_X_TYPES else _xc0)
         yl = settings.get('subplot_ylabels', {}).get('0', '') or ('' if ct in _NO_X_TYPES else _yc0)
         # Single-subplot title is rendered via suptitle below, not ax.set_title.
@@ -1645,7 +1655,8 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
                 _show_t = (settings.get('subplot_title_show') or {}).get(str(idx), True)
                 sp_title = (settings.get('sp_titles', {}).get(str(idx), '') or f'Subplot {idx+1}') if _show_t else ''
                 _sx = ', '.join(dict.fromkeys(s.get('x_col', '') for s in sub_series if s.get('x_col')))
-                _sy = ', '.join(dict.fromkeys(s.get('y_col', '') for s in sub_series if s.get('y_col')))
+                _sy = ', '.join(dict.fromkeys(s.get('y_col', '') for s in _data_series(settings, sub_series)
+                                              if s.get('y_col')))
                 xl = settings.get('subplot_xlabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _sx)
                 yl = settings.get('subplot_ylabels', {}).get(str(idx), '') or ('' if sub_ct in _NO_X_TYPES else _sy)
                 lines += _gen_decoration(sub_settings, idx, ax_var, sub_ct, xl, yl, sp_title)
@@ -1690,7 +1701,8 @@ def generate_plot_script(settings: Settings, series_meta: SeriesMeta,
                 _show_t = (settings.get('subplot_title_show') or {}).get(str(idx), True)
                 sp_title = (settings.get('sp_titles', {}).get(str(idx), '') or f'Subplot {idx+1}') if _show_t else ''
                 _sx = ', '.join(dict.fromkeys(s.get('x_col', '') for s in sub_series if s.get('x_col')))
-                _sy = ', '.join(dict.fromkeys(s.get('y_col', '') for s in sub_series if s.get('y_col')))
+                _sy = ', '.join(dict.fromkeys(s.get('y_col', '') for s in _data_series(settings, sub_series)
+                                              if s.get('y_col')))
                 _horiz = (sub_ct == 'Bar' and sub_settings.get('bar_horizontal', False))
                 _def_xl = _sy if _horiz else _sx
                 _def_yl = _sx if _horiz else _sy

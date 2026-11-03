@@ -215,6 +215,32 @@ class TestScriptLayoutMatchesExport(unittest.TestCase):
     def test_colorbar_chart(self):
         self.assertSameLayout(self._window(chart="Heatmap", mode="Heatmap & Contour"), "heatmap")
 
+    def test_each_subplot_has_the_same_canvas_and_grid_in_the_script(self):
+        from matplotlib.colors import to_hex
+        w = self._window(types=["Line", "Line", "Line", "Line"])
+        for i in range(4):
+            co = w._default_canvas_opts()
+            co.update(plot_bg=["#ffe0e0", "#e0ffe0", "#e0e0ff", "#fffbe0"][i],
+                      border_top=bool(i % 2), border_right=bool(i // 2))
+            go = w._default_grid_opts()
+            go.update(enabled=bool(i % 2), color=["#ff0000", "#00ff00", "#0000ff", "#888888"][i])
+            w.subplot_canvas_opts[i], w.subplot_grid_opts[i] = co, go
+        w._load_canvas_grid_opts(0)
+
+        def look(ax):
+            lines = ax.xaxis.get_gridlines()
+            return (to_hex(ax.get_facecolor()),
+                    "".join("1" if ax.spines[k].get_visible() else "0"
+                            for k in ("top", "bottom", "left", "right")),
+                    bool(lines and lines[0].get_visible()),
+                    to_hex(lines[0].get_color()) if lines and lines[0].get_visible() else None)
+
+        app = [look(a) for a in self._export_figure(w).axes]
+        script = [look(a) for a in self._script_figure(w)[0].axes]
+        self.assertEqual(len(app), 4)
+        self.assertEqual(app, script)
+        self.assertEqual(len({f for f, *_ in app}), 4)          # and they do differ per subplot
+
     def test_script_has_no_tight_layout(self):
         script = self.assertSameLayout(self._window(), "no tight_layout")
         self.assertNotIn("tight_layout", script)

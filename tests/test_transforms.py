@@ -233,6 +233,95 @@ class TestMoreOperations(unittest.TestCase):
         np.testing.assert_allclose(mn, [4, 4, 2, 2, 1])
 
 
+class TestFixedReferences(unittest.TestCase):
+    """Baseline, normalisation and trend can use a value or a stretch of x that the user chooses."""
+
+    X = np.arange(10.0)
+    Y = np.array([5, 5, 5, 5, 9, 5, 5, 5, 5, 5], dtype=float)         # a pulse on a baseline of 5
+
+    def test_baseline_from_a_value(self):
+        _, y = tf.subtract_baseline(self.X, self.Y, 'value', value=4.5)
+        np.testing.assert_allclose(y[:2], [0.5, 0.5])
+
+    def test_baseline_from_a_range_ignores_the_pulse(self):
+        for method in ('mean of range', 'median of range'):
+            _, y = tf.subtract_baseline(self.X, self.Y, method, x_from=0, x_to=2)
+            self.assertEqual((y[0], y[4]), (0.0, 4.0), method)
+        _, y = tf.subtract_baseline(self.X, self.Y, 'mean')            # the global mean is pulled up
+        self.assertGreater(y[0], -1)
+        self.assertNotEqual(y[0], 0.0)
+
+    def test_range_open_ends_and_index_as_x(self):
+        _, y = tf.subtract_baseline(None, self.Y, 'median of range', x_to=3)        # index positions
+        self.assertEqual(y[0], 0.0)
+        _, y = tf.subtract_baseline(self.X, self.Y, 'mean of range', x_from=5)
+        self.assertEqual(y[0], 0.0)
+
+    def test_empty_range_is_an_error(self):
+        with self.assertRaises(ValueError):
+            tf.subtract_baseline(self.X, self.Y, 'mean of range', x_from=50, x_to=60)
+
+    def test_normalize_by_a_value_or_a_range(self):
+        _, y = tf.normalize(self.X, self.Y, 'value', value=5.0)
+        self.assertEqual((y[0], y[4]), (1.0, 1.8))
+        _, y = tf.normalize(self.X, self.Y, 'mean of range', x_from=0, x_to=3)
+        self.assertEqual((y[0], y[4]), (1.0, 1.8))
+        with self.assertRaises(ValueError):
+            tf.normalize(self.X, self.Y, 'value', value=0)
+
+    def test_detrend_fits_only_the_chosen_stretch(self):
+        x = np.arange(100.0)
+        y = 0.5 * x + 3
+        y[40:44] += 20                                        # a pulse that would tilt a global fit
+        _, whole = tf.detrend(x, y, 1)
+        _, quiet = tf.detrend(x, y, 1, x_from=0, x_to=30)
+        self.assertGreater(np.abs(whole[:30]).max(), 0.5)
+        np.testing.assert_allclose(quiet[:30], 0, atol=1e-9)
+        np.testing.assert_allclose(quiet[40:44], 20, atol=1e-9)
+
+
+class TestNoiseThresholdAndSteps(unittest.TestCase):
+    def test_noise_sigma_matches_the_std_and_ignores_pulses(self):
+        rng = np.random.default_rng(3)
+        y = rng.normal(0, 0.1, 5000)
+        self.assertAlmostEqual(tf.noise_sigma(y), 0.1, delta=0.01)
+        y[100:104] += 5
+        self.assertAlmostEqual(tf.noise_sigma(y), 0.1, delta=0.01)       # an std would be 0.14+
+
+    def test_peaks_by_noise_threshold(self):
+        rng = np.random.default_rng(11)
+        y = 2.5 + 0.02 * rng.standard_normal(1000)
+        y[300:304] += [0.10, 0.25, 0.25, 0.12]
+        y[720:723] += [0.12, 0.20, 0.10]
+        x = np.arange(1000) / 1000.0
+        px, _ = tf.peaks(x, y, min_distance=4, min_height_noise=6)
+        np.testing.assert_allclose(px, [0.301, 0.721], atol=0.003)
+        with self.assertRaisesRegex(ValueError, 'above'):
+            tf.peaks(x, y, min_height_noise=1000)
+        # with both limits, the higher one applies
+        px, _ = tf.peaks(x, y, min_distance=4, min_height_noise=6, min_height=2.7)
+        np.testing.assert_allclose(px, [0.301], atol=0.003)
+
+    def test_integral_starts_where_asked(self):
+        x = np.linspace(0, 2, 201)
+        _, i = tf.cumulative_integral(x, np.ones_like(x), start=3.0)
+        self.assertEqual(i[0], 3.0)
+        self.assertAlmostEqual(i[-1], 5.0)
+
+    def test_resample_by_step(self):
+        x = np.array([0.0, 0.4, 1.0, 2.0])
+        gx, gy = tf.resample_uniform(x, x * 10, step=0.5)
+        np.testing.assert_allclose(gx, [0, 0.5, 1.0, 1.5, 2.0])
+        np.testing.assert_allclose(gy, [0, 5, 10, 15, 20])
+        gx, _ = tf.resample_uniform(x, x, points=3, step=1.0)            # the step wins
+        self.assertEqual(len(gx), 3)
+        for bad in (0, -1):
+            with self.assertRaises(ValueError):
+                tf.resample_uniform(x, x, step=bad)
+        with self.assertRaises(ValueError):
+            tf.resample_uniform(x, x, step=1e-9)                         # absurdly many points
+
+
 class TestRegistry(unittest.TestCase):
     def test_groups_are_contiguous_and_every_operation_has_one(self):
         seen, last = [], None
