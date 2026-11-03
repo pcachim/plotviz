@@ -521,6 +521,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../transform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transform & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../chart-types/" class="md-nav__link">
         
   
@@ -612,7 +640,7 @@
   <span class="md-ellipsis">
     
   
-    Annotations
+    Legend & Notes
   
 
     
@@ -1440,7 +1468,7 @@
 <li>Title, legend, grid, and figure size</li>
 </ul>
 <h3 id="data">data/<a class="headerlink" href="#data" title="Permanent link">&para;</a></h3>
-<p>Only the columns actually assigned to series in the chart are exported. If all exported columns share the same row count, they are written to a single <code>data/data.csv</code>. If they differ in length, each column gets its own CSV file (e.g. <code>data/pressure.csv</code>) to avoid NaN padding.</p>
+<p>Date columns are written to the CSV as ISO 8601 text (<code>2024-03-01</code>, <code>2024-03-01T12:30:00</code>), and the script converts them back with <code>pd.to_datetime</code>, so the exported chart has a date axis too. Only the columns actually assigned to series in the chart are exported. If all exported columns share the same row count, they are written to a single <code>data/data.csv</code>. If they differ in length, each column gets its own CSV file (e.g. <code>data/pressure.csv</code>) to avoid NaN padding.</p>
 <h3 id="pyprojecttoml">pyproject.toml<a class="headerlink" href="#pyprojecttoml" title="Permanent link">&para;</a></h3>
 <p>A minimal <code>pyproject.toml</code> listing the required packages (<code>matplotlib</code>, <code>numpy</code>, <code>pandas</code>, <code>scipy</code>) for use with tools like <code>uv</code> or <code>pip</code>.</p>
 <hr />

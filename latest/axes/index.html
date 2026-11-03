@@ -521,6 +521,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../transform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transform & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../chart-types/" class="md-nav__link">
         
   
@@ -639,6 +667,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#subplot-title" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subplot title
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#axis-labels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -738,7 +777,7 @@
   <span class="md-ellipsis">
     
   
-    Annotations
+    Legend & Notes
   
 
     
@@ -1190,6 +1229,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#subplot-title" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subplot title
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#axis-labels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1292,7 +1342,44 @@
 
 
 <h1 id="axes">Axes<a class="headerlink" href="#axes" title="Permanent link">&para;</a></h1>
-<p>The <strong>Axes</strong> tab controls per-subplot axis configuration: labels, limits, scale, ticks, and the secondary Y axis. When the chart has more than one subplot, a <strong>Subplot</strong> selector at the top lets you switch between panels. Changing the selector in the Axes tab automatically syncs with the selectors in the other Plots pages.</p>
+<p>The <strong>Axes</strong> tab controls per-subplot axis configuration: the subplot title, axis labels, limits, scale, ticks, and the secondary Y axis. When the chart has more than one subplot, a <strong>Subplot</strong> selector at the top lets you switch between panels. Changing the selector in the Axes tab automatically syncs with the selectors in the other Plots pages.</p>
+<hr />
+<h2 id="subplot-title">Subplot title<a class="headerlink" href="#subplot-title" title="Permanent link">&para;</a></h2>
+<p>The <strong>Subplot Title</strong> section is at the top of the tab and only appears when the chart has more than one panel. For a single-panel chart, the chart title is set in the <strong>Layout &amp; Style</strong> tab.</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Show title</strong></td>
+<td>Checkbox: toggle title visibility</td>
+</tr>
+<tr>
+<td><strong>Text field</strong></td>
+<td>Title text for this subplot</td>
+</tr>
+<tr>
+<td><strong>Font / Size / Color</strong></td>
+<td>Typography</td>
+</tr>
+<tr>
+<td><strong>Pad</strong></td>
+<td>Distance between the title and the top of the axes (points)</td>
+</tr>
+<tr>
+<td><strong>Rot</strong></td>
+<td>Rotation in degrees</td>
+</tr>
+<tr>
+<td><strong>Align</strong></td>
+<td>center, left or right</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="axis-labels">Axis labels<a class="headerlink" href="#axis-labels" title="Permanent link">&para;</a></h2>
 <p>Each axis (X, Y, Y2) has three controls:</p>
@@ -1429,19 +1516,20 @@
 <td><code>1.23 × 10⁶</code></td>
 </tr>
 <tr>
-<td>eng</td>
-<td><code>1.23 M</code> (SI prefix)</td>
-</tr>
-<tr>
 <td>percent</td>
 <td><code>12.3%</code></td>
 </tr>
 <tr>
-<td>date</td>
-<td><code>2024-01</code> (for date-encoded floats)</td>
+<td><code>{x:.2f}</code>, <code>{x:.0f}</code>, …</td>
+<td>any Python format string with <code>{x}</code>: <code>3.14</code>, <code>3</code></td>
+</tr>
+<tr>
+<td><code>%Y-%m-%d</code>, <code>%d/%m/%Y</code>, <code>%b %Y</code>, <code>%H:%M</code>, …</td>
+<td>a <a href="https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes">date format</a>, for an axis that shows dates</td>
 </tr>
 </tbody>
 </table>
+<p>The dropdown is editable, so you can type any format. Date formats only make sense on an axis that shows a date column; see <a href="../data/#date-and-time-columns">Date and time columns</a>. With <strong>auto</strong>, a date axis picks sensible ticks and labels by itself (years, months, days or hours, depending on the range).</p>
 <hr />
 <h2 id="secondary-y-axis-y2">Secondary Y axis (Y2)<a class="headerlink" href="#secondary-y-axis-y2" title="Permanent link">&para;</a></h2>
 <p>Enable the secondary Y axis by ticking the <strong>Y2</strong> checkbox on one or more series rows in <strong>Plots → Plot</strong>. The Y2 axis appears on the right side of the plot.</p>
@@ -1519,13 +1607,13 @@
         
         
           
-          <a href="../annotations/" class="md-footer__link md-footer__link--next" aria-label="Next: Annotations">
+          <a href="../annotations/" class="md-footer__link md-footer__link--next" aria-label="Next: Legend &amp; Notes">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Annotations
+                Legend & Notes
               </div>
             </div>
             <div class="md-footer__button md-icon">

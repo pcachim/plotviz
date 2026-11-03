@@ -18,7 +18,7 @@
         <link rel="prev" href="../getting-started/">
       
       
-        <link rel="next" href="../chart-types/">
+        <link rel="next" href="../transform/">
       
       
         
@@ -567,6 +567,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#import-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date-and-time-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Date and time columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#removing-datasets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -681,6 +703,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../transform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transform & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../chart-types/" class="md-nav__link">
         
   
@@ -772,7 +822,7 @@
   <span class="md-ellipsis">
     
   
-    Annotations
+    Legend & Notes
   
 
     
@@ -1236,6 +1286,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#import-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date-and-time-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Date and time columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#removing-datasets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1374,12 +1446,12 @@
 <tr>
 <td>CSV</td>
 <td><code>.csv</code></td>
-<td>Comma-separated, auto-detected header</td>
+<td>Separator, decimal mark and encoding selectable</td>
 </tr>
 <tr>
 <td>Excel</td>
 <td><code>.xlsx</code>, <code>.xls</code></td>
-<td>First sheet loaded</td>
+<td>Choose the sheet in the import dialog</td>
 </tr>
 <tr>
 <td>JSON</td>
@@ -1393,12 +1465,85 @@
 </tr>
 </tbody>
 </table>
-<p>All columns from the file are imported. Numeric columns become float arrays; text columns are treated as categorical. Column names are taken from the first row.</p>
+<p>Each file opens an import dialog with a preview of the first 100 rows. You can pick the columns to import and rename them. Numeric columns become float arrays, date columns become dates (below), and other text columns are treated as categorical. Column names are taken from the first row.</p>
+<h3 id="import-options">Import options<a class="headerlink" href="#import-options" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Applies to</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sheet</td>
+<td>Excel</td>
+<td>Which sheet to read</td>
+</tr>
+<tr>
+<td>Separator</td>
+<td>CSV, TXT</td>
+<td>Auto-detect, comma, semicolon, tab, whitespace, pipe or a custom character</td>
+</tr>
+<tr>
+<td>Decimal</td>
+<td>CSV, TXT</td>
+<td><code>Point (1.5)</code> or <code>Comma (1,5)</code>. Use the comma for files from European locales, otherwise numbers such as <code>1,5</code> are read as text</td>
+</tr>
+<tr>
+<td>Encoding</td>
+<td>CSV, TXT</td>
+<td><code>utf-8-sig</code> (the default) reads plain UTF-8 and the marker Excel adds at the start of the file; try <code>latin-1</code> or <code>cp1252</code> if accented characters look wrong</td>
+</tr>
+<tr>
+<td>Orientation</td>
+<td>JSON</td>
+<td>Layout of the JSON data</td>
+</tr>
+<tr>
+<td>Header row, Skip rows</td>
+<td>All</td>
+<td>Where the column names are, and how many lines to ignore before them</td>
+</tr>
+</tbody>
+</table>
 <p>You can load multiple files in one session — each file's columns are pooled into the shared column list and available in all series rows.</p>
+<h3 id="date-and-time-columns">Date and time columns<a class="headerlink" href="#date-and-time-columns" title="Permanent link">&para;</a></h3>
+<p>Columns that hold dates or times are recognised when you import them and marked with 📅 in the column list. They can be used as the X (or Y) of any series, and the axis then shows dates, with ticks that adapt to the range: years, months, days, hours…</p>
+<p>Recognised formats include <code>2024-03-01</code>, <code>2024-03-01 12:30</code>, <code>2024-03-01T12:30:00</code>, <code>1 Mar 2024</code>, <code>March 5, 2024</code> and <code>03/04/2024</code>, and Excel date cells. A text column is only taken as dates when <strong>every</strong> value looks like a date, so names such as <code>May</code> or numbers such as <code>1,5</code> stay as they were. Two import options control this:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Dates: auto-detect / off</strong></td>
+<td>Turn the detection off to keep date-like columns as plain text</td>
+</tr>
+<tr>
+<td><strong>Day first</strong></td>
+<td>Read <code>03/04/2024</code> as 3 April instead of March 4</td>
+</tr>
+</tbody>
+</table>
+<p>Things to know:</p>
+<ul>
+<li>A date column is kept as the number of days since 1970-01-01 (fractions are the time of day), so everything that works on numbers keeps working: transforms, fits, statistics. Time zones are converted to UTC and dropped.</li>
+<li>The tick labels follow the range automatically. To choose them, type a date format such as <code>%d/%m/%Y</code> in the axis <strong>Format</strong> box (<a href="../axes/#tick-formatters">Axes</a>).</li>
+<li>Limits and the tick step typed in the Axes tab are in <strong>days</strong> (for example a step of 7 puts a tick every week).</li>
+<li>Log scales are ignored on a date axis.</li>
+<li>Saved charts keep dates as dates, and so does the <a href="../python-export/">Python export</a>.</li>
+<li>The Seaborn Explorer and the Code Runner see date columns as numbers (days since 1970-01-01). In the Code Runner use <code>pd.to_datetime(x, unit='D')</code> to get datetimes back.</li>
+</ul>
 <h3 id="removing-datasets">Removing datasets<a class="headerlink" href="#removing-datasets" title="Permanent link">&para;</a></h3>
 <p>Select one or more entries in the <strong>Datasets</strong> list and click <strong>Remove selected</strong>. Any series that reference removed columns will show empty dropdowns but are not deleted from the table.</p>
 <h3 id="inspecting-columns">Inspecting columns<a class="headerlink" href="#inspecting-columns" title="Permanent link">&para;</a></h3>
 <p>Select a column (or multiple columns) in the Datasets list and click <strong>Inspect values</strong> to see a summary: count, min, max, mean, and a preview of the first values.</p>
+<p>For a full summary (quartiles, standard deviation, skewness, correlation between series), use the <strong>Statistics</strong> page; to create new series from existing ones (smoothing, derivatives, resampling…), use the <strong>Transform</strong> page. See <a href="../transform/">Transform and Statistics</a>.</p>
 <hr />
 <h2 id="the-series-table">The series table<a class="headerlink" href="#the-series-table" title="Permanent link">&para;</a></h2>
 <p>The series table in the <strong>Data</strong> tab maps data columns to visual series. Each row is one plotted series.</p>
@@ -1508,13 +1653,13 @@
         
         
           
-          <a href="../chart-types/" class="md-footer__link md-footer__link--next" aria-label="Next: Chart Types">
+          <a href="../transform/" class="md-footer__link md-footer__link--next" aria-label="Next: Transform &amp; Statistics">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Chart Types
+                Transform & Statistics
               </div>
             </div>
             <div class="md-footer__button md-icon">
