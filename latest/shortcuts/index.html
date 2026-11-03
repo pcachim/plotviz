@@ -1030,6 +1030,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#undo-and-redo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Undo and redo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#canvas-matplotlib-toolbar" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1229,6 +1240,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#undo-and-redo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Undo and redo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#canvas-matplotlib-toolbar" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1389,6 +1411,17 @@
 </tr>
 </tbody>
 </table>
+<h2 id="undo-and-redo">Undo and redo<a class="headerlink" href="#undo-and-redo" title="Permanent link">&para;</a></h2>
+<p><strong>Edit → Undo</strong> and <strong>Redo</strong> (and the two buttons in the top bar) step through up to 50 changes. Hover over a button to see what it will undo or redo ("Undo: Apply fit"), and the status bar says what was undone.</p>
+<p>A step is recorded about half a second after the last change, so a burst of edits (typing, dragging a spin box) is one step. Everything that makes up the chart is in it:</p>
+<ul>
+<li>every setting, per subplot, including the style of each curve;</li>
+<li>the datasets (loading, removing, <strong>Generate</strong>, <strong>Transform</strong>, the data table);</li>
+<li>the series table and the fits (with their bands, and whether each is shown);</li>
+<li>the annotations (adding, moving, editing, deleting).</li>
+</ul>
+<p>After an undo you stay on the same subplot and curve, and the lists keep their selection. Undo does not cover zooming or panning with the toolbar, the open/save state of the file, or the palettes you saved to disk.</p>
+<p>The history starts again when you open a file or start a new chart. The datasets in the history are not copied: a step only holds the arrays that changed, so a long history does not multiply the memory used by large data.</p>
 <h2 id="canvas-matplotlib-toolbar">Canvas (matplotlib toolbar)<a class="headerlink" href="#canvas-matplotlib-toolbar" title="Permanent link">&para;</a></h2>
 <p>The toolbar above the chart canvas provides standard matplotlib navigation:</p>
 <table>

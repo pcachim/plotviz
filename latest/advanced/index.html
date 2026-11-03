@@ -823,6 +823,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1307,6 +1318,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1468,7 +1490,17 @@
 <li>Name the X and Y columns.</li>
 <li>Click <strong>Generate</strong> — the columns appear in the Datasets list and can be assigned to series in <strong>Plots → Plot</strong>.</li>
 </ol>
-<p>Clicking <strong>Generate</strong> again with the same column names replaces the previous data.</p>
+<p>Clicking <strong>Generate</strong> again with the same column names does not replace the previous data: the new columns get a numeric suffix (<code>x_1</code>, <code>y_1</code>, …).</p>
+<h3 id="preview">Preview<a class="headerlink" href="#preview" title="Permanent link">&para;</a></h3>
+<p>Below the expression, a small plot shows what <strong>Generate</strong> would create, without creating anything. It uses the same calculation as the button, so what you see is what you get.</p>
+<ul>
+<li><strong>Preview</strong> draws it once. <strong>Live</strong> (on by default) redraws shortly after any change: expression, range, number of points, spacing or names.</li>
+<li>With the <strong>column</strong> input, the source column is drawn in grey and the result over it.</li>
+<li><code>logspace</code> and <code>geomspace</code> get a logarithmic x axis; <strong>log y</strong> is optional.</li>
+<li>With <code>random</code> or <code>uniform</code> spacing the preview keeps the same random draw until you click <strong>Generate</strong>, and the columns created are exactly the ones shown. The next preview is a new draw.</li>
+<li>Problems (syntax errors, unknown names, an empty range) are written in the plot area instead of showing a dialog.</li>
+<li>A line under the plot gives the number of points and the names of the columns that would be created. Above 50,000 points Live pauses; use <strong>Preview</strong>.</li>
+</ul>
 <hr />
 <h2 id="data-table">Data Table<a class="headerlink" href="#data-table" title="Permanent link">&para;</a></h2>
 <p>The data table provides a manual spreadsheet-style entry grid for small datasets.</p>

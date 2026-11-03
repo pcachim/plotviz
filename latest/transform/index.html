@@ -606,6 +606,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#dates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1347,6 +1358,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#dates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1546,6 +1568,22 @@
 <li>Click <strong>Apply</strong>.</li>
 </ol>
 <p>The status line under the button says what was created and how many points it has. New series appear at once in the Datasets list and in the series table.</p>
+<h3 id="preview">Preview<a class="headerlink" href="#preview" title="Permanent link">&para;</a></h3>
+<p>Below the parameters, a small plot shows what <strong>Apply</strong> would create, without
+creating anything: the original series in grey and the result on top of it.
+It uses the same calculation as Apply, so what you see is what you get.</p>
+<ul>
+<li><strong>Preview</strong> draws it once. <strong>Live</strong> (on by default) redraws shortly after
+  any change — series, operation or parameter.</li>
+<li>Peaks are drawn as markers. A spectrum is drawn alone, since its x axis is
+  different. Date columns get a date axis. <strong>log y</strong> helps with spectra.</li>
+<li>Long series are drawn with a reduced number of points (the highs and lows
+  are kept). Above 50,000 points Live pauses; use <strong>Preview</strong>.</li>
+<li>Problems (a window longer than the series, no x for a resample, ...) are
+  written in the plot area instead of showing a dialog.</li>
+<li>Under the plot, a line says how many points go in and the name of the
+  series that would be created.</li>
+</ul>
 <h3 id="dates">Dates<a class="headerlink" href="#dates" title="Permanent link">&para;</a></h3>
 <p>When x is a date column, the operations that keep or select x values keep it as dates: the new x series from cropping, decimating, resampling, aligning, removing NaN or finding peaks is a date series, and plots with a date axis. Notes:</p>
 <ul>

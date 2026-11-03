@@ -804,6 +804,51 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Available models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-expression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom expression
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-to-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to fit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What to fit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#smoothing-lowess" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smoothing (LOWESS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -1366,6 +1411,51 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Available models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-expression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom expression
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-to-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to fit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What to fit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#smoothing-lowess" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smoothing (LOWESS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -1527,40 +1617,97 @@
 <tr>
 <th>Model</th>
 <th>Equation</th>
+<th>Typical use</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Linear</td>
 <td>y = a·x + b</td>
+<td></td>
 </tr>
 <tr>
 <td>Quadratic</td>
 <td>y = a·x² + b·x + c</td>
+<td></td>
 </tr>
 <tr>
 <td>Cubic</td>
 <td>y = a·x³ + b·x² + c·x + d</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Polynomial (degree n)</strong></td>
+<td>y = c<em>n</em>·xⁿ + … + c1·x + c0</td>
+<td>any degree from 1 to 10; choose the <strong>Degree</strong> below the list</td>
 </tr>
 <tr>
 <td>Exponential</td>
 <td>y = a·e^(b·x)</td>
+<td>decay or growth towards 0</td>
+</tr>
+<tr>
+<td><strong>Exponential + offset</strong></td>
+<td>y = a·e^(b·x) + c</td>
+<td>charging or discharging (a capacitor, cooling): it settles at c instead of 0</td>
 </tr>
 <tr>
 <td>Power Law</td>
 <td>y = a·x^b</td>
+<td>needs x &gt; 0</td>
 </tr>
 <tr>
 <td>Logarithmic</td>
 <td>y = a·ln(x) + b</td>
+<td>needs x &gt; 0</td>
 </tr>
 <tr>
 <td>Sigmoid</td>
 <td>y = a / (1 + e^(−(x − b)/c))</td>
+<td>rising or falling step</td>
+</tr>
+<tr>
+<td><strong>Gaussian</strong></td>
+<td>y = a·e^(−(x − μ)²/2σ²) + c</td>
+<td>a peak (or, with a &lt; 0, a dip) on a baseline: centre μ, width σ, height a</td>
+</tr>
+<tr>
+<td><strong>Sinusoid</strong></td>
+<td>y = a·sin(2π·f·x + φ) + c</td>
+<td>a periodic signal: amplitude, frequency (cycles per x unit), phase</td>
+</tr>
+<tr>
+<td><strong>Custom expression</strong></td>
+<td>whatever you type</td>
+<td>see below</td>
+</tr>
+<tr>
+<td><strong>Smoothing (LOWESS)</strong></td>
+<td>no equation</td>
+<td>a smooth trend through noisy data, to see its shape; see below</td>
 </tr>
 </tbody>
 </table>
 <p>Fitted parameters are shown in the results box along with R², RMSE, and other statistics.</p>
+<h4 id="custom-expression">Custom expression<a class="headerlink" href="#custom-expression" title="Permanent link">&para;</a></h4>
+<p>Type the formula in <strong>Custom expression</strong>, for example <code>a*exp(-x/b) + c</code> or <code>a*x/(b+x)</code>:</p>
+<ul>
+<li><code>x</code> is the independent variable; <strong>every other letter or word is a parameter to fit</strong>. The results list them in the order they first appear.</li>
+<li>You can use numbers, <code>+ - * / ** %</code>, parentheses, the constants <code>pi</code> and <code>e</code>, and the functions <code>sin cos tan arcsin arccos arctan arctan2 sinh cosh tanh exp expm1 log log10 log2 log1p sqrt cbrt abs sign minimum maximum</code>. Nothing else is accepted (no attributes, no other function calls, no conditions).</li>
+<li><strong>Start values</strong> (optional): <code>a=3, b=2, c=1</code>. The search starts at 1 for the parameters you do not list (and also tries 0.1 and 10). Give them when the fit does not converge.</li>
+<li>The F-test is not defined for custom models; use the AIC to compare.</li>
+</ul>
+<p>Polynomials, the Gaussian, the sinusoid and the offset exponential find their own starting values from the data (the sinusoid from the spectrum, so a frequency is found without being given). A negative width or amplitude is reported in its usual form: σ &gt; 0, a &gt; 0 with the phase turned half a cycle.</p>
+<h3 id="what-to-fit">What to fit<a class="headerlink" href="#what-to-fit" title="Permanent link">&para;</a></h3>
+<p>Below the model, three options decide <em>which points</em> count and <em>how much</em>:</p>
+<ul>
+<li><strong>Fit only x from … to …</strong>: only the points in that stretch decide the fit, to leave out a transient or a zone without interest. Leave a box empty for no limit; write a date when x is a date. The curve is still drawn over all of x, and the results say how many points were left out.</li>
+<li><strong>Weight by the error column</strong>: points with a larger error count less. It uses the <strong>Error</strong> column chosen in the Plot tab (so it is available only when one is chosen), read as the standard deviation of each y. The results show χ² and the reduced χ² (near 1 when the errors match the scatter), the parameter errors are absolute, and there is no F test. Points whose error is missing or not positive are left out.</li>
+<li><strong>Robust (reduce the effect of outliers)</strong>: points far from the curve count less, so a few wild values do not drag the fit, and the ones that stand out (more than 3 robust standard deviations from it) are counted as outliers in the results. R² and RMSE still include them, and the parameter errors are approximate.</li>
+</ul>
+<p>Each combination is a fit of its own: its name carries what was chosen (<code>Series 1 (Linear, x 2–…, robust fit)</code>), so you can fit a series with and without an option and compare them in the Fits list. The prediction band uses the scatter of the points that were fitted.</p>
+<h4 id="smoothing-lowess">Smoothing (LOWESS)<a class="headerlink" href="#smoothing-lowess" title="Permanent link">&para;</a></h4>
+<p>LOWESS draws a smooth trend through the data by fitting a short line around each point, using the share of points set by <strong>Span</strong> (0.05 to 1; small follows the data closely, large is smoother). It is for <em>seeing</em> a trend without choosing a model: it has no equation, parameters, bands or tests, and it is not drawn outside the range of the data. It is saved with the chart and shows in the Fits list with its R² and RMSE.</p>
 <h3 id="how-the-data-are-handled">How the data are handled<a class="headerlink" href="#how-the-data-are-handled" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Missing values.</strong> Points where x or y is NaN are ignored, and the results say how many.</li>
