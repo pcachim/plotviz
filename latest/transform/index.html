@@ -1532,7 +1532,7 @@
 
 
 <h1 id="transform-and-statistics">Transform and Statistics<a class="headerlink" href="#transform-and-statistics" title="Permanent link">&para;</a></h1>
-<p>The <strong>Data</strong> tab has four pages: <strong>Datasets</strong>, <strong>Transform</strong>, <strong>Statistics</strong> and <strong>Generate</strong>. This page covers the two that work on series you have already loaded: <strong>Transform</strong> creates new series from existing ones, and <strong>Statistics</strong> summarises them.</p>
+<p>The <strong>Data</strong> tab has four pages: <strong>Datasets</strong>, <strong>Generate</strong>, <strong>Statistics</strong> and <strong>Transform</strong>. This page covers the two that work on series you have already loaded: <strong>Transform</strong> creates new series from existing ones, and <strong>Statistics</strong> summarises them.</p>
 <hr />
 <h2 id="transform">Transform<a class="headerlink" href="#transform" title="Permanent link">&para;</a></h2>
 <p>The Transform page applies an operation (smoothing, decimation, calculus, scaling, cleaning, resampling…) to a series and stores the result as a <strong>new series</strong>. The original is never changed, so you can plot both together.</p>
@@ -1629,8 +1629,8 @@
 </tr>
 <tr>
 <td>Resample (uniform x)</td>
-<td>Points</td>
-<td>Linear interpolation onto equally spaced x; needs x</td>
+<td>Points, step</td>
+<td>Linear interpolation onto equally spaced x. Give a <strong>step</strong> (for example <code>0.001</code> for a sample every millisecond) to fix the spacing instead of the number of points; the step wins when both are set. Needs x</td>
 </tr>
 <tr>
 <td>Decimate (anti-aliased)</td>
@@ -1668,7 +1668,7 @@
 </tr>
 <tr>
 <td>Integral (cumulative)</td>
-<td>Trapezoid rule, starting at 0</td>
+<td>Starts at</td>
 </tr>
 <tr>
 <td>Difference</td>
@@ -1701,7 +1701,7 @@
 <tr>
 <td>Normalize</td>
 <td>Method</td>
-<td><code>min-max</code> → 0 to 1; <code>z-score</code> → mean 0, std 1; <code>first</code> → divide by the first value; <code>max</code> → divide by the largest absolute value</td>
+<td><code>min-max</code> → 0 to 1; <code>z-score</code> → mean 0, std 1; <code>first</code> → divide by the first value; <code>max</code> → divide by the largest absolute value; <code>value</code> → divide by a number you type; <code>mean of range</code> → divide by the mean over an x range (for example the resting reading)</td>
 </tr>
 <tr>
 <td>Scale and shift</td>
@@ -1711,7 +1711,7 @@
 <tr>
 <td>Subtract baseline</td>
 <td>Baseline</td>
-<td>First value, last value, mean, median or minimum</td>
+<td>First value, last value, mean, median or minimum; a fixed <strong>value</strong>; or the <strong>mean / median of a range</strong> of x (a quiet stretch, so a peak does not pull the baseline up). The <em>Value</em> and <em>x from / x to</em> boxes appear only for the methods that use them; leave a limit empty to leave it open</td>
 </tr>
 <tr>
 <td>Absolute value</td>
@@ -1720,8 +1720,8 @@
 </tr>
 <tr>
 <td>Remove trend (polynomial)</td>
-<td>Degree</td>
-<td>Subtracts a least-squares polynomial; degree 1 is a straight line</td>
+<td>Degree, fit from x, fit to x</td>
+<td>Subtracts a least-squares polynomial; degree 1 is a straight line. Limit the fit to a stretch of x (without the peak) so the peak does not tilt it; the result is subtracted over the whole series</td>
 </tr>
 </tbody>
 </table>
@@ -1806,8 +1806,8 @@
 </tr>
 <tr>
 <td>Find peaks</td>
-<td>Min height, min prominence, min distance</td>
-<td>Local maxima. Output: only the peak points. An error is shown if there are none</td>
+<td>Min height (× noise), min height, min prominence, min distance</td>
+<td>Local maxima. Output: only the peak points. <strong>Min height (× noise)</strong> sets the threshold at the median plus <em>k</em> times the noise of the series (estimated robustly, so a few peaks do not inflate it; remove any drift first). With <em>Min height</em> as well, the higher limit applies. Prominence is measured against the valleys around a peak, so with noise it needs about 8 times the noise level; a height threshold of about 5 times is simpler. An error is shown if there are no peaks</td>
 </tr>
 </tbody>
 </table>
@@ -1817,6 +1817,7 @@
 <li><strong>Remove spikes, then smooth:</strong> <em>Outlier filter (Hampel)</em>, then <em>Savitzky-Golay</em> on the result.</li>
 <li><strong>Find the dominant frequency:</strong> <em>Remove trend</em>, then <em>FFT amplitude spectrum</em>, and plot the spectrum.</li>
 <li><strong>Uneven sampling:</strong> <em>Resample (uniform x)</em> before a Butterworth filter or an FFT.</li>
+<li><strong>Pulse in a stable signal with noise:</strong> <em>Subtract baseline</em> (<strong>median of range</strong>, over a stretch without the pulse), then <em>Savitzky-Golay</em> with a window no longer than the pulse (in points), then <em>Find peaks</em> with <strong>Min height (× noise)</strong> of 5 or 6 and a <em>Min distance</em> of the pulse width. Do not use the moving median or the outlier filter: they treat the pulse as noise and remove it. For a negative pulse, <em>Scale and shift</em> with a = −1 first.</li>
 <li><strong>Compare two series with different x:</strong> <em>Align to another x</em> puts one on the x of the other.</li>
 </ul>
 </div>

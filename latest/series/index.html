@@ -807,6 +807,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#how-the-data-are-handled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the data are handled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#several-fits-of-the-same-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several fits of the same series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#fit-curve-style" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1347,6 +1369,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#how-the-data-are-handled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the data are handled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#several-fits-of-the-same-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several fits of the same series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#fit-curve-style" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1472,7 +1516,7 @@
 <p>The curve fitting section lets you fit a mathematical model to any series and overlay the result on the chart.</p>
 <h3 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Select a series from the <strong>Fit series</strong> dropdown.</li>
+<li>Select the series to fit in the <strong>Per-Curve</strong> selector above. (If a fit curve is selected, the series it came from is fitted.)</li>
 <li>Choose a model from the <strong>Model</strong> dropdown.</li>
 <li>Click <strong>Apply Fit</strong>.</li>
 <li>The fitted curve appears on the chart and the equation and statistics are shown in the results box.</li>
@@ -1517,6 +1561,47 @@
 </tbody>
 </table>
 <p>Fitted parameters are shown in the results box along with R², RMSE, and other statistics.</p>
+<h3 id="how-the-data-are-handled">How the data are handled<a class="headerlink" href="#how-the-data-are-handled" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Missing values.</strong> Points where x or y is NaN are ignored, and the results say how many.</li>
+<li><strong>Starting values</strong> for the Exponential, Power Law and Sigmoid models come from the data (for example the Exponential starts from a straight-line fit of ln y), so they work for any amplitude and x range, for decreasing sigmoids, and for negative data.</li>
+<li><strong>x far from zero</strong> (years, or a date column, which is a number of days since 1970): the fit is done on <code>x − x₀</code>, where x₀ is about the centre of the data, because <code>e^(b·19800)</code> overflows and polynomials in such x are badly conditioned. The equation then shows <code>(x − x₀)</code> and the results box gives x₀. The curve and the bands are still drawn against the real x.</li>
+<li><strong>Logarithmic and Power Law</strong> need every x to be greater than 0; if not, the fit reports it instead of returning a meaningless curve.</li>
+<li>A fit that does not converge is reported with a message, never drawn as a curve with a nonsense R².</li>
+<li>The fit curve and its bands are drawn from left to right even when the data are not sorted by x.</li>
+</ul>
+<h3 id="several-fits-of-the-same-series">Several fits of the same series<a class="headerlink" href="#several-fits-of-the-same-series" title="Permanent link">&para;</a></h3>
+<p>You can apply as many models as you like to a series, to compare them. Every fit is kept, with its own parameters, statistics, bands and style, and all of them are saved in the <code>.pviz</code> file.</p>
+<p>The <strong>Fits</strong> list under the buttons shows them side by side:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Show</strong></td>
+<td>Untick to hide the fit and its bands from the chart (and from the exported script) without deleting it</td>
+</tr>
+<tr>
+<td><strong>Model</strong>, <strong>Series</strong></td>
+<td>What was fitted to what</td>
+</tr>
+<tr>
+<td><strong>R²</strong>, <strong>RMSE</strong>, <strong>AIC</strong></td>
+<td>The numbers to compare by. The <strong>bold AIC</strong> is the lowest among the fits of that series: a better fit relative to its number of parameters. A higher-order model always has a higher R², so look at the AIC before choosing it</td>
+</tr>
+</tbody>
+</table>
+<p>Click a row to select that fit: the confidence limits, the prediction band, the style controls and the results below then act on it. Selecting a fit curve in the <strong>Per-Curve</strong> list does the same.</p>
+<ul>
+<li>Each new fit takes a colour that the series and its other fits do not use, so they can be told apart.</li>
+<li>Applying <strong>the same model</strong> to the same series again replaces the previous one, and the results say so.</li>
+<li><strong>Remove Fit</strong> removes the selected fit only. With the data series selected it removes all its fits, after asking.</li>
+<li>The results box shows the selected fit; it never shows another one instead.</li>
+</ul>
 <h3 id="fit-curve-style">Fit curve style<a class="headerlink" href="#fit-curve-style" title="Permanent link">&para;</a></h3>
 <p>The appearance of the fitted curve is set independently from the data series:</p>
 <table>
@@ -1551,28 +1636,30 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>Confidence band</strong></td>
-<td>Shaded region showing the confidence interval around the fit (None, 90%, 95%, 99%)</td>
+<td><strong>Confidence limits</strong></td>
+<td>Shaded region around the fit: Off, 1σ (68%), 2σ (95%) or 3σ (99.7%)</td>
 </tr>
 <tr>
 <td><strong>Prediction band</strong></td>
-<td>Shaded region showing where new observations are expected to fall (None, 90%, 95%, 99%)</td>
+<td>Shaded region where new observations are expected to fall: Off, 1σ, 2σ or 3σ</td>
 </tr>
 <tr>
-<td><strong>Band alpha</strong></td>
-<td>Opacity of the shaded bands (0.0–1.0)</td>
+<td><strong>Band opacity</strong></td>
+<td>Opacity of the shaded bands (0.05–1.0; 0.35 by default, the prediction band is drawn at half of it)</td>
 </tr>
 </tbody>
 </table>
+<p>The bands belong to the fit curve and are drawn whatever line type you give that curve, and they follow it if you rename it. If the data lie exactly on the curve (for example data made by the function generator, with no noise) the bands have no width and cannot be seen; the results box says so.</p>
+<p>When a fit curve is selected and you click <strong>Apply Fit</strong> with another model, the new model is fitted to the data the curve came from, not to the curve (a curve fitted to its own fit would fit perfectly and have bands of no width).</p>
+<p>The percentages hold for few points too: the bands use the Student-t quantile for the degrees of freedom of the fit, which for many points is the same as 1, 2 or 3 normal standard deviations.</p>
 <p>The confidence band is tighter (it bounds the mean prediction); the prediction band is wider (it bounds individual future observations).</p>
 <h3 id="fit-results">Fit results<a class="headerlink" href="#fit-results" title="Permanent link">&para;</a></h3>
 <p>The results box at the bottom of the section shows:</p>
 <ul>
 <li>Model equation with fitted parameter values</li>
-<li>R² (coefficient of determination)</li>
-<li>RMSE (root mean square error)</li>
-<li>Parameter values and standard errors</li>
-<li>Additional statistics (AIC, BIC if available)</li>
+<li>Goodness of fit: n, parameters, degrees of freedom, R², adjusted R², RMSE, MSE, SSE, SST, AIC and BIC (from the Gaussian log-likelihood, as in statsmodels)</li>
+<li>F-statistic and its p-value, for the models that contain an intercept-only model (Linear, Quadratic, Cubic, Logarithmic); the Exponential, Power Law and Sigmoid have no such test and show <code>—</code></li>
+<li>For each parameter: value, standard error, t, p and the confidence interval</li>
 </ul>
 <p>The fit result is saved with the <code>.pviz</code> project file and restored on reload.</p>
 
