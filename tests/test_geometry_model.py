@@ -31,7 +31,7 @@ def _have_real_qt():
 
 
 HAVE_QT = _have_real_qt()
-DEFAULT_MARGINS = (0.10, 0.95, 0.10, 0.95)
+DEFAULT_MARGINS = (0.10, 0.95, 0.10, 0.90)
 DEFAULT_TITLE = (0.5, 0.97)
 
 
@@ -67,6 +67,16 @@ class TestFractionModel(unittest.TestCase):
         self.assertLayout(w)
         self.assertAlmostEqual(w.fig_right.value(), 19.0, places=1)    # 0.95 x 20 cm
 
+    def test_the_default_title_does_not_touch_the_plot_area(self):
+        # The main title (placeholder text included) sits above the top margin.
+        w = self._win()
+        w.update_preview()
+        fig = w.canvas.figure
+        fig.canvas.draw()
+        title = fig._suptitle.get_window_extent(fig.canvas.get_renderer())
+        axes_top = max(ax.get_window_extent(fig.canvas.get_renderer()).y1 for ax in fig.axes)
+        self.assertGreater(title.y0, axes_top)
+
     def test_size_edits_keep_the_fractions(self):
         # Regression: widening the figure used to leave the right margin stuck.
         w = self._win()
@@ -78,7 +88,7 @@ class TestFractionModel(unittest.TestCase):
         for height in (22.0, 8.0, 15.0):
             w.fig_height.setValue(height)
             self.assertLayout(w)
-            self.assertAlmostEqual(w.fig_top.value(), 0.95 * height, delta=0.051)
+            self.assertAlmostEqual(w.fig_top.value(), 0.90 * height, delta=0.051)
 
     def test_many_size_changes_do_not_drift(self):
         w = self._win()
@@ -111,7 +121,7 @@ class TestFractionModel(unittest.TestCase):
         self.assertAlmostEqual(l, 3.0 / 17.3, places=9)
         self.assertAlmostEqual(r, 0.95, places=9)  # untouched, not re-quantised
         self.assertAlmostEqual(b, 0.10, places=9)
-        self.assertAlmostEqual(t, 0.95, places=9)
+        self.assertAlmostEqual(t, 0.90, places=9)
 
     def test_editing_the_title_position(self):
         w = self._win()

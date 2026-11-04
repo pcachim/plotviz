@@ -103,8 +103,8 @@ class StyleTabMixin(MixinBase):
         left_col = QVBoxLayout()
         right_col = QVBoxLayout()
         # Shown in physical units (fig_unit) but stored as fractions of the figure
-        # (self._fig_margins); the defaults are 0.10 / 0.95 / 0.10 / 0.95, i.e.
-        # 2 / 19 / 1.5 / 14.25 cm on the default 20 × 15 cm figure.
+        # (self._fig_margins); the defaults are 0.10 / 0.95 / 0.10 / 0.90, i.e.
+        # 2 / 19 / 1.5 / 13.5 cm on the default 20 × 15 cm figure.
         for idx, (attr, label, col) in enumerate([
             ('fig_left',   'Left',   left_col),
             ('fig_right',  'Right',  right_col),

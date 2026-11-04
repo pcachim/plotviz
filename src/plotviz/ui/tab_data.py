@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QTabWidget,
 )
 from ui.mixin_base import MixinBase
-from ui.tab_constants import INNER_TAB_QSS
+from ui.tab_constants import make_compact_tabs
 
 
 class DataTabMixin(MixinBase):
@@ -65,7 +65,7 @@ class DataTabMixin(MixinBase):
 
         # Data tab, in working order: get data (load, generate), look at it, derive new series
         self.data_inner_tabs = QTabWidget()
-        self.data_inner_tabs.tabBar().setStyleSheet(INNER_TAB_QSS)
+        make_compact_tabs(self.data_inner_tabs.tabBar())
         self.data_inner_tabs.addTab(widget, 'Datasets')
         self.data_inner_tabs.addTab(self._advanced_panel, 'Generate')
         self.data_inner_tabs.addTab(self.create_statistics_page(), 'Statistics')

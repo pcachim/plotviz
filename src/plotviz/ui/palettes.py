@@ -399,7 +399,7 @@ class PaletteColorMixin(MixinBase):
     # Editing a spinbox changes that one fraction; changing the figure size, the
     # unit or the preset changes nothing but the displayed numbers. So the layout
     # never drifts (no rounding accumulation) and needs no rescaling logic.
-    _DEFAULT_MARGINS = (0.10, 0.95, 0.10, 0.95)   # left, right, bottom, top
+    _DEFAULT_MARGINS = (0.10, 0.95, 0.10, 0.90)   # left, right, bottom, top (the title sits above 0.90)
     _DEFAULT_TITLE_FRAC = (0.5, 0.97)             # x, y
 
     def _geom_widgets_ready(self):

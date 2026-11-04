@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from ui.mixin_base import MixinBase
-from ui.tab_constants import INNER_TAB_QSS
+from ui.tab_constants import make_compact_tabs
 
 
 class PlotsTabMixin(MixinBase):
@@ -251,7 +251,7 @@ class PlotsTabMixin(MixinBase):
 
         # ── Inner tab widget ──────────────────────────────────────────────────
         self.plots_inner_tabs = QTabWidget()
-        self.plots_inner_tabs.tabBar().setStyleSheet(INNER_TAB_QSS)
+        make_compact_tabs(self.plots_inner_tabs.tabBar())
         self.create_plot_tab()
         self.create_canvas_grid_tab()
         self.create_curves_tab()

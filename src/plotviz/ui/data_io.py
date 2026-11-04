@@ -426,7 +426,7 @@ class DataMixin(MixinBase):
             'fig_unit':      'cm',
             'fig_width':     20.0, 'fig_height': 15.0,
             'fig_left':      0.10, 'fig_right':  0.95,
-            'fig_bottom':    0.10, 'fig_top':    0.95,
+            'fig_bottom':    0.10, 'fig_top':    0.90,
             'grid_on':        True,  'grid_color': '#cccccc',
             'grid_linestyle': '--',  'grid_linewidth': 0.5, 'grid_alpha': 0.4,
             'minor_grid_on':  False, 'minor_grid_color': '#e8e8e8',

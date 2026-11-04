@@ -8,7 +8,8 @@ ui/tab_constants.py  –  plotviz
 Shared constants, palettes and small helpers for the tab-builder mixins.
 (Re-exported by ui.tab_builders so existing imports keep working.)
 """
-from PyQt6.QtCore import QObject, QEvent
+from PyQt6.QtCore import QObject, QEvent, QSize
+from PyQt6.QtWidgets import QApplication, QProxyStyle, QStyle, QStyleOptionTab
 
 # Opacity of the fit confidence band by default; the prediction band is drawn at half of it.
 # (0.25 left the prediction band at 0.125, which was too faint to see on a light background.)
@@ -16,13 +17,53 @@ DEFAULT_FIT_BAND_OPACITY = 0.35
 
 # Compact tabs for the inner tab bars (Data and Plots).  The native tab padding is wide
 # enough that the five Plots tabs do not fit the side panel and scroll; this keeps the
-# text and puts a coloured line under the selected tab.  Colours come from the palette,
-# so it follows the light/dark scheme.
-INNER_TAB_QSS = '''
-QTabBar::tab { padding: 5px 7px; margin: 0; border: none; border-bottom: 2px solid transparent; }
-QTabBar::tab:selected { border-bottom: 2px solid palette(highlight); }
-QTabBar::tab:!selected:hover { border-bottom: 2px solid palette(mid); }
-'''
+# text and puts a coloured line under the selected tab.  It is a style, not a style sheet:
+# a style sheet on a tab bar stopped the whole inner tab widget from following a change of
+# the palette, which left its pages light in dark mode.  Colours come from the palette.
+class CompactTabStyle(QProxyStyle):
+    """Flat tabs, 7 px of padding, a 2 px line under the selected one (palette highlight)
+    and under the one the mouse is over (palette mid)."""
+    _PAD_X, _PAD_Y, _LINE = 7, 5, 2
+
+    def sizeFromContents(self, type, option, size, widget):
+        if type == QStyle.ContentsType.CT_TabBarTab and isinstance(option, QStyleOptionTab):
+            metrics = option.fontMetrics
+            icon = option.iconSize.width() + 4 if not option.icon.isNull() else 0
+            return QSize(metrics.horizontalAdvance(option.text) + icon + 2 * self._PAD_X,
+                         metrics.height() + 2 * self._PAD_Y + self._LINE)
+        return super().sizeFromContents(type, option, size, widget)
+
+    def subElementRect(self, element, option, widget):
+        if element == QStyle.SubElement.SE_TabBarTabText and isinstance(option, QStyleOptionTab):
+            return option.rect.adjusted(self._PAD_X, 0, -self._PAD_X, -self._LINE)   # the whole tab but the padding
+        return super().subElementRect(element, option, widget)
+
+    def drawControl(self, element, option, painter, widget=None):
+        if element == QStyle.ControlElement.CE_TabBarTabShape and isinstance(option, QStyleOptionTab) and painter:
+            state = option.state
+            if state & QStyle.StateFlag.State_Selected:
+                colour = option.palette.highlight()
+            elif state & QStyle.StateFlag.State_MouseOver:
+                colour = option.palette.mid()
+            else:
+                return
+            r = option.rect
+            painter.fillRect(r.left(), r.bottom() - self._LINE + 1, r.width(), self._LINE, colour)
+            return
+        super().drawControl(element, option, painter, widget)
+
+
+_compact_styles: list[CompactTabStyle] = []     # lives as long as the application
+
+
+def make_compact_tabs(tab_bar):
+    """Give a QTabBar the compact look. Qt does not own a widget's style, and a style that
+    Python has dropped loses its overrides, so the bar's Python object keeps it."""
+    style = CompactTabStyle(QApplication.style().objectName())
+    _compact_styles.append(style)
+    tab_bar.setStyle(style)
+    tab_bar.setDrawBase(False)
+
 
 ALL_CHART_TYPES = [
     # ── Per-series mixable ────────────────────────────────────────────
