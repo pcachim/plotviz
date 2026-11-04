@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
     QSpinBox, QDoubleSpinBox, QPushButton, QCheckBox, QScrollArea, QRadioButton,
     QTableWidget, QHeaderView,
-    QTabWidget, QSizePolicy,
+    QTabWidget, QSizePolicy, QButtonGroup,
 )
 from ui.mixin_base import MixinBase
 from ui.preview_panel import PreviewPanel
@@ -35,7 +35,7 @@ class AdvancedTabMixin(MixinBase):
         outer_lay.addWidget(title_lbl)
 
         # ── Top: compact inner QTabWidget for f(x) and Data Table ─────────────
-        inner_tabs = QTabWidget()
+        inner_tabs = self.gen_inner_tabs = QTabWidget()
         inner_tabs.setDocumentMode(True)
         inner_tabs.setTabPosition(QTabWidget.TabPosition.North)
         inner_tabs.setMaximumWidth(420)
@@ -182,6 +182,7 @@ class AdvancedTabMixin(MixinBase):
                    'uniform   — Uniform(start, stop), sorted ascending')
         # ─ Meshgrid ─
         self.fxy_meshgrid = QCheckBox('Meshgrid  (expand x × y → n² points)')
+        self.fxy_meshgrid.setChecked(True)
         self.fxy_meshgrid.setToolTip(
             'When checked, a full meshgrid is created (every x_i × y_j combination).\n'
             'x, y, and z columns are all flattened to length nx * ny.\n'
@@ -195,6 +196,9 @@ class AdvancedTabMixin(MixinBase):
         self.fxy_x_mode_range = QRadioButton('range')
         self.fxy_x_mode_range.setChecked(True)
         self.fxy_x_mode_col   = QRadioButton('column')
+        self._fxy_x_mode_group = QButtonGroup(self)       # each axis is its own choice
+        self._fxy_x_mode_group.addButton(self.fxy_x_mode_range)
+        self._fxy_x_mode_group.addButton(self.fxy_x_mode_col)
         _fxm.addWidget(self.fxy_x_mode_range)
         _fxm.addWidget(self.fxy_x_mode_col)
         _fxm.addStretch()
@@ -269,6 +273,9 @@ class AdvancedTabMixin(MixinBase):
         self.fxy_y_mode_range = QRadioButton('range')
         self.fxy_y_mode_range.setChecked(True)
         self.fxy_y_mode_col   = QRadioButton('column')
+        self._fxy_y_mode_group = QButtonGroup(self)       # each axis is its own choice
+        self._fxy_y_mode_group.addButton(self.fxy_y_mode_range)
+        self._fxy_y_mode_group.addButton(self.fxy_y_mode_col)
         _fym.addWidget(self.fxy_y_mode_range)
         _fym.addWidget(self.fxy_y_mode_col)
         _fym.addStretch()
@@ -348,6 +355,13 @@ class AdvancedTabMixin(MixinBase):
         _zn.addWidget(self.fxy_z_name)
         _zn.addStretch()
         fxy_lay.addLayout(_zn)
+        fxy_lay.addWidget(self._sec_label('Preview'))
+        self.fxy_preview = PreviewPanel(self._compute_fxy, self._grid_draw_plan, lambda: self._grid_size('fxy'),
+                                        what='what would be created', log_option=False)
+        fxy_lay.addWidget(self.fxy_preview)
+        self._grid_connect_preview_triggers('fxy', self.fxy_preview)
+        self.fxy_preview.hint('Type an expression; the preview shows here.')
+
         btn_fxy = QPushButton('▶  Generate z')
         btn_fxy.clicked.connect(self._generate_fxy)
         fxy_lay.addWidget(btn_fxy)
@@ -394,6 +408,9 @@ class AdvancedTabMixin(MixinBase):
         self.fuv_x_mode_range = QRadioButton('range')
         self.fuv_x_mode_range.setChecked(True)
         self.fuv_x_mode_col   = QRadioButton('column')
+        self._fuv_x_mode_group = QButtonGroup(self)       # each axis is its own choice
+        self._fuv_x_mode_group.addButton(self.fuv_x_mode_range)
+        self._fuv_x_mode_group.addButton(self.fuv_x_mode_col)
         _fuvxm.addWidget(self.fuv_x_mode_range)
         _fuvxm.addWidget(self.fuv_x_mode_col)
         _fuvxm.addStretch()
@@ -468,6 +485,9 @@ class AdvancedTabMixin(MixinBase):
         self.fuv_y_mode_range = QRadioButton('range')
         self.fuv_y_mode_range.setChecked(True)
         self.fuv_y_mode_col   = QRadioButton('column')
+        self._fuv_y_mode_group = QButtonGroup(self)       # each axis is its own choice
+        self._fuv_y_mode_group.addButton(self.fuv_y_mode_range)
+        self._fuv_y_mode_group.addButton(self.fuv_y_mode_col)
         _fuvym.addWidget(self.fuv_y_mode_range)
         _fuvym.addWidget(self.fuv_y_mode_col)
         _fuvym.addStretch()
@@ -560,6 +580,13 @@ class AdvancedTabMixin(MixinBase):
         _fuvvn.addWidget(self.fuv_v_name)
         _fuvvn.addStretch()
         fuv_lay.addLayout(_fuvvn)
+        fuv_lay.addWidget(self._sec_label('Preview'))
+        self.fuv_preview = PreviewPanel(self._compute_fuv, self._grid_draw_plan, lambda: self._grid_size('fuv'),
+                                        what='what would be created', log_option=False)
+        fuv_lay.addWidget(self.fuv_preview)
+        self._grid_connect_preview_triggers('fuv', self.fuv_preview)
+        self.fuv_preview.hint('Type the expressions; the preview shows here.')
+
         btn_fuv = QPushButton('▶  Generate u, v')
         btn_fuv.clicked.connect(self._generate_fuv)
         fuv_lay.addWidget(btn_fuv)
@@ -648,6 +675,7 @@ class AdvancedTabMixin(MixinBase):
 
         # Size inner tabs to their content (no forced stretch)
         inner_tabs.adjustSize()
+        inner_tabs.currentChanged.connect(self._schedule_generate_previews)
         outer_lay.addWidget(inner_tabs)
 
         outer_lay.addStretch()

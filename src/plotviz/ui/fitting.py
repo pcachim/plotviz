@@ -43,6 +43,28 @@ class GeneratePlan:
         return ([self.x_new] if self.x_new else []) + [self.y_new]
 
 
+@dataclass
+class GridPlan:
+    """What a z = f(x, y) or (u, v) = f(x, y) generator would create, worked out without
+    changing anything (the preview draws it)."""
+    label: str
+    x: Any                          # the points the expressions are evaluated at
+    y: Any
+    outputs: list[tuple[str, str, Any]]     # (role, name it would be stored under, values)
+    x_name: str                     # the x / y series the results belong to
+    y_name: str
+    x_new: str | None               # set when x / y would be created (generated, or meshgrid)
+    y_new: str | None
+    shape: tuple[int, int] | None   # (ny, nx) of a meshgrid
+    log_x: bool
+    log_y: bool
+    vector: bool                    # (u, v) rather than z
+
+    @property
+    def made(self):
+        return [n for n in (self.x_new, self.y_new) if n] + [name for _, name, _ in self.outputs]
+
+
 class FitPresetMixin(MixinBase):
 
     def _rename_table_col(self, col_idx):
@@ -61,10 +83,13 @@ class FitPresetMixin(MixinBase):
             self._gen_seed = int(np.random.default_rng().integers(2**32))
         return self._gen_seed
 
+    def _gen_eval(self, expr, var, arr):
+        return self._gen_eval_vars(expr, {var: arr})
+
     @staticmethod
-    def _gen_eval(expr, var, arr):
+    def _gen_eval_vars(expr, variables):
         ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
-        ns.update({var: arr, 'pi': np.pi, 'e': np.e,
+        ns.update({**variables, 'pi': np.pi, 'e': np.e,
                    'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
                    'exp': np.exp, 'log': np.log, 'log10': np.log10,
                    'sqrt': np.sqrt, 'abs': np.abs})
@@ -77,7 +102,7 @@ class FitPresetMixin(MixinBase):
             cnt += 1
         return name
 
-    def _gen_x_array(self, spacing, x_min, x_max, n):
+    def _gen_x_array(self, spacing, x_min, x_max, n, salt=0):
         if spacing != 'logspace' and x_min >= x_max:
             raise ValueError('x_min must be less than x_max')
         if spacing == 'logspace' and x_min >= x_max:
@@ -89,10 +114,10 @@ class FitPresetMixin(MixinBase):
                 raise ValueError('geomspace requires start and stop > 0')
             return np.geomspace(x_min, x_max, n)
         if spacing == 'random':
-            rng = np.random.default_rng(self._gen_seed_value())
+            rng = np.random.default_rng(self._gen_seed_value() + salt)
             return np.sort(rng.normal((x_min + x_max) / 2, (x_max - x_min) / 6, n))
         if spacing == 'uniform':
-            rng = np.random.default_rng(self._gen_seed_value())
+            rng = np.random.default_rng(self._gen_seed_value() + salt)
             return np.sort(rng.uniform(x_min, x_max, n))
         return np.linspace(x_min, x_max, n)
 
@@ -152,6 +177,12 @@ class FitPresetMixin(MixinBase):
             return self.gen_x_n.value()
         return len(self.datasets.get(self.fn_source_combo.currentText(), ()))
 
+    def _schedule_generate_previews(self, *_):
+        """The page shown may have changed, or the datasets: ask each preview to refresh."""
+        for name in ('gen_preview', 'fxy_preview', 'fuv_preview'):
+            if hasattr(self, name):
+                getattr(self, name).schedule()
+
     def _gen_connect_preview_triggers(self):
         schedule = self.gen_preview.schedule
         for edit in (self.gen_expr, self.gen_x_name, self.gen_y_name, self.fn_var_name):
@@ -176,244 +207,169 @@ class FitPresetMixin(MixinBase):
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
             self.gen_status.setText(f'❌  {e}')
 
-    # ── Apply function to column ───────────────────────────────────────────────
+    # ── z = f(x, y) and (u, v) = f(x, y): one calculation for the buttons and the previews ──
+
+    def _grid_axis(self, prefix, axis, salt):
+        """One input axis of a grid generator: (values, variable name, column name to use,
+        whether it is generated, whether it is spaced logarithmically)."""
+        def widget(name):
+            return getattr(self, f'{prefix}_{axis}_{name}')
+        if widget('mode_range').isChecked():
+            spacing = widget('spacing').currentText()
+            try:
+                arr = self._gen_x_array(spacing, widget('min').value(), widget('max').value(),
+                                        widget('n').value(), salt)
+            except ValueError as e:
+                raise ValueError(f'{axis}: {e}') from e
+            var = widget('col_name').text().strip() or axis
+            return arr, var, var, True, spacing in ('logspace', 'geomspace')
+        col = widget('combo').currentText()
+        if col not in self.datasets:
+            raise ValueError(f'{axis} column not found')
+        return (np.asarray(self.datasets[col], dtype=float), widget('var').text().strip() or axis,
+                col, False, False)
+
+    def _compute_grid(self, prefix, label, outputs):
+        """What a grid generator would create, without changing anything: a GridPlan.
+        *outputs* lists (role, expression widget, name widget, default name)."""
+        wanted = []
+        for role, expr_widget, name_widget, default in outputs:
+            expr = expr_widget.text().strip()
+            if not expr:
+                raise ValueError(f'{role} expression is empty' if len(outputs) > 1 else 'Expression is empty')
+            wanted.append((role, expr, name_widget.text().strip() or default))
+        x_arr, x_var, x_col, x_gen, log_x = self._grid_axis(prefix, 'x', 0)
+        y_arr, y_var, y_col, y_gen, log_y = self._grid_axis(prefix, 'y', 1)
+        meshgrid = getattr(self, f'{prefix}_meshgrid').isChecked()
+        if meshgrid:
+            gx, gy = np.meshgrid(x_arr, y_arr)
+            x_eval, y_eval, shape = gx.ravel(), gy.ravel(), (len(y_arr), len(x_arr))
+        else:
+            n = min(len(x_arr), len(y_arr))
+            x_eval, y_eval, shape = x_arr[:n], y_arr[:n], None
+        n = len(x_eval)
+        taken: set[str] = set()
+        x_new = self._gen_unique(x_col) if (x_gen or meshgrid) else None
+        taken.update(filter(None, [x_new]))
+        y_new = self._gen_unique(y_col, taken) if (y_gen or meshgrid) else None
+        taken.update(filter(None, [y_new]))
+        results = []
+        for role, expr, name in wanted:
+            values = np.asarray(self._gen_eval_vars(expr, {x_var: x_eval, y_var: y_eval}), dtype=float)
+            if values.shape == ():
+                values = np.full(n, float(values))
+            stored = self._gen_unique(name, taken)
+            taken.add(stored)
+            results.append((role, stored, values))
+        return GridPlan(label, x_eval, y_eval, results, x_new or x_col, y_new or y_col, x_new, y_new,
+                        shape, log_x, log_y, vector=len(results) == 2)
+
+    def _store_grid(self, plan, undo_label):
+        if plan.x_new:
+            self.datasets[plan.x_new] = plan.x
+        if plan.y_new:
+            self.datasets[plan.y_new] = plan.y
+        for _, name, values in plan.outputs:
+            self.datasets[name] = values
+        self._gen_seed = None                        # the next random spacing is a new draw
+        self._schedule_undo_snapshot(undo_label)
+        self.update_lists()
+        mesh = 'meshgrid ' if plan.shape else ''
+        parts = [f'x={plan.x_name}', f'y={plan.y_name}'] + [f'{role}={name}' for role, name, _ in plan.outputs]
+        return f'\u2713  {mesh}Created {", ".join(parts)}  ({len(plan.x)} pts)'
+
+    def _compute_fxy(self):
+        return self._compute_grid('fxy', 'z = f(x, y)', [('z', self.fxy_expr, self.fxy_z_name, 'z')])
+
+    def _compute_fuv(self):
+        return self._compute_grid('fuv', '(u, v) = f(x, y)', [
+            ('u', self.fuv_u_expr, self.fuv_u_name, 'u'), ('v', self.fuv_v_expr, self.fuv_v_name, 'v')])
+
     def _generate_fxy(self):
         """Generate z = f(x, y) — supports per-axis range/column input and meshgrid."""
         try:
-            expr   = self.fxy_expr.text().strip()           if hasattr(self, 'fxy_expr')   else ''
-            z_name = self.fxy_z_name.text().strip() or 'z' if hasattr(self, 'fxy_z_name') else 'z'
-            if not expr:
-                self.fxy_status.setText('❌  Expression is empty')
-                return
-            meshgrid = getattr(self, 'fxy_meshgrid', None) and self.fxy_meshgrid.isChecked()
-
-            def _make_spacing(arr_min, arr_max, n, spacing):
-                """Build a 1-D array from range params and spacing mode."""
-                if spacing == 'linspace':
-                    return np.linspace(arr_min, arr_max, n)
-                elif spacing == 'logspace':
-                    if arr_min >= arr_max:
-                        raise ValueError('logspace: start exponent must be < stop')
-                    return np.logspace(arr_min, arr_max, n)
-                elif spacing == 'geomspace':
-                    if arr_min <= 0 or arr_max <= 0:
-                        raise ValueError('geomspace: start and stop must be > 0')
-                    return np.geomspace(arr_min, arr_max, n)
-                elif spacing == 'random':
-                    mid = (arr_min + arr_max) / 2
-                    sigma = (arr_max - arr_min) / 6
-                    return np.sort(np.random.normal(mid, sigma, n))
-                elif spacing == 'uniform':
-                    return np.sort(np.random.uniform(arr_min, arr_max, n))
-                return np.linspace(arr_min, arr_max, n)
-
-            # ── Resolve x array ────────────────────────────────────────────────
-            x_use_range = getattr(self, 'fxy_x_mode_range', None) and self.fxy_x_mode_range.isChecked()
-            if x_use_range:
-                x_min = self.fxy_x_min.value()
-                x_max = self.fxy_x_max.value()
-                if x_min >= x_max and getattr(self, 'fxy_x_spacing', None) and self.fxy_x_spacing.currentText() not in ('logspace',):
-                    self.fxy_status.setText('❌  x: min must be < max')
-                    return
-                x_arr = _make_spacing(x_min, x_max, self.fxy_x_n.value(),
-                                      self.fxy_x_spacing.currentText() if hasattr(self, 'fxy_x_spacing') else 'linspace')
-                x_var = self.fxy_x_col_name.text().strip() or 'x' if hasattr(self, 'fxy_x_col_name') else 'x'
-                x_col_out = x_var
-            else:
-                x_col = self.fxy_x_combo.currentText() if hasattr(self, 'fxy_x_combo') else ''
-                if x_col not in self.datasets:
-                    self.fxy_status.setText('❌  x column not found')
-                    return
-                x_arr = self.datasets[x_col].astype(float)
-                x_var = self.fxy_x_var.text().strip() or 'x' if hasattr(self, 'fxy_x_var') else 'x'
-                x_col_out = x_col
-
-            # ── Resolve y array ────────────────────────────────────────────────
-            y_use_range = getattr(self, 'fxy_y_mode_range', None) and self.fxy_y_mode_range.isChecked()
-            if y_use_range:
-                y_min = self.fxy_y_min.value()
-                y_max = self.fxy_y_max.value()
-                if y_min >= y_max and getattr(self, 'fxy_y_spacing', None) and self.fxy_y_spacing.currentText() not in ('logspace',):
-                    self.fxy_status.setText('❌  y: min must be < max')
-                    return
-                y_arr = _make_spacing(y_min, y_max, self.fxy_y_n.value(),
-                                      self.fxy_y_spacing.currentText() if hasattr(self, 'fxy_y_spacing') else 'linspace')
-                y_var = self.fxy_y_col_name.text().strip() or 'y' if hasattr(self, 'fxy_y_col_name') else 'y'
-                y_col_out = y_var
-            else:
-                y_col = self.fxy_y_combo.currentText() if hasattr(self, 'fxy_y_combo') else ''
-                if y_col not in self.datasets:
-                    self.fxy_status.setText('❌  y column not found')
-                    return
-                y_arr = self.datasets[y_col].astype(float)
-                y_var = self.fxy_y_var.text().strip() or 'y' if hasattr(self, 'fxy_y_var') else 'y'
-                y_col_out = y_col
-
-            # ── Meshgrid expansion ─────────────────────────────────────────────
-            if meshgrid:
-                X, Y = np.meshgrid(x_arr, y_arr)
-                x_eval = X.ravel()
-                y_eval = Y.ravel()
-                n = len(x_eval)
-            else:
-                n = min(len(x_arr), len(y_arr))
-                x_eval = x_arr[:n]
-                y_eval = y_arr[:n]
-
-            # ── Evaluate expression ────────────────────────────────────────────
-            ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
-            ns.update({x_var: x_eval, y_var: y_eval,
-                       'pi': np.pi, 'e': np.e,
-                       'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
-                       'exp': np.exp, 'log': np.log, 'log10': np.log10,
-                       'sqrt': np.sqrt, 'abs': np.abs})
-            z_arr = eval(expr, {'__builtins__': {}}, ns)
-            z_arr = np.asarray(z_arr, dtype=float)
-            if z_arr.shape == (): z_arr = np.full(n, float(z_arr))
-
-            # ── Store datasets ─────────────────────────────────────────────────
-            def _store(name, arr):
-                base, cnt, nm = name, 1, name
-                while nm in self.datasets:
-                    nm = f'{base}_{cnt}'
-                    cnt += 1
-                self.datasets[nm] = arr
-                return nm
-
-            stored_x = _store(x_col_out, x_eval) if x_use_range or meshgrid else x_col_out
-            if x_use_range: self.datasets[stored_x] = x_eval
-            stored_y = _store(y_col_out, y_eval) if y_use_range or meshgrid else y_col_out
-            if y_use_range: self.datasets[stored_y] = y_eval
-            stored_z = _store(z_name, z_arr)
-            self._schedule_undo_snapshot('Generate z = f(x, y)')
-            self.update_lists()
-            mode_str = 'meshgrid ' if meshgrid else ''
-            self.fxy_status.setText(f'\u2713  {mode_str}Created x={stored_x}, y={stored_y}, z={stored_z}  ({n} pts)')
+            self.fxy_status.setText(self._store_grid(self._compute_fxy(), 'Generate z = f(x, y)'))
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
-            if hasattr(self, 'fxy_status'):
-                self.fxy_status.setText(f'\u274c  {e}')
+            self.fxy_status.setText(f'\u274c  {e}')
 
     def _generate_fuv(self):
         """Generate (u, v) = f(x, y) — vector-field components over a 2-D grid."""
         try:
-            u_expr = self.fuv_u_expr.text().strip() if hasattr(self, 'fuv_u_expr') else ''
-            v_expr = self.fuv_v_expr.text().strip() if hasattr(self, 'fuv_v_expr') else ''
-            u_name = self.fuv_u_name.text().strip() or 'u' if hasattr(self, 'fuv_u_name') else 'u'
-            v_name = self.fuv_v_name.text().strip() or 'v' if hasattr(self, 'fuv_v_name') else 'v'
-            if not u_expr:
-                self.fuv_status.setText('❌  u expression is empty')
-                return
-            if not v_expr:
-                self.fuv_status.setText('❌  v expression is empty')
-                return
-            meshgrid = getattr(self, 'fuv_meshgrid', None) and self.fuv_meshgrid.isChecked()
-
-            def _make_spacing(arr_min, arr_max, n, spacing):
-                if spacing == 'linspace':
-                    return np.linspace(arr_min, arr_max, n)
-                elif spacing == 'logspace':
-                    if arr_min >= arr_max:
-                        raise ValueError('logspace: start exponent must be < stop')
-                    return np.logspace(arr_min, arr_max, n)
-                elif spacing == 'geomspace':
-                    if arr_min <= 0 or arr_max <= 0:
-                        raise ValueError('geomspace: start and stop must be > 0')
-                    return np.geomspace(arr_min, arr_max, n)
-                elif spacing == 'random':
-                    mid = (arr_min + arr_max) / 2
-                    sigma = (arr_max - arr_min) / 6
-                    return np.sort(np.random.normal(mid, sigma, n))
-                elif spacing == 'uniform':
-                    return np.sort(np.random.uniform(arr_min, arr_max, n))
-                return np.linspace(arr_min, arr_max, n)
-
-            # ── Resolve x array ────────────────────────────────────────────────
-            x_use_range = getattr(self, 'fuv_x_mode_range', None) and self.fuv_x_mode_range.isChecked()
-            if x_use_range:
-                x_min = self.fuv_x_min.value()
-                x_max = self.fuv_x_max.value()
-                if x_min >= x_max and self.fuv_x_spacing.currentText() not in ('logspace',):
-                    self.fuv_status.setText('❌  x: min must be < max')
-                    return
-                x_arr = _make_spacing(x_min, x_max, self.fuv_x_n.value(), self.fuv_x_spacing.currentText())
-                x_var = self.fuv_x_col_name.text().strip() or 'x'
-                x_col_out = x_var
-            else:
-                x_col = self.fuv_x_combo.currentText() if hasattr(self, 'fuv_x_combo') else ''
-                if x_col not in self.datasets:
-                    self.fuv_status.setText('❌  x column not found')
-                    return
-                x_arr = self.datasets[x_col].astype(float)
-                x_var = self.fuv_x_var.text().strip() or 'x' if hasattr(self, 'fuv_x_var') else 'x'
-                x_col_out = x_col
-
-            # ── Resolve y array ────────────────────────────────────────────────
-            y_use_range = getattr(self, 'fuv_y_mode_range', None) and self.fuv_y_mode_range.isChecked()
-            if y_use_range:
-                y_min = self.fuv_y_min.value()
-                y_max = self.fuv_y_max.value()
-                if y_min >= y_max and self.fuv_y_spacing.currentText() not in ('logspace',):
-                    self.fuv_status.setText('❌  y: min must be < max')
-                    return
-                y_arr = _make_spacing(y_min, y_max, self.fuv_y_n.value(), self.fuv_y_spacing.currentText())
-                y_var = self.fuv_y_col_name.text().strip() or 'y'
-                y_col_out = y_var
-            else:
-                y_col = self.fuv_y_combo.currentText() if hasattr(self, 'fuv_y_combo') else ''
-                if y_col not in self.datasets:
-                    self.fuv_status.setText('❌  y column not found')
-                    return
-                y_arr = self.datasets[y_col].astype(float)
-                y_var = self.fuv_y_var.text().strip() or 'y' if hasattr(self, 'fuv_y_var') else 'y'
-                y_col_out = y_col
-
-            # ── Meshgrid expansion ─────────────────────────────────────────────
-            if meshgrid:
-                X, Y = np.meshgrid(x_arr, y_arr)
-                x_eval = X.ravel()
-                y_eval = Y.ravel()
-                n = len(x_eval)
-            else:
-                n = min(len(x_arr), len(y_arr))
-                x_eval = x_arr[:n]
-                y_eval = y_arr[:n]
-
-            # ── Evaluate expressions ───────────────────────────────────────────
-            ns = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
-            ns.update({x_var: x_eval, y_var: y_eval,
-                       'pi': np.pi, 'e': np.e,
-                       'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
-                       'exp': np.exp, 'log': np.log, 'log10': np.log10,
-                       'sqrt': np.sqrt, 'abs': np.abs})
-            u_arr = np.asarray(eval(u_expr, {'__builtins__': {}}, ns), dtype=float)
-            v_arr = np.asarray(eval(v_expr, {'__builtins__': {}}, ns), dtype=float)
-            if u_arr.shape == (): u_arr = np.full(n, float(u_arr))
-            if v_arr.shape == (): v_arr = np.full(n, float(v_arr))
-
-            # ── Store datasets ─────────────────────────────────────────────────
-            def _store(name, arr):
-                base, cnt, nm = name, 1, name
-                while nm in self.datasets:
-                    nm = f'{base}_{cnt}'
-                    cnt += 1
-                self.datasets[nm] = arr
-                return nm
-
-            stored_x = _store(x_col_out, x_eval) if x_use_range or meshgrid else x_col_out
-            if x_use_range: self.datasets[stored_x] = x_eval
-            stored_y = _store(y_col_out, y_eval) if y_use_range or meshgrid else y_col_out
-            if y_use_range: self.datasets[stored_y] = y_eval
-            stored_u = _store(u_name, u_arr)
-            stored_v = _store(v_name, v_arr)
-            self._schedule_undo_snapshot('Generate (u, v) = f(x, y)')
-            self.update_lists()
-            mode_str = 'meshgrid ' if meshgrid else ''
-            self.fuv_status.setText(
-                f'\u2713  {mode_str}Created x={stored_x}, y={stored_y}, '
-                f'u={stored_u}, v={stored_v}  ({n} pts)')
+            self.fuv_status.setText(self._store_grid(self._compute_fuv(), 'Generate (u, v) = f(x, y)'))
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
-            if hasattr(self, 'fuv_status'):
-                self.fuv_status.setText(f'\u274c  {e}')
+            self.fuv_status.setText(f'\u274c  {e}')
+
+    def _grid_size(self, prefix):
+        """Points a grid generator would evaluate (Live pauses for very many)."""
+        sizes = []
+        for axis in ('x', 'y'):
+            if getattr(self, f'{prefix}_{axis}_mode_range').isChecked():
+                sizes.append(getattr(self, f'{prefix}_{axis}_n').value())
+            else:
+                sizes.append(len(self.datasets.get(getattr(self, f'{prefix}_{axis}_combo').currentText(), ())))
+        return sizes[0] * sizes[1] if getattr(self, f'{prefix}_meshgrid').isChecked() else min(sizes)
+
+    def _grid_connect_preview_triggers(self, prefix, panel):
+        from PyQt6.QtWidgets import QAbstractButton, QDoubleSpinBox, QLineEdit
+        names = ['meshgrid'] + [f'{a}_{n}' for a in 'xy' for n in
+                                ('mode_range', 'min', 'max', 'n', 'spacing', 'col_name', 'combo', 'var')]
+        names += {'fxy': ['expr', 'z_name'], 'fuv': ['u_expr', 'v_expr', 'u_name', 'v_name']}[prefix]
+        for name in names:
+            w = getattr(self, f'{prefix}_{name}')
+            if isinstance(w, QLineEdit):
+                w.textChanged.connect(panel.schedule)
+            elif isinstance(w, QComboBox):
+                w.currentTextChanged.connect(panel.schedule)
+            elif isinstance(w, QAbstractButton):
+                w.toggled.connect(panel.schedule)
+            elif isinstance(w, (QSpinBox, QDoubleSpinBox)):
+                w.valueChanged.connect(panel.schedule)
+
+    def _grid_draw_plan(self, ax, plan, fg):
+        x, y = plan.x, plan.y
+        n = len(x)
+        if plan.vector:
+            u, v = plan.outputs[0][2], plan.outputs[1][2]
+            if plan.shape:                       # a grid: an arrow every few cells (at most 20 per side)
+                ny, nx = plan.shape
+                sy, sx = max(1, ny // 20), max(1, nx // 20)
+                pick = np.arange(n).reshape(plan.shape)[::sy, ::sx].ravel()
+            else:
+                pick = np.arange(0, n, max(1, n // 400))
+            magnitude = np.hypot(u, v)
+            ax.quiver(x[pick], y[pick], u[pick], v[pick], magnitude[pick], cmap='viridis', angles='xy')
+            shown = magnitude[np.isfinite(magnitude)]
+            summary = f'|(u, v)| from {shown.min():.4g} to {shown.max():.4g}' if len(shown) else 'no finite values'
+        else:
+            z = plan.outputs[0][2]
+            if plan.shape:                       # a grid: filled contours with their lines (at most ~150 per side)
+                ny, nx = plan.shape
+                sy, sx = max(1, ny // 150), max(1, nx // 150)
+                xs = x.reshape(plan.shape)[0, ::sx]
+                ys = y.reshape(plan.shape)[::sy, 0]
+                zs = z.reshape(plan.shape)[::sy, ::sx]
+                finite = zs[np.isfinite(zs)]
+                if len(finite) and finite.max() > finite.min() and min(zs.shape) >= 2:
+                    ax.contourf(xs, ys, zs, levels=12, cmap='viridis')
+                    ax.contour(xs, ys, zs, levels=12, colors=fg, linewidths=0.3, alpha=0.5)
+                else:                            # flat or too small to contour
+                    ax.pcolormesh(xs, ys, zs, shading='nearest', cmap='viridis')
+            else:
+                step = max(1, n // 3000)
+                ax.scatter(x[::step], y[::step], c=z[::step], s=6, cmap='viridis')
+            shown = z[np.isfinite(z)]
+            summary = f'z from {shown.min():.4g} to {shown.max():.4g}' if len(shown) else 'no finite values'
+        if plan.log_x and len(x) and x.min() > 0:
+            ax.set_xscale('log')
+        if plan.log_y and len(y) and y.min() > 0:
+            ax.set_yscale('log')
+        ax.set_xlabel(plan.x_name, fontsize=7, color=fg, labelpad=1)
+        ax.set_ylabel(plan.y_name, fontsize=7, color=fg, labelpad=1)
+        names = ', '.join(f'"{name}"' for name in plan.made)
+        grid = f' ({plan.shape[1]} × {plan.shape[0]} grid)' if plan.shape else ''
+        if not plan.shape:
+            summary += '. Without Meshgrid, x and y are paired point by point'
+        return f'{plan.label}: {n:,} points{grid} → would create {names}; {summary}.'
 
     def _apply_col_function(self):
         self._generate_fx()

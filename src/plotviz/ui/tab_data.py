@@ -85,4 +85,4 @@ class DataTabMixin(MixinBase):
         elif self.data_inner_tabs.tabText(index) == 'Transform':
             self.tf_preview.schedule()
         elif self.data_inner_tabs.tabText(index) == 'Generate':
-            self.gen_preview.schedule()
+            self._schedule_generate_previews()

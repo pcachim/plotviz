@@ -30,7 +30,7 @@ class PreviewPanel(QWidget):
     size() is the number of points involved (Live pauses above PREVIEW_LIVE_LIMIT)."""
 
     def __init__(self, compute: Callable[[], Any], draw: Callable[[Any, Any, str], str],
-                 size: Callable[[], int], what: str = 'the result', parent=None):
+                 size: Callable[[], int], what: str = 'the result', log_option: bool = True, parent=None):
         super().__init__(parent)
         self._compute, self._draw, self._size = compute, draw, size
         self.last_plan: Any = None
@@ -50,6 +50,7 @@ class PreviewPanel(QWidget):
         row.addWidget(self.live_check)
         self.log_check = QCheckBox('log y')
         self.log_check.setToolTip('Logarithmic y axis for the preview')
+        self.log_check.setVisible(log_option)
         row.addWidget(self.log_check)
         row.addStretch()
         layout.addLayout(row)

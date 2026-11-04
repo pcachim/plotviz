@@ -23,7 +23,7 @@ def _have_real_qt():
 
 
 @unittest.skipUnless(_have_real_qt(), "real PyQt6 not available")
-class TestGeneratePreview(unittest.TestCase):
+class PreviewCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import numpy as np
@@ -59,6 +59,9 @@ class TestGeneratePreview(unittest.TestCase):
     def labels(self):
         return [str(l.get_label()) for l in self.w.gen_preview.ax.get_lines()]
 
+
+@unittest.skipUnless(_have_real_qt(), "real PyQt6 not available")
+class TestGeneratePreview(PreviewCase):
     def test_it_draws_the_function_and_names_what_would_be_created(self):
         w = self.w
         w.gen_expr.setText("x**2")
@@ -176,6 +179,124 @@ class TestGeneratePreview(unittest.TestCase):
         w.gen_preview.button.click()
         self.assertEqual(self.labels(), ["big", "y"])
         self.assertLess(self.np.asarray(w.gen_preview.ax.get_lines()[0].get_xdata()).size, 2200)
+
+
+@unittest.skipUnless(_have_real_qt(), "real PyQt6 not available")
+class TestGridPreviews(PreviewCase):
+    """z = f(x, y) and (u, v) = f(x, y): the same behaviour, on their own pages."""
+
+    def page(self, title):
+        tabs = self.w.gen_inner_tabs
+        tabs.setCurrentIndex([tabs.tabText(i) for i in range(tabs.count())].index(title))
+        self.settle()
+
+    def test_z_is_drawn_as_a_grid_and_named(self):
+        w = self.w
+        self.page("z=f(x,y)")
+        w.fxy_meshgrid.setChecked(True)
+        w.fxy_x_n.setValue(30)
+        w.fxy_y_n.setValue(20)
+        self.settle()
+        self.assertIn("600 points (30 × 20 grid)", w.fxy_preview.info.text())
+        self.assertIn('would create "x", "y", "z"', w.fxy_preview.info.text())
+        self.assertGreaterEqual(len(w.fxy_preview.ax.collections), 2)    # filled contours and their lines
+        self.assertEqual(w.fxy_preview.ax.get_xlabel(), "x")
+
+    def test_without_meshgrid_the_points_are_scattered(self):
+        w = self.w
+        self.page("z=f(x,y)")
+        self.assertTrue(w.fxy_meshgrid.isChecked())                       # on by default
+        w.fxy_meshgrid.setChecked(False)
+        self.settle()
+        self.assertIn("50 points", w.fxy_preview.info.text())
+        self.assertNotIn(" grid)", w.fxy_preview.info.text())
+        self.assertIn("Without Meshgrid", w.fxy_preview.info.text())
+
+    def test_the_vectors_are_drawn_as_arrows(self):
+        w = self.w
+        self.page("(u,v)=f(x,y)")
+        w.fuv_meshgrid.setChecked(True)
+        self.settle()
+        self.assertIn('"u", "v"', w.fuv_preview.info.text())
+        self.assertIn("|(u, v)| from", w.fuv_preview.info.text())
+        self.assertEqual(len(w.fuv_preview.ax.collections), 1)           # the quiver
+
+    def test_previews_change_nothing_and_match_the_buttons(self):
+        w = self.w
+        for page, preview, plan_of, button, outs in (
+                ("z=f(x,y)", w.fxy_preview, w._compute_fxy, w._generate_fxy, ["z"]),
+                ("(u,v)=f(x,y)", w.fuv_preview, w._compute_fuv, w._generate_fuv, ["u", "v"])):
+            with self.subTest(page=page):
+                self.page(page)
+                w.datasets.clear()
+                preview.button.click()
+                self.assertEqual(w.datasets, {})
+                for flag in (False, True):
+                    getattr(w, "fxy_meshgrid" if outs == ["z"] else "fuv_meshgrid").setChecked(flag)
+                    plan = plan_of()
+                    button()
+                    for name in plan.made:
+                        self.assertIn(name, w.datasets)
+                    for _, name, values in plan.outputs:
+                        self.assertTrue(self.np.array_equal(w.datasets[name], values, equal_nan=True))
+                    if plan.x_new:
+                        self.assertTrue(self.np.array_equal(w.datasets[plan.x_new], plan.x))
+                    w.datasets.clear()
+
+    def test_each_axis_has_its_own_input_choice(self):
+        w = self.w
+        w.fxy_x_mode_col.setChecked(True)
+        w.fxy_y_mode_col.setChecked(True)
+        w.fxy_y_mode_range.setChecked(True)               # y back to a range: x must stay a column
+        self.assertTrue(w.fxy_x_mode_col.isChecked())
+        self.assertFalse(w.fxy_x_mode_range.isChecked())
+        w.fuv_x_mode_col.setChecked(True)
+        w.fuv_y_mode_col.setChecked(True)
+        self.assertTrue(w.fuv_x_mode_col.isChecked())
+
+    def test_columns_are_used_as_they_are(self):
+        w = self.w
+        w.datasets.update({"a": self.np.arange(5.0), "b": self.np.arange(5.0) * 2})
+        w.update_lists()
+        self.page("z=f(x,y)")
+        w.fxy_x_mode_col.setChecked(True)
+        w.fxy_y_mode_col.setChecked(True)
+        w.fxy_x_combo.setCurrentText("a")
+        w.fxy_y_combo.setCurrentText("b")
+        w.fxy_expr.setText("x + y")
+        w.fxy_meshgrid.setChecked(False)
+        plan = w._compute_fxy()
+        self.assertEqual((plan.x_name, plan.y_name, plan.x_new, plan.y_new), ("a", "b", None, None))
+        self.assertEqual(plan.made, ["z"])
+        self.assertEqual(list(plan.outputs[0][2]), [0, 3, 6, 9, 12])
+
+    def test_random_axes_are_not_the_same_draw(self):
+        w = self.w
+        self.page("z=f(x,y)")
+        w.fxy_meshgrid.setChecked(False)
+        w.fxy_x_spacing.setCurrentText("random")
+        w.fxy_y_spacing.setCurrentText("random")
+        plan = w._compute_fxy()
+        self.assertFalse(self.np.array_equal(plan.x, plan.y))
+        self.assertTrue(self.np.array_equal(plan.x, w._compute_fxy().x))
+
+    def test_problems_are_written_in_the_plot(self):
+        w = self.w
+        self.page("z=f(x,y)")
+        w.fxy_expr.setText("")
+        self.settle()
+        self.assertIn("Expression is empty", w.fxy_preview.info.text())
+        w.fxy_expr.setText("x + nothing")
+        w.fxy_x_min.setValue(9)
+        w.fxy_x_max.setValue(1)
+        self.settle()
+        self.assertIn("x: x_min must be less than x_max", w.fxy_preview.info.text())
+        w._generate_fxy()
+        self.assertTrue(w.fxy_status.text().startswith("\u274c"))
+        self.page("(u,v)=f(x,y)")
+        w.fuv_v_expr.setText("")
+        self.settle()
+        self.assertIn("v expression is empty", w.fuv_preview.info.text())
 
 
 if __name__ == "__main__":

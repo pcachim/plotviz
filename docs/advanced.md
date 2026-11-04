@@ -60,6 +60,24 @@ Below the expression, a small plot shows what **Generate** would create, without
 
 ---
 
+## z = f(x, y) and (u, v) = f(x, y)
+
+The other two pages of the generator evaluate an expression of two variables, `x` and `y`, for the **z** column of a surface, or two expressions, `u` and `v`, for the components of a vector field.
+
+- Each axis is its own choice: a generated **range** (with its spacing) or an existing **column**, used as it is.
+- **Meshgrid** combines every x with every y (nx × ny points), which is what heatmaps, contours, surfaces and vector fields need. Without it, x and y are paired point by point.
+- The columns created are x and y (only when generated, or with a meshgrid) and z, or u and v. Names already in use get a numeric suffix.
+
+### Preview
+
+Both pages have the same **Preview** and **Live** as the function generator, and the plot shows what the button would create without creating anything:
+
+- **z**: a meshgrid as filled contours with their lines, otherwise coloured points (x and y paired one by one). The line under the plot gives the range of z.
+- **(u, v)**: arrows coloured by their length, at most 20 per side on a grid. The line gives the range of the length.
+- Random and uniform spacing keep their draw until you click the button, and x and y are different draws.
+
+---
+
 ## Data Table
 
 The data table provides a manual spreadsheet-style entry grid for small datasets.

@@ -653,8 +653,6 @@ class DataMixin(MixinBase):
         i_fn = self.fn_source_combo.findText(prev_fn)
         self.fn_source_combo.setCurrentIndex(i_fn if i_fn >= 0 else 0)
         self.fn_source_combo.blockSignals(False)
-        if hasattr(self, 'gen_preview'):
-            self.gen_preview.schedule()
         self._refresh_transform_combos(cols)
         for _fxy_attr, _fxy_prev in [
             ('fxy_x_combo', getattr(getattr(self, 'fxy_x_combo', None), 'currentText', lambda: '')()),
@@ -670,6 +668,7 @@ class DataMixin(MixinBase):
             _i = _cb.findText(_fxy_prev)
             _cb.setCurrentIndex(_i if _i >= 0 else 0)
             _cb.blockSignals(False)
+        self._schedule_generate_previews()
 
         # Notify Seaborn Explorer if it is open
         self._notify_sns_explorer()
