@@ -840,6 +840,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#z-fx-y-and-u-v-fx-y" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        z = f(x, y) and (u, v) = f(x, y)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="z = f(x, y) and (u, v) = f(x, y)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#preview_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#data-table" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1335,6 +1363,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#z-fx-y-and-u-v-fx-y" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        z = f(x, y) and (u, v) = f(x, y)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="z = f(x, y) and (u, v) = f(x, y)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#preview_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#data-table" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1500,6 +1556,21 @@
 <li>With <code>random</code> or <code>uniform</code> spacing the preview keeps the same random draw until you click <strong>Generate</strong>, and the columns created are exactly the ones shown. The next preview is a new draw.</li>
 <li>Problems (syntax errors, unknown names, an empty range) are written in the plot area instead of showing a dialog.</li>
 <li>A line under the plot gives the number of points and the names of the columns that would be created. Above 50,000 points Live pauses; use <strong>Preview</strong>.</li>
+</ul>
+<hr />
+<h2 id="z-fx-y-and-u-v-fx-y">z = f(x, y) and (u, v) = f(x, y)<a class="headerlink" href="#z-fx-y-and-u-v-fx-y" title="Permanent link">&para;</a></h2>
+<p>The other two pages of the generator evaluate an expression of two variables, <code>x</code> and <code>y</code>, for the <strong>z</strong> column of a surface, or two expressions, <code>u</code> and <code>v</code>, for the components of a vector field.</p>
+<ul>
+<li>Each axis is its own choice: a generated <strong>range</strong> (with its spacing) or an existing <strong>column</strong>, used as it is.</li>
+<li><strong>Meshgrid</strong> combines every x with every y (nx × ny points), which is what heatmaps, contours, surfaces and vector fields need. Without it, x and y are paired point by point.</li>
+<li>The columns created are x and y (only when generated, or with a meshgrid) and z, or u and v. Names already in use get a numeric suffix.</li>
+</ul>
+<h3 id="preview_1">Preview<a class="headerlink" href="#preview_1" title="Permanent link">&para;</a></h3>
+<p>Both pages have the same <strong>Preview</strong> and <strong>Live</strong> as the function generator, and the plot shows what the button would create without creating anything:</p>
+<ul>
+<li><strong>z</strong>: a meshgrid as filled contours with their lines, otherwise coloured points (x and y paired one by one). The line under the plot gives the range of z.</li>
+<li><strong>(u, v)</strong>: arrows coloured by their length, at most 20 per side on a grid. The line gives the range of the length.</li>
+<li>Random and uniform spacing keep their draw until you click the button, and x and y are different draws.</li>
 </ul>
 <hr />
 <h2 id="data-table">Data Table<a class="headerlink" href="#data-table" title="Permanent link">&para;</a></h2>
