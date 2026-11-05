@@ -32,7 +32,8 @@ class DateArray(np.ndarray):
     so a column computed from a date column is not mistaken for dates."""
 
     def __new__(cls, values: Any) -> DateArray:
-        return np.asarray(values, dtype=float).view(cls)
+        out: DateArray = np.asarray(values, dtype=float).view(cls)
+        return out
 
     def __array_wrap__(self, obj: Any, context: Any = None, return_scalar: bool = False) -> Any:
         out = np.asarray(obj)

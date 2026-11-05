@@ -66,6 +66,15 @@ class TestTransformPreview(unittest.TestCase):
         from PyQt6.QtTest import QTest
         QTest.qWait(450)  # ty: ignore[missing-argument, invalid-argument-type]
 
+    def flush_undo(self):
+        """Let the undo snapshot that loading the data scheduled (400 ms) happen first,
+        so that only what the preview itself does is counted. Slow machines need longer."""
+        from PyQt6.QtTest import QTest
+        for _ in range(100):
+            if not self.w._snapshot_timer.isActive():
+                break
+            QTest.qWait(50)  # ty: ignore[missing-argument, invalid-argument-type]
+
     def op(self, key):
         self.w.tf_op_combo.setCurrentIndex(self.w.tf_op_combo.findData(key))
 
@@ -117,6 +126,7 @@ class TestTransformPreview(unittest.TestCase):
     # ── it never changes anything ────────────────────────────────────────────────
     def test_previewing_changes_nothing(self):
         w = self.w
+        self.flush_undo()
         before = {k: v for k, v in w.datasets.items()}
         steps = len(w._undo_stack)
         rows = w.series_table.rowCount()
@@ -124,6 +134,7 @@ class TestTransformPreview(unittest.TestCase):
             self.op(key)
             self.settle()
         w.tf_preview.button.click()
+        self.flush_undo()
         self.assertEqual(list(w.datasets), list(before))
         self.assertTrue(all(w.datasets[k] is before[k] for k in before))
         self.assertEqual((len(w._undo_stack), w.series_table.rowCount()), (steps, rows))
