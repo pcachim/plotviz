@@ -694,6 +694,12 @@ class CanvasPlotter(FigureCanvas):
             schedule = getattr(self.main_window, '_schedule_undo_snapshot', None)
             if schedule is not None:
                 schedule('Annotation')
+            # Adding, moving or deleting an annotation does not redraw the axes (which is what
+            # marks the chart as changed), so say it here: otherwise the Save button stays
+            # disabled and the annotation is lost when the file is closed.
+            mw = self.main_window
+            if not getattr(mw, '_applying_settings', False) and not getattr(mw, '_undo_suspended', False):
+                mw._is_dirty = True
 
     # ─── Status bar helper ────────────────────────────────────────────────────
     def _show_status(self, msg: str, timeout: int = 4000) -> None:

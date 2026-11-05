@@ -58,6 +58,11 @@ def slug(chart_type: str) -> str:
 
 
 def main(only: list[str]) -> int:
+    import tempfile
+    import config.settings as st
+    folder = Path(tempfile.mkdtemp(prefix="plotviz-images-"))      # never the user's own settings:
+    st._CFG_DIR, st.CFG_FILE = folder, folder / "settings.json"    # opening a chart adds it to the recent files
+    st.settings.clear()
     import matplotlib
     from PyQt6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
