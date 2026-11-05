@@ -85,7 +85,7 @@ class TestChartFigures(unittest.TestCase):
 
     def test_the_image_script_covers_every_chart_type(self):
         import importlib.util
-        spec = importlib.util.spec_from_file_location("make_doc_images", _ROOT / "util_files" / "make_doc_images.py")
+        spec = importlib.util.spec_from_file_location("make_doc_images", _ROOT / "util" / "make_doc_images.py")
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -127,7 +127,7 @@ class TestTransformFigures(unittest.TestCase):
 
     def test_every_figure_of_the_script_is_in_the_page(self):
         import importlib.util
-        spec = importlib.util.spec_from_file_location("make_doc_transforms", _ROOT / "util_files" / "make_doc_transforms.py")
+        spec = importlib.util.spec_from_file_location("make_doc_transforms", _ROOT / "util" / "make_doc_transforms.py")
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -142,7 +142,7 @@ class TestTransformFigures(unittest.TestCase):
         # renamed operation or parameter makes this fail (into a temporary folder).
         import importlib.util
         import tempfile
-        spec = importlib.util.spec_from_file_location("make_doc_transforms", _ROOT / "util_files" / "make_doc_transforms.py")
+        spec = importlib.util.spec_from_file_location("make_doc_transforms", _ROOT / "util" / "make_doc_transforms.py")
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -184,7 +184,7 @@ class TestExamples(unittest.TestCase):
     def test_the_pictures_and_numbers_match_a_fresh_run(self):
         import importlib.util
         import tempfile
-        spec = importlib.util.spec_from_file_location("make_doc_examples", _ROOT / "util_files" / "make_doc_examples.py")
+        spec = importlib.util.spec_from_file_location("make_doc_examples", _ROOT / "util" / "make_doc_examples.py")
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -279,7 +279,7 @@ class TestInterfaceFigures(unittest.TestCase):
     def test_the_screenshot_script_knows_every_page(self):
         import importlib.util
         import json
-        spec = importlib.util.spec_from_file_location("make_doc_screenshots", _ROOT / "util_files" / "make_doc_screenshots.py")
+        spec = importlib.util.spec_from_file_location("make_doc_screenshots", _ROOT / "util" / "make_doc_screenshots.py")
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
