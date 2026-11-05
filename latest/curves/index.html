@@ -1246,6 +1246,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#putting-a-fit-on-the-chart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Putting a fit on the chart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exporting-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exporting the results
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1998,6 +2020,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#putting-a-fit-on-the-chart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Putting a fit on the chart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exporting-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exporting the results
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2037,7 +2081,8 @@
 <p>The <strong>Plots → Curves</strong> page:</p>
 <ol>
 <li><strong>Per-curve</strong> — Choose the curve, then its <strong>line style</strong>, <strong>colour</strong> (<strong>Unlock</strong> lets the palette change it again), <strong>marker</strong>, line width and marker size, marker colour and <strong>draw style</strong>.</li>
-<li><strong>Curve fit (line / scatter)</strong> — The <strong>model</strong> and the options of the fit (range of x, weights, robust), <strong>Apply Fit</strong> and <strong>Remove Fit</strong>, the list of fits of the chart with their R², RMSE and AIC, the confidence and prediction bands, and the results.</li>
+<li><strong>Curve fit (line / scatter)</strong> — The <strong>model</strong> and the options of the fit (range of x, weights, robust), <strong>Apply Fit</strong> and <strong>Remove Fit</strong>, the list of fits of the chart with their R², RMSE and AIC, the confidence and prediction bands, and the results box.</li>
+<li><strong>Results</strong> — <strong>Export (.txt)</strong> writes the numbers to a file (with <strong>All fits</strong> for every fit), and <strong>Add to chart…</strong> writes a fit on the chart as a text box.</li>
 </ol>
 <p>Select a series from the <strong>Curve</strong> dropdown to edit its style. Changes take effect on the live preview immediately.</p>
 <h3 id="line">Line<a class="headerlink" href="#line" title="Permanent link">&para;</a></h3>
@@ -2301,6 +2346,84 @@
 <li>For each parameter: value, standard error, t, p and the confidence interval</li>
 </ul>
 <p>The fit result is saved with the <code>.pviz</code> project file and restored on reload.</p>
+<h3 id="putting-a-fit-on-the-chart">Putting a fit on the chart<a class="headerlink" href="#putting-a-fit-on-the-chart" title="Permanent link">&para;</a></h3>
+<p><strong>📝 Add to chart…</strong>, in the <strong>Results</strong> row, next to <strong>Export (.txt)</strong>, writes the fit on the chart as a text box, so that the equation and the numbers travel with the picture. It asks what to show:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Adds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Title</strong></td>
+<td><code>Quadratic fit: series</code>, with the x range, <em>weighted</em> or <em>robust</em> when they were used</td>
+</tr>
+<tr>
+<td><strong>Equation</strong></td>
+<td>The equation with the fitted numbers (<code>y = 0.383 x² − 2.31 x + 5.39</code>). With <strong>Parameters</strong> ticked it is written with their names (<code>y = a x² + b x + c</code>) and the numbers follow below</td>
+</tr>
+<tr>
+<td><strong>Write the equation as math text</strong></td>
+<td>On by default: the equation is written in LaTeX between dollar signs (<code>$y = 0.383\,x^{2} - 2.31\,x + 5.39$</code>) and drawn by matplotlib as a typeset formula, with powers, fractions, <code>e^{…}</code>, Greek letters and so on. Switch it off for plain characters. You can copy the text from the annotation into a paper</td>
+</tr>
+<tr>
+<td><strong>Parameters, with their errors</strong></td>
+<td>One line per parameter: <code>a = 0.383 ± 0.014</code>. The error has two significant digits and the value the same decimals</td>
+</tr>
+<tr>
+<td><strong>R²</strong>, <strong>RMSE</strong>, <strong>AIC</strong></td>
+<td>The goodness of fit</td>
+</tr>
+<tr>
+<td><strong>Number of points</strong></td>
+<td><code>n = 80</code></td>
+</tr>
+</tbody>
+</table>
+<p>By default it shows the title, the equation and R², for the fit that is selected in the <strong>Fits</strong> list. Tick <strong>All fits</strong> (the box of the <strong>Results</strong> row, the same one that <strong>Export (.txt)</strong> uses) to label every fit of the chart; the labels are stacked under each other at the top left of their subplot. With no fit selected and <strong>All fits</strong> off, you are asked to select one.</p>
+<p><img alt="Two fits with their labels" src="../images/examples/fits.png" /></p>
+<p>The label is an ordinary <a href="../legend-notes/">text annotation</a>: drag it where you want it, double-click it to edit the text, delete it from the annotations list. It is saved with the chart and appears in the exported image and in the exported Python script. Two things to know:</p>
+<ul>
+<li><strong>The text is fixed.</strong> If you fit again (another range, other data), the label does not change: delete it and make it again.</li>
+<li><strong>A shifted x is shown.</strong> When x is far from zero (years, dates) the fit is made on <code>x − x₀</code> for accuracy, and the label then writes <code>(x − x₀)</code> and adds a line <code>x₀ = 2005</code>. A LOWESS fit has no equation: its label has the title, <em>no equation</em> and R².</li>
+</ul>
+<h3 id="exporting-the-results">Exporting the results<a class="headerlink" href="#exporting-the-results" title="Permanent link">&para;</a></h3>
+<p>In the <strong>Results</strong> row at the bottom of the page, <strong>⬇ Export (.txt)</strong> writes the results to a text file, with the <strong>All fits</strong> box beside it deciding what goes in:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>All fits</strong> off (the default)</th>
+<th><strong>All fits</strong> on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What is written</strong></td>
+<td>The fit that is selected in the <strong>Fits</strong> list</td>
+<td>Every fit of the chart, one after the other</td>
+</tr>
+<tr>
+<td><strong>Suggested file name</strong></td>
+<td><code>&lt;name of the fit&gt;_results.txt</code></td>
+<td><code>all_fits_results.txt</code></td>
+</tr>
+<tr>
+<td><strong>Header</strong></td>
+<td>The block of that fit</td>
+<td><code>CURVE FIT RESULTS — N fit(s)</code>, then the blocks separated by a line</td>
+</tr>
+<tr>
+<td><strong>If there is nothing to write</strong></td>
+<td><em>Select a fit curve first, or tick "All fits".</em></td>
+<td><em>No fitted curves found.</em></td>
+</tr>
+</tbody>
+</table>
+<p>The file is plain text (no LaTeX). For each fit it has the equation, the goodness of fit (R², RMSE, AIC, BIC and the F-statistic with its p-value when it exists) and, for each parameter, its value with the error, <em>t</em>, <em>p</em> and the confidence interval. After the last fit comes a short glossary of the models that appeared. The level of the intervals is the one chosen in <strong>Confidence limits</strong>.</p>
+<p>To compare models, tick <strong>All fits</strong> and export once: the line and the parabola of the <a href="../examples/#which-curve-fits-best">worked example</a> end up side by side in one file instead of two. The button is available once the chart has at least one fit.</p>
 
 
 

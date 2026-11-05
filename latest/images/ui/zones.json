@@ -53,7 +53,8 @@
   ],
   "curves": [
     "PER-CURVE",
-    "CURVE FIT (LINE / SCATTER)"
+    "CURVE FIT (LINE / SCATTER)",
+    "RESULTS"
   ],
   "axes": [
     "X AXIS",
