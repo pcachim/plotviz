@@ -20,6 +20,7 @@ except ImportError:
     from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.patches as mpatches
+from matplotlib.transforms import Bbox
 
 from core.geometry import point_segment_distance
 
@@ -430,8 +431,46 @@ class CanvasPlotter(FigureCanvas):
             mw.select_annotation_in_list(hit)
         return True
 
+    def _annotation_box(self, ann):
+        """The area an annotation covers on the screen (pixels), or None: the text with its box,
+        or the image. An arrow is grabbed along its shaft instead."""
+        artist = ann.get('artist')
+        if artist is None or ann['type'] == 'arrow':
+            return None
+        try:
+            renderer = self.get_renderer()
+            box = artist.get_window_extent(renderer)
+            patch = artist.get_bbox_patch() if hasattr(artist, 'get_bbox_patch') else None
+            if patch is not None:
+                box = Bbox.union([box, patch.get_window_extent(renderer)])
+            return box
+        except (AttributeError, RuntimeError, ValueError, TypeError):
+            logging.getLogger('plotviz').debug('annotation box not measurable', exc_info=True)
+            return None
+
+    def _find_annotation_under(self, ax, x, y, slack=3.0):
+        """The annotation whose text or image is under the point (x, y) (data coordinates).
+        Where several overlap, the smallest wins, so that a small label on a big one can be picked."""
+        px, py = ax.transData.transform((x, y))
+        best, best_area = None, float('inf')
+        for ann in self.annotations:
+            if ann['axes_index'] != self._axes_index(ax):
+                continue
+            box = self._annotation_box(ann)
+            if box is None:
+                continue
+            if box.x0 - slack <= px <= box.x1 + slack and box.y0 - slack <= py <= box.y1 + slack:
+                area = box.width * box.height
+                if area < best_area:
+                    best, best_area = ann, area
+        return best
+
     def _find_annotation_at(self, ax, x, y, tol_frac=0.05):
-        """Find the closest annotation within tol_frac of axis range."""
+        """Find the annotation at (x, y): the one whose text is under the point, else the closest
+        anchor within tol_frac of the axis range."""
+        under = self._find_annotation_under(ax, x, y)
+        if under is not None:
+            return under
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
         tx = abs(xlim[1] - xlim[0]) * tol_frac

@@ -96,6 +96,10 @@ def fits(app):
         w.apply_fit()
     w.fit_ci_combo.setCurrentIndex(2)
     app.processEvents()
+    from data.fit_text import FitTextOptions
+    line, parabola = list(w._fits)
+    w._add_fit_label(line, FitTextOptions())
+    w._add_fit_label(parabola, FitTextOptions(parameters=True, aic=True))
     save(w, "fits")
     table = w.fit_table
     rows = [[table.item(r, c).text() if table.item(r, c) else "" for c in range(table.columnCount())]

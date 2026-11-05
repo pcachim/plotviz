@@ -13,7 +13,8 @@ When the chart has more than one subplot, a **Subplot** selector at the top swit
 The **Plots → Curves** page:
 
 1. **Per-curve** — Choose the curve, then its **line style**, **colour** (**Unlock** lets the palette change it again), **marker**, line width and marker size, marker colour and **draw style**.
-2. **Curve fit (line / scatter)** — The **model** and the options of the fit (range of x, weights, robust), **Apply Fit** and **Remove Fit**, the list of fits of the chart with their R², RMSE and AIC, the confidence and prediction bands, and the results.
+2. **Curve fit (line / scatter)** — The **model** and the options of the fit (range of x, weights, robust), **Apply Fit** and **Remove Fit**, the list of fits of the chart with their R², RMSE and AIC, the confidence and prediction bands, and the results box.
+3. **Results** — **Export (.txt)** writes the numbers to a file (with **All fits** for every fit), and **Add to chart…** writes a fit on the chart as a text box.
 
 Select a series from the **Curve** dropdown to edit its style. Changes take effect on the live preview immediately.
 
@@ -163,3 +164,40 @@ The results box at the bottom of the section shows:
 - For each parameter: value, standard error, t, p and the confidence interval
 
 The fit result is saved with the `.pviz` project file and restored on reload.
+
+### Putting a fit on the chart
+
+**📝 Add to chart…**, in the **Results** row, next to **Export (.txt)**, writes the fit on the chart as a text box, so that the equation and the numbers travel with the picture. It asks what to show:
+
+| Option | Adds |
+|--------|------|
+| **Title** | `Quadratic fit: series`, with the x range, *weighted* or *robust* when they were used |
+| **Equation** | The equation with the fitted numbers (`y = 0.383 x² − 2.31 x + 5.39`). With **Parameters** ticked it is written with their names (`y = a x² + b x + c`) and the numbers follow below |
+| **Write the equation as math text** | On by default: the equation is written in LaTeX between dollar signs (`$y = 0.383\,x^{2} - 2.31\,x + 5.39$`) and drawn by matplotlib as a typeset formula, with powers, fractions, `e^{…}`, Greek letters and so on. Switch it off for plain characters. You can copy the text from the annotation into a paper |
+| **Parameters, with their errors** | One line per parameter: `a = 0.383 ± 0.014`. The error has two significant digits and the value the same decimals |
+| **R²**, **RMSE**, **AIC** | The goodness of fit |
+| **Number of points** | `n = 80` |
+
+By default it shows the title, the equation and R², for the fit that is selected in the **Fits** list. Tick **All fits** (the box of the **Results** row, the same one that **Export (.txt)** uses) to label every fit of the chart; the labels are stacked under each other at the top left of their subplot. With no fit selected and **All fits** off, you are asked to select one.
+
+![Two fits with their labels](images/examples/fits.png)
+
+The label is an ordinary [text annotation](legend-notes.md): drag it where you want it, double-click it to edit the text, delete it from the annotations list. It is saved with the chart and appears in the exported image and in the exported Python script. Two things to know:
+
+- **The text is fixed.** If you fit again (another range, other data), the label does not change: delete it and make it again.
+- **A shifted x is shown.** When x is far from zero (years, dates) the fit is made on `x − x₀` for accuracy, and the label then writes `(x − x₀)` and adds a line `x₀ = 2005`. A LOWESS fit has no equation: its label has the title, *no equation* and R².
+
+### Exporting the results
+
+In the **Results** row at the bottom of the page, **⬇ Export (.txt)** writes the results to a text file, with the **All fits** box beside it deciding what goes in:
+
+| | **All fits** off (the default) | **All fits** on |
+|---|---|---|
+| **What is written** | The fit that is selected in the **Fits** list | Every fit of the chart, one after the other |
+| **Suggested file name** | `<name of the fit>_results.txt` | `all_fits_results.txt` |
+| **Header** | The block of that fit | `CURVE FIT RESULTS — N fit(s)`, then the blocks separated by a line |
+| **If there is nothing to write** | *Select a fit curve first, or tick "All fits".* | *No fitted curves found.* |
+
+The file is plain text (no LaTeX). For each fit it has the equation, the goodness of fit (R², RMSE, AIC, BIC and the F-statistic with its p-value when it exists) and, for each parameter, its value with the error, *t*, *p* and the confidence interval. After the last fit comes a short glossary of the models that appeared. The level of the intervals is the one chosen in **Confidence limits**.
+
+To compare models, tick **All fits** and export once: the line and the parabola of the [worked example](examples.md#which-curve-fits-best) end up side by side in one file instead of two. The button is available once the chart has at least one fit.

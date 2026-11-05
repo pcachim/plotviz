@@ -95,6 +95,8 @@ Controls in the **Style for new annotations** section set the default appearance
 
 ## Managing annotations
 
+The labels that **📝 Add to chart…** makes for a fit (see [Curves and Fitting](curves.md#putting-a-fit-on-the-chart)) are annotations like any other, and are managed here too.
+
 The **Annotations** list at the bottom of the tab shows all annotations on the current subplot. Each entry shows the type icon and either the label text or coordinates.
 
 **Double-click** any entry to open an edit dialog where you can change the text, position, font, colors, and border of that annotation.

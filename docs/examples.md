@@ -28,6 +28,7 @@ The pulses are at 0.302 s (2.76 V) and 0.721 s (2.67 V). With the threshold at 5
 2. In **Plots → Curves**, choose the series in the **Per-curve** list, set **Model** to **Linear** and click **Apply Fit**.
 3. Set **Model** to **Quadratic** and click **Apply Fit** again. Both fits stay on the chart and in the list of fits.
 4. Set **Confidence limits** to **2σ (95%)** to draw the band of the selected fit.
+5. Put the numbers on the chart: click **📝 Add to chart…** and choose what to show. Here the parabola is labelled with its parameters and AIC, and the line with the defaults (equation and R²).
 
 ![A line and a parabola fitted to the same points](images/examples/fits.png)
 

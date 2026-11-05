@@ -22,6 +22,7 @@ from data.scientific import (
     CurveFitter, CUSTOM_CHOICE, LOWESS_CHOICE, POLYNOMIAL_CHOICE, POLYNOMIAL_PREFIX, parse_start_values,
 )
 from ui.tab_builders import PLOT_MODE_GROUPS, PER_SERIES_TYPES
+from data.fit_text import FitTextOptions, fit_annotation_text
 from data.transforms import downsample_minmax
 from ui.mixin_base import MixinBase
 
@@ -370,6 +371,120 @@ class FitPresetMixin(MixinBase):
         if not plan.shape:
             summary += '. Without Meshgrid, x and y are paired point by point'
         return f'{plan.label}: {n:,} points{grid} → would create {names}; {summary}.'
+
+    # ── A label with the fit on the chart (an ordinary text annotation) ───────────────
+
+    def _fit_subplot_index(self, key):
+        """The subplot (0-based) that the curve of fit *key* is drawn in."""
+        for row in range(self.series_table.rowCount()):
+            item = self.series_table.item(row, 2)
+            if item and item.text() == key:
+                spin = self.series_table.cellWidget(row, 4)
+                if spin:
+                    return max(0, spin.value() - 1)
+        return 0
+
+    @staticmethod
+    def _text_block_pts(text, style):
+        """Measure a label: (distance from its anchor down to the bottom of the text, its height,
+        distance from the anchor to its left edge), all in points. The size of a text in points
+        does not depend on the size of the window, so this holds for the exported file too."""
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        from matplotlib.figure import Figure
+        fig = Figure(dpi=100)
+        FigureCanvasAgg(fig)
+        artist = fig.text(0.5, 0.5, text, fontsize=style.get('fontsize', 10),
+                          fontfamily=style.get('fontfamily', 'sans-serif'))
+        box = artist.get_window_extent(fig.canvas.get_renderer())
+        anchor_x, anchor_y = fig.transFigure.transform((0.5, 0.5))
+        k = 72 / fig.dpi
+        return (anchor_y - box.y0) * k, box.height * k, (box.x0 - anchor_x) * k
+
+    def _axes_size_pts(self, ax_idx):
+        """Width and height in points of subplot *ax_idx* in the exported figure."""
+        wi, hi = self._fig_size_in_inches()
+        figure = self._build_export_figure(wi, hi, 100)
+        position = figure._pviz_axes[min(ax_idx, len(figure._pviz_axes) - 1)].get_position()
+        return position.width * wi * 72, position.height * hi * 72
+
+    def _add_fit_label(self, key, options=None):
+        """Put the text of fit *key* on the chart as a text annotation, at the top left of its
+        subplot (under the labels of other fits already there). The text is fixed: it does not
+        follow the fit if the fit is made again. Returns the annotation, or None.
+
+        The place is worked out in points on the exported figure (a label is as big in points
+        whatever the size of the window), then stored in data coordinates like any annotation."""
+        fit = self._fits.get(key)
+        canvas = self.canvas
+        if fit is None or not getattr(canvas, 'axes_list', None):
+            return None
+        text = fit_annotation_text(fit, options or getattr(self, '_fit_label_options', FitTextOptions()))
+        ax_idx = min(self._fit_subplot_index(key), len(canvas.axes_list) - 1)
+        ax = canvas.axes_list[ax_idx]
+        style = dict(canvas.ann_style)
+        font = style.get('fontsize', 10)
+        pad, edge, gap = 0.3 * font, 0.8 * font, 0.8 * font       # the box padding; from the edge; between labels
+        width, height = self._axes_size_pts(ax_idx)
+        canvas.draw()                                             # final limits, for the transforms
+
+        def from_top(x, y):
+            """How far below the top of the axes (points) is the anchor at data (x, y)."""
+            return (1 - ax.transAxes.inverted().transform(ax.transData.transform((x, y)))[1]) * height
+
+        top = edge + pad                                          # of the text
+        for other in canvas.annotations:
+            if other.get('source_fit') and other.get('axes_index') == ax_idx:
+                other_down, _, _ = self._text_block_pts(other['label'], other.get('style', style))
+                bottom = from_top(other['x'], other['y']) + other_down + 0.3 * other.get('style', style).get('fontsize', 10)
+                top = max(top, bottom + gap + pad)
+        down, block, left = self._text_block_pts(text, style)
+        fx, fy = (edge + pad - left) / width, 1 - (top + block - down) / height
+        x, y = (float(v) for v in ax.transData.inverted().transform(ax.transAxes.transform((fx, fy))))
+        canvas._place_text_annotation(ax, ax_idx, x, y, label=text)
+        ann = canvas.annotations[-1]
+        ann['source_fit'] = key
+        self._schedule_undo_snapshot('Add fit label')
+        return ann
+
+    def _add_fit_label_dialog(self):
+        """Ask what the label shows, then add it for the selected fit, or for every fit when
+        **All fits** (the box of the Results row, shared with Export) is ticked."""
+        from PyQt6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QLabel, QVBoxLayout
+        if not self._fits:
+            QMessageBox.information(self, 'No fits', 'Fit a curve first.')
+            return
+        every = self.fit_export_all_check.isChecked()
+        key = self._selected_curve_key()
+        if not every and key not in self._fits:
+            QMessageBox.information(self, 'No Fit Selected', 'Select a fit curve first, or tick "All fits".')
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Fit label')
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel('Add to the chart as a text annotation:\n'
+                                + (f'one label for each of the {len(self._fits)} fits' if every else key)))
+        opt = getattr(self, '_fit_label_options', FitTextOptions())
+        boxes = {}
+        for name, text in (('name', 'Title (model and series)'), ('equation', 'Equation'),
+                           ('latex', 'Write the equation as math text ($…$)'),
+                           ('parameters', 'Parameters, with their errors'), ('r2', 'R²'),
+                           ('rmse', 'RMSE'), ('aic', 'AIC'), ('n', 'Number of points')):
+            boxes[name] = QCheckBox(text)
+            boxes[name].setChecked(getattr(opt, name))
+            layout.addWidget(boxes[name])
+        note = QLabel('The text is fixed: make the label again if you fit again.\n'
+                      'Drag it, or double-click it, like any annotation.')
+        note.setStyleSheet('color:#888;font-size:11px;')
+        layout.addWidget(note)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self._fit_label_options = FitTextOptions(**{name: box.isChecked() for name, box in boxes.items()})
+        for each in (list(self._fits) if every else [key]):
+            self._add_fit_label(each, self._fit_label_options)
 
     def _apply_col_function(self):
         self._generate_fx()
