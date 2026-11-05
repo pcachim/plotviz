@@ -230,30 +230,108 @@ class TestWindow(unittest.TestCase):
         x, y = self.d.points_data()
         np.testing.assert_allclose(y, 10 * x, atol=2.0)  # the line is y = 10 x
 
-    def test_adding_to_the_chart_emits_the_two_columns(self):
+    def test_adding_to_the_chart_emits_two_columns_named_after_the_curve(self):
         self.calibrate()
         self.d.add_point(200, 150)
-        self.d.name_x.setText("t")
-        self.d.name_y.setText("v")
+        self.d.rename_curve("signal")
         seen = []
         self.d.columns_ready.connect(seen.append)
         self.d.add_to_chart()
-        self.assertEqual(list(seen[0]), ["t", "v"])
-        np.testing.assert_allclose(seen[0]["v"], [50.0])
+        self.assertEqual(list(seen[0]), ["signal_x", "signal_y"])
+        np.testing.assert_allclose(seen[0]["signal_y"], [50.0])
 
-    def test_adding_without_a_calibration_or_with_one_name_is_refused(self):
-        self.d.add_point(200, 150)
+    def test_adding_without_a_calibration_or_without_points_is_refused(self):
         seen = []
         self.d.columns_ready.connect(seen.append)
+        self.d.add_point(200, 150)
         with mock.patch("ui.digitizer.QMessageBox.information") as info:
-            self.d.add_to_chart()
-        info.assert_called_once()
+            self.d.add_to_chart()                       # not calibrated
+        self.assertIn("X point 1", info.call_args[0][2])
         self.calibrate()
-        self.d.name_y.setText(self.d.name_x.text())
-        with mock.patch("ui.digitizer.QMessageBox.warning") as warn:
-            self.d.add_to_chart()
-        warn.assert_called_once()
+        self.d.clear_points()
+        with mock.patch("ui.digitizer.QMessageBox.information") as info:
+            self.d.add_to_chart()                       # no points
+        self.assertIn("Click on the curve", info.call_args[0][2])
         self.assertEqual(seen, [])
+
+    def test_several_curves_keep_their_own_points_and_all_are_added(self):
+        self.calibrate()
+        self.d.add_point(200, 150)
+        self.d.add_curve("second")
+        self.assertEqual(self.d._points, [])             # a new curve starts empty
+        self.d.add_point(100, 100)
+        self.d.add_point(300, 100)
+        self.d.set_active_curve(0)
+        self.assertEqual(self.d._points, [(200, 150)])
+        self.assertEqual(self.d.curve_names(), ["curve1", "second"])
+        seen = []
+        self.d.columns_ready.connect(seen.append)
+        self.d.add_to_chart()
+        self.assertEqual(list(seen[0]), ["curve1_x", "curve1_y", "second_x", "second_y"])
+        self.assertEqual(len(seen[0]["second_x"]), 2)
+        self.assertEqual(len(seen[0]["curve1_x"]), 1)
+
+    def test_each_curve_has_its_own_x_values_and_marker_colour(self):
+        self.calibrate()
+        self.d.add_point(100, 100)
+        self.d.add_curve()
+        self.d.add_point(300, 100)
+        self.assertNotEqual(self.d._curves[0]["marker"], self.d._curves[1]["marker"])
+        names_x = {name: x for name, x, _ in self.d.curves_data()}
+        self.assertNotEqual(float(names_x["curve1"][0]), float(names_x["curve2"][0]))
+
+    def test_a_curve_remembers_its_colour_and_tolerance(self):
+        self.d.pick_color_at(200, 150)
+        self.d.tolerance.setValue(33)
+        self.d.add_curve()
+        self.assertIsNone(self.d._color)
+        self.assertEqual(self.d.tolerance.value(), 60)
+        self.d.set_active_curve(0)
+        self.assertEqual(self.d._color, (220, 30, 30))
+        self.assertEqual(self.d.tolerance.value(), 33)
+
+    def test_trace_adds_to_the_active_curve_only(self):
+        self.calibrate()
+        self.d.add_curve()
+        self.d.pick_color_at(200, 150)
+        self.assertGreater(self.d.trace_curve(), 0)
+        self.assertEqual(self.d._curves[0]["points"], [])
+        self.assertGreater(len(self.d._curves[1]["points"]), 0)
+
+    def test_names_are_unique_and_a_blank_name_is_ignored(self):
+        self.d.add_curve()
+        self.d.rename_curve("curve1")
+        self.assertEqual(self.d.curve_names(), ["curve1", "curve1_2"])
+        self.d.rename_curve("   ")
+        self.assertEqual(self.d.curve_names()[1], "curve1_2")
+
+    def test_deleting_a_curve_removes_its_points_and_the_last_one_is_only_emptied(self):
+        self.d.add_point(100, 100)
+        self.d.add_curve()
+        self.d.add_point(200, 100)
+        before = len(self.d.scene.items())
+        self.d.delete_curve()
+        self.assertEqual(self.d.curve_names(), ["curve1"])
+        self.assertEqual(len(self.d.scene.items()), before - 1)
+        self.d.delete_curve()
+        self.assertEqual(self.d.curve_names(), ["curve1"])
+        self.assertEqual(self.d._points, [])
+
+    def test_the_combo_lists_the_curves_with_their_number_of_points(self):
+        self.d.add_point(100, 100)
+        self.d.add_curve()
+        texts = [self.d.curve_combo.itemText(i) for i in range(self.d.curve_combo.count())]
+        self.assertEqual(texts, ["curve1  (1)", "curve2  (0)"])
+        self.d.curve_combo.setCurrentIndex(0)
+        self.assertEqual(self.d._active, 0)
+
+    def test_a_new_image_starts_with_one_empty_curve(self):
+        from PyQt6.QtGui import QImage
+        self.d.add_curve()
+        self.d.add_point(100, 100)
+        self.d.set_image(QImage(100, 100, QImage.Format.Format_RGB32), "other")
+        self.assertEqual(self.d.curve_names(), ["curve1"])
+        self.assertEqual(self.d._points, [])
 
     def reference_mode(self, n_points=3):
         """Reference points for a picture whose axes are rotated: pixel = (100 + 20x + 5y, 250 - 2x - 15y)."""

@@ -15,9 +15,9 @@ import os
 
 import numpy as np
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QShortcut
+from PyQt6.QtGui import QBrush, QColor, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog, QFileDialog,
+    QAbstractItemView, QInputDialog, QApplication, QCheckBox, QComboBox, QDialog, QFileDialog,
     QFormLayout, QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsPixmapItem, QGraphicsScene,
     QGraphicsView, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton,
     QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -33,6 +33,7 @@ GRAB_RADIUS_PX = 10                                  # how near the pointer must
 MAGNIFIER_SIZE = 150
 MAGNIFIER_SPAN = 25                                  # picture pixels shown across the magnifier
 POINT_COLOR = '#2ca02c'
+CURVE_COLORS = ['#2ca02c', '#ff7f0e', '#9467bd', '#17becf', '#e377c2', '#8c564b', '#bcbd22', '#7f7f7f']
 IMAGE_FILTER = 'Images (*.png *.jpg *.jpeg *.bmp *.gif *.tif *.tiff *.webp);;All files (*)'
 
 
@@ -195,16 +196,98 @@ class DigitizerDialog(QDialog):
         self._path = ''
         self._cal_points: dict[str, tuple[float, float]] = {}
         self._cal_items: dict[str, QGraphicsPathItem] = {}
-        self._points: list[tuple[float, float]] = []
-        self._point_items: list[QGraphicsEllipseItem] = []
+        self._curves = [self._new_curve('curve1', 0)]     # every curve digitized from this image
+        self._active = 0                                   # the one that receives the points
         self._awaiting: str | None = None            # a calibration key, or 'color', waiting for a click
         self._grabbed_point: int | None = None       # the marked point being dragged
         self._grabbed_marker: str | None = None      # or the reference marker being dragged
-        self._color: tuple[int, int, int] | None = None
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._build()
         QShortcut(QKeySequence(QKeySequence.StandardKey.Paste), self).activated.connect(self.paste_image)
         self._refresh()
+
+    # ─── curves ───────────────────────────────────────────────────────────────
+    @staticmethod
+    def _new_curve(name: str, index: int) -> dict:
+        return {'name': name, 'points': [], 'items': [], 'color': None, 'tolerance': 60,
+                'marker': CURVE_COLORS[index % len(CURVE_COLORS)]}
+
+    @property
+    def _points(self) -> list[tuple[float, float]]:
+        """The points of the active curve, as pixel positions."""
+        return self._curves[self._active]['points']
+
+    @property
+    def _point_items(self) -> list[QGraphicsEllipseItem]:
+        return self._curves[self._active]['items']
+
+    @property
+    def _color(self) -> tuple[int, int, int] | None:
+        """The colour that Trace follows for the active curve."""
+        return self._curves[self._active]['color']
+
+    @_color.setter
+    def _color(self, value):
+        self._curves[self._active]['color'] = value
+
+    def curve_names(self) -> list[str]:
+        return [c['name'] for c in self._curves]
+
+    def add_curve(self, name: str | None = None) -> int:
+        """Start another curve (it becomes the active one).  Returns its index."""
+        index = len(self._curves)
+        self._curves.append(self._new_curve(self._unique_name(name or f'curve{index + 1}'), index))
+        self.set_active_curve(index)
+        return index
+
+    def _unique_name(self, name: str, ignore: int | None = None) -> str:
+        taken = {c['name'] for i, c in enumerate(self._curves) if i != ignore}
+        name, n = name.strip() or 'curve', 2
+        candidate = name
+        while candidate in taken:
+            candidate, n = f'{name}_{n}', n + 1
+        return candidate
+
+    def rename_curve(self, name: str):
+        """Give the active curve a name (the columns it makes are <name>_x and <name>_y)."""
+        if name.strip():
+            self._curves[self._active]['name'] = self._unique_name(name, ignore=self._active)
+            self._refresh_curve_combo()
+            self._refresh()
+
+    def delete_curve(self):
+        """Remove the active curve and its points (the last curve is emptied instead)."""
+        self.clear_points(refresh=False)
+        if len(self._curves) > 1:
+            del self._curves[self._active]
+            self._active = max(0, self._active - 1)
+        self.set_active_curve(self._active)
+
+    def set_active_curve(self, index: int):
+        if not 0 <= index < len(self._curves):
+            return
+        self._active = index
+        curve = self._curves[index]
+        self.tolerance.setValue(curve['tolerance'])
+        self._show_color_button()
+        self._refresh_curve_combo()
+        self._refresh()
+
+    def _refresh_curve_combo(self):
+        self.curve_combo.blockSignals(True)
+        self.curve_combo.clear()
+        for i, curve in enumerate(self._curves):
+            swatch = QPixmap(12, 12)
+            swatch.fill(QColor(curve['marker']))
+            self.curve_combo.addItem(QIcon(swatch), f"{curve['name']}  ({len(curve['points'])})")
+        self.curve_combo.setCurrentIndex(self._active)
+        self.curve_combo.blockSignals(False)
+
+    def _rename_dialog(self):
+        name, ok = QInputDialog.getText(self, 'Rename curve', 'Name (the columns will be <name>_x and <name>_y):',
+                                        text=self._curves[self._active]['name'])
+        if ok:
+            self.rename_curve(name)
 
     # ─── window ───────────────────────────────────────────────────────────────
     def _build(self):
@@ -319,6 +402,24 @@ class DigitizerDialog(QDialog):
         # 3. points
         box = QGroupBox('3. Points')
         lay = QVBoxLayout(box)
+        curves = QHBoxLayout()
+        self.curve_combo = QComboBox()
+        self.curve_combo.setToolTip('The curve that receives the points. Each curve becomes two columns')
+        self.curve_combo.currentIndexChanged.connect(self.set_active_curve)
+        new_curve = QPushButton('+')
+        new_curve.setFixedWidth(30)
+        new_curve.setToolTip('Start another curve')
+        new_curve.clicked.connect(lambda: self.add_curve())
+        rename_curve = QPushButton('Rename…')
+        rename_curve.clicked.connect(self._rename_dialog)
+        delete_curve = QPushButton('−')
+        delete_curve.setFixedWidth(30)
+        delete_curve.setToolTip('Delete this curve and its points')
+        delete_curve.clicked.connect(self.delete_curve)
+        curves.addWidget(self.curve_combo, 1)
+        for w in (new_curve, rename_curve, delete_curve):
+            curves.addWidget(w)
+        lay.addLayout(curves)
         self.tool_combo = QComboBox()
         self.tool_combo.addItems(['Add points: click on the curve', 'Pan: drag the image'])
         self.tool_combo.currentIndexChanged.connect(self._on_tool)
@@ -337,6 +438,7 @@ class DigitizerDialog(QDialog):
         self.tolerance.setValue(60)
         self.tolerance.setPrefix('± ')
         self.tolerance.setToolTip('How different from the picked colour a pixel may be')
+        self.tolerance.valueChanged.connect(lambda v: self._curves[self._active].__setitem__('tolerance', v))
         self.step = QSpinBox()
         self.step.setRange(1, 100)
         self.step.setValue(8)
@@ -369,14 +471,14 @@ class DigitizerDialog(QDialog):
         # 4. dataset
         box = QGroupBox('4. Add to the chart')
         form = QFormLayout(box)
-        self.name_x = QLineEdit('x_digitized')
-        self.name_y = QLineEdit('y_digitized')
-        form.addRow('Column for x:', self.name_x)
-        form.addRow('Column for y:', self.name_y)
+        note = QLabel('Each curve becomes two columns, <name>_x and <name>_y.')
+        note.setWordWrap(True)
+        note.setStyleSheet('color:#555;')
+        form.addRow(note)
         self.sort_check = QCheckBox('Sort by x')
         self.sort_check.setChecked(True)
         form.addRow(self.sort_check)
-        self.add_btn = QPushButton('Add as columns')
+        self.add_btn = QPushButton('Add curves as columns')
         self.add_btn.clicked.connect(self.add_to_chart)
         form.addRow(self.add_btn)
         panel.addWidget(box)
@@ -412,16 +514,19 @@ class DigitizerDialog(QDialog):
 
     def set_image(self, image: QImage, name: str = ''):
         """Show *image* and start over (a new picture has other axes and other points)."""
-        self.clear_points(refresh=False)
+        for item in [i for c in self._curves for i in c['items']]:
+            self.scene.removeItem(item)
+        self._curves = [self._new_curve('curve1', 0)]
+        self._active = 0
+        self.tolerance.setValue(60)
+        self._show_color_button()
         for key in list(self._cal_items):
             self.scene.removeItem(self._cal_items.pop(key))
         self._cal_points.clear()
         self.scene.clear()
         self._cal_items.clear()
-        self._point_items.clear()
         self._image = image
         self._rgb = image_to_rgb(image)
-        self._color = None
         self._grabbed_point = self._grabbed_marker = None
         self.magnifier.hide()
         self._pixmap_item = self.scene.addPixmap(QPixmap.fromImage(image))
@@ -618,7 +723,7 @@ class DigitizerDialog(QDialog):
     # ─── points ───────────────────────────────────────────────────────────────
     def add_point(self, x: float, y: float):
         self._points.append((x, y))
-        item = self.scene.addEllipse(-4, -4, 8, 8, QPen(QColor('white'), 1), QBrush(QColor(POINT_COLOR)))
+        item = self.scene.addEllipse(-4, -4, 8, 8, QPen(QColor('white'), 1), QBrush(QColor(self._curves[self._active]['marker'])))
         assert item is not None
         item.setFlag(QGraphicsEllipseItem.GraphicsItemFlag.ItemIgnoresTransformations)
         item.setPos(QPointF(x, y))
@@ -663,8 +768,16 @@ class DigitizerDialog(QDialog):
             return
         r, g, b = (int(v) for v in self._rgb[min(int(y), self._rgb.shape[0] - 1), min(int(x), self._rgb.shape[1] - 1)])
         self._color = (r, g, b)
-        self.color_btn.setStyleSheet(f'background-color: rgb({r},{g},{b}); color: {"white" if r + g + b < 380 else "black"};')
+        self._show_color_button()
         self._refresh()
+
+    def _show_color_button(self):
+        colour = self._color
+        if colour is None:
+            self.color_btn.setStyleSheet('')
+        else:
+            r, g, b = colour
+            self.color_btn.setStyleSheet(f'background-color: rgb({r},{g},{b}); color: {"white" if r + g + b < 380 else "black"};')
 
     def trace_curve(self) -> int:
         """Add points along the picked colour, within the horizontal range of the X reference points
@@ -688,18 +801,29 @@ class DigitizerDialog(QDialog):
                              'No pixel of that colour was found: raise the tolerance or pick the colour again.')
         return len(px)
 
-    def points_data(self) -> tuple[np.ndarray, np.ndarray]:
-        """The points as values of the axes (sorted by x when the option is on).  Empty until calibrated."""
-        cal = self.calibration()
-        if cal is None or not self._points:
-            return np.array([]), np.array([])
-        pts = np.asarray(self._points)
+    def _curve_values(self, points, cal) -> tuple[np.ndarray, np.ndarray]:
+        """Values of the axes for *points* (pixel positions), sorted by x when the option is on."""
+        pts = np.asarray(points)
         x, y = cal.to_data(pts[:, 0], pts[:, 1])
         x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
         if self.sort_check.isChecked():
             order = np.argsort(x, kind='stable')
             x, y = x[order], y[order]
         return x, y
+
+    def points_data(self) -> tuple[np.ndarray, np.ndarray]:
+        """The points of the active curve as values of the axes.  Empty until calibrated."""
+        cal = self.calibration()
+        if cal is None or not self._points:
+            return np.array([]), np.array([])
+        return self._curve_values(self._points, cal)
+
+    def curves_data(self) -> list[tuple[str, np.ndarray, np.ndarray]]:
+        """(name, x, y) of every curve that has points.  Empty until calibrated."""
+        cal = self.calibration()
+        if cal is None:
+            return []
+        return [(c['name'], *self._curve_values(c['points'], cal)) for c in self._curves if c['points']]
 
     def _table_order(self) -> list[int]:
         """The index of each table row in self._points (the table follows the sort option)."""
@@ -712,17 +836,17 @@ class DigitizerDialog(QDialog):
         return [int(i) for i in np.argsort(x, kind='stable')]
 
     def add_to_chart(self):
-        x, y = self.points_data()
-        if not len(x):
+        """Send every curve to the chart as two columns, <name>_x and <name>_y."""
+        curves = self.curves_data()
+        if not curves:
             reason = self._calibration_or_reason()[1] or 'Click on the curve to add points first.'
-            QMessageBox.information(self, 'Add as columns', reason)
+            QMessageBox.information(self, 'Add curves as columns', reason)
             return
-        nx, ny = self.name_x.text().strip() or 'x_digitized', self.name_y.text().strip() or 'y_digitized'
-        if nx == ny:
-            QMessageBox.warning(self, 'Add as columns', 'The two columns need different names.')
-            return
-        self.columns_ready.emit({nx: x, ny: y})
-        self.readout.setText(f'Added {len(x)} point(s) as "{nx}" and "{ny}".')
+        columns = {}
+        for name, x, y in curves:
+            columns[f'{name}_x'], columns[f'{name}_y'] = x, y
+        self.columns_ready.emit(columns)
+        self.readout.setText(f'Added {len(curves)} curve(s): {", ".join(columns)}.')
 
     # ─── display ──────────────────────────────────────────────────────────────
     def _refresh(self, *_):
@@ -739,6 +863,7 @@ class DigitizerDialog(QDialog):
         for button in self.cal_buttons.values():
             button.setEnabled(have)
         self._fill_table(cal)
+        self._refresh_curve_combo()
 
     def _fill_table(self, cal):
         order = self._table_order()

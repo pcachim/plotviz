@@ -11,9 +11,18 @@ Open it from the menu bar: **Tools → Digitize Image…** (`Ctrl + Shift + D`).
 1. **Open the image.** Click **Open image…**, or copy the picture (from a PDF viewer, a web page) and click **Paste** (`Ctrl + V`). **Fit** shows the whole image.
 2. **Calibrate the axes.** Click **Set X point 1**, then click on the image at a position of the X axis whose value you know, and type that value in the box beside the button. Do the same for **X point 2** and for the two points of the Y axis. The two points of an axis should be far apart (the ends of the axis are best), and need not be on the curve. The line **Axes calibrated** appears when the four points and the four values are set. Tick **logarithmic** for an axis with a log scale.
 3. **Mark the curve.** With the tool **Add points**, click on the curve: each click adds a point. Right-click a point to remove it, or take it with the left button and drag it to correct its place. The table shows the value of each point, and the bar under the image shows the values at the pointer. While you move the pointer over the image, a **magnifier** in a corner shows the picture around it, enlarged, with a cross at the exact position: place the point where the cross is.
-4. **Add the points to the chart.** Type the names of the two columns and click **Add as columns**. They appear in the **Datasets** list like any other column (a name already in use gets a number).
+4. **Add the points to the chart.** Click **Add curves as columns**. Each curve becomes two columns, `<name>_x` and `<name>_y` (for example `curve1_x` and `curve1_y`), which appear in the **Datasets** list like any other column (a name already in use gets a number). With **Sort by x** on, the points of each curve are sorted by x.
 
 Zoom with the mouse wheel and drag the image with the middle button, or choose the **Pan** tool and drag with the left button. Zooming in before clicking makes the points more exact.
+
+## Several curves
+
+A chart often has more than one curve. Digitize them all in the same window, so that the axes are calibrated once:
+
+* The list at the top of **Points** shows the curves, each with its marker colour and its number of points. The **active** curve is the one that receives the clicks, the tracing and the dragging.
+* **+** starts another curve, **Rename…** changes the name (the columns are called after it), and **−** deletes the active curve and its points.
+* Each curve remembers its own **curve colour** and tolerance, so for a chart with a red and a blue curve: pick red and click **Trace**, add a curve, pick blue and click **Trace** again.
+* **Add curves as columns** sends all the curves that have points. Each one keeps the x values of its own points. If you need all the curves on the same x values, add them as they are and use **Transform → Align to another x** in the Data tab, which interpolates the others on the x of one of them.
 
 ## A picture that is rotated or tilted
 

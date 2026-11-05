@@ -28,6 +28,7 @@ def main() -> int:
     fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
     x = np.linspace(0, 10, 200)
     ax.plot(x, 10 * np.exp(-x / 4) * np.cos(x) + 12, color="#d62728", lw=2.2)
+    ax.plot(x, 3 + 1.6 * x, color="#1f77b4", lw=2.2)
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 25)
     ax.grid(alpha=0.3)
@@ -53,6 +54,10 @@ def main() -> int:
         dialog.cal_values[key].setText(value)
     dialog.pick_color_at(*pixel(3, 10 * np.exp(-3 / 4) * np.cos(3) + 12))
     dialog.step.setValue(14)
+    dialog.trace_curve()
+    dialog.rename_curve("damped")
+    dialog.add_curve("line")
+    dialog.pick_color_at(*pixel(8, 3 + 1.6 * 8))
     dialog.trace_curve()
     dialog._on_move(*pixel(5.0, 10 * np.exp(-5 / 4) * np.cos(5) + 12))      # the magnifier shows near the curve
     app.processEvents()
