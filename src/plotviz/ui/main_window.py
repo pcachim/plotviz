@@ -908,25 +908,33 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._open_code_runner()
         self._code_runner.load_pvizx(fp)
 
-    def _open_documentation(self):
-        """Show the documentation in its own window; when it is not on disk (a pip install
-        does not carry it) open the online version in the browser instead."""
+    def _open_documentation(self, page: str | None = None):
+        """Show the documentation in its own window, on *page* when given; when it is not on
+        disk (a pip install does not carry it) open the online version in the browser instead."""
         from ui.help_window import HelpWindow, docs_dir
         if docs_dir() is None:
-            self._open_documentation_online()
+            self._open_documentation_online(page)
             return
         if getattr(self, '_help_window', None) is None:
             self._help_window = HelpWindow(self)
+        if page:
+            self._help_window.open_page(page)
         self._help_window.show()
         self._help_window.raise_()
         self._help_window.activateWindow()
 
-    def _open_documentation_online(self):
-        """Open the plotviz online documentation in the default browser."""
+    def _open_licenses(self):
+        """The Licenses page of the documentation (Help > Licenses, and the About dialog)."""
+        self._open_documentation('licenses.md')
+
+    def _open_documentation_online(self, page: str | None = None):
+        """Open the plotviz online documentation in the default browser (on *page* if given)."""
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
         from ui.help_window import ONLINE_URL
-        QDesktopServices.openUrl(QUrl(ONLINE_URL))
+        # The site is versioned: the pages live under the "stable" alias, the root redirects there.
+        address = f"{ONLINE_URL}stable/{page[:-3]}/" if page and page.endswith('.md') else ONLINE_URL
+        QDesktopServices.openUrl(QUrl(address))
 
     def _open_sample_chart(self):
         """Pick a sample chart in an Open dialog that starts in the samples folder."""
@@ -1230,6 +1238,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         sample_datasets_action.setStatusTip('Choose one or more sample datasets to load')
         sample_datasets_action.triggered.connect(self._open_sample_dataset)
         help_menu.addAction(sample_datasets_action)
+
+        help_menu.addSeparator()
+
+        licenses_action = QAction('Licenses', self)
+        licenses_action.setStatusTip('The licence of plotviz and of the packages it contains')
+        licenses_action.triggered.connect(self._open_licenses)
+        help_menu.addAction(licenses_action)
 
         self._help_menu = help_menu
 

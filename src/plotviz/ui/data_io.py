@@ -198,7 +198,11 @@ class DataMixin(MixinBase):
             '<b>Help → Documentation → Licenses</b> and in <code>THIRD-PARTY-NOTICES.md</code>.</p>'
         )
         dlg.setIconPixmap(QApplication.windowIcon().pixmap(64, 64))
+        licenses = dlg.addButton('Licenses…', QMessageBox.ButtonRole.ActionRole)
+        dlg.addButton(QMessageBox.StandardButton.Ok)
         dlg.exec()
+        if dlg.clickedButton() is licenses:
+            self._open_licenses()
 
     # ── Undo / Redo ─────────────────────────────────────────────────────────────
     def _schedule_undo_snapshot(self, label=None):

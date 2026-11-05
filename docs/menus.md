@@ -62,7 +62,8 @@ The file types are described in [File Formats](file-formats.md).
 | **Documentation Online** | | The same documentation on the website |
 | **Sample Charts…** | | A file dialog in your samples folder: pick a ready-made chart to open |
 | **Sample Datasets…** | | A file dialog in your sample datasets folder: pick one or more files to load |
-| **About plotviz** | | The version, the copyright and the licence |
+| **Licenses** | | This documentation, on the page with the licence of plotviz and of the packages it contains |
+| **About plotviz** | | The version, the copyright and the licence, with a **Licenses…** button that opens the same page |
 
 The samples are copies of the examples that come with plotviz, made the first time it runs, so you can open and change them freely. They live in the `plots` and `datasets` folders of the config folder shown in the Preferences. (A `pip` install does not include them; the binary releases and a source checkout do.) The sample charts cover each chart type; the sample datasets are the data behind them, and some more to try the Generate, Transform and Statistics pages (`pulse_signal.csv`, `fit_test.csv`, `dates_daily.csv`…).
 

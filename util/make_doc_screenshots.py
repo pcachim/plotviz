@@ -257,8 +257,23 @@ def preferences_dialog(w, app):
     return [t for t, _ in shot["zones"]]
 
 
+def home_picture(w):
+    """The whole window with the gallery of charts, for the home page of the documentation."""
+    from PyQt6.QtTest import QTest
+    from ui.collapsible import CollapsibleSection
+    w._load_project_inner(str(ROOT / "data" / "plots" / "multiple" / "09_gallery_2x3.pviz"), silent=True)
+    for section in w.findChildren(CollapsibleSection):
+        section._toggle.setChecked(True)
+    w.resize(1280, 820)
+    w.tabs.setCurrentIndex(2)                                   # Plots
+    w.plots_inner_tabs.setCurrentIndex(0)                       # Plot: the series table
+    QTest.qWait(700)
+    w.grab().save(str(OUT / "home.png"))
+    print("home")
+
+
 def main(only: list[str]) -> int:
-    unknown = [k for k in only if k not in PAGES and k not in ("overview", "export", "preferences")]
+    unknown = [k for k in only if k not in PAGES and k not in ("overview", "export", "preferences", "home")]
     if unknown:
         print("unknown page(s):", ", ".join(unknown), "| known:", ", ".join(PAGES))
         return 2
@@ -309,6 +324,8 @@ def main(only: list[str]) -> int:
         print(f"{key:<16} {len(found)} zone(s): {', '.join(zones[key])}")
     if not only or "export" in only:
         zones["export"] = export_dialog(w, app)
+    if not only or "home" in only:
+        home_picture(w)
     if not only or "preferences" in only:
         zones["preferences"] = preferences_dialog(w, app)
     if not only or "overview" in only:

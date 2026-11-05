@@ -309,6 +309,11 @@ class TestMarkdownPreparation(unittest.TestCase):
         self.assertEqual(out.split("\n")[0], "![logo](images/logo.png)")
         self.assertIn("text {not an attribute list}", out)
 
+    def test_the_home_page_shows_the_app_before_the_highlights(self):
+        text = (DOCS / "index.md").read_text(encoding="utf-8")
+        self.assertTrue((DOCS / "images" / "ui" / "home.png").is_file())
+        self.assertLess(text.index("(images/ui/home.png)"), text.index("## Highlights"))
+
     def test_the_logo_is_on_the_home_page_and_in_the_readme(self):
         self.assertTrue((DOCS / "images" / "logo.png").is_file())
         self.assertIn("(images/logo.png)", (DOCS / "index.md").read_text(encoding="utf-8"))
@@ -523,6 +528,54 @@ class TestHelpMenu(unittest.TestCase):
         w._open_documentation()
         self.assertIs(w._help_window, first)            # one window, shown again
         first.close()
+        w.close()
+
+    def test_help_has_a_licenses_item_in_its_own_group_after_the_samples(self):
+        w = self.PlotVizApp()
+        actions = w._help_menu.actions()
+        titles = [a.text() for a in actions]
+        self.assertIn("Licenses", titles)
+        i = titles.index("Licenses")
+        self.assertGreater(i, titles.index("Sample Datasets…"))
+        self.assertTrue(actions[i - 1].isSeparator())                    # a group of its own
+        w.close()
+
+    def test_licenses_opens_the_help_window_on_that_page(self):
+        w = self.PlotVizApp()
+        w._open_licenses()
+        self.assertTrue(w._help_window.isVisible())
+        self.assertEqual(w._help_window.selected_page(), "licenses.md")
+        w._open_documentation()                                          # F1 keeps the page it was on
+        self.assertEqual(w._help_window.selected_page(), "licenses.md")
+        w._help_window.close()
+        w.close()
+
+    def test_without_the_docs_licenses_opens_that_page_of_the_website(self):
+        from unittest import mock
+        w = self.PlotVizApp()
+        with mock.patch("ui.help_window.docs_dir", return_value=None), \
+                mock.patch("PyQt6.QtGui.QDesktopServices.openUrl") as opened:
+            w._open_licenses()
+        self.assertEqual(opened.call_args[0][0].toString(), "https://pcachim.github.io/plotviz/stable/licenses/")
+        self.assertIsNone(getattr(w, "_help_window", None))
+        w.close()
+
+    def test_the_about_dialog_has_a_licenses_button(self):
+        from PyQt6.QtCore import QTimer
+        from PyQt6.QtWidgets import QApplication, QMessageBox
+        w = self.PlotVizApp()
+        seen = {}
+
+        def click():
+            dialog = QApplication.activeModalWidget()
+            assert isinstance(dialog, QMessageBox)
+            seen["buttons"] = [b.text() for b in dialog.buttons()]
+            next(b for b in dialog.buttons() if b.text() == "Licenses…").click()
+        QTimer.singleShot(300, click)
+        w._show_about()
+        self.assertIn("Licenses…", seen["buttons"])
+        self.assertEqual(w._help_window.selected_page(), "licenses.md")
+        w._help_window.close()
         w.close()
 
     def test_without_the_docs_on_disk_the_browser_is_used(self):
