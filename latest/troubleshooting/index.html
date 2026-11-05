@@ -1365,6 +1365,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../command-line/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Line
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1659,6 +1687,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command line
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#digitize-image" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1851,6 +1890,17 @@
     <span class="md-ellipsis">
       
         Python Code Runner
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command line
       
     </span>
   </a>
@@ -2117,6 +2167,33 @@
 <tr>
 <td>The <strong>Runtime Error</strong> panel</td>
 <td>It shows the traceback of your code; the last line is the error and the one above it the line that caused it. <strong>Copy</strong> puts it on the clipboard</td>
+</tr>
+</tbody>
+</table>
+<h2 id="command-line">Command line<a class="headerlink" href="#command-line" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Cause and what to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>no such file</strong> / <strong>not a plotviz chart</strong></td>
+<td>The path is wrong, or the file is not a <code>.pviz</code> chart. Other charts on the command line are still drawn; the status is 1</td>
+</tr>
+<tr>
+<td><strong>the data files could not be read again</strong></td>
+<td><code>--reload</code> could not read a data file (moved, deleted, a column is gone). The chart is not drawn. Put the file back or run without <code>--reload</code> to draw the saved data</td>
+</tr>
+<tr>
+<td><strong>cannot tell the format</strong></td>
+<td>The name after <code>-o</code> has an extension that is not an image format. Use <code>-f png</code>, <code>svg</code>, <code>pdf</code>, <code>jpeg</code>, <code>tiff</code> or <code>eps</code>, or one of those extensions</td>
+</tr>
+<tr>
+<td>Nothing is printed on Windows</td>
+<td>The packaged program has no console. Use the pip or the source installation for scripts; see the <a href="../command-line/#known-limitations">known limitations</a></td>
 </tr>
 </tbody>
 </table>
