@@ -55,6 +55,8 @@ class TestDocsContent(unittest.TestCase):
         bad = []
         for page in sorted(p.name for p in DOCS.glob("*.md")):
             for target in re.findall(r"\]\(([^)\s]+\.md(?:#[^)\s]*)?)\)", (DOCS / page).read_text(encoding="utf-8")):
+                if target.startswith("http"):
+                    continue                                   # a page of the repository, not of the docs
                 name, _, anchor = target.partition("#")
                 if not (DOCS / name).is_file() or (anchor and anchor not in _headings(name)):
                     bad.append(f"{page} -> {target}")
@@ -300,6 +302,17 @@ class TestMarkdownPreparation(unittest.TestCase):
         out = prepare_markdown('!!! note "Requirements"\n    Needs seaborn.\n\n    More.\n\nAfter.')
         self.assertEqual(out.split("\n"), ["> **Requirements**", "> Needs seaborn.", ">", "> More.", "", "After."])
         self.assertEqual(prepare_markdown("!!! note\n    Text").split("\n"), ["> **Note**", "> Text"])
+
+    def test_the_attribute_lists_of_the_site_are_not_shown(self):
+        from ui.help_window import prepare_markdown
+        out = prepare_markdown('![logo](images/logo.png){ width="110" }\n\ntext {not an attribute list}')
+        self.assertEqual(out.split("\n")[0], "![logo](images/logo.png)")
+        self.assertIn("text {not an attribute list}", out)
+
+    def test_the_logo_is_on_the_home_page_and_in_the_readme(self):
+        self.assertTrue((DOCS / "images" / "logo.png").is_file())
+        self.assertIn("(images/logo.png)", (DOCS / "index.md").read_text(encoding="utf-8"))
+        self.assertIn("docs/images/logo.png", (_ROOT / "README.md").read_text(encoding="utf-8"))
 
     def test_icons_and_wrappers_go(self):
         from ui.help_window import prepare_markdown

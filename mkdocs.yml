@@ -96,6 +96,7 @@ nav:
     - Keyboard Shortcuts: shortcuts.md
     - Troubleshooting: troubleshooting.md
     - Glossary: glossary.md
+    - Licenses: licenses.md
 
 extra:
   version:

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/pcachim/plotviz/main/docs/images/logo.png" alt="plotviz logo" width="120">
+</p>
+
 # plotviz
 
 [![Latest Release](https://img.shields.io/github/v/release/pcachim/plotviz?label=download&style=flat-square)](https://github.com/pcachim/plotviz/releases/latest)
@@ -58,6 +62,7 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | [Export Image](docs/export.md) | Formats, resolution, clipboard, one file per subplot |
 | [Python Export Bundle](docs/python-export.md) | Export charts as standalone Python projects |
 | [File Formats](docs/file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |
+| [Licenses](docs/licenses.md) | The licence of plotviz and of what it contains |
 | [Troubleshooting](docs/troubleshooting.md) | The messages of the app and what to do |
 | [Glossary](docs/glossary.md) | The terms used in the app |
 | [Menus](docs/menus.md) | Every menu item, the samples, the preferences |
@@ -89,7 +94,9 @@ Dependencies are installed automatically via pip:
 
 ## License
 
-GPL-3.0-or-later — see [LICENSE.md](LICENSE.md).
+plotviz is released under the GPL-3.0-or-later — see [LICENSE.md](LICENSE.md); the source of each release is at the address in [SOURCE.md](SOURCE.md).
+
+It contains open-source packages under their own licences (BSD, MIT, Apache, and, for the Qt libraries, the LGPL v3). They are listed, with the text of each licence, in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and explained in the [Licenses](docs/licenses.md) page of the documentation.
 
 ---
 

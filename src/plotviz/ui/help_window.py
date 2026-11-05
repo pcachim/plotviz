@@ -60,6 +60,7 @@ NAV: list[tuple[str, list[tuple[str, str]]]] = [
         ('Keyboard Shortcuts', 'shortcuts.md'),
         ('Troubleshooting', 'troubleshooting.md'),
         ('Glossary', 'glossary.md'),
+        ('Licenses', 'licenses.md'),
     ]),
 ]
 
@@ -81,6 +82,7 @@ def slugify(text: str) -> str:
 
 _ADMONITION = re.compile(r'^!!!\s+\w+(?:\s+"([^"]*)")?\s*$')
 _ICON = re.compile(r':(?:material|fontawesome|octicons)-[\w-]+:\s*')
+_ATTRIBUTES = re.compile(r'(!\[[^\]]*\]\([^)]*\))\{[^}]*\}')      # ![](x.png){ width="110" }: for the site only
 
 
 def prepare_markdown(text: str) -> str:
@@ -106,7 +108,7 @@ def prepare_markdown(text: str) -> str:
         if line.strip().startswith('<div') or line.strip() == '</div>':
             i += 1
             continue
-        out.append(_ICON.sub('', line))
+        out.append(_ATTRIBUTES.sub(r'\1', _ICON.sub('', line)))
         i += 1
     return '\n'.join(out)
 

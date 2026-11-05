@@ -92,6 +92,9 @@ if _assets.exists():
 _license = ROOT_DIR / 'LICENSE.md'
 if _license.exists():
     datas += [(str(_license), '.')]
+_notices = ROOT_DIR / 'THIRD-PARTY-NOTICES.md'
+if _notices.exists():
+    datas += [(str(_notices), '.')]
 _source_note = ROOT_DIR / 'SOURCE.md'
 if _source_note.exists():
     datas += [(str(_source_note), '.')]

@@ -1,5 +1,7 @@
 # plotviz
 
+![plotviz logo](images/logo.png){ width="110" }
+
 **plotviz** is a desktop chart editor for scientists, engineers and analysts. Load tabular data, build publication-quality charts through a point-and-click interface, and export to PNG, SVG, PDF, JPEG, TIFF or EPS — no code required.
 
 ---
