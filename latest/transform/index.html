@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://pcachim.github.io/plotviz/latest/transform/">
       
       
-        <link rel="prev" href="../data/">
+        <link rel="prev" href="../statistics/">
       
       
-        <link rel="next" href="../chart-types/">
+        <link rel="next" href="../layout-style/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Transform & Statistics - plotviz</title>
+        <title>Transform - plotviz</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#transform-and-statistics" class="md-skip">
+        <a href="#transform" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Transform & Statistics
+              Transform
             
           </span>
         </div>
@@ -272,11 +272,71 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../data/" class="md-tabs__link">
+        <a href="../datasets/" class="md-tabs__link">
           
   
   
-  User Guide
+  Data
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../layout-style/" class="md-tabs__link">
+          
+  
+  
+  Layout & Style
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../plot/" class="md-tabs__link">
+          
+  
+  
+  Plots
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../seaborn-explorer/" class="md-tabs__link">
+          
+  
+  
+  Tools
 
         </a>
       </li>
@@ -297,26 +357,6 @@
   
   
   Reference
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../building/" class="md-tabs__link">
-          
-  
-  
-  Development
 
         </a>
       </li>
@@ -464,7 +504,7 @@
   <span class="md-ellipsis">
     
   
-    User Guide
+    Data
   
 
     
@@ -480,7 +520,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    User Guide
+    Data
   
 
           </label>
@@ -493,14 +533,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../data/" class="md-nav__link">
+      <a href="../datasets/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Loading Data
+    Datasets and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../generate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Statistics
   
 
     
@@ -537,7 +633,7 @@
   <span class="md-ellipsis">
     
   
-    Transform & Statistics
+    Transform
   
 
     
@@ -555,7 +651,7 @@
   <span class="md-ellipsis">
     
   
-    Transform & Statistics
+    Transform
   
 
     
@@ -583,18 +679,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#transform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transform
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Transform">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
   <a href="#using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -604,8 +688,8 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#preview" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -615,8 +699,8 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#dates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -626,8 +710,8 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#when-x-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -637,8 +721,8 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#operations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -731,50 +815,6 @@
     </nav>
   
 </li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#statistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Statistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Statistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#summary-table" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary table
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#correlation-matrix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Correlation matrix
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
       
     </ul>
   
@@ -785,21 +825,46 @@
 
               
             
-              
-                
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
   
   
   
   
-    <li class="md-nav__item">
-      <a href="../chart-types/" class="md-nav__link">
+    
+    
+    
+    
+      
+      
         
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
     
   
-    Chart Types
+    Layout & Style
   
 
     
@@ -807,11 +872,19 @@
   
   
 
-      </a>
-    </li>
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Layout & Style
   
 
-              
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -820,98 +893,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../style/" class="md-nav__link">
+      <a href="../layout-style/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Style & Appearance
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../axes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Axes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../annotations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Legend & Notes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../series/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Series & Curve Fitting
+    Figure
   
 
     
@@ -960,14 +949,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../advanced/" class="md-nav__link">
+      <a href="../color-schemes/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Advanced Tools
+    Color Schemes
   
 
     
@@ -980,6 +969,324 @@
   
 
               
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../palettes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Color Palettes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plots
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plots
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chart-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chart Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../curves/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curves and Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../axes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Axes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../canvas-grid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Canvas & Grid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../legend-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Legend & Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -1094,10 +1401,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1115,8 +1422,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1161,34 +1468,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../palettes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Color Palettes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../shortcuts/" class="md-nav__link">
         
   
@@ -1197,95 +1476,6 @@
     
   
     Keyboard Shortcuts
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Development
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Development
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../building/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Building & Packaging
   
 
     
@@ -1335,18 +1525,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#transform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transform
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Transform">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
   <a href="#using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1356,8 +1534,8 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#preview" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1367,8 +1545,8 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#dates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1378,8 +1556,8 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#when-x-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1389,8 +1567,8 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#operations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1483,50 +1661,6 @@
     </nav>
   
 </li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#statistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Statistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Statistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#summary-table" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary table
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#correlation-matrix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Correlation matrix
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
       
     </ul>
   
@@ -1553,12 +1687,19 @@
   
 
 
-<h1 id="transform-and-statistics">Transform and Statistics<a class="headerlink" href="#transform-and-statistics" title="Permanent link">&para;</a></h1>
-<p>The <strong>Data</strong> tab has four pages: <strong>Datasets</strong>, <strong>Generate</strong>, <strong>Statistics</strong> and <strong>Transform</strong>. This page covers the two that work on series you have already loaded: <strong>Transform</strong> creates new series from existing ones, and <strong>Statistics</strong> summarises them.</p>
+<h1 id="transform">Transform<a class="headerlink" href="#transform" title="Permanent link">&para;</a></h1>
+<p>The <strong>Data → Transform</strong> page creates new series from existing ones: smoothing, decimation, calculus, scaling, cleaning, resampling and signal analysis. To summarise series instead, see <a href="../statistics/">Statistics</a>.</p>
 <hr />
-<h2 id="transform">Transform<a class="headerlink" href="#transform" title="Permanent link">&para;</a></h2>
 <p>The Transform page applies an operation (smoothing, decimation, calculus, scaling, cleaning, resampling…) to a series and stores the result as a <strong>new series</strong>. The original is never changed, so you can plot both together.</p>
-<h3 id="using-it">Using it<a class="headerlink" href="#using-it" title="Permanent link">&para;</a></h3>
+<p><img alt="The Transform page" src="../images/ui/transform.png" /></p>
+<p>The <strong>Transform</strong> page:</p>
+<ol>
+<li><strong>Series</strong> — <strong>x</strong> is the horizontal axis (optional) and <strong>y</strong> the series to transform.</li>
+<li><strong>Operation</strong> — The operation, grouped by type, and its parameters, which change with the operation.</li>
+<li><strong>Preview</strong> — What <strong>Apply</strong> would create, without creating anything. See <a href="#preview">Preview</a>.</li>
+<li><strong>Result</strong> — The name of the new series (automatic when empty) and the <strong>Apply</strong> button.</li>
+</ol>
+<h2 id="using-it">Using it<a class="headerlink" href="#using-it" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>x</strong> — the horizontal axis (for example the time or position series). Optional: choose <code>(none: use index)</code> when the series has no x column. Operations that need an x (resampling, cropping, sorting, aligning) report an error without it. Derivatives and integrals use the index as the spacing when there is no x.</li>
 <li><strong>y</strong> — the series to transform (the values: the signal, the measurement). Swapping x and y gives odd results, because the result is calculated <em>as a function of x</em>: resampling <code>y_irregular</code> over <code>t_irregular</code> is a different curve from resampling <code>t_irregular</code> over <code>y_irregular</code>.</li>
@@ -1568,7 +1709,7 @@
 <li>Click <strong>Apply</strong>.</li>
 </ol>
 <p>The status line under the button says what was created and how many points it has. New series appear at once in the Datasets list and in the series table.</p>
-<h3 id="preview">Preview<a class="headerlink" href="#preview" title="Permanent link">&para;</a></h3>
+<h2 id="preview">Preview<a class="headerlink" href="#preview" title="Permanent link">&para;</a></h2>
 <p>Below the parameters, a small plot shows what <strong>Apply</strong> would create, without
 creating anything: the original series in grey and the result on top of it.
 It uses the same calculation as Apply, so what you see is what you get.</p>
@@ -1584,7 +1725,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 <li>Under the plot, a line says how many points go in and the name of the
   series that would be created.</li>
 </ul>
-<h3 id="dates">Dates<a class="headerlink" href="#dates" title="Permanent link">&para;</a></h3>
+<h2 id="dates">Dates<a class="headerlink" href="#dates" title="Permanent link">&para;</a></h2>
 <p>When x is a date column, the operations that keep or select x values keep it as dates: the new x series from cropping, decimating, resampling, aligning, removing NaN or finding peaks is a date series, and plots with a date axis. Notes:</p>
 <ul>
 <li><strong>Crop x range</strong>: type the limits as dates, for example <code>2024-03-01</code> or <code>1 Mar 2024 12:00</code>. Leave a box empty for no limit.</li>
@@ -1596,14 +1737,14 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 <p class="admonition-title">Results are calculated once</p>
 <p>A transformed series is a copy. If you later change or reload the original data, the transformed series is not recalculated — apply the operation again.</p>
 </div>
-<h3 id="when-x-changes">When x changes<a class="headerlink" href="#when-x-changes" title="Permanent link">&para;</a></h3>
+<h2 id="when-x-changes">When x changes<a class="headerlink" href="#when-x-changes" title="Permanent link">&para;</a></h2>
 <p>Some operations change the number or position of the points (decimating, cropping, resampling, removing NaN, FFT, peaks…). When that happens a <strong>new x series</strong> is created next to the new y, named after the x series and the suffix, for example <code>t_every3</code> and <code>y_every3</code>. Plot the pair together.</p>
 <ul>
 <li><strong>FFT</strong> and <strong>Find peaks</strong> create their own x even if you chose none: frequencies for the FFT, and the x of each peak (the point index when there is no x series).</li>
 <li><strong>Align to another x</strong> reuses the x of the series you chose instead of creating a duplicate; the status line tells you which series to use as x.</li>
 </ul>
-<h3 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">&para;</a></h3>
-<h4 id="smoothing">Smoothing<a class="headerlink" href="#smoothing" title="Permanent link">&para;</a></h4>
+<h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">&para;</a></h2>
+<h3 id="smoothing">Smoothing<a class="headerlink" href="#smoothing" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -1645,7 +1786,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="reduce-and-resample">Reduce and resample<a class="headerlink" href="#reduce-and-resample" title="Permanent link">&para;</a></h4>
+<h3 id="reduce-and-resample">Reduce and resample<a class="headerlink" href="#reduce-and-resample" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -1687,7 +1828,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="calculus">Calculus<a class="headerlink" href="#calculus" title="Permanent link">&para;</a></h4>
+<h3 id="calculus">Calculus<a class="headerlink" href="#calculus" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -1726,7 +1867,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="scale-and-baseline">Scale and baseline<a class="headerlink" href="#scale-and-baseline" title="Permanent link">&para;</a></h4>
+<h3 id="scale-and-baseline">Scale and baseline<a class="headerlink" href="#scale-and-baseline" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -1763,7 +1904,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="cleaning">Cleaning<a class="headerlink" href="#cleaning" title="Permanent link">&para;</a></h4>
+<h3 id="cleaning">Cleaning<a class="headerlink" href="#cleaning" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -1800,7 +1941,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="rolling-statistics">Rolling statistics<a class="headerlink" href="#rolling-statistics" title="Permanent link">&para;</a></h4>
+<h3 id="rolling-statistics">Rolling statistics<a class="headerlink" href="#rolling-statistics" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -1827,7 +1968,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="signal-analysis">Signal analysis<a class="headerlink" href="#signal-analysis" title="Permanent link">&para;</a></h4>
+<h3 id="signal-analysis">Signal analysis<a class="headerlink" href="#signal-analysis" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -1859,50 +2000,6 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 <li><strong>Compare two series with different x:</strong> <em>Align to another x</em> puts one on the x of the other.</li>
 </ul>
 </div>
-<hr />
-<h2 id="statistics">Statistics<a class="headerlink" href="#statistics" title="Permanent link">&para;</a></h2>
-<p>The Statistics page summarises the loaded series. It works on the series <strong>selected in the Datasets list</strong>, or on all of them when none is selected. It refreshes when you open the page; click <strong>↻ Refresh</strong> after changing the selection or the data.</p>
-<h3 id="summary-table">Summary table<a class="headerlink" href="#summary-table" title="Permanent link">&para;</a></h3>
-<p>One column per series and one row per statistic:</p>
-<table>
-<thead>
-<tr>
-<th>Statistic</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>count</td>
-<td>Valid values (NaN and infinity are not counted)</td>
-</tr>
-<tr>
-<td>missing</td>
-<td>NaN, infinity or empty values</td>
-</tr>
-<tr>
-<td>mean, std</td>
-<td>Mean and sample standard deviation (n − 1)</td>
-</tr>
-<tr>
-<td>min, 25%, median, 75%, max</td>
-<td>Range and quartiles</td>
-</tr>
-<tr>
-<td>skew, kurtosis</td>
-<td>Skewness and excess kurtosis (a normal distribution has 0 for both)</td>
-</tr>
-</tbody>
-</table>
-<p>Text series only get <em>count</em> and <em>missing</em>. For <strong>date</strong> series the mean, minimum, quartiles, median and maximum are shown as dates, and the standard deviation is in days. Cells that cannot be computed (the std of one value, the skew of a constant series) are left blank.</p>
-<p><strong>📋 Copy summary</strong> copies the table to the clipboard, tab-separated, ready to paste into a spreadsheet.</p>
-<h3 id="correlation-matrix">Correlation matrix<a class="headerlink" href="#correlation-matrix" title="Permanent link">&para;</a></h3>
-<p>Below the summary, the correlation between every pair of numeric series, with cells shaded red for positive and blue for negative values. Choose the <strong>Method</strong>:</p>
-<ul>
-<li><strong>pearson</strong> — linear correlation.</li>
-<li><strong>spearman</strong> — rank correlation; detects any monotonic relationship, linear or not, and is less sensitive to outliers.</li>
-</ul>
-<p>Each pair uses only the points where both series are valid. A cell is blank when the two series have different lengths, one of them is constant, or there are fewer than 3 common points.</p>
 
 
 
@@ -1938,7 +2035,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../data/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Loading Data">
+          <a href="../statistics/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Statistics">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1948,20 +2045,20 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Loading Data
+                Statistics
               </div>
             </div>
           </a>
         
         
           
-          <a href="../chart-types/" class="md-footer__link md-footer__link--next" aria-label="Next: Chart Types">
+          <a href="../layout-style/" class="md-footer__link md-footer__link--next" aria-label="Next: Figure">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Chart Types
+                Figure
               </div>
             </div>
             <div class="md-footer__button md-icon">

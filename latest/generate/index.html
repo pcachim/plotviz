@@ -12,13 +12,13 @@
         <meta name="author" content="Paulo Cachim">
       
       
-        <link rel="canonical" href="https://pcachim.github.io/plotviz/latest/data/">
+        <link rel="canonical" href="https://pcachim.github.io/plotviz/latest/generate/">
       
       
-        <link rel="prev" href="../getting-started/">
+        <link rel="prev" href="../datasets/">
       
       
-        <link rel="next" href="../transform/">
+        <link rel="next" href="../statistics/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Loading Data - plotviz</title>
+        <title>Generate - plotviz</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#data" class="md-skip">
+        <a href="#generate" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Loading Data
+              Generate
             
           </span>
         </div>
@@ -272,11 +272,71 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../datasets/" class="md-tabs__link">
           
   
   
-  User Guide
+  Data
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../layout-style/" class="md-tabs__link">
+          
+  
+  
+  Layout & Style
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../plot/" class="md-tabs__link">
+          
+  
+  
+  Plots
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../seaborn-explorer/" class="md-tabs__link">
+          
+  
+  
+  Tools
 
         </a>
       </li>
@@ -297,26 +357,6 @@
   
   
   Reference
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../building/" class="md-tabs__link">
-          
-  
-  
-  Development
 
         </a>
       </li>
@@ -464,7 +504,7 @@
   <span class="md-ellipsis">
     
   
-    User Guide
+    Data
   
 
     
@@ -480,11 +520,39 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    User Guide
+    Data
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -509,7 +577,7 @@
   <span class="md-ellipsis">
     
   
-    Loading Data
+    Generate
   
 
     
@@ -527,7 +595,7 @@
   <span class="md-ellipsis">
     
   
-    Loading Data
+    Generate
   
 
     
@@ -555,22 +623,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#loading-files" class="md-nav__link">
+  <a href="#function-generator" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Loading files
+        Function Generator
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Loading files">
+    <nav class="md-nav" aria-label="Function Generator">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#import-options" class="md-nav__link">
+  <a href="#controls" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Import options
+        Controls
       
     </span>
   </a>
@@ -578,10 +646,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#date-and-time-columns" class="md-nav__link">
+  <a href="#expression-syntax" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Date and time columns
+        Expression syntax
       
     </span>
   </a>
@@ -589,10 +657,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#removing-datasets" class="md-nav__link">
+  <a href="#workflow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Removing datasets
+        Workflow
       
     </span>
   </a>
@@ -600,10 +668,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#inspecting-columns" class="md-nav__link">
+  <a href="#preview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Inspecting columns
+        Preview
       
     </span>
   </a>
@@ -616,55 +684,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-series-table" class="md-nav__link">
+  <a href="#z-fx-y-and-u-v-fx-y" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The series table
+        z = f(x, y) and (u, v) = f(x, y)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="The series table">
+    <nav class="md-nav" aria-label="z = f(x, y) and (u, v) = f(x, y)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#adding-and-removing-series" class="md-nav__link">
+  <a href="#preview_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Adding and removing series
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mixing-chart-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mixing chart types
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#secondary-y-axis-y2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Secondary Y axis (Y2)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#z-column-and-error-column" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Z column and error column
+        Preview
       
     </span>
   </a>
@@ -677,13 +712,74 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#chart-type-selection" class="md-nav__link">
+  <a href="#data-table" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Chart type selection
+        Data Table
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Data Table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#importing-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Importing data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exporting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exporting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-table-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the table data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -703,6 +799,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../transform/" class="md-nav__link">
         
   
@@ -710,7 +834,7 @@
   <span class="md-ellipsis">
     
   
-    Transform & Statistics
+    Transform
   
 
     
@@ -724,21 +848,46 @@
 
               
             
-              
-                
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
   
   
   
   
-    <li class="md-nav__item">
-      <a href="../chart-types/" class="md-nav__link">
+    
+    
+    
+    
+      
+      
         
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
     
   
-    Chart Types
+    Layout & Style
   
 
     
@@ -746,11 +895,19 @@
   
   
 
-      </a>
-    </li>
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Layout & Style
   
 
-              
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -759,98 +916,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../style/" class="md-nav__link">
+      <a href="../layout-style/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Style & Appearance
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../axes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Axes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../annotations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Legend & Notes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../series/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Series & Curve Fitting
+    Figure
   
 
     
@@ -899,14 +972,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../advanced/" class="md-nav__link">
+      <a href="../color-schemes/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Advanced Tools
+    Color Schemes
   
 
     
@@ -919,6 +992,324 @@
   
 
               
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../palettes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Color Palettes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plots
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plots
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chart-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chart Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../curves/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curves and Fitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../axes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Axes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../canvas-grid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Canvas & Grid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../legend-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Legend & Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -1033,10 +1424,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1054,8 +1445,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1100,34 +1491,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../palettes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Color Palettes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../shortcuts/" class="md-nav__link">
         
   
@@ -1136,95 +1499,6 @@
     
   
     Keyboard Shortcuts
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Development
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Development
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../building/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Building & Packaging
   
 
     
@@ -1274,22 +1548,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#loading-files" class="md-nav__link">
+  <a href="#function-generator" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Loading files
+        Function Generator
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Loading files">
+    <nav class="md-nav" aria-label="Function Generator">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#import-options" class="md-nav__link">
+  <a href="#controls" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Import options
+        Controls
       
     </span>
   </a>
@@ -1297,10 +1571,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#date-and-time-columns" class="md-nav__link">
+  <a href="#expression-syntax" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Date and time columns
+        Expression syntax
       
     </span>
   </a>
@@ -1308,10 +1582,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#removing-datasets" class="md-nav__link">
+  <a href="#workflow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Removing datasets
+        Workflow
       
     </span>
   </a>
@@ -1319,10 +1593,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#inspecting-columns" class="md-nav__link">
+  <a href="#preview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Inspecting columns
+        Preview
       
     </span>
   </a>
@@ -1335,55 +1609,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-series-table" class="md-nav__link">
+  <a href="#z-fx-y-and-u-v-fx-y" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The series table
+        z = f(x, y) and (u, v) = f(x, y)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="The series table">
+    <nav class="md-nav" aria-label="z = f(x, y) and (u, v) = f(x, y)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#adding-and-removing-series" class="md-nav__link">
+  <a href="#preview_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Adding and removing series
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mixing-chart-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mixing chart types
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#secondary-y-axis-y2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Secondary Y axis (Y2)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#z-column-and-error-column" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Z column and error column
+        Preview
       
     </span>
   </a>
@@ -1396,13 +1637,74 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#chart-type-selection" class="md-nav__link">
+  <a href="#data-table" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Chart type selection
+        Data Table
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Data Table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#importing-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Importing data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exporting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exporting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-table-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the table data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1423,7 +1725,7 @@
 
 
   
-    <a href="https://github.com/pcachim/plotviz/edit/main/docs/data.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/pcachim/plotviz/edit/main/docs/generate.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1431,176 +1733,173 @@
   
 
 
-<h1 id="data">Data<a class="headerlink" href="#data" title="Permanent link">&para;</a></h1>
-<h2 id="loading-files">Loading files<a class="headerlink" href="#loading-files" title="Permanent link">&para;</a></h2>
-<p>Open the <strong>Data</strong> tab and click <strong>Browse Files</strong> to load one or more data files. Supported formats:</p>
-<table>
-<thead>
-<tr>
-<th>Format</th>
-<th>Extensions</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>CSV</td>
-<td><code>.csv</code></td>
-<td>Separator, decimal mark and encoding selectable</td>
-</tr>
-<tr>
-<td>Excel</td>
-<td><code>.xlsx</code>, <code>.xls</code></td>
-<td>Choose the sheet in the import dialog</td>
-</tr>
-<tr>
-<td>JSON</td>
-<td><code>.json</code></td>
-<td>Array of objects or column-oriented dict</td>
-</tr>
-<tr>
-<td>Plain text</td>
-<td><code>.txt</code></td>
-<td>Whitespace-separated columns</td>
-</tr>
-</tbody>
-</table>
-<p>Each file opens an import dialog with a preview of the first 100 rows. You can pick the columns to import and rename them. Numeric columns become float arrays, date columns become dates (below), and other text columns are treated as categorical. Column names are taken from the first row.</p>
-<h3 id="import-options">Import options<a class="headerlink" href="#import-options" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Option</th>
-<th>Applies to</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Sheet</td>
-<td>Excel</td>
-<td>Which sheet to read</td>
-</tr>
-<tr>
-<td>Separator</td>
-<td>CSV, TXT</td>
-<td>Auto-detect, comma, semicolon, tab, whitespace, pipe or a custom character</td>
-</tr>
-<tr>
-<td>Decimal</td>
-<td>CSV, TXT</td>
-<td><code>Point (1.5)</code> or <code>Comma (1,5)</code>. Use the comma for files from European locales, otherwise numbers such as <code>1,5</code> are read as text</td>
-</tr>
-<tr>
-<td>Encoding</td>
-<td>CSV, TXT</td>
-<td><code>utf-8-sig</code> (the default) reads plain UTF-8 and the marker Excel adds at the start of the file; try <code>latin-1</code> or <code>cp1252</code> if accented characters look wrong</td>
-</tr>
-<tr>
-<td>Orientation</td>
-<td>JSON</td>
-<td>Layout of the JSON data</td>
-</tr>
-<tr>
-<td>Header row, Skip rows</td>
-<td>All</td>
-<td>Where the column names are, and how many lines to ignore before them</td>
-</tr>
-</tbody>
-</table>
-<p>You can load multiple files in one session — each file's columns are pooled into the shared column list and available in all series rows.</p>
-<h3 id="date-and-time-columns">Date and time columns<a class="headerlink" href="#date-and-time-columns" title="Permanent link">&para;</a></h3>
-<p>Columns that hold dates or times are recognised when you import them and marked with 📅 in the column list. They can be used as the X (or Y) of any series, and the axis then shows dates, with ticks that adapt to the range: years, months, days, hours…</p>
-<p>Recognised formats include <code>2024-03-01</code>, <code>2024-03-01 12:30</code>, <code>2024-03-01T12:30:00</code>, <code>1 Mar 2024</code>, <code>March 5, 2024</code> and <code>03/04/2024</code>, and Excel date cells. A text column is only taken as dates when <strong>every</strong> value looks like a date, so names such as <code>May</code> or numbers such as <code>1,5</code> stay as they were. Two import options control this:</p>
-<table>
-<thead>
-<tr>
-<th>Option</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Dates: auto-detect / off</strong></td>
-<td>Turn the detection off to keep date-like columns as plain text</td>
-</tr>
-<tr>
-<td><strong>Day first</strong></td>
-<td>Read <code>03/04/2024</code> as 3 April instead of March 4</td>
-</tr>
-</tbody>
-</table>
-<p>Things to know:</p>
-<ul>
-<li>A date column is kept as the number of days since 1970-01-01 (fractions are the time of day), so everything that works on numbers keeps working: transforms, fits, statistics. Time zones are converted to UTC and dropped.</li>
-<li>The tick labels follow the range automatically. To choose them, type a date format such as <code>%d/%m/%Y</code> in the axis <strong>Format</strong> box (<a href="../axes/#tick-formatters">Axes</a>).</li>
-<li>Limits and the tick step typed in the Axes tab are in <strong>days</strong> (for example a step of 7 puts a tick every week).</li>
-<li>Log scales are ignored on a date axis.</li>
-<li>Saved charts keep dates as dates, and so does the <a href="../python-export/">Python export</a>.</li>
-<li>The Seaborn Explorer and the Code Runner see date columns as numbers (days since 1970-01-01). In the Code Runner use <code>pd.to_datetime(x, unit='D')</code> to get datetimes back.</li>
-</ul>
-<h3 id="removing-datasets">Removing datasets<a class="headerlink" href="#removing-datasets" title="Permanent link">&para;</a></h3>
-<p>Select one or more entries in the <strong>Datasets</strong> list and click <strong>Remove selected</strong>. Any series that reference removed columns will show empty dropdowns but are not deleted from the table.</p>
-<h3 id="inspecting-columns">Inspecting columns<a class="headerlink" href="#inspecting-columns" title="Permanent link">&para;</a></h3>
-<p>Select a column (or multiple columns) in the Datasets list and click <strong>Inspect values</strong> to see a summary: count, min, max, mean, and a preview of the first values.</p>
-<p>For a full summary (quartiles, standard deviation, skewness, correlation between series), use the <strong>Statistics</strong> page; to create new series from existing ones (smoothing, derivatives, resampling…), use the <strong>Transform</strong> page. See <a href="../transform/">Transform and Statistics</a>.</p>
+<h1 id="generate">Generate<a class="headerlink" href="#generate" title="Permanent link">&para;</a></h1>
+<p>The <strong>Data → Generate</strong> page creates series without loading a file: the <strong>y=f(x)</strong>, <strong>z=f(x,y)</strong> and <strong>(u,v)=f(x,y)</strong> generators, and the <strong>Table</strong> for typing values. To derive new series from loaded ones, see <a href="../transform/">Transform</a>.</p>
 <hr />
-<h2 id="the-series-table">The series table<a class="headerlink" href="#the-series-table" title="Permanent link">&para;</a></h2>
-<p>The series table in the <strong>Data</strong> tab maps data columns to visual series. Each row is one plotted series.</p>
+<h2 id="function-generator">Function Generator<a class="headerlink" href="#function-generator" title="Permanent link">&para;</a></h2>
+<p>The function generator evaluates a mathematical expression over a range of X values and adds the result as a new dataset.</p>
+<p><img alt="The y = f(x) generator" src="../images/ui/generate-fx.png" /></p>
+<p>The <strong>Generate</strong> page, <strong>y=f(x)</strong>:</p>
+<ol>
+<li><strong>Function generator</strong> — The input is either an <strong>x range</strong> (from, to, number of points, spacing and the name of the x column) or an existing <strong>column</strong>; then the expression and the name of the y column. <strong>Generate / Apply</strong> at the bottom creates the columns.</li>
+<li><strong>Preview</strong> — What the button would create. See <a href="#preview">Preview</a>.</li>
+</ol>
+<h3 id="controls">Controls<a class="headerlink" href="#controls" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Column</th>
-<th>Purpose</th>
+<th>Control</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>X</strong></td>
-<td>Column used as the horizontal axis values</td>
+<td><strong>f(x)</strong></td>
+<td>Python/NumPy expression — <code>x</code> is the independent variable array</td>
 </tr>
 <tr>
-<td><strong>Y</strong></td>
-<td>Column used as the vertical axis values</td>
+<td><strong>X min</strong></td>
+<td>Start of the X range</td>
 </tr>
 <tr>
-<td><strong>Label</strong></td>
-<td>Text shown in the chart legend</td>
+<td><strong>X max</strong></td>
+<td>End of the X range</td>
 </tr>
 <tr>
-<td><strong>Type</strong></td>
-<td>Chart type for this series (Line, Scatter, Bar, …)</td>
+<td><strong>N points</strong></td>
+<td>Number of evenly spaced points in the range</td>
 </tr>
 <tr>
-<td><strong>Plot #</strong></td>
-<td>Which subplot panel this series appears in (1-based)</td>
+<td><strong>X col name</strong></td>
+<td>Column name for the X dataset</td>
 </tr>
 <tr>
-<td><strong>Y2</strong></td>
-<td>Checkbox — plots this series on the secondary Y axis</td>
+<td><strong>Y col name</strong></td>
+<td>Column name for the generated Y dataset</td>
 </tr>
 </tbody>
 </table>
-<h3 id="adding-and-removing-series">Adding and removing series<a class="headerlink" href="#adding-and-removing-series" title="Permanent link">&para;</a></h3>
+<h3 id="expression-syntax">Expression syntax<a class="headerlink" href="#expression-syntax" title="Permanent link">&para;</a></h3>
+<p>The expression field accepts any valid NumPy expression. The variable <code>x</code> is a NumPy array. Common functions available without a prefix:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sin(x)          cos(x)          tan(x)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>exp(x)          log(x)          log10(x)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>sqrt(x)         abs(x)          sign(x)
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pi              e
+</code></pre></div>
+<p>Examples:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sin(x) * exp(-0.1 * x)
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>x**2 - 3*x + 2
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>log(x + 1) / (1 + cos(x))
+</code></pre></div>
+<h3 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Enter an expression in the <strong>f(x)</strong> field.</li>
+<li>Set the X range and number of points.</li>
+<li>Name the X and Y columns.</li>
+<li>Click <strong>Generate</strong> — the columns appear in the Datasets list and can be assigned to series in <strong>Plots → Plot</strong>.</li>
+</ol>
+<p>Clicking <strong>Generate</strong> again with the same column names does not replace the previous data: the new columns get a numeric suffix (<code>x_1</code>, <code>y_1</code>, …).</p>
+<h3 id="preview">Preview<a class="headerlink" href="#preview" title="Permanent link">&para;</a></h3>
+<p>Below the expression, a small plot shows what <strong>Generate</strong> would create, without creating anything. It uses the same calculation as the button, so what you see is what you get.</p>
 <ul>
-<li><strong>+ Add series</strong> — appends a new row with empty column selections.</li>
-<li><strong>✕</strong> button on a row — removes that series.</li>
-</ul>
-<h3 id="mixing-chart-types">Mixing chart types<a class="headerlink" href="#mixing-chart-types" title="Permanent link">&para;</a></h3>
-<p>Each row in the series table has its own <strong>Type</strong> dropdown, so you can mix chart types within the same panel — for example, a Line series and a Scatter series sharing the same axes.</p>
-<p>Types that take over the whole chart (Histogram, Pie, Heatmap, etc.) cannot be mixed with other types in the same subplot.</p>
-<h3 id="secondary-y-axis-y2">Secondary Y axis (Y2)<a class="headerlink" href="#secondary-y-axis-y2" title="Permanent link">&para;</a></h3>
-<p>Tick the <strong>Y2</strong> checkbox on any series row to plot it against a second Y axis on the right side of the chart. The Y2 axis label is set in the <strong>Axes</strong> tab.</p>
-<h3 id="z-column-and-error-column">Z column and error column<a class="headerlink" href="#z-column-and-error-column" title="Permanent link">&para;</a></h3>
-<p>Below the series table are two extra dropdowns:</p>
-<ul>
-<li><strong>Z</strong> — used by Heatmap, Hist2D, Hexbin, Contour, and Bubble charts as the third data dimension.</li>
-<li><strong>Error</strong> — used by the Errorbar chart as the error/uncertainty values.</li>
+<li><strong>Preview</strong> draws it once. <strong>Live</strong> (on by default) redraws shortly after any change: expression, range, number of points, spacing or names.</li>
+<li>With the <strong>column</strong> input, the source column is drawn in grey and the result over it.</li>
+<li><code>logspace</code> and <code>geomspace</code> get a logarithmic x axis; <strong>log y</strong> is optional.</li>
+<li>With <code>random</code> or <code>uniform</code> spacing the preview keeps the same random draw until you click <strong>Generate</strong>, and the columns created are exactly the ones shown. The next preview is a new draw.</li>
+<li>Problems (syntax errors, unknown names, an empty range) are written in the plot area instead of showing a dialog.</li>
+<li>A line under the plot gives the number of points and the names of the columns that would be created. Above 50,000 points Live pauses; use <strong>Preview</strong>.</li>
 </ul>
 <hr />
-<h2 id="chart-type-selection">Chart type selection<a class="headerlink" href="#chart-type-selection" title="Permanent link">&para;</a></h2>
-<p>The <strong>Chart type</strong> dropdown at the top of <strong>Plots → Plot</strong> sets the default type for the entire chart. Individual series can override this with their own Type cell.</p>
-<p>See <a href="../chart-types/">Chart Types</a> for a full description of every chart type and its options.</p>
+<h2 id="z-fx-y-and-u-v-fx-y">z = f(x, y) and (u, v) = f(x, y)<a class="headerlink" href="#z-fx-y-and-u-v-fx-y" title="Permanent link">&para;</a></h2>
+<p>The other two pages of the generator evaluate an expression of two variables, <code>x</code> and <code>y</code>, for the <strong>z</strong> column of a surface, or two expressions, <code>u</code> and <code>v</code>, for the components of a vector field.</p>
+<p><img alt="The z = f(x, y) generator" src="../images/ui/generate-fxy.png" /></p>
+<p>The <strong>z=f(x,y)</strong> page:</p>
+<ol>
+<li><strong>z = f(x, y) generator</strong> — <strong>Meshgrid</strong> combines every x with every y.</li>
+<li><strong>x series</strong> — A generated range (with its spacing) or an existing column, and the name of the variable.</li>
+<li><strong>y series</strong> — The same for y.</li>
+<li><strong>z series</strong> — The expression, written with the two variables, and the name of the z column.</li>
+<li><strong>Preview</strong> — The field as contours, or as points when Meshgrid is off.</li>
+</ol>
+<p><img alt="The (u, v) = f(x, y) generator" src="../images/ui/generate-fuv.png" /></p>
+<p>The <strong>(u,v)=f(x,y)</strong> page has the same x and y series, and an expression for each component:</p>
+<ol>
+<li><strong>(u, v) = f(x, y) generator</strong> — <strong>Meshgrid</strong> combines every x with every y.</li>
+<li><strong>x series</strong> — A generated range or an existing column.</li>
+<li><strong>y series</strong> — The same for y.</li>
+<li><strong>u series</strong> — The expression and the name of the horizontal component.</li>
+<li><strong>v series</strong> — The expression and the name of the vertical component.</li>
+<li>
+<p><strong>Preview</strong> — The vector field as arrows.</p>
+</li>
+<li>
+<p>Each axis is its own choice: a generated <strong>range</strong> (with its spacing) or an existing <strong>column</strong>, used as it is.</p>
+</li>
+<li><strong>Meshgrid</strong> combines every x with every y (nx × ny points), which is what heatmaps, contours, surfaces and vector fields need. Without it, x and y are paired point by point.</li>
+<li>The columns created are x and y (only when generated, or with a meshgrid) and z, or u and v. Names already in use get a numeric suffix.</li>
+</ol>
+<h3 id="preview_1">Preview<a class="headerlink" href="#preview_1" title="Permanent link">&para;</a></h3>
+<p>Both pages have the same <strong>Preview</strong> and <strong>Live</strong> as the function generator, and the plot shows what the button would create without creating anything:</p>
+<ul>
+<li><strong>z</strong>: a meshgrid as filled contours with their lines, otherwise coloured points (x and y paired one by one). The line under the plot gives the range of z.</li>
+<li><strong>(u, v)</strong>: arrows coloured by their length, at most 20 per side on a grid. The line gives the range of the length.</li>
+<li>Random and uniform spacing keep their draw until you click the button, and x and y are different draws.</li>
+</ul>
+<hr />
+<h2 id="data-table">Data Table<a class="headerlink" href="#data-table" title="Permanent link">&para;</a></h2>
+<p>The data table provides a manual spreadsheet-style entry grid for small datasets.</p>
+<p><img alt="The Table page" src="../images/ui/generate-table.png" /></p>
+<p>The <strong>Table</strong> page: set the number of columns (<strong>Cols</strong>) and rows (<strong>Rows</strong>) and click <strong>New</strong>. Below the table, <strong>+R</strong>, <strong>−R</strong>, <strong>+C</strong> and <strong>−C</strong> add and remove rows and columns, the bin button clears it, the clipboard button pastes CSV text, <strong>Load</strong> opens a CSV or Excel file into the table and <strong>CSV</strong> copies the table to the clipboard as CSV. The sections below explain each one.</p>
+<h3 id="creating-a-table">Creating a table<a class="headerlink" href="#creating-a-table" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Set the <strong>Cols</strong> and <strong>Rows</strong> spinboxes.</li>
+<li>Click <strong>New</strong> to create a blank table.</li>
+<li>Click any cell and type to enter values.</li>
+<li>Double-click a column header to rename it.</li>
+</ol>
+<h3 id="editing">Editing<a class="headerlink" href="#editing" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Button</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>＋R</strong></td>
+<td>Add a row at the bottom</td>
+</tr>
+<tr>
+<td><strong>－R</strong></td>
+<td>Delete selected rows (or the last row if none selected)</td>
+</tr>
+<tr>
+<td><strong>＋C</strong></td>
+<td>Add a column on the right</td>
+</tr>
+<tr>
+<td><strong>－C</strong></td>
+<td>Delete the rightmost column</td>
+</tr>
+<tr>
+<td><strong>🗑</strong></td>
+<td>Clear all cell contents</td>
+</tr>
+</tbody>
+</table>
+<h3 id="importing-data">Importing data<a class="headerlink" href="#importing-data" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>📋 (Paste)</strong> — paste tab- or comma-separated text from the clipboard directly into the table.</li>
+<li><strong>📥 Load</strong> — open a CSV or Excel file; its contents fill the table.</li>
+</ul>
+<h3 id="exporting">Exporting<a class="headerlink" href="#exporting" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>📤 CSV</strong> — copies the entire table as CSV text to the clipboard, ready to paste into another application.</li>
+</ul>
+<h3 id="using-the-table-data">Using the table data<a class="headerlink" href="#using-the-table-data" title="Permanent link">&para;</a></h3>
+<p>Click <strong>Apply to chart</strong> (or the equivalent generate button depending on the UI layout) to load the table's columns into the Datasets list. They become available in the series table X/Y dropdowns just like data loaded from a file.</p>
+<p>Column names are taken from the table headers. Values that cannot be parsed as numbers are treated as categorical strings.</p>
 
 
 
@@ -1636,7 +1935,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../getting-started/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting Started">
+          <a href="../datasets/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Datasets and Import">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1646,20 +1945,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Getting Started
+                Datasets and Import
               </div>
             </div>
           </a>
         
         
           
-          <a href="../transform/" class="md-footer__link md-footer__link--next" aria-label="Next: Transform &amp; Statistics">
+          <a href="../statistics/" class="md-footer__link md-footer__link--next" aria-label="Next: Statistics">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Transform & Statistics
+                Statistics
               </div>
             </div>
             <div class="md-footer__button md-icon">

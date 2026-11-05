@@ -5,19 +5,11 @@
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
-         <loc>https://pcachim.github.io/plotviz/latest/advanced/</loc>
-         <lastmod>2026-11-05</lastmod>
-    </url>
-    <url>
-         <loc>https://pcachim.github.io/plotviz/latest/annotations/</loc>
-         <lastmod>2026-11-05</lastmod>
-    </url>
-    <url>
          <loc>https://pcachim.github.io/plotviz/latest/axes/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
-         <loc>https://pcachim.github.io/plotviz/latest/building/</loc>
+         <loc>https://pcachim.github.io/plotviz/latest/canvas-grid/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
@@ -29,7 +21,15 @@
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
-         <loc>https://pcachim.github.io/plotviz/latest/data/</loc>
+         <loc>https://pcachim.github.io/plotviz/latest/color-schemes/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
+         <loc>https://pcachim.github.io/plotviz/latest/curves/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
+         <loc>https://pcachim.github.io/plotviz/latest/datasets/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
@@ -37,11 +37,27 @@
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
+         <loc>https://pcachim.github.io/plotviz/latest/generate/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
          <loc>https://pcachim.github.io/plotviz/latest/getting-started/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
+         <loc>https://pcachim.github.io/plotviz/latest/layout-style/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
+         <loc>https://pcachim.github.io/plotviz/latest/legend-notes/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
          <loc>https://pcachim.github.io/plotviz/latest/palettes/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
+         <loc>https://pcachim.github.io/plotviz/latest/plot/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
@@ -53,15 +69,11 @@
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
-         <loc>https://pcachim.github.io/plotviz/latest/series/</loc>
-         <lastmod>2026-11-05</lastmod>
-    </url>
-    <url>
          <loc>https://pcachim.github.io/plotviz/latest/shortcuts/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
-         <loc>https://pcachim.github.io/plotviz/latest/style/</loc>
+         <loc>https://pcachim.github.io/plotviz/latest/statistics/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
