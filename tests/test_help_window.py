@@ -348,6 +348,96 @@ class TestHelpWindow(unittest.TestCase):
         self.assertEqual(len(widths), (DOCS / "chart-types.md").read_text(encoding="utf-8").count("](images/"))
         self.assertLessEqual(max(widths), 760)
 
+    # ── the look of a page: room between the blocks ──────────────────────────────
+    def blocks(self):
+        doc = self.h.browser.document()
+        block = doc.begin()
+        while block.isValid():
+            yield block
+            block = block.next()
+
+    def test_headings_have_room_and_paragraphs_do_not_touch(self):
+        from PyQt6.QtGui import QTextCursor
+        self.h.open_page("datasets.md")
+        seen = {"h2": [], "h3": [], "p": []}
+        for block in self.blocks():
+            fmt = block.blockFormat()
+            if QTextCursor(block).currentTable() is not None or not block.text().strip():
+                continue
+            if fmt.headingLevel() == 2:
+                seen["h2"].append((fmt.topMargin(), fmt.bottomMargin()))
+            elif fmt.headingLevel() == 3:
+                seen["h3"].append((fmt.topMargin(), fmt.bottomMargin()))
+            elif not fmt.headingLevel() and block.textList() is None:
+                seen["p"].append(fmt.bottomMargin())
+        self.assertTrue(seen["h3"] and seen["p"])
+        self.assertTrue(all(top >= 14 and bottom >= 5 for top, bottom in seen["h3"]))
+        self.assertTrue(all(bottom >= 8 for bottom in seen["p"]))
+
+    def test_list_items_are_apart_and_the_list_is_set_off_from_what_follows(self):
+        self.h.open_page("examples.md")
+        gaps = []
+        for block in self.blocks():
+            items = block.textList()
+            if items is not None:
+                gaps.append((items.itemNumber(block) == items.count() - 1, block.blockFormat().bottomMargin()))
+        self.assertTrue(gaps)
+        self.assertTrue(all(bottom >= 3 for last, bottom in gaps if not last))
+        self.assertTrue(all(bottom >= 10 for last, bottom in gaps if last))
+
+    def test_tables_are_padded_with_a_tinted_header(self):
+        from PyQt6.QtGui import QTextTable
+        self.h.open_page("curves.md")
+        tables = [f for f in self.h.browser.document().rootFrame().childFrames() if isinstance(f, QTextTable)]
+        self.assertTrue(tables)
+        for table in tables:
+            fmt = table.format()
+            self.assertGreaterEqual(fmt.cellPadding(), 6)
+            self.assertEqual(fmt.cellSpacing(), 0)
+            header = table.cellAt(0, 0).format().toTableCellFormat()
+            self.assertNotEqual(header.background().style().value, 0)       # a fill, not "no brush"
+
+    def test_code_is_in_a_monospace_font(self):
+        self.h.open_page("examples.md")
+        monospaced = []
+        for block in self.blocks():
+            it = block.begin()
+            while not it.atEnd():
+                frag = it.fragment()
+                if frag.isValid() and frag.charFormat().fontFixedPitch():
+                    monospaced.append(frag.charFormat().fontFamilies())
+                it += 1
+        self.assertTrue(monospaced)
+        self.assertTrue(all(len(fam) > 1 for fam in monospaced))         # a list of fallbacks, ending in monospace ones
+        families = {f for fam in monospaced for f in fam}
+        self.assertTrue({"Menlo", "Consolas", "DejaVu Sans Mono", "Courier New"} & families)
+
+    def test_figures_are_centred_with_room_around_them(self):
+        from PyQt6.QtCore import Qt
+        self.h.open_page("examples.md")
+        centred = []
+        for block in self.blocks():
+            it = block.begin()
+            while not it.atEnd():
+                if it.fragment().charFormat().isImageFormat():
+                    fmt = block.blockFormat()
+                    centred.append((fmt.alignment() & Qt.AlignmentFlag.AlignHCenter, fmt.topMargin(), fmt.bottomMargin()))
+                it += 1
+        self.assertTrue(centred)
+        self.assertTrue(all(c and top >= 8 and bottom >= 8 for c, top, bottom in centred))
+
+    def test_the_text_keeps_a_reading_width_on_a_wide_window(self):
+        from PyQt6.QtTest import QTest
+        self.h.show()
+        self.h.resize(1900, 800)
+        QTest.qWait(100)  # ty: ignore[missing-argument, invalid-argument-type]
+        browser = self.h.browser
+        self.assertLessEqual(browser.viewport().width(), browser.MAX_TEXT_WIDTH + 2)
+        self.assertGreater(browser.viewport().x(), 20)                    # centred: margin on the left
+        self.h.resize(900, 800)
+        QTest.qWait(100)  # ty: ignore[missing-argument, invalid-argument-type]
+        self.assertGreater(browser.viewport().width(), 450)               # a narrow window uses its width
+
     def test_a_link_to_a_heading_scrolls_to_it(self):
         from PyQt6.QtCore import QUrl
         self.h.show()

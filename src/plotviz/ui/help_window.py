@@ -15,7 +15,10 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QDesktopServices, QFontDatabase, QImage, QTextCharFormat, QTextCursor, QTextFormat
+from PyQt6.QtGui import (
+    QBrush, QDesktopServices, QFont, QFontDatabase, QImage, QResizeEvent, QTextCharFormat, QTextCursor,
+    QTextFormat, QTextFrameFormat, QTextTable, QTextTableCellFormat,
+)
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSplitter, QTextBrowser,
     QTreeWidget, QTreeWidgetItem, QVBoxLayout,
@@ -108,6 +111,18 @@ def prepare_markdown(text: str) -> str:
     return '\n'.join(out)
 
 
+class _ReadingBrowser(QTextBrowser):
+    """A text browser whose text never runs wider than MAX_TEXT_WIDTH: on a wide window the
+    page stays centred, like the online documentation, instead of stretching each line."""
+    MAX_TEXT_WIDTH = 860
+
+    def resizeEvent(self, a0: QResizeEvent | None) -> None:
+        super().resizeEvent(a0)
+        scroll = self.verticalScrollBar()
+        side = max(0, (self.width() - (scroll.width() if scroll else 0) - self.MAX_TEXT_WIDTH) // 2)
+        self.setViewportMargins(side, 0, side, 0)
+
+
 class HelpWindow(QDialog):
     def __init__(self, parent=None, folder: Path | None = None):
         super().__init__(parent)
@@ -146,10 +161,10 @@ class HelpWindow(QDialog):
         self.index.setMinimumWidth(170)
         self.index.itemClicked.connect(self._index_clicked)
         split.addWidget(self.index)
-        self.browser = QTextBrowser()
+        self.browser = _ReadingBrowser()
         self.browser.setOpenLinks(False)
         self.browser.anchorClicked.connect(self._link_clicked)
-        self.browser.document().setDocumentMargin(14)
+        self.browser.document().setDocumentMargin(18)
         split.addWidget(self.browser)
         split.setSizes([210, 840])
         layout.addWidget(split, 1)
@@ -193,6 +208,7 @@ class HelpWindow(QDialog):
             self._page = page
             self._style_code()
             self._size_images()
+            self._polish()
             item = self._items.get(page)
             if item:
                 self.index.setCurrentItem(item)
@@ -213,7 +229,8 @@ class HelpWindow(QDialog):
         """Code (inline and fenced) in the system's monospace font, fenced blocks on a tinted band."""
         doc = self.browser.document()
         assert doc is not None
-        mono = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
+        mono = [QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family(),
+                'Menlo', 'Consolas', 'DejaVu Sans Mono', 'Courier New']
         tint = self.palette().alternateBase().color()
         cursor = QTextCursor(doc)
         cursor.beginEditBlock()
@@ -229,7 +246,8 @@ class HelpWindow(QDialog):
                 frag = it.fragment()
                 if frag.isValid() and (fenced or frag.charFormat().fontFixedPitch()):
                     mono_fmt = QTextCharFormat()
-                    mono_fmt.setFontFamilies([mono])
+                    mono_fmt.setFontFamilies(mono)
+                    mono_fmt.setFontStyleHint(QFont.StyleHint.Monospace)
                     sel = QTextCursor(doc)
                     sel.setPosition(frag.position())
                     sel.setPosition(frag.position() + frag.length(), QTextCursor.MoveMode.KeepAnchor)
@@ -237,6 +255,80 @@ class HelpWindow(QDialog):
                 it += 1
             block = block.next()
         cursor.endEditBlock()
+
+    # Space above and below each kind of block (points), by heading level
+    _HEADING_MARGINS = {1: (4, 14), 2: (28, 10), 3: (20, 6), 4: (14, 4)}
+
+    def _polish(self):
+        """The Markdown importer of Qt leaves almost no space between blocks. Give the page the
+        rhythm of a document: room around headings, between paragraphs and list items, around
+        tables, code, quotes and figures."""
+        doc = self.browser.document()
+        assert doc is not None
+        pal = self.palette()
+        line, tint = pal.mid().color(), pal.alternateBase().color()
+        cursor = QTextCursor(doc)
+        cursor.beginEditBlock()
+        for table in (f for f in doc.rootFrame().childFrames() if isinstance(f, QTextTable)):
+            fmt = table.format()
+            fmt.setCellPadding(7)
+            fmt.setCellSpacing(0)
+            fmt.setBorder(1)
+            fmt.setBorderBrush(QBrush(line))
+            fmt.setBorderStyle(QTextFrameFormat.BorderStyle.BorderStyle_Solid)
+            fmt.setTopMargin(6)
+            fmt.setBottomMargin(14)
+            fmt.setHeaderRowCount(1)
+            table.setFormat(fmt)
+            for column in range(table.columns()):                  # the header row on a tinted band
+                cell = table.cellAt(0, column)
+                cell_fmt = QTextTableCellFormat(cell.format().toTableCellFormat())
+                cell_fmt.setBackground(QBrush(tint))
+                cell.setFormat(cell_fmt)
+        previous_fenced = False
+        block = doc.begin()
+        while block.isValid():
+            fmt = block.blockFormat()
+            inside_table = QTextCursor(block).currentTable() is not None
+            fenced = fmt.hasProperty(QTextFormat.Property.BlockCodeFence)
+            nxt = block.next()
+            next_fenced = nxt.isValid() and nxt.blockFormat().hasProperty(QTextFormat.Property.BlockCodeFence)
+            level = fmt.headingLevel()
+            items = block.textList()
+            has_image = any(f.charFormat().isImageFormat()
+                            for f in (it.fragment() for it in self._fragments(block)) if f.isValid())
+            if inside_table:
+                top, bottom = 0, 0
+            elif level:
+                top, bottom = self._HEADING_MARGINS.get(level, (12, 4))
+            elif fenced:                                   # a code block: padding above its first line and under its last
+                top, bottom = (10 if not previous_fenced else 0), (14 if not next_fenced else 0)
+                fmt.setLeftMargin(8)
+                fmt.setRightMargin(8)
+            elif items is not None:
+                last = items.itemNumber(block) == items.count() - 1
+                top, bottom = 2, (12 if last else 4)
+            elif fmt.hasProperty(QTextFormat.Property.BlockQuoteLevel):
+                top, bottom = 6, 10
+            elif has_image:
+                top, bottom = 10, 12
+                fmt.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            else:
+                top, bottom = 0, 10
+            fmt.setTopMargin(top)
+            fmt.setBottomMargin(bottom)
+            QTextCursor(block).setBlockFormat(fmt)
+            previous_fenced = fenced
+            block = nxt
+        cursor.endEditBlock()
+
+    @staticmethod
+    def _fragments(block):
+        """The text fragments of a block, as iterators positioned on each one."""
+        it = block.begin()
+        while not it.atEnd():
+            yield it
+            it += 1
 
     def _size_images(self, max_width: int = 760):
         """Figures are shown at most *max_width* px wide (they are saved larger, for the site)."""
