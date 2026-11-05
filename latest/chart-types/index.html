@@ -678,6 +678,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#fill-between" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fill Between
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#step" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -849,6 +860,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#tricontour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tricontour
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#3d-surface" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -875,6 +897,28 @@
     <span class="md-ellipsis">
       
         Quiver
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#barbs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Barbs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamplot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streamplot
       
     </span>
   </a>
@@ -1495,6 +1539,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#fill-between" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fill Between
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#step" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1666,6 +1721,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#tricontour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tricontour
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#3d-surface" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1692,6 +1758,28 @@
     <span class="md-ellipsis">
       
         Quiver
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#barbs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Barbs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamplot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streamplot
       
     </span>
   </a>
@@ -1740,11 +1828,12 @@
 
 
 <h1 id="chart-types">Chart Types<a class="headerlink" href="#chart-types" title="Permanent link">&para;</a></h1>
-<p>plotviz supports 22 chart types. Types marked <strong>per-series</strong> can be mixed freely in the same subplot. Types marked <strong>whole-chart</strong> take over the entire panel and cannot be combined with other types.</p>
+<p>plotviz supports 26 chart types. Types marked <strong>per-series</strong> can be mixed freely in the same subplot. Types marked <strong>whole-chart</strong> take over the entire panel and cannot be combined with other types.</p>
 <hr />
 <h2 id="per-series-types">Per-series types<a class="headerlink" href="#per-series-types" title="Permanent link">&para;</a></h2>
 <p>These types are assigned per row in the series table. Multiple series with different types can share the same subplot axes.</p>
 <h3 id="line">Line<a class="headerlink" href="#line" title="Permanent link">&para;</a></h3>
+<p><img alt="Line chart" src="../images/charts/line.png" /></p>
 <p>A classic line chart connecting data points in X order. Default options:</p>
 <ul>
 <li><strong>Line style</strong> — solid, dashed, dotted, dash-dot, or none.</li>
@@ -1755,8 +1844,10 @@
 </ul>
 <p>Configured in the <strong>Series</strong> tab.</p>
 <h3 id="scatter">Scatter<a class="headerlink" href="#scatter" title="Permanent link">&para;</a></h3>
+<p><img alt="Scatter chart" src="../images/charts/scatter.png" /></p>
 <p>Plots each (X, Y) pair as an independent point with no connecting line. Options: point size, alpha (opacity), color.</p>
 <h3 id="bar">Bar<a class="headerlink" href="#bar" title="Permanent link">&para;</a></h3>
+<p><img alt="Bar chart" src="../images/charts/bar.png" /></p>
 <p>Vertical grouped bars. One bar per data point, one group per X value. Options:</p>
 <ul>
 <li><strong>Width</strong> — bar width as a fraction of available space (0.05–1.0, default 0.8).</li>
@@ -1764,18 +1855,30 @@
 <li><strong>Horizontal</strong> — rotates the chart 90° (bars grow left/right).</li>
 </ul>
 <h3 id="errorbar">Errorbar<a class="headerlink" href="#errorbar" title="Permanent link">&para;</a></h3>
+<p><img alt="Errorbar chart" src="../images/charts/errorbar.png" /></p>
 <p>Line chart with error bars drawn at each point. Requires a column assigned to the <strong>Error</strong> dropdown below the series table. Options: <strong>Cap size</strong> (length of the horizontal cap lines).</p>
 <h3 id="area">Area<a class="headerlink" href="#area" title="Permanent link">&para;</a></h3>
+<p><img alt="Area chart" src="../images/charts/area.png" /></p>
 <p>Filled region between the line and the X axis (or between two lines if stacked). Options:</p>
 <ul>
 <li><strong>Fill alpha</strong> — transparency of the filled region (0.05–1.0, default 0.4).</li>
 <li><strong>Stacked</strong> — accumulates areas vertically.</li>
 </ul>
+<h3 id="fill-between">Fill Between<a class="headerlink" href="#fill-between" title="Permanent link">&para;</a></h3>
+<p><img alt="Fill Between chart" src="../images/charts/fill-between.png" /></p>
+<p>The area between a series and a second series (the <strong>Fill Between Y2</strong> dropdown), or between the series and the X axis when none is chosen. Options:</p>
+<ul>
+<li><strong>Alpha</strong> — transparency of the filled region.</li>
+<li><strong>Line width</strong> and <strong>Show line</strong> — the outlines of the two curves.</li>
+</ul>
 <h3 id="step">Step<a class="headerlink" href="#step" title="Permanent link">&para;</a></h3>
+<p><img alt="Step chart" src="../images/charts/step.png" /></p>
 <p>Like Line but uses a staircase interpolation between points instead of straight lines. Useful for discrete or sampled data, histograms drawn as steps.</p>
 <h3 id="stem">Stem<a class="headerlink" href="#stem" title="Permanent link">&para;</a></h3>
+<p><img alt="Stem chart" src="../images/charts/stem.png" /></p>
 <p>Draws vertical lines (stems) from the X axis to each data point, with a marker at the tip. Good for sparse discrete signals.</p>
 <h3 id="bubble">Bubble<a class="headerlink" href="#bubble" title="Permanent link">&para;</a></h3>
+<p><img alt="Bubble chart" src="../images/charts/bubble.png" /></p>
 <p>Scatter chart where the size of each point is controlled by a third column assigned to the <strong>Z</strong> dropdown. Options:</p>
 <ul>
 <li><strong>Size col</strong> — which column drives the bubble radius (or "(uniform)" for equal sizes).</li>
@@ -1785,6 +1888,7 @@
 <li><strong>Edge color</strong> — outline color around each bubble.</li>
 </ul>
 <h3 id="waterfall">Waterfall<a class="headerlink" href="#waterfall" title="Permanent link">&para;</a></h3>
+<p><img alt="Waterfall chart" src="../images/charts/waterfall.png" /></p>
 <p>Cumulative bar chart where each bar starts where the previous one ended. Positive increments grow upward (green by default), negative increments fall (red). Options:</p>
 <ul>
 <li><strong>Show connectors</strong> — horizontal lines linking the top/bottom of adjacent bars.</li>
@@ -1796,18 +1900,23 @@
 <h2 id="whole-chart-types">Whole-chart types<a class="headerlink" href="#whole-chart-types" title="Permanent link">&para;</a></h2>
 <p>These types use all series columns together and cannot be mixed with other types in the same subplot.</p>
 <h3 id="histogram">Histogram<a class="headerlink" href="#histogram" title="Permanent link">&para;</a></h3>
+<p><img alt="Histogram chart" src="../images/charts/histogram.png" /></p>
 <p>Distribution of a single Y column. Options:</p>
 <ul>
 <li><strong>Bins</strong> — number of histogram bins (2–500, default 20).</li>
 <li><strong>Density</strong> — normalize the Y axis to show probability density instead of counts.</li>
 </ul>
 <h3 id="hist2d">Hist2D<a class="headerlink" href="#hist2d" title="Permanent link">&para;</a></h3>
+<p><img alt="Hist2D chart" src="../images/charts/hist2d.png" /></p>
 <p>2D histogram (heatmap of point density) using X and Y columns together. Options: <strong>Colormap</strong>, <strong>Bins</strong>.</p>
 <h3 id="hexbin">Hexbin<a class="headerlink" href="#hexbin" title="Permanent link">&para;</a></h3>
+<p><img alt="Hexbin chart" src="../images/charts/hexbin.png" /></p>
 <p>Like Hist2D but aggregates points into hexagonal cells. Options: <strong>Colormap</strong>, <strong>Bins</strong>.</p>
 <h3 id="boxplot">Boxplot<a class="headerlink" href="#boxplot" title="Permanent link">&para;</a></h3>
+<p><img alt="Boxplot chart" src="../images/charts/boxplot.png" /></p>
 <p>Box-and-whisker plots showing median, quartiles and outliers for one or more Y columns. Multiple series produce side-by-side boxes.</p>
 <h3 id="violin">Violin<a class="headerlink" href="#violin" title="Permanent link">&para;</a></h3>
+<p><img alt="Violin chart" src="../images/charts/violin.png" /></p>
 <p>Kernel-density estimate of the distribution, mirrored to form a violin shape. Options:</p>
 <ul>
 <li><strong>Show means</strong> — horizontal line at the mean.</li>
@@ -1818,37 +1927,76 @@
 <li><strong>Vertical</strong> — draw violins vertically (default) or horizontally.</li>
 </ul>
 <h3 id="pie">Pie<a class="headerlink" href="#pie" title="Permanent link">&para;</a></h3>
+<p><img alt="Pie chart" src="../images/charts/pie.png" /></p>
 <p>Circular sector chart. Each Y value becomes a slice whose angle is proportional to its share of the total. Options:</p>
 <ul>
 <li><strong>Show %</strong> — print the percentage inside each slice.</li>
 <li><strong>Shadow</strong> — drop shadow under the pie.</li>
 </ul>
 <h3 id="polar">Polar<a class="headerlink" href="#polar" title="Permanent link">&para;</a></h3>
+<p><img alt="Polar chart" src="../images/charts/polar.png" /></p>
 <p>Line or scatter chart in polar coordinates. X is the angle (radians), Y is the radius. Options:</p>
 <ul>
 <li><strong>Line style</strong>, <strong>Line width</strong>, <strong>Marker</strong> — visual style.</li>
 <li><strong>Fill</strong> — fill the area under the polar line.</li>
 </ul>
 <h3 id="radar">Radar<a class="headerlink" href="#radar" title="Permanent link">&para;</a></h3>
+<p><img alt="Radar chart" src="../images/charts/radar.png" /></p>
 <p>Spider/radar chart. Each column in the Y data becomes one axis radiating from the center. Multiple series are overlaid. Useful for comparing multivariate profiles.</p>
 <h3 id="heatmap">Heatmap<a class="headerlink" href="#heatmap" title="Permanent link">&para;</a></h3>
+<p><img alt="Heatmap chart" src="../images/charts/heatmap.png" /></p>
 <p>2D color grid. Requires a Z column. Plots X values along one axis, Y values along the other, and colors cells by Z. Options:</p>
 <ul>
 <li><strong>Colormap</strong> — matplotlib colormap (viridis, plasma, coolwarm, etc.).</li>
 <li><strong>Show colorbar</strong> — display the color scale legend.</li>
 </ul>
 <h3 id="contour">Contour<a class="headerlink" href="#contour" title="Permanent link">&para;</a></h3>
+<p><img alt="Contour chart" src="../images/charts/contour.png" /></p>
 <p>Contour or filled contour plot of a 2D scalar field. Requires X, Y and Z columns on a regular or irregular grid. Options:</p>
 <ul>
 <li><strong>Colormap</strong> — color mapping for the contour levels.</li>
 <li><strong>Contour levels</strong> — number of isolines (3–100, default 10).</li>
 </ul>
+<h3 id="tricontour">Tricontour<a class="headerlink" href="#tricontour" title="Permanent link">&para;</a></h3>
+<p><img alt="Tricontour chart" src="../images/charts/tricontour.png" /></p>
+<p>Contour plot of a scalar field known at scattered points (no regular grid needed): the points are triangulated. Requires X, Y and Z columns. Options:</p>
+<ul>
+<li><strong>Fill</strong> — <em>Filled contour</em>, <em>Face colours</em> (one colour per triangle) or <em>None</em>.</li>
+<li><strong>Levels</strong>, <strong>Alpha</strong> and <strong>Colormap</strong>.</li>
+<li><strong>Lines</strong> — contour lines over the fill; <strong>Triangulation</strong> shows the triangles.</li>
+<li><strong>Colorbar</strong> and its size.</li>
+</ul>
 <h3 id="3d-surface">3D Surface<a class="headerlink" href="#3d-surface" title="Permanent link">&para;</a></h3>
+<p><img alt="3D Surface chart" src="../images/charts/3d-surface.png" /></p>
 <p>Three-dimensional surface plot. Requires X, Y and Z columns. The canvas renders in 3D; rotate the view by clicking and dragging.</p>
 <h3 id="ecdf">ECDF<a class="headerlink" href="#ecdf" title="Permanent link">&para;</a></h3>
+<p><img alt="ECDF chart" src="../images/charts/ecdf.png" /></p>
 <p>Empirical Cumulative Distribution Function. Plots the fraction of data points ≤ each X value. Useful for comparing distributions without binning.</p>
 <h3 id="quiver">Quiver<a class="headerlink" href="#quiver" title="Permanent link">&para;</a></h3>
-<p>Vector field plot. Each (X, Y) point has an arrow whose direction and length come from the Z column (encoded as complex numbers: <code>real = dx</code>, <code>imag = dy</code>).</p>
+<p><img alt="Quiver chart" src="../images/charts/quiver.png" /></p>
+<p>Vector field plot: an arrow at each (X, Y) point. The direction and length of the arrow come from two columns chosen in the <strong>U</strong> (horizontal component) and <strong>V</strong> (vertical component) dropdowns. Options:</p>
+<ul>
+<li><strong>Scale</strong> — arrow length scale (1.0 = automatic).</li>
+<li><strong>Width</strong> — shaft width.</li>
+<li><strong>Color by magnitude</strong> — colour each arrow by its length, with a <strong>Colormap</strong>.</li>
+</ul>
+<h3 id="barbs">Barbs<a class="headerlink" href="#barbs" title="Permanent link">&para;</a></h3>
+<p><img alt="Barbs chart" src="../images/charts/barbs.png" /></p>
+<p>Meteorological wind barbs: at each (X, Y) point a staff with flags and feathers whose number tells the wind speed, pointing along the <strong>U</strong> and <strong>V</strong> components. Options:</p>
+<ul>
+<li><strong>Length</strong> — length of the staff in points.</li>
+<li><strong>Pivot</strong> — which end of the staff sits on the point (tip or middle).</li>
+<li><strong>Alpha</strong> — opacity.</li>
+<li><strong>Color by magnitude</strong> — colour by speed, with a <strong>Colormap</strong>.</li>
+</ul>
+<h3 id="streamplot">Streamplot<a class="headerlink" href="#streamplot" title="Permanent link">&para;</a></h3>
+<p><img alt="Streamplot chart" src="../images/charts/streamplot.png" /></p>
+<p>Streamlines of a vector field. X and Y must be the points of a regular grid (every x with every y, for example from <strong>Generate → (u,v)=f(x,y)</strong> with <em>Meshgrid</em>), with the field components in the <strong>U</strong> and <strong>V</strong> dropdowns. Options:</p>
+<ul>
+<li><strong>Density</strong> — how closely the lines are packed.</li>
+<li><strong>Arrow size</strong> and <strong>Line width</strong>.</li>
+<li><strong>Color by magnitude</strong> — colour by speed, with a <strong>Colormap</strong>.</li>
+</ul>
 <hr />
 <h2 id="chart-type-options-panel">Chart-type options panel<a class="headerlink" href="#chart-type-options-panel" title="Permanent link">&para;</a></h2>
 <p>When a whole-chart type is active, a corresponding options panel appears in the <strong>Data</strong> tab below the series table. Per-series options (line style, marker, color) are set in the <strong>Series</strong> tab regardless of chart type.</p>
