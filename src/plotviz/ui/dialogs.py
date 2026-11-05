@@ -3,8 +3,7 @@ Copyright (c) 2026 Paulo Cachim
 ui/dialogs.py — AnnotationEditDialog and DataImportDialog
 """
 import logging
-import os, csv
-from typing import Any
+import os
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit,
     QSpinBox, QDoubleSpinBox, QPushButton, QDialogButtonBox, QComboBox,
@@ -14,6 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from core.dates import is_date
+from data.importing import ImportOptions, column_data, read_table
 from ui.helpers import _show_color_dialog
 
 class PaletteColorDialog:
@@ -459,47 +459,23 @@ class DataImportDialog(QDialog):
         finally:
             self._building = False
 
+    def options(self) -> ImportOptions:
+        """The settings of the dialog, as the options to read the file again later."""
+        is_text = self.ext in ('.csv', '.txt')
+        orient_map = {'columns (default)': None, 'records': 'records', 'index': 'index',
+                      'split': 'split', 'values': 'values'}
+        return ImportOptions(
+            sheet=self._sheet_combo.currentText() if self.ext in ('.xlsx', '.xls') else '',
+            sep=self._current_sep() if is_text else None,
+            decimal=self._DECIMAL_CHARS[self._dec_combo.currentIndex()],
+            encoding=self._enc_combo.currentText(),
+            header=self._header_spin.value(), skiprows=self._skip_spin.value(),
+            json_orient=orient_map.get(self._json_combo.currentText()),
+            parse_dates=self._dates_combo.currentIndex() == 0,
+            dayfirst=self._dayfirst_check.isChecked())
+
     def _parse(self):
-        import pandas as pd
-        ext  = self.ext
-        hdr  = self._header_spin.value()
-        skip = self._skip_spin.value()
-        kw: dict[str, Any]       # keyword arguments for the pandas reader
-
-        if ext in ('.xlsx', '.xls'):
-            sheet = self._sheet_combo.currentText() or 0
-            return pd.read_excel(self.filepath, sheet_name=sheet,
-                                 header=hdr, skiprows=skip or None)
-
-        if ext == '.json':
-            orient_map = {
-                'columns (default)': None, 'records': 'records',
-                'index': 'index', 'split': 'split', 'values': 'values',
-            }
-            orient = orient_map.get(self._json_combo.currentText())
-            with open(self.filepath) as f:
-                import json as _json
-                raw = _json.load(f)
-            if isinstance(raw, list):
-                return pd.DataFrame(raw)
-            kw = {'orient': orient} if orient else {}
-            return pd.read_json(self.filepath, **kw)
-
-        # CSV / TXT
-        sep = self._current_sep()
-        if sep is None:                       # auto-detect
-            try:
-                with open(self.filepath, newline='', encoding=self._enc_combo.currentText()) as f:
-                    dialect = csv.Sniffer().sniff(f.read(4096))
-                sep = dialect.delimiter
-            except (csv.Error, OSError, UnicodeError):
-                sep = ','
-        kw = dict(header=hdr, skiprows=skip or None,
-                  decimal=self._DECIMAL_CHARS[self._dec_combo.currentIndex()],
-                  encoding=self._enc_combo.currentText())
-        if sep == r'\s+':
-            return pd.read_csv(self.filepath, sep=r'\s+', engine='python', **kw)
-        return pd.read_csv(self.filepath, sep=sep, **kw)
+        return read_table(self.filepath, self.options())
 
     # ─── preview table ───────────────────────────────────────────────────────
     def _populate_preview(self, df):
@@ -515,23 +491,7 @@ class DataImportDialog(QDialog):
 
     # ─── dtype inference ─────────────────────────────────────────────────────
     def _infer_col_data(self, df):
-        import numpy as np, pandas as pd
-        from core.dates import parse_series
-        self._col_data = {}
-        parse_dates = self._dates_combo.currentIndex() == 0
-        for col in df.columns:
-            series = df[col]
-            if parse_dates:
-                dates = parse_series(series, dayfirst=self._dayfirst_check.isChecked())
-                if dates is not None:
-                    self._col_data[str(col)] = dates
-                    continue
-            numeric = pd.to_numeric(series, errors='coerce')
-            non_null = series.notna().sum()
-            if non_null > 0 and numeric.notna().sum() == non_null:
-                self._col_data[str(col)] = numeric.to_numpy(dtype=float, na_value=np.nan)
-            else:
-                self._col_data[str(col)] = series.fillna('').astype(str).to_numpy()
+        self._col_data = column_data(df, self.options())
 
     # ─── column picker ───────────────────────────────────────────────────────
     def _rebuild_col_picker(self, df):
@@ -630,6 +590,11 @@ class DataImportDialog(QDialog):
             QMessageBox.warning(self, 'No columns', 'Select at least one column to import.')
             return
         self.accept()
+
+    def get_selected_origin(self) -> dict:
+        """{import name: name of the column in the file} for the checked columns."""
+        return {(self._col_renames[col].text().strip() or col): col
+                for col, chk in self._col_checks.items() if chk.isChecked() and col in self._col_data}
 
     def get_selected_data(self) -> dict:
         """Return {import_name: np.ndarray} for all checked columns."""

@@ -94,6 +94,7 @@ def main(only: list[str]) -> int:
         finally:
             matplotlib.rcParams["font.family"] = old
         print(f"{chart_type:<12} {(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)}  {path.stat().st_size // 1024} KB")
+    w._is_dirty = False          # nothing to save: close without asking
     w.close()
     return 0
 

@@ -20,3 +20,23 @@ _settings._CFG_DIR = _folder
 _settings.CFG_FILE = _folder / "settings.json"
 _settings.settings.clear()
 _settings.settings.update(copy.deepcopy(_settings.DEFAULTS))
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _closing_a_window_never_asks():
+    """Many tests leave a chart with unsaved changes and close the window: the question that
+    the real window asks would wait for a click that never comes."""
+    try:
+        from ui.main_window import PlotVizApp
+    except Exception:  # noqa: BLE001 - no real Qt here: nothing to patch
+        yield
+        return
+    original = PlotVizApp._confirm_close
+    PlotVizApp._confirm_close = lambda self: True
+    try:
+        yield
+    finally:
+        PlotVizApp._confirm_close = original

@@ -48,6 +48,10 @@ class CanvasPlotter(FigureCanvas):
         self._drag_offy = 0.0
         self._drag_part = 'both'   # arrows: 'tail' | 'tip' | 'both'
 
+        # Hover readout: the data point nearest the pointer is written to the status bar
+        self._hover_shown = False
+        self._hover_last = 0.0
+
         # Border rect artist (page boundary indicator)
         self._border_rect = None
         # Margin mask (preview-only overlay; never part of an export)
@@ -134,8 +138,12 @@ class CanvasPlotter(FigureCanvas):
         self._mask_artists = []
 
     # ─── Mouse events ─────────────────────────────────────────────────────────
+    HOVER_RADIUS_PX = 14     # how near (in screen pixels) the pointer must be to a point
+    HOVER_MIN_INTERVAL = 0.03
+
     def on_mouse_move(self, event):
         if event.inaxes is None:
+            self._clear_hover()
             return
         x, y = event.xdata, event.ydata
         if x is None or y is None:
@@ -183,6 +191,88 @@ class CanvasPlotter(FigureCanvas):
                 except (AttributeError, KeyError, TypeError):
                     logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
             self.draw_idle()
+        else:
+            self._show_hover_point(event)
+
+    # ─── Hover readout ────────────────────────────────────────────────────────
+    def nearest_point(self, ax, event, radius_px=None):
+        """The plotted point (line vertex or scatter marker) nearest the pointer, as
+        (label, x, y, distance in pixels), or None when no point is within *radius_px*."""
+        import numpy as np
+        from matplotlib.lines import Line2D
+        from matplotlib.collections import PathCollection
+        if event.x is None or event.y is None:
+            return None
+        limit = self.HOVER_RADIUS_PX if radius_px is None else radius_px
+        best = None
+        for artist in ax.get_children():
+            if not artist.get_visible():
+                continue
+            label = artist.get_label()
+            label = label.get_text() if hasattr(label, 'get_text') else str(label or '')
+            if label.startswith('_'):
+                continue
+            try:
+                if isinstance(artist, Line2D):
+                    points = np.column_stack([np.asarray(artist.get_xdata(), dtype=float),
+                                              np.asarray(artist.get_ydata(), dtype=float)])
+                elif isinstance(artist, PathCollection):
+                    points = np.asarray(artist.get_offsets(), dtype=float)
+                else:
+                    continue
+                if points.ndim != 2 or len(points) == 0:
+                    continue
+                screen = artist.get_transform().transform(points)
+                dist = np.hypot(screen[:, 0] - event.x, screen[:, 1] - event.y)
+                if not np.isfinite(dist).any():
+                    continue
+                i = int(np.nanargmin(dist))
+            except (ValueError, TypeError, AttributeError, IndexError):
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+                continue
+            if dist[i] <= limit and (best is None or dist[i] < best[3]):
+                best = (label, float(points[i, 0]), float(points[i, 1]), float(dist[i]))
+        return best
+
+    def _format_hover(self, ax, axis, value) -> str:
+        """A coordinate for the readout: a date on a date axis, otherwise 4 significant figures."""
+        from matplotlib import dates as mdates
+        formatter = (ax.xaxis if axis == 'x' else ax.yaxis).get_major_formatter()
+        if isinstance(formatter, (mdates.DateFormatter, mdates.AutoDateFormatter,
+                                  mdates.ConciseDateFormatter)):
+            try:
+                return (ax.format_xdata if axis == 'x' else ax.format_ydata)(value)
+            except (ValueError, TypeError, OverflowError):
+                logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+        return self._fmt(value)
+
+    def _show_hover_point(self, event):
+        import time
+        now = time.monotonic()
+        if now - self._hover_last < self.HOVER_MIN_INTERVAL:
+            return
+        self._hover_last = now
+        if self.main_window is None or getattr(event, 'inaxes', None) is None:
+            return
+        found = self.nearest_point(event.inaxes, event)
+        if found is None:
+            self._clear_hover()
+            return
+        label, x, y, _ = found
+        ax = event.inaxes
+        text = f'{label}  ·  x = {self._format_hover(ax, "x", x)},  y = {self._format_hover(ax, "y", y)}'
+        self._hover_shown = True
+        self._show_status(text, 0)
+
+    def _clear_hover(self):
+        if self._hover_shown:
+            self._hover_shown = False
+            mw = self.main_window
+            if mw is not None:
+                try:
+                    mw.statusBar().clearMessage()
+                except (AttributeError, RuntimeError):
+                    logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
 
     # ── Tab-navigation constants ──────────────────────────────────────────────
     # Outer tabs: 0=Data  1=Layout & Style  2=Plots

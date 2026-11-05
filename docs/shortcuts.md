@@ -59,6 +59,10 @@ The toolbar above the chart canvas provides standard matplotlib navigation:
 | ⚙ Subplots | Adjust subplot spacing (matplotlib built-in) |
 | 💾 Save | Save the figure via matplotlib's own dialog |
 
+### Reading values from the chart
+
+Move the pointer close to a point of a curve or a scatter plot (within about 14 pixels) and the status bar at the bottom of the window shows the series and the **x** and **y** of that point, not those of the pointer: `Quadratic · x = 4.5, y = 6.1`. On a date axis the value is written as a date. The text disappears when the pointer moves away from the points. Clicking on an empty part of the chart still writes the coordinates of the click.
+
 ## Annotation mode shortcuts
 
 While in the Legend & Notes tab:

@@ -15,6 +15,7 @@ Everything the menu bar does, with its shortcut. The shortcuts are also in [Keyb
 | **Load Palette…** | | Loads a colour palette file (`.pvizp`); see [Color Palettes](palettes.md) |
 | **Load Scheme…** | | Loads a colour scheme file (`.pvizc`); see [Color Schemes](color-schemes.md) |
 | **Load Data…** | `Ctrl + L` | Opens the import dialog for CSV, Excel, JSON or text files; see [Datasets and Import](datasets.md) |
+| **Reload Data Files** | `Ctrl + Shift + L` | Reads again the data files that the datasets came from, with the same import options; see [Reloading data files](datasets.md#reloading-data-files) |
 | **Save Chart** | `Ctrl + S` | Saves the open chart (asks where the first time) |
 | **Save Chart As…** | `Ctrl + Shift + S` | Saves it under another name |
 | **Save Template…** | | Saves the style and layout without the data |

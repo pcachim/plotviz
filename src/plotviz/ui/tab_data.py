@@ -51,10 +51,15 @@ class DataTabMixin(MixinBase):
         ds_btn_row.setSpacing(4)
         btn_remove_ds = QPushButton('🗑 Remove selected')
         btn_remove_ds.clicked.connect(self._remove_selected_datasets)
+        btn_reload_ds = QPushButton('⟳ Reload')
+        btn_reload_ds.setToolTip('Read the selected columns (all of them if none is selected) again from '
+                                 'their files; the chart follows.  File → Reload Data Files does the same')
+        btn_reload_ds.clicked.connect(lambda: self._reload_datasets(self._selected_dataset_names()))
         btn_inspect = QPushButton('🔍 Inspect values')
         btn_inspect.setToolTip('Inspect selected column(s), or all if none selected')
         btn_inspect.clicked.connect(self._inspect_series)
         ds_btn_row.addWidget(btn_remove_ds)
+        ds_btn_row.addWidget(btn_reload_ds)
         ds_btn_row.addWidget(btn_inspect)
         layout.addLayout(ds_btn_row)
 

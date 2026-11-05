@@ -8,6 +8,7 @@ mixed into PlotVizApp so its methods share the datasets, series table and
 widgets via `self`.
 """
 import logging
+import os
 import sys
 from dataclasses import dataclass
 from typing import Any
@@ -489,6 +490,8 @@ class DataMixin(MixinBase):
         self._redo_stack.clear()
         self._update_undo_buttons()
         self.datasets.clear()
+        self.dataset_sources.clear()
+        self._source_mtimes.clear()
         self.curve_styles.clear()
         self.canvas.annotations.clear()
         self._last_fit = None
@@ -544,12 +547,17 @@ class DataMixin(MixinBase):
                 dlg = DataImportDialog(fp, self)
                 if dlg.exec() != QDialog.DialogCode.Accepted:
                     continue
+                origin = dlg.get_selected_origin()
+                options = dlg.options().to_dict()
                 for name, arr in dlg.get_selected_data().items():
                     base, cnt = name, 1
                     while name in self.datasets:
                         name = f'{base}_{cnt}'
                         cnt += 1
                     self.datasets[name] = arr
+                    self.dataset_sources[name] = {'path': os.path.abspath(fp), 'column': origin.get(base, base),
+                                                  'options': options}
+                    self._remember_source_time(fp)
             except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
                 QMessageBox.critical(self, 'Error', f'Failed: {fp}\n{e}')
         self._schedule_undo_snapshot('Load data')
@@ -558,6 +566,107 @@ class DataMixin(MixinBase):
             self._add_series_row()
         self._notify_sns_explorer()
 
+
+    # ─── Reload data files ────────────────────────────────────────────────────
+    def _remember_source_time(self, path):
+        """Note when *path* was last read, to notice later that it changed."""
+        try:
+            self._source_mtimes[os.path.abspath(path)] = os.path.getmtime(path)
+        except OSError:
+            logging.getLogger('plotviz').debug('ignored exception', exc_info=True)
+
+    def _selected_dataset_names(self):
+        return [item.text() for item in self.dataset_list.selectedItems()]
+
+    def _reload_datasets(self, names=None, quiet=False):
+        """Read again the files that datasets came from, with the options used to import them.
+
+        *names*: the datasets to read again (all of those that came from a file when empty).
+        The columns keep their names, so the series, the styles and the annotations stay as
+        they are and the chart follows the new values.  Returns the number of columns read.
+        """
+        import json
+        from data.importing import ImportOptions, column_data, read_table
+        wanted = [n for n in (names or list(self.datasets))
+                  if n in self.datasets and n in self.dataset_sources]
+        if not wanted:
+            if not quiet:
+                QMessageBox.information(self, 'Reload data',
+                                        'None of the datasets comes from a file that can be read again.\n'
+                                        'Datasets made by Generate or Transform, and charts saved before this '
+                                        'feature existed, have no file to read.')
+            return 0
+        groups: dict[tuple, list] = {}
+        for n in wanted:
+            src = self.dataset_sources[n]
+            groups.setdefault((src['path'], json.dumps(src['options'], sort_keys=True)), []).append(n)
+        done, problems = 0, []
+        for (path, _), group in groups.items():
+            opts = ImportOptions.from_dict(self.dataset_sources[group[0]]['options'])
+            try:
+                stamp = os.path.getmtime(path)
+                columns = column_data(read_table(path, opts), opts)
+            except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
+                problems.append(f'{os.path.basename(path)}: {e}')
+                continue
+            self._source_mtimes[path] = stamp
+            for n in group:
+                column = self.dataset_sources[n]['column']
+                if column not in columns:
+                    problems.append(f'{n}: the column "{column}" is not in {os.path.basename(path)} any more')
+                    continue
+                self.datasets[n] = columns[column]
+                done += 1
+        if done:
+            self.update_lists()
+            self.update_preview()
+            self._schedule_undo_snapshot('Reload data')
+            if not getattr(self, '_applying_settings', False):
+                self._is_dirty = True
+            self._notify_sns_explorer()
+            self.statusBar().showMessage(f'Reloaded {done} column(s) from {len(groups)} file(s)', 5000)
+        if problems:
+            QMessageBox.warning(self, 'Reload data', 'Some columns could not be read again:\n\n'
+                                + '\n'.join(problems) + ('\n\nThe others keep the values they had.' if done else ''))
+        return done
+
+    def _on_application_state(self, state):
+        """Back in the window: ask whether to read again the data files that changed meanwhile."""
+        from PyQt6.QtCore import QTimer
+        if state == Qt.ApplicationState.ApplicationActive:
+            QTimer.singleShot(250, self._check_data_files_changed)
+
+    def _check_data_files_changed(self):
+        if self._checking_files or QApplication.activeModalWidget() is not None:
+            return
+        used = {self.dataset_sources[n]['path']: [] for n in self.datasets if n in self.dataset_sources}
+        for n in self.datasets:
+            if n in self.dataset_sources:
+                used[self.dataset_sources[n]['path']].append(n)
+        self._checking_files = True
+        try:
+            for path, names in used.items():
+                try:
+                    stamp = os.path.getmtime(path)
+                except OSError:
+                    continue                                   # moved or deleted: nothing to read
+                known = self._source_mtimes.get(path)
+                if known is None:
+                    self._source_mtimes[path] = stamp          # first sight (a chart that was just opened)
+                    continue
+                if stamp <= known:
+                    continue
+                self._source_mtimes[path] = stamp              # ask once per change
+                answer = QMessageBox.question(
+                    self, 'Data file changed',
+                    f'{os.path.basename(path)} has changed on disk.\n\n'
+                    f'Read it again? {len(names)} column(s) of this chart come from it.',
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes)
+                if answer == QMessageBox.StandardButton.Yes:
+                    self._reload_datasets(names)
+        finally:
+            self._checking_files = False
 
     def _remove_selected_datasets(self):
         """Remove datasets selected in the dataset list, then refresh."""

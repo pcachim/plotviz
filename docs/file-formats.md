@@ -20,9 +20,15 @@ A `.pviz` file is a complete saved chart. It contains:
 
 Choose **File → Save Chart** (Ctrl+S). It rewrites the open file without asking; the first time, or with **Save Chart As…** (Ctrl+Shift+S), a dialog asks where to save. A dialog asks whether to save **Used series only** (keeps only the columns currently assigned in the series table) or **All columns** (preserves every loaded column for future reassignment). Used-only files are smaller; all-columns files are more portable. **All columns** is the default button (Enter) and sits on the right, with **Cancel** on the left. If every loaded column is already used, nothing is asked.
 
+When you close the window (or quit) with changes that are not saved, plotviz asks whether to **Save** them, **Don't save** them or **Cancel** and keep working. If the save is cancelled or fails, the window stays open.
+
 ### Loading
 
 Choose **File → Open Chart…** (Ctrl+O), or double-click a `.pviz` file in Finder/Explorer. The chart, all datasets, and all settings are restored exactly.
+
+### Automatic copy and recovery
+
+While the chart has changes that are not saved, plotviz writes a copy of it, with all its columns, every minute and a half to the `recovery` folder inside the settings folder (see [Settings and preferences](getting-started.md#settings-and-preferences)). The copy is removed when you save or close plotviz normally. If plotviz stops in any other way (a crash, a power failure, the process killed), the next start asks whether to restore the chart as it was at the last copy. **Restore** opens it with the changes still unsaved, so **Save** writes it to the file the chart came from; **Discard** deletes the copy. Only the most recent copy is offered. The copy is not your file and is never used instead of it.
 
 ### Recent files
 

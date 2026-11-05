@@ -336,6 +336,7 @@ def main(only: list[str]) -> int:
         overview(w).save(str(OUT / "overview.png"))
         print("overview")
     zones_file.write_text(json.dumps(zones, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    w._is_dirty = False          # nothing to save: close without asking
     w.close()
     return 0
 

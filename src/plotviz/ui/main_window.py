@@ -50,6 +50,7 @@ from ui.color_schemes import ColorSchemeMixin
 from ui.curve_styles import CurveStyleMixin
 from ui.subplots import SubplotMixin
 from ui.data_io import DataMixin
+from ui.recovery import RecoveryMixin
 from ui.fitting import FitPresetMixin
 from ui.chart_options import ChartOptionsMixin
 from ui.palettes import PaletteColorMixin
@@ -559,7 +560,7 @@ import config.settings as settings
 #         return result
 
 
-class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonExportMixin, ColorSchemeMixin, CurveStyleMixin, SubplotMixin, DataMixin, FitPresetMixin, ChartOptionsMixin, PaletteColorMixin, AnnotationUIMixin, QMainWindow):
+class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonExportMixin, ColorSchemeMixin, CurveStyleMixin, SubplotMixin, DataMixin, RecoveryMixin, FitPresetMixin, ChartOptionsMixin, PaletteColorMixin, AnnotationUIMixin, QMainWindow):
     @property
     def _is_dirty(self):
         """True while the chart has changes that are not saved to its file."""
@@ -568,6 +569,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     @_is_dirty.setter
     def _is_dirty(self, value):
         self.__dict__['_dirty_flag'] = bool(value)
+        if value:
+            self.__dict__['_dirty_epoch'] = self.__dict__.get('_dirty_epoch', 0) + 1     # a change since the last automatic copy
         self._update_save_button()
 
     def _update_save_button(self):
@@ -594,6 +597,9 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self.showMaximized()
 
         self.datasets      = {}
+        self.dataset_sources = {}  # name -> {'path', 'column', 'options'}: the file a dataset was read from
+        self._source_mtimes  = {}  # path -> modification time when the file was last read
+        self._checking_files = False
         self.curve_styles  = {}
         self._last_fit     = None
         self._fits         = {}    # per-series: label -> fit dict
@@ -713,6 +719,10 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
 
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._load_on_startup)
+        self._start_recovery_timer()
+        _app = QApplication.instance()
+        if _app is not None:
+            _app.applicationStateChanged.connect(self._on_application_state)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # WINDOW TITLE
@@ -733,7 +743,13 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
     # STARTUP LOAD
     # ═══════════════════════════════════════════════════════════════════════════
     def _load_on_startup(self):
-        """After the window is shown, silently load the last-used chart.
+        """After the window is shown: the last-used chart, then the offer to restore a chart
+        that an earlier plotviz left unsaved when it did not close properly."""
+        self._load_last_chart()
+        self._offer_recovery()
+
+    def _load_last_chart(self):
+        """Silently load the last-used chart.
         If no recent file exists (first launch or cleared history) load a
         built-in sample chart so the canvas is never blank on first open.
         """
@@ -766,6 +782,8 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self._redo_stack.clear()
             self._update_undo_buttons()
         self.datasets.clear()
+        self.dataset_sources.clear()
+        self._source_mtimes.clear()
         self.curve_styles.clear()
         if hasattr(self.canvas, 'annotations'):
             self.canvas.annotations.clear()
@@ -950,8 +968,37 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         from config.settings import datasets_dir
         self._load_data_files('Open Sample Dataset', str(datasets_dir()), remember_dir=False)
 
+    def _confirm_close(self) -> bool:
+        """With unsaved changes, ask whether to save them first.  False when the user cancels
+        (or the chart could not be saved), so the window stays open."""
+        if not self._is_dirty:
+            return True
+        current = getattr(self, '_current_filepath', None)
+        name = os.path.basename(current) if current else 'the chart'
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle('Unsaved changes')
+        box.setText(f'Save the changes to {name} before closing?')
+        box.setInformativeText('Your changes will be lost if you do not save them.')
+        save = box.addButton('Save', QMessageBox.ButtonRole.AcceptRole)
+        discard = box.addButton("Don't save", QMessageBox.ButtonRole.DestructiveRole)
+        cancel = box.addButton('Cancel', QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(save)
+        box.setEscapeButton(cancel)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is discard:
+            return True
+        if clicked is save:
+            self._save_project()
+            return not self._is_dirty                  # a cancelled or failed save keeps the window open
+        return False
+
     def closeEvent(self, a0):
-        """Persist window state and prefs before closing."""
+        """Ask about unsaved changes, then persist window state and prefs before closing."""
+        if not self._confirm_close():
+            a0.ignore()
+            return
         geo = self.geometry()
         settings.set('window_geometry', [geo.x(), geo.y(), geo.width(), geo.height()])
         settings.set('window_maximised', self.isMaximized())
@@ -964,6 +1011,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             settings.set('export_dpi', self.dpi_spin.value())
         if hasattr(self, 'fig_preset_combo'):
             settings.set('fig_preset', self.fig_preset_combo.currentText())
+        self._discard_recovery_copy()
         a0.accept()
 
     def _restore_prefs_from_settings(self):
@@ -1085,6 +1133,12 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         act_load_data.setShortcut('Ctrl+L')
         act_load_data.triggered.connect(lambda: (_go_data_tab(), self.load_data()))
         file_menu.addAction(act_load_data)
+
+        act_reload_data = QAction('Reload Data Files', self)
+        act_reload_data.setStatusTip('Read again the data files that the datasets came from')
+        act_reload_data.setShortcut('Ctrl+Shift+L')
+        act_reload_data.triggered.connect(lambda: self._reload_datasets())
+        file_menu.addAction(act_reload_data)
 
         # ── Save ──────────────────────────────────────────────────────────────
         file_menu.addSeparator()

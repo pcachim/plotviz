@@ -54,6 +54,14 @@ Things to know:
 - Saved charts keep dates as dates, and so does the [Python export](python-export.md).
 - The Seaborn Explorer and the Code Runner see date columns as numbers (days since 1970-01-01). In the Code Runner use `pd.to_datetime(x, unit='D')` to get datetimes back.
 
+### Reloading data files
+
+When the file that a dataset came from changes (the measurements were updated, the model was run again), you do not have to import it again: click **⟳ Reload** under the **Datasets** list, or choose **File → Reload Data Files** (`Ctrl + Shift + L`). plotviz reads the file again with the same import options (separator, decimal mark, sheet, header row, dates) and puts the new values in the columns of the same name. The series, the styles, the annotations and the layout stay as they are, so the chart simply shows the new data. The button reloads the selected columns, or every column that came from a file when none is selected.
+
+When you come back to the window after the file was changed by another program, plotviz notices and asks whether to read it again; it asks once for each change.
+
+The file and the options of each column are saved in the chart file, so the reload also works after you reopen the chart, as long as the data file is still where it was. Columns made by Generate or Transform, and charts saved by older versions, have no file to read and are left alone. A column that is no longer in the file keeps its values, and plotviz says so. Fits that were made on the old values are not recalculated: apply them again.
+
 ### Removing datasets
 
 Select one or more entries in the **Datasets** list and click **Remove selected**. Any series that reference removed columns will show empty dropdowns but are not deleted from the table.

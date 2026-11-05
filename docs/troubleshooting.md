@@ -77,5 +77,8 @@ The messages plotviz shows when something cannot be done, what usually causes th
 
 | Message or problem | Cause and what to do |
 |--------------------|----------------------|
+| **None of the datasets comes from a file that can be read again** | Reload needs the file and the options kept at import. Columns made by Generate or Transform, and charts saved by an older version, do not have them: import the file again once |
+| **Some columns could not be read again** | The file was moved or deleted, or a column is no longer in it. The columns that failed keep the values they had; put the file back or import it again |
+| **plotviz did not close properly last time** | An automatic copy of the chart was found at start-up. Restore opens it with its changes unsaved; see [File Formats](file-formats.md#automatic-copy-and-recovery) |
 | **No settings.json in archive.** | The file is not a plotviz chart or template. Chart and template files are zip archives with a `settings.json` inside; see [File Formats](file-formats.md) |
 | **Open error** / **Save error** / **Export error** | The text after the title is the reason given by the system: a file that is open in another program, a folder without write permission, a disk that is full |

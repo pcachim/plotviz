@@ -1382,6 +1382,9 @@ class SerializationMixin(MixinBase):
                             keep.add(_col)
             else:
                 keep = set(self.datasets.keys())
+            # where each column came from, to read it again (File > Reload Data Files)
+            settings['data_sources'] = {n: self.dataset_sources[n] for n in sorted(keep)
+                                        if n in self.dataset_sources}
 
             datasets = encode_datasets({k: self.datasets[k] for k in keep})
 
@@ -1402,6 +1405,7 @@ class SerializationMixin(MixinBase):
             self._current_filepath = fp
             self._update_window_title()
             self._is_dirty = False
+            self._discard_recovery_copy()                # what the copy protected is in the file now
 
             import config.settings as _cfg
             _cfg.add_recent_file(fp)
@@ -1480,6 +1484,8 @@ class SerializationMixin(MixinBase):
         # equivalent to a fresh start — no stale datasets, styles, subplot modes,
         # series rows, or type-combo contents can bleed through from the old file.
         self.datasets.clear()
+        self.dataset_sources = {}
+        self._source_mtimes = {}
         self.curve_styles.clear()
         if hasattr(self, 'canvas'):
             self.canvas.annotations.clear()
@@ -1509,6 +1515,9 @@ class SerializationMixin(MixinBase):
             if bundle['palette_json']:
                 self._load_custom_palettes_json(bundle['palette_json'])
             self.datasets = decode_datasets(bundle['datasets_raw'])
+            self.dataset_sources = {n: src for n, src in (settings.get('data_sources') or {}).items()
+                                    if n in self.datasets}
+            self._source_mtimes = {}
             # Extract image-annotation files to a temp dir for runtime use.
             img_dir = tempfile.mkdtemp(prefix='plotviz_imgs_')
             for bname, data in bundle['images'].items():
