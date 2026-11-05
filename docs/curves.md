@@ -44,6 +44,8 @@ When a palette is active (set in the Layout & Style tab), plotviz assigns the ne
 
 The curve fitting section lets you fit a mathematical model to any series and overlay the result on the chart.
 
+(The **Regression** chart of the [Seaborn Explorer](seaborn-explorer.md#regression-here-and-in-curves) draws a trend line to look at; it gives no equation, numbers or comparison, and is not stored in the chart. The two are compared there.)
+
 ### Workflow
 
 1. Select the series to fit in the **Per-Curve** selector above. (If a fit curve is selected, the series it came from is fitted.)

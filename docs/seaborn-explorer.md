@@ -137,6 +137,27 @@ The **Palette** dropdown controls the color scheme used for all chart types. The
 !!! note
     Robust fit and LOWESS are mutually exclusive with each other and with polynomial order > 1.
 
+#### Regression here and in Curves
+
+The Explorer draws a **trend line over the points**, to look at them. The curve fit of **Plots → Curves** (see [Curves and Fitting](curves.md)) **fits a model** that you can read numbers from, compare and keep with the chart. They are not two versions of the same tool:
+
+| | **Explorer → Regression** | **Plots → Curves → Curve fit** |
+|---|---|---|
+| **What it is** | A picture for exploring the data | A fit that is stored in the chart |
+| **Models** | A line or a polynomial (order 1 to 6), a robust line, or LOWESS | Linear, polynomial up to degree 10, exponential (with or without an offset), power, logarithmic, sigmoid, Gaussian, sinusoid, your own expression, and LOWESS |
+| **Band** | **CI %** (95 by default), found by resampling the data at random; it is not drawn for a robust fit or for LOWESS | **Confidence limits** and **Prediction band**, at 1, 2 or 3 sigma, calculated from the uncertainty of the parameters |
+| **Numbers** | None | The equation, the parameters with their errors, R², adjusted R², RMSE, AIC, BIC and, for the models where it applies, an F-test; they can be exported to a text file |
+| **Outliers** | *Robust fit* lessens their weight | *Robust* lessens their weight and **marks** the points that stand out, counting them in the results |
+| **Part of the data** | All the points | **Fit only x from … to …** fits one stretch |
+| **Weights** | No | **Weight by the error column** |
+| **Comparing** | No: **Redraw** replaces the chart | The **Fits** list keeps several fits of a series, with R² and AIC side by side |
+| **Where it lives** | In the Explorer window; it leaves as an image or as a script | On the main chart, saved in the `.pviz` and in the exported script |
+| **New data** | None | New series with the curve and the bands, which can be drawn or transformed |
+
+When to use which: the Explorer to see quickly whether there is a trend, or for a fast figure with the seaborn look; Curves when you need a value (the slope and its uncertainty), want to compare models, fit only part of the data, or keep the fit with the chart.
+
+Two details. The straight line is the same in both (a least-squares line), but the Explorer's band comes from random resampling, so it changes a little each time the chart is redrawn, whereas the band of Curves is calculated and always the same. And **LOWESS** is in both only to *show* a trend, with no equation: in the Explorer it is drawn over the points, in Curves it joins the **Fits** list and is saved with the chart.
+
 ### Strip options
 
 | Option | Description |
