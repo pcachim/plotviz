@@ -1,14 +1,21 @@
-# Transform and Statistics
+# Transform
 
-The **Data** tab has four pages: **Datasets**, **Generate**, **Statistics** and **Transform**. This page covers the two that work on series you have already loaded: **Transform** creates new series from existing ones, and **Statistics** summarises them.
+The **Data → Transform** page creates new series from existing ones: smoothing, decimation, calculus, scaling, cleaning, resampling and signal analysis. To summarise series instead, see [Statistics](statistics.md).
 
 ---
 
-## Transform
-
 The Transform page applies an operation (smoothing, decimation, calculus, scaling, cleaning, resampling…) to a series and stores the result as a **new series**. The original is never changed, so you can plot both together.
 
-### Using it
+![The Transform page](images/ui/transform.png)
+
+The **Transform** page:
+
+1. **Series** — **x** is the horizontal axis (optional) and **y** the series to transform.
+2. **Operation** — The operation, grouped by type, and its parameters, which change with the operation.
+3. **Preview** — What **Apply** would create, without creating anything. See [Preview](#preview).
+4. **Result** — The name of the new series (automatic when empty) and the **Apply** button.
+
+## Using it
 
 1. **x** — the horizontal axis (for example the time or position series). Optional: choose `(none: use index)` when the series has no x column. Operations that need an x (resampling, cropping, sorting, aligning) report an error without it. Derivatives and integrals use the index as the spacing when there is no x.
 2. **y** — the series to transform (the values: the signal, the measurement). Swapping x and y gives odd results, because the result is calculated *as a function of x*: resampling `y_irregular` over `t_irregular` is a different curve from resampling `t_irregular` over `y_irregular`.
@@ -19,7 +26,7 @@ The Transform page applies an operation (smoothing, decimation, calculus, scalin
 
 The status line under the button says what was created and how many points it has. New series appear at once in the Datasets list and in the series table.
 
-### Preview
+## Preview
 
 Below the parameters, a small plot shows what **Apply** would create, without
 creating anything: the original series in grey and the result on top of it.
@@ -36,7 +43,7 @@ It uses the same calculation as Apply, so what you see is what you get.
 - Under the plot, a line says how many points go in and the name of the
   series that would be created.
 
-### Dates
+## Dates
 
 When x is a date column, the operations that keep or select x values keep it as dates: the new x series from cropping, decimating, resampling, aligning, removing NaN or finding peaks is a date series, and plots with a date axis. Notes:
 
@@ -48,16 +55,16 @@ When x is a date column, the operations that keep or select x values keep it as 
 !!! note "Results are calculated once"
     A transformed series is a copy. If you later change or reload the original data, the transformed series is not recalculated — apply the operation again.
 
-### When x changes
+## When x changes
 
 Some operations change the number or position of the points (decimating, cropping, resampling, removing NaN, FFT, peaks…). When that happens a **new x series** is created next to the new y, named after the x series and the suffix, for example `t_every3` and `y_every3`. Plot the pair together.
 
 - **FFT** and **Find peaks** create their own x even if you chose none: frequencies for the FFT, and the x of each peak (the point index when there is no x series).
 - **Align to another x** reuses the x of the series you chose instead of creating a duplicate; the status line tells you which series to use as x.
 
-### Operations
+## Operations
 
-#### Smoothing
+### Smoothing
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
@@ -68,7 +75,7 @@ Some operations change the number or position of the points (decimating, croppin
 | Gaussian | Sigma (in points) | Gaussian kernel |
 | Low/high-pass filter (Butterworth) | Type, cutoff, order | Zero-phase. The cutoff is in cycles per x unit (cycles per point with no x) and must be below half the sampling rate. x should be evenly spaced and y must have no NaN |
 
-#### Reduce and resample
+### Reduce and resample
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
@@ -79,7 +86,7 @@ Some operations change the number or position of the points (decimating, croppin
 | Align to another x | Series, interpolation | Interpolates y onto the x of another series (`linear` or `pchip`); NaN outside the range of the original x. Needs x |
 | Crop x range | x min, x max | Keeps `x min ≤ x ≤ x max`; leave a bound on `auto` to leave it open. Needs x |
 
-#### Calculus
+### Calculus
 
 | Operation | Notes |
 |-----------|-------|
@@ -91,7 +98,7 @@ Some operations change the number or position of the points (decimating, croppin
 | Log return | `ln(y[i] / y[i−1])`; all values must be positive |
 | Cumulative sum | Running total |
 
-#### Scale and baseline
+### Scale and baseline
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
@@ -101,7 +108,7 @@ Some operations change the number or position of the points (decimating, croppin
 | Absolute value | — | |
 | Remove trend (polynomial) | Degree, fit from x, fit to x | Subtracts a least-squares polynomial; degree 1 is a straight line. Limit the fit to a stretch of x (without the peak) so the peak does not tilt it; the result is subtracted over the whole series |
 
-#### Cleaning
+### Cleaning
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
@@ -111,7 +118,7 @@ Some operations change the number or position of the points (decimating, croppin
 | Sort by x | — | Reorders the points so x increases. Needs x |
 | Outlier filter (Hampel) | Window, sigmas | Replaces a point by the local median when it is more than *sigmas* robust standard deviations away from it |
 
-#### Rolling statistics
+### Rolling statistics
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
@@ -119,7 +126,7 @@ Some operations change the number or position of the points (decimating, croppin
 | Rolling minimum / maximum | Window | Same |
 | Running minimum / maximum | — | Cumulative: the smallest or largest value so far |
 
-#### Signal analysis
+### Signal analysis
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
@@ -132,34 +139,3 @@ Some operations change the number or position of the points (decimating, croppin
     - **Uneven sampling:** *Resample (uniform x)* before a Butterworth filter or an FFT.
     - **Pulse in a stable signal with noise:** *Subtract baseline* (**median of range**, over a stretch without the pulse), then *Savitzky-Golay* with a window no longer than the pulse (in points), then *Find peaks* with **Min height (× noise)** of 5 or 6 and a *Min distance* of the pulse width. Do not use the moving median or the outlier filter: they treat the pulse as noise and remove it. For a negative pulse, *Scale and shift* with a = −1 first.
     - **Compare two series with different x:** *Align to another x* puts one on the x of the other.
-
----
-
-## Statistics
-
-The Statistics page summarises the loaded series. It works on the series **selected in the Datasets list**, or on all of them when none is selected. It refreshes when you open the page; click **↻ Refresh** after changing the selection or the data.
-
-### Summary table
-
-One column per series and one row per statistic:
-
-| Statistic | Meaning |
-|-----------|---------|
-| count | Valid values (NaN and infinity are not counted) |
-| missing | NaN, infinity or empty values |
-| mean, std | Mean and sample standard deviation (n − 1) |
-| min, 25%, median, 75%, max | Range and quartiles |
-| skew, kurtosis | Skewness and excess kurtosis (a normal distribution has 0 for both) |
-
-Text series only get *count* and *missing*. For **date** series the mean, minimum, quartiles, median and maximum are shown as dates, and the standard deviation is in days. Cells that cannot be computed (the std of one value, the skew of a constant series) are left blank.
-
-**📋 Copy summary** copies the table to the clipboard, tab-separated, ready to paste into a spreadsheet.
-
-### Correlation matrix
-
-Below the summary, the correlation between every pair of numeric series, with cells shaded red for positive and blue for negative values. Choose the **Method**:
-
-- **pearson** — linear correlation.
-- **spearman** — rank correlation; detects any monotonic relationship, linear or not, and is less sensitive to outliers.
-
-Each pair uses only the points where both series are valid. A cell is blank when the two series have different lengths, one of them is constant, or there are fewer than 3 common points.

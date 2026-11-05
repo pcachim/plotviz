@@ -1,12 +1,19 @@
-# Series
+# Curves and Fitting
 
-The **Series** tab controls the visual appearance of individual curves and provides curve fitting tools.
+The **Curves** page of the **Plots** tab controls the visual appearance of individual curves and provides curve fitting tools.
 
 When the chart has more than one subplot, a **Subplot** selector at the top switches context. The curve selector below it lists all series assigned to the active subplot.
 
 ---
 
 ## Per-curve style
+
+![The Curves page](images/ui/curves.png)
+
+The **Plots → Curves** page:
+
+1. **Per-curve** — Choose the curve, then its **line style**, **colour** (**Unlock** lets the palette change it again), **marker**, line width and marker size, marker colour and **draw style**.
+2. **Curve fit (line / scatter)** — The **model** and the options of the fit (range of x, weights, robust), **Apply Fit** and **Remove Fit**, the list of fits of the chart with their R², RMSE and AIC, the confidence and prediction bands, and the results.
 
 Select a series from the **Curve** dropdown to edit its style. Changes take effect on the live preview immediately.
 

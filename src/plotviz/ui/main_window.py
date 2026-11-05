@@ -1425,6 +1425,7 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         """Section header label styled like the DATASETS label."""
         lbl = QLabel(txt.upper())
         lbl.setStyleSheet('font-weight:bold; color:#888; font-size:10px;')
+        lbl.setProperty('section', True)         # the documentation screenshots number these
         return lbl
 
     def _get_xscale(self):

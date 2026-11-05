@@ -26,26 +26,32 @@ ONLINE_URL = 'https://pcachim.github.io/plotviz/'
 # The page index: the same order as `nav` in mkdocs.yml (a test keeps them in step).
 NAV: list[tuple[str, list[tuple[str, str]]]] = [
     ('', [('Home', 'index.md'), ('Getting Started', 'getting-started.md')]),
-    ('User Guide', [
-        ('Loading Data', 'data.md'),
-        ('Transform & Statistics', 'transform.md'),
-        ('Chart Types', 'chart-types.md'),
-        ('Style & Appearance', 'style.md'),
-        ('Axes', 'axes.md'),
-        ('Legend & Notes', 'annotations.md'),
-        ('Series & Curve Fitting', 'series.md'),
+    ('Data', [
+        ('Datasets and Import', 'datasets.md'),
+        ('Generate', 'generate.md'),
+        ('Statistics', 'statistics.md'),
+        ('Transform', 'transform.md'),
+    ]),
+    ('Layout & Style', [
+        ('Figure', 'layout-style.md'),
         ('Subplots', 'subplots.md'),
-        ('Advanced Tools', 'advanced.md'),
+        ('Color Schemes', 'color-schemes.md'),
+        ('Color Palettes', 'palettes.md'),
+    ]),
+    ('Plots', [
+        ('Plot', 'plot.md'),
+        ('Chart Types', 'chart-types.md'),
+        ('Curves and Fitting', 'curves.md'),
+        ('Axes', 'axes.md'),
+        ('Canvas & Grid', 'canvas-grid.md'),
+        ('Legend & Notes', 'legend-notes.md'),
+    ]),
+    ('Tools', [
         ('Seaborn Explorer', 'seaborn-explorer.md'),
         ('Python Code Runner', 'code-runner.md'),
         ('Python Export Bundle', 'python-export.md'),
     ]),
-    ('Reference', [
-        ('File Formats', 'file-formats.md'),
-        ('Color Palettes', 'palettes.md'),
-        ('Keyboard Shortcuts', 'shortcuts.md'),
-    ]),
-    ('Development', [('Building & Packaging', 'building.md')]),
+    ('Reference', [('File Formats', 'file-formats.md'), ('Keyboard Shortcuts', 'shortcuts.md')]),
 ]
 
 

@@ -1,5 +1,7 @@
 # Building & Packaging
 
+For developers. How to publish a release (tag, GitHub Actions) is in [RELEASE.md](RELEASE.md); signing and notarising in [DISTRIBUTION.md](DISTRIBUTION.md).
+
 plotviz ships two build scripts that produce distributable packages from the source tree:
 
 - `create_pkg.sh` — macOS `.app` bundle and `.dmg` disk image

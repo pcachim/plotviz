@@ -101,6 +101,61 @@ class TestChartFigures(unittest.TestCase):
             self.assertIn(f"{n} chart types", (DOCS / name).read_text(encoding="utf-8"), name)
 
 
+class TestInterfaceFigures(unittest.TestCase):
+    """The numbered screenshots of the pages: every zone of a picture is explained, in order."""
+
+    ZONES = DOCS / "images" / "ui" / "zones.json"
+
+    @staticmethod
+    def _norm(text):
+        return re.sub(r"\s+", " ", text.strip().rstrip(":")).lower()
+
+    def _explained(self, key):
+        """The bold titles of the numbered list that follows the picture images/ui/<key>.png."""
+        for md in DOCS.glob("*.md"):
+            text = md.read_text(encoding="utf-8")
+            marker = f"(images/ui/{key}.png)"
+            if marker in text:
+                rest = text.split(marker, 1)[1]
+                titles = []
+                for line in rest.split("\n")[1:]:
+                    m = re.match(r"(\d+)\. \*\*(.+?)\*\* — ", line)
+                    if m:
+                        titles.append((int(m.group(1)), self._norm(m.group(2))))
+                    elif titles and line.strip() == "":
+                        break
+                    elif titles:
+                        break
+                return titles
+        return None
+
+    def test_every_picture_is_in_the_guide_and_every_zone_is_explained(self):
+        import json
+        zones = json.loads(self.ZONES.read_text(encoding="utf-8"))
+        for key, titles in zones.items():
+            with self.subTest(page=key):
+                self.assertTrue((DOCS / "images" / "ui" / f"{key}.png").is_file())
+                explained = self._explained(key)
+                self.assertIsNotNone(explained, f"images/ui/{key}.png is not used in the guide")
+                if titles:
+                    self.assertEqual([t for _, t in explained], [self._norm(t) for t in titles])
+                    self.assertEqual([n for n, _ in explained], list(range(1, len(titles) + 1)))
+
+    def test_the_overview_has_its_five_zones(self):
+        self.assertTrue((DOCS / "images" / "ui" / "overview.png").is_file())
+        self.assertEqual(len(self._explained("overview") or []), 5)
+
+    def test_the_screenshot_script_knows_every_page(self):
+        import importlib.util
+        import json
+        spec = importlib.util.spec_from_file_location("make_doc_screenshots", _ROOT / "util_files" / "make_doc_screenshots.py")
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        zones = json.loads(self.ZONES.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(module.PAGES), sorted(zones))
+
+
 @unittest.skipUnless(_have_real_qt(), "real PyQt6 not available")
 class TestMarkdownPreparation(unittest.TestCase):
     def test_slugify_matches_mkdocs(self):
@@ -166,23 +221,23 @@ class TestHelpWindow(unittest.TestCase):
         from PyQt6.QtCore import QUrl
         self.h.show()
         self.h.open_page("index.md")
-        self.h._link_clicked(QUrl("data.md#date-and-time-columns"))
-        self.assertEqual(self.h.selected_page(), "data.md")
+        self.h._link_clicked(QUrl("datasets.md#date-and-time-columns"))
+        self.assertEqual(self.h.selected_page(), "datasets.md")
         self.assertGreater(self.h.browser.verticalScrollBar().value(), 0)
-        self.assertEqual(self.h.index.currentItem().text(0), "Loading Data")
+        self.assertEqual(self.h.index.currentItem().text(0), "Datasets and Import")
 
     def test_back_and_forward(self):
-        self.h.open_page("data.md")
+        self.h.open_page("datasets.md")
         self.h.open_page("axes.md")
         self.assertTrue(self.h.back_btn.isEnabled())
         self.assertFalse(self.h.fwd_btn.isEnabled())
         self.h.back()
-        self.assertEqual(self.h.selected_page(), "data.md")
+        self.assertEqual(self.h.selected_page(), "datasets.md")
         self.assertTrue(self.h.fwd_btn.isEnabled())
         self.h.forward()
         self.assertEqual(self.h.selected_page(), "axes.md")
         self.h.back()
-        self.h.open_page("style.md")                    # a new page drops what was ahead
+        self.h.open_page("plot.md")                     # a new page drops what was ahead
         self.assertFalse(self.h.fwd_btn.isEnabled())
 
     def test_web_links_open_the_browser_not_a_page(self):

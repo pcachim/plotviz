@@ -1,12 +1,19 @@
-# Advanced
+# Generate
 
-The **Data** tab's **Generate** page provides tools for generating data without loading a file: the **Function Generator** and the **Data Table**. To derive new series from loaded ones, see the **Transform** page in [Transform and Statistics](transform.md).
+The **Data → Generate** page creates series without loading a file: the **y=f(x)**, **z=f(x,y)** and **(u,v)=f(x,y)** generators, and the **Table** for typing values. To derive new series from loaded ones, see [Transform](transform.md).
 
 ---
 
 ## Function Generator
 
 The function generator evaluates a mathematical expression over a range of X values and adds the result as a new dataset.
+
+![The y = f(x) generator](images/ui/generate-fx.png)
+
+The **Generate** page, **y=f(x)**:
+
+1. **Function generator** — The input is either an **x range** (from, to, number of points, spacing and the name of the x column) or an existing **column**; then the expression and the name of the y column. **Generate / Apply** at the bottom creates the columns.
+2. **Preview** — What the button would create. See [Preview](#preview).
 
 ### Controls
 
@@ -64,6 +71,27 @@ Below the expression, a small plot shows what **Generate** would create, without
 
 The other two pages of the generator evaluate an expression of two variables, `x` and `y`, for the **z** column of a surface, or two expressions, `u` and `v`, for the components of a vector field.
 
+![The z = f(x, y) generator](images/ui/generate-fxy.png)
+
+The **z=f(x,y)** page:
+
+1. **z = f(x, y) generator** — **Meshgrid** combines every x with every y.
+2. **x series** — A generated range (with its spacing) or an existing column, and the name of the variable.
+3. **y series** — The same for y.
+4. **z series** — The expression, written with the two variables, and the name of the z column.
+5. **Preview** — The field as contours, or as points when Meshgrid is off.
+
+![The (u, v) = f(x, y) generator](images/ui/generate-fuv.png)
+
+The **(u,v)=f(x,y)** page has the same x and y series, and an expression for each component:
+
+1. **(u, v) = f(x, y) generator** — **Meshgrid** combines every x with every y.
+2. **x series** — A generated range or an existing column.
+3. **y series** — The same for y.
+4. **u series** — The expression and the name of the horizontal component.
+5. **v series** — The expression and the name of the vertical component.
+6. **Preview** — The vector field as arrows.
+
 - Each axis is its own choice: a generated **range** (with its spacing) or an existing **column**, used as it is.
 - **Meshgrid** combines every x with every y (nx × ny points), which is what heatmaps, contours, surfaces and vector fields need. Without it, x and y are paired point by point.
 - The columns created are x and y (only when generated, or with a meshgrid) and z, or u and v. Names already in use get a numeric suffix.
@@ -81,6 +109,10 @@ Both pages have the same **Preview** and **Live** as the function generator, and
 ## Data Table
 
 The data table provides a manual spreadsheet-style entry grid for small datasets.
+
+![The Table page](images/ui/generate-table.png)
+
+The **Table** page: set the number of columns (**Cols**) and rows (**Rows**) and click **New**. Below the table, **+R**, **−R**, **+C** and **−C** add and remove rows and columns, the bin button clears it, the clipboard button pastes CSV text, **Load** opens a CSV or Excel file into the table and **CSV** copies the table to the clipboard as CSV. The sections below explain each one.
 
 ### Creating a table
 

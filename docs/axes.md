@@ -2,6 +2,14 @@
 
 The **Axes** tab controls per-subplot axis configuration: the subplot title, axis labels, limits, scale, ticks, and the secondary Y axis. When the chart has more than one subplot, a **Subplot** selector at the top lets you switch between panels. Changing the selector in the Axes tab automatically syncs with the selectors in the other Plots pages.
 
+![The Axes page](images/ui/axes.png)
+
+From top to bottom (**Equal scale** is at the very top):
+
+1. **X axis** — Label (text, font, size, colour, rotation, position), limits or **auto limits**, the **scale** (linear, log, logit, inverted), tick size, direction, minor ticks, step, format, and where the axis sits.
+2. **Y axis (left)** — The same settings for the left y axis.
+3. **Y axis (right / secondary)** — The same for the secondary axis, active when a series has **Y2** ticked.
+
 ---
 
 ## Subplot title
@@ -85,7 +93,7 @@ The **Formatter** dropdown on each axis controls how tick values are displayed:
 | `{x:.2f}`, `{x:.0f}`, … | any Python format string with `{x}`: `3.14`, `3` |
 | `%Y-%m-%d`, `%d/%m/%Y`, `%b %Y`, `%H:%M`, … | a [date format](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes), for an axis that shows dates |
 
-The dropdown is editable, so you can type any format. Date formats only make sense on an axis that shows a date column; see [Date and time columns](data.md#date-and-time-columns). With **auto**, a date axis picks sensible ticks and labels by itself (years, months, days or hours, depending on the range).
+The dropdown is editable, so you can type any format. Date formats only make sense on an axis that shows a date column; see [Date and time columns](datasets.md#date-and-time-columns). With **auto**, a date axis picks sensible ticks and labels by itself (years, months, days or hours, depending on the range).
 
 ---
 

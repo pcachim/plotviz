@@ -36,21 +36,26 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | Document | Contents |
 |----------|----------|
 | [Getting Started](docs/getting-started.md) | Installation, first chart, interface overview |
-| [Data](docs/data.md) | Loading files, the series table, column types |
-| [Chart Types](docs/chart-types.md) | All 26 chart types and their options |
-| [Style & Appearance](docs/style.md) | Colors, fonts, grid, figure size, color schemes |
-| [Axes](docs/axes.md) | Labels, limits, scales, ticks, formatters |
-| [Legend and Notes](docs/annotations.md) | Legends, text, arrows, images |
-| [Series](docs/series.md) | Per-curve style, markers, curve fitting |
+| [Datasets and Import](docs/datasets.md) | Loading files, import options, date columns |
+| [Generate](docs/generate.md) | Function generators and the manual data table |
+| [Statistics](docs/statistics.md) | Summary table and correlation matrix |
+| [Transform](docs/transform.md) | Smoothing, resampling, calculus, signal analysis |
+| [Layout & Style](docs/layout-style.md) | Figure size, margins, title |
 | [Subplots](docs/subplots.md) | Multi-panel layouts, mosaic, shared axes |
-| [Advanced](docs/advanced.md) | Function generator, manual data entry table |
+| [Color Schemes](docs/color-schemes.md) | Coordinated colour presets |
+| [Color Palettes](docs/palettes.md) | Built-in palettes, custom palettes |
+| [Plot](docs/plot.md) | The series table and plot modes |
+| [Chart Types](docs/chart-types.md) | All 26 chart types and their options |
+| [Curves and Fitting](docs/curves.md) | Per-curve style, markers, curve fitting |
+| [Axes](docs/axes.md) | Labels, limits, scales, ticks, formatters |
+| [Canvas & Grid](docs/canvas-grid.md) | Plot area, borders, grid |
+| [Legend and Notes](docs/legend-notes.md) | Legends, text, arrows, images |
 | [Seaborn Explorer](docs/seaborn-explorer.md) | Statistical charts via seaborn |
 | [Python Code Runner](docs/code-runner.md) | Built-in Python editor with live preview |
 | [Python Export Bundle](docs/python-export.md) | Export charts as standalone Python projects |
 | [File Formats](docs/file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |
-| [Color Palettes](docs/palettes.md) | Built-in palettes, custom palettes |
 | [Keyboard Shortcuts](docs/shortcuts.md) | All keyboard shortcuts |
-| [Building & Packaging](docs/building.md) | macOS .app and Windows .exe |
+| [Building & Packaging](BUILDING.md) | macOS .app and Windows .exe (for developers) |
 
 ---
 

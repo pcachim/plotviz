@@ -4,6 +4,15 @@ The **Legend & Notes** tab manages what is drawn on and around the data: the leg
 
 When the chart has more than one subplot, the **Subplot** selector at the top of the tab switches context. All controls — legend, annotation visibility — apply to the currently selected subplot.
 
+![The Legend & Notes page](images/ui/legend-notes.png)
+
+The page, from top to bottom:
+
+1. **Legend** — Show it, place it (automatically or at coordinates), its font size, columns, frame and colours.
+2. **Place annotation** — Choose what a click on the chart does: nothing (**Normal / Drag**), or add a **Text**, an **Arrow** or an **Image**.
+3. **Style for new annotations** — Font, size and colours of what you add next. Below it you can also type the **position** and click **Place**, and use **Undo last** or **Clear all**.
+4. **Annotations — double-click to edit** — The list of the annotations of this subplot. Double-click one to edit it, or use **Edit selected** and **Delete selected**.
+
 ---
 
 ## Legend

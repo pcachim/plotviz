@@ -46,37 +46,41 @@ See [Getting Started](getting-started.md) for full setup instructions.
 
     Install plotviz and create your first chart in minutes.
 
-- :material-table: **[Loading Data](data.md)**
+- :material-table: **[Data](datasets.md)**
 
-    Load CSV, Excel, JSON or TXT files and build the series table.
+    Load files, generate series, summarise them and transform them.
 
-- :material-chart-line: **[Chart Types](chart-types.md)**
+- :material-chart-line: **[Plot and Chart Types](plot.md)**
 
-    Reference for all 26 chart types and their options.
+    The series table and the reference for all 26 chart types.
 
-- :material-palette: **[Style & Appearance](style.md)**
+- :material-chart-scatter-plot: **[Curves and Fitting](curves.md)**
 
-    Colors, themes, grid, figure size, and color schemes.
+    Per-curve style and curve fitting with confidence and prediction bands.
 
 - :material-axis-arrow: **[Axes](axes.md)**
 
     Labels, limits, scales, ticks, formatters, secondary Y axis.
 
-- :material-text-box: **[Legend and Notes](annotations.md)**
+- :material-grid: **[Canvas & Grid](canvas-grid.md)**
 
-    Subplot titles, legends, text, arrows, and images.
+    Plot area colour, borders and grid of each subplot.
 
-- :material-chart-scatter-plot: **[Series & Curve Fitting](series.md)**
+- :material-text-box: **[Legend and Notes](legend-notes.md)**
 
-    Per-curve style and 7 curve-fit models.
+    Legends, text, arrows, and images.
+
+- :material-page-layout-body: **[Layout & Style](layout-style.md)**
+
+    Figure size, margins, title position.
 
 - :material-view-grid: **[Subplots](subplots.md)**
 
     Multi-panel layouts and mosaic editor.
 
-- :material-function: **[Advanced Tools](advanced.md)**
+- :material-palette: **[Color Schemes and Palettes](color-schemes.md)**
 
-    Function generator and manual data table.
+    Coordinated colour presets and the colour cycle of the curves.
 
 - :material-file: **[File Formats](file-formats.md)**
 
@@ -85,10 +89,6 @@ See [Getting Started](getting-started.md) for full setup instructions.
 - :material-keyboard: **[Keyboard Shortcuts](shortcuts.md)**
 
     All keyboard shortcuts and canvas controls.
-
-- :material-package-variant: **[Building & Packaging](building.md)**
-
-    Create macOS .app and Windows .exe distributions.
 
 </div>
 

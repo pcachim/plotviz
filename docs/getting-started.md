@@ -68,6 +68,16 @@ You can also double-click a `.pviz`, `.pvizt`, `.pvizc` or `.pvizp` file in Find
 
 ## Interface overview
 
+![The plotviz window](images/ui/overview.png)
+
+The window has five zones:
+
+1. **Menu bar** — **File** (open, save, export), **Edit** (undo, redo, copy the chart as an image), **View**, **Tools** and **Help**. On macOS, *About* and *Preferences* are under the **plotviz** menu.
+2. **Top bar** — **New**, **Open**, **Save**, **Export**, and **Undo** / **Redo** for the last changes.
+3. **Panel tabs** — **Data**, **Layout & Style** and **Plots**: all the settings of the chart. Each has its own pages, described in the User Guide.
+4. **Canvas toolbar** — The matplotlib tools for the preview: home, back and forward, pan, zoom and the others.
+5. **Chart preview** — The chart as it will be exported. It redraws as you change settings. The dashed rectangle is the edge of the page (the figure size set in **Layout & Style**).
+
 The plotviz window has two main areas:
 
 **Left panel — tabs**
@@ -130,5 +140,15 @@ plotviz stores user preferences in a JSON file:
 | Windows | `%APPDATA%\plotviz\settings.json` |
 
 Stored preferences include the last-used directory, theme (System/Light/Dark), recent files list (up to 12), recent colors; your colour schemes and palettes are files in the `schemes` and `palettes` folders beside it, and window geometry.
+
+### Appearance (light and dark)
+
+The **Colour scheme** dropdown in the Preferences window (**plotviz → Preferences…** on macOS, **Edit → Settings…** on Windows and Linux) controls the application's light and dark mode:
+
+- **System** — follows the OS theme (default).
+- **Light** — forces the light theme.
+- **Dark** — forces the dark theme.
+
+This changes the application only, not the chart colours, which are set with [Color Schemes](color-schemes.md) and the Layout & Style tab.
 
 To reset all settings to defaults, delete the `settings.json` file and restart the app.

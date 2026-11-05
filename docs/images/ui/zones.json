@@ -1,0 +1,68 @@
+{
+  "datasets": [
+    "DATASETS"
+  ],
+  "generate-fx": [
+    "FUNCTION GENERATOR",
+    "PREVIEW"
+  ],
+  "generate-fxy": [
+    "Z = F(X, Y)  GENERATOR",
+    "X SERIES",
+    "Y SERIES",
+    "Z SERIES",
+    "PREVIEW"
+  ],
+  "generate-fuv": [
+    "(U, V) = F(X, Y)  GENERATOR",
+    "X SERIES",
+    "Y SERIES",
+    "U SERIES",
+    "V SERIES",
+    "PREVIEW"
+  ],
+  "generate-table": [],
+  "statistics": [
+    "SUMMARY",
+    "CORRELATION"
+  ],
+  "transform": [
+    "SERIES",
+    "OPERATION",
+    "PREVIEW",
+    "RESULT"
+  ],
+  "layout": [
+    "FIGURE",
+    "MARGINS",
+    "SUBPLOTS",
+    "TITLE",
+    "POSITION & ROTATION",
+    "COLORS",
+    "COLOR SCHEMES",
+    "COLOUR PALETTE"
+  ],
+  "plot": [
+    "PLOT MODE",
+    "SERIES"
+  ],
+  "curves": [
+    "PER-CURVE",
+    "CURVE FIT (LINE / SCATTER)"
+  ],
+  "axes": [
+    "X AXIS",
+    "Y AXIS (LEFT)",
+    "Y AXIS (RIGHT / SECONDARY)"
+  ],
+  "canvas-grid": [
+    "CHART CANVAS",
+    "GRID"
+  ],
+  "legend-notes": [
+    "LEGEND",
+    "PLACE ANNOTATION",
+    "Style for new annotations",
+    "Annotations — double-click to edit"
+  ]
+}

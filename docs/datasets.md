@@ -1,6 +1,12 @@
-# Data
+# Datasets and Import
 
-## Loading files
+The **Data → Datasets** page loads your files and lists every column the chart can use.
+
+![The Datasets page](images/ui/datasets.png)
+
+The **Datasets** page of the Data tab:
+
+1. **Datasets** — **Browse Files** opens the import dialog. The list below shows every column loaded, from files and also those created by Generate, Transform and curve fits; select one or more to act on them. **Remove selected** deletes the selected columns, **Inspect values** shows a summary and lets you edit them.
 
 Open the **Data** tab and click **Browse Files** to load one or more data files. Supported formats:
 
@@ -54,49 +60,4 @@ Select one or more entries in the **Datasets** list and click **Remove selected*
 
 Select a column (or multiple columns) in the Datasets list and click **Inspect values** to see a summary: count, min, max, mean, and a preview of the first values.
 
-For a full summary (quartiles, standard deviation, skewness, correlation between series), use the **Statistics** page; to create new series from existing ones (smoothing, derivatives, resampling…), use the **Transform** page. See [Transform and Statistics](transform.md).
-
----
-
-## The series table
-
-The series table in the **Data** tab maps data columns to visual series. Each row is one plotted series.
-
-| Column | Purpose |
-|--------|---------|
-| **X** | Column used as the horizontal axis values |
-| **Y** | Column used as the vertical axis values |
-| **Label** | Text shown in the chart legend |
-| **Type** | Chart type for this series (Line, Scatter, Bar, …) |
-| **Plot #** | Which subplot panel this series appears in (1-based) |
-| **Y2** | Checkbox — plots this series on the secondary Y axis |
-
-### Adding and removing series
-
-- **+ Add series** — appends a new row with empty column selections.
-- **✕** button on a row — removes that series.
-
-### Mixing chart types
-
-Each row in the series table has its own **Type** dropdown, so you can mix chart types within the same panel — for example, a Line series and a Scatter series sharing the same axes.
-
-Types that take over the whole chart (Histogram, Pie, Heatmap, etc.) cannot be mixed with other types in the same subplot.
-
-### Secondary Y axis (Y2)
-
-Tick the **Y2** checkbox on any series row to plot it against a second Y axis on the right side of the chart. The Y2 axis label is set in the **Axes** tab.
-
-### Z column and error column
-
-Below the series table are two extra dropdowns:
-
-- **Z** — used by Heatmap, Hist2D, Hexbin, Contour, and Bubble charts as the third data dimension.
-- **Error** — used by the Errorbar chart as the error/uncertainty values.
-
----
-
-## Chart type selection
-
-The **Chart type** dropdown at the top of **Plots → Plot** sets the default type for the entire chart. Individual series can override this with their own Type cell.
-
-See [Chart Types](chart-types.md) for a full description of every chart type and its options.
+For a full summary (quartiles, standard deviation, skewness, correlation between series), use the **Statistics** page; to create new series from existing ones (smoothing, derivatives, resampling…), use the **Transform** page. See [Statistics](statistics.md) and [Transform](transform.md).

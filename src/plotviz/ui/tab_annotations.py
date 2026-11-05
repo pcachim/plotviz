@@ -222,7 +222,9 @@ class AnnotationsTabMixin(MixinBase):
         lrow('Img zoom:', self.ann_image_zoom)
 
         layout.addWidget(self._hline())
-        layout.addWidget(QLabel('Style for new annotations:'))
+        style_lbl = QLabel('Style for new annotations:')
+        style_lbl.setProperty('section', True)      # numbered in the documentation screenshots
+        layout.addWidget(style_lbl)
 
         self.ann_font = QComboBox()
         self.ann_font.addItems(_FONTS)
@@ -274,7 +276,9 @@ class AnnotationsTabMixin(MixinBase):
         irow(btn_undo, btn_clear)
 
         layout.addWidget(self._hline())
-        layout.addWidget(QLabel('Annotations — double-click to edit:'))
+        list_lbl = QLabel('Annotations — double-click to edit:')
+        list_lbl.setProperty('section', True)
+        layout.addWidget(list_lbl)
         self.ann_list_widget = QListWidget()
         self.ann_list_widget.setMaximumHeight(120)
         self.ann_list_widget.itemDoubleClicked.connect(self._edit_selected_annotation)
