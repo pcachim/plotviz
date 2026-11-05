@@ -101,6 +101,32 @@ class TestChartFigures(unittest.TestCase):
             self.assertIn(f"{n} chart types", (DOCS / name).read_text(encoding="utf-8"), name)
 
 
+class TestTransformFigures(unittest.TestCase):
+    """The figures of the Transform page: the script, the files and the page agree."""
+
+    def test_every_figure_of_the_script_is_in_the_page(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("make_doc_transforms", _ROOT / "util_files" / "make_doc_transforms.py")
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        text = (DOCS / "transform.md").read_text(encoding="utf-8")
+        for name in module.GROUPS:
+            with self.subTest(figure=name):
+                self.assertTrue((DOCS / "images" / "transform" / f"{name}.png").is_file())
+                self.assertIn(f"(images/transform/{name}.png)", text)
+
+    def test_the_figures_use_the_operations_of_the_app(self):
+        # The script draws what apply_operation returns, so these keys must exist.
+        from data.transforms import OPERATIONS
+        keys = {op["key"] for op in OPERATIONS}
+        source = (_ROOT / "util_files" / "make_doc_transforms.py").read_text(encoding="utf-8")
+        import re
+        used = set(re.findall(r'"(moving_average|median_filter|exponential_smooth|savitzky_golay|gaussian_smooth|butterworth|every_n|block_average|decimate|resample_uniform|fft_spectrum|peaks)"', source))
+        self.assertEqual(len(used), 12)
+        self.assertTrue(used <= keys)
+
+
 class TestInterfaceFigures(unittest.TestCase):
     """The numbered screenshots of the pages: every zone of a picture is explained, in order."""
 
@@ -215,7 +241,7 @@ class TestHelpWindow(unittest.TestCase):
                 it += 1
             block = block.next()
         self.assertEqual(len(widths), 26)
-        self.assertLessEqual(max(widths), 520)
+        self.assertLessEqual(max(widths), 760)
 
     def test_a_link_to_a_heading_scrolls_to_it(self):
         from PyQt6.QtCore import QUrl

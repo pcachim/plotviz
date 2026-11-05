@@ -66,6 +66,10 @@ Some operations change the number or position of the points (decimating, croppin
 
 ### Smoothing
 
+![Six smoothing operations on the same signal](images/transform/smoothing.png)
+
+The same signal — a slow wave, a narrow bump at t = 7 s, a two-point spike and noise — smoothed six ways (grey: the original; orange: the result). The moving median ignores the spike, which the other filters turn into a bump. The moving average and Savitzky-Golay keep the height of the narrow bump best in this example; the Gaussian and the Butterworth filter round it off more.
+
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
 | Moving average | Window, centered/trailing, ends | Ends: `partial` averages the points that exist, `nan` leaves NaN where the window is incomplete, `trim` removes those points (and their x) |
@@ -76,6 +80,10 @@ Some operations change the number or position of the points (decimating, croppin
 | Low/high-pass filter (Butterworth) | Type, cutoff, order | Zero-phase. The cutoff is in cycles per x unit (cycles per point with no x) and must be below half the sampling rate. x should be evenly spaced and y must have no NaN |
 
 ### Reduce and resample
+
+![Reducing a signal, and resampling uneven samples](images/transform/resample.png)
+
+A 0.4 Hz wave plus a 7.3 Hz one, sampled at 50 Hz, reduced to a tenth of the points. **Every N points** just keeps one point in ten, so the fast component is folded into a false slow wave (aliasing). **Block average** averages each block and lowers the amplitude. **Decimate** filters first, so only the real slow wave is left. The last panel shows unevenly spaced samples put on a uniform x grid with **Resample**.
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
@@ -127,6 +135,10 @@ Some operations change the number or position of the points (decimating, croppin
 | Running minimum / maximum | — | Cumulative: the smallest or largest value so far |
 
 ### Signal analysis
+
+![The FFT spectrum and Find peaks](images/transform/signal-analysis.png)
+
+Left: the spectrum of the 0.4 Hz plus 7.3 Hz signal above, with one line at each frequency and the amplitudes 1 and 0.5. Right: **Find peaks** on the `pulse_signal.csv` sample, with the threshold set to 5 times the noise, finds the two pulses and nothing in the noise.
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|

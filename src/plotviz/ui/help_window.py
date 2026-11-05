@@ -232,7 +232,7 @@ class HelpWindow(QDialog):
             block = block.next()
         cursor.endEditBlock()
 
-    def _size_images(self, max_width: int = 520):
+    def _size_images(self, max_width: int = 760):
         """Figures are shown at most *max_width* px wide (they are saved larger, for the site)."""
         doc = self.browser.document()
         if doc is None or not self._folder:
