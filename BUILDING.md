@@ -59,7 +59,19 @@ chmod +x create_pkg.sh
 2. `pyinstaller plotviz.spec` — builds the `.app` bundle.
 3. Copies file-type icons (`pviz.icns`, `pvizt.icns`, `pvizc.icns`, `pvizp.icns`) into the bundle's Resources folder.
 4. Code-signs the bundle with an ad-hoc signature (`codesign --force --deep -s -`).
-5. Optionally creates a `.dmg` with `create-dmg`.
+5. Optionally creates a `.dmg` with `create-dmg`, on the fixed background of `assets/` (see below).
+
+### The disk image background
+
+The picture behind the two icons of the `.dmg` is **not drawn at build time**: it is the pair `assets/background.png` (600×400) and `assets/background@2x.png` (1200×800), kept in the repository, so a build never changes a file that is tracked. `create_pkg.sh` joins the two into one HiDPI image with `tiffutil`, so Finder shows the sharp one on a Retina screen (without `tiffutil` or `sips` it uses the 600×400 one). The version is in the name of the `.dmg`, not in the picture.
+
+To change the look, edit `util/make_dmg_background.py` (opacity, blur, arrow, text) and run it, then commit the two PNG files:
+
+```bash
+uv run python util/make_dmg_background.py
+```
+
+The picture is a faint copy of the chart gallery of `docs/images/ui/home.png`. The icons of the window are at (150, 200) and (450, 200) on the 600×400 window (the `--icon` and `--app-drop-link` of `create_pkg.sh`); the arrow is drawn between them.
 
 ### File-type registration
 

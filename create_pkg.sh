@@ -97,30 +97,24 @@ echo "▶ Removing quarantine attributes..."
 xattr -cr "$APP"
 
 # ── DMG background ────────────────────────────────────────────────────────────
+# A fixed picture, drawn once by util/make_dmg_background.py (assets/background.png at
+# 600x400 and assets/background@2x.png at 1200x800) and kept in the repository: nothing is
+# regenerated here.  The two are joined into one HiDPI image so that Finder shows the sharp
+# one on a Retina screen; without tiffutil or sips the plain 600x400 picture is used.
 echo ""
-echo "▶ Generating DMG background..."
-mkdir -p "$ASSETS_DIR"
-
-uv run python - <<EOF
-from PIL import Image, ImageDraw, ImageFont
-import pathlib
-
-W, H = 600, 400
-img  = Image.new("RGB", (W, H), (245, 246, 248))
-draw = ImageDraw.Draw(img)
-font = ImageFont.load_default()
-
-draw.text((195, 40),  "Install $APP_NAME $VERSION", (30, 30, 30),  font=font)
-draw.text((135, 330), "Drag the application to Applications", (90, 90, 90), font=font)
-
-# Arrow
-draw.line(   (260, 200, 340, 200), fill=(120, 120, 120), width=6)
-draw.polygon([(340, 200), (320, 185), (320, 215)], fill=(120, 120, 120))
-
-pathlib.Path("$ASSETS_DIR").mkdir(parents=True, exist_ok=True)
-img.save("$ASSETS_DIR/background.png")
-print("  background.png written")
-EOF
+echo "▶ Preparing the DMG background..."
+BACKGROUND="$ASSETS_DIR/background.png"
+if [ -f "$ASSETS_DIR/background@2x.png" ] && command -v tiffutil &>/dev/null && command -v sips &>/dev/null; then
+    _BG_TMP="$(mktemp -d /tmp/plotviz_bg_XXXXXX)"
+    sips -s format tiff -s dpiWidth 72  -s dpiHeight 72  "$ASSETS_DIR/background.png"    --out "$_BG_TMP/bg.tiff"    >/dev/null 2>&1 || true
+    sips -s format tiff -s dpiWidth 144 -s dpiHeight 144 "$ASSETS_DIR/background@2x.png" --out "$_BG_TMP/bg@2x.tiff" >/dev/null 2>&1 || true
+    if tiffutil -cathidpicheck "$_BG_TMP/bg.tiff" "$_BG_TMP/bg@2x.tiff" -out "$_BG_TMP/background.tiff" >/dev/null 2>&1; then
+        BACKGROUND="$_BG_TMP/background.tiff"
+        echo "   HiDPI background ready."
+    else
+        echo "   ⚠️  tiffutil could not join the two pictures — using the 600x400 one."
+    fi
+fi
 
 # ── Create DMG ────────────────────────────────────────────────────────────────
 echo ""
@@ -139,7 +133,7 @@ else
         --icon "$APP_NAME.app" 150 200 \
         --hide-extension "$APP_NAME.app" \
         --app-drop-link 450 200 \
-        --background "$ASSETS_DIR/background.png" \
+        --background "$BACKGROUND" \
         "$DMG" \
         "$APP"
 
