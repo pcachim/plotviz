@@ -96,17 +96,25 @@ A 0.4 Hz wave plus a 7.3 Hz one, sampled at 50 Hz, reduced to a tenth of the poi
 
 ### Calculus
 
+![A series and five calculus operations](images/transform/calculus.png)
+
+One smooth series (top left) and five operations on it. The **derivative** and the **second derivative** are its slope and curvature (the second derivative of 2 + sin t + 0.2t is −sin t). The **cumulative integral** is the area so far, starting at 0. **Difference** is the change from one point to the next, and **Percent change** the same relative to the previous value; the first point of both is NaN.
+
 | Operation | Notes |
 |-----------|-------|
 | Derivative dy/dx | Central differences |
 | Second derivative d2y/dx2 | Needs at least 3 points |
-| Integral (cumulative) | Starts at | Trapezoid rule; the running total starts at the value you give (the constant of integration, 0 by default) |
+| Integral (cumulative) | Trapezoid rule; the running total starts at the value you give in **Starts at** (the constant of integration, 0 by default) |
 | Difference | `y[i] − y[i−1]`; the first point is NaN |
 | Percent change | `100·(y[i] − y[i−1]) / abs(y[i−1])`; the first point is NaN |
 | Log return | `ln(y[i] / y[i−1])`; all values must be positive |
 | Cumulative sum | Running total |
 
 ### Scale and baseline
+
+![Scaling and baseline operations on a series with an offset, a drift and a peak](images/transform/scale-baseline.png)
+
+A series with an offset, a drift and a peak. **Normalize** rescales it to 0–1 (*min-max*) or to mean 0 and standard deviation 1 (*z-score*). **Subtract baseline** with *mean of range* takes a quiet stretch (x from 0 to 2) as the zero, which removes the offset but not the drift. **Remove trend** fits a straight line only on x from 0 to 4, before the peak, so that the peak does not tilt it, and subtracts it from the whole series. **Scale and shift** applies a·y + b.
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
@@ -118,6 +126,10 @@ A 0.4 Hz wave plus a 7.3 Hz one, sampled at 50 Hz, reduced to a tenth of the poi
 
 ### Cleaning
 
+![Cleaning a series with gaps and outliers](images/transform/cleaning.png)
+
+A series with two gaps (NaN) and three outliers; grey is the original. **Remove NaN** drops the missing points, so the line jumps across each gap, while **Interpolate NaN** keeps every point and fills the gaps linearly. **Limit to a range** clips the outliers to the limits. The **Hampel filter** replaces them by the local median and leaves the other points as they were. The last panel shows points that arrive out of order, and **Sort by x** putting them right.
+
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|
 | Remove NaN | — | Drops points where y or x is NaN/inf, from both series |
@@ -127,6 +139,10 @@ A 0.4 Hz wave plus a 7.3 Hz one, sampled at 50 Hz, reduced to a tenth of the poi
 | Outlier filter (Hampel) | Window, sigmas | Replaces a point by the local median when it is more than *sigmas* robust standard deviations away from it |
 
 ### Rolling statistics
+
+![Rolling and running statistics of a noisy signal](images/transform/rolling.png)
+
+A noisy signal. The **rolling standard deviation** shows where it varies most. The **rolling minimum and maximum** draw an envelope that follows the signal. The **running** minimum and maximum never go back: they are the smallest and largest values so far.
 
 | Operation | Parameters | Notes |
 |-----------|-----------|-------|

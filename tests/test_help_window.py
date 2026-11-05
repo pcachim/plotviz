@@ -116,15 +116,19 @@ class TestTransformFigures(unittest.TestCase):
                 self.assertTrue((DOCS / "images" / "transform" / f"{name}.png").is_file())
                 self.assertIn(f"(images/transform/{name}.png)", text)
 
-    def test_the_figures_use_the_operations_of_the_app(self):
-        # The script draws what apply_operation returns, so these keys must exist.
-        from data.transforms import OPERATIONS
-        keys = {op["key"] for op in OPERATIONS}
-        source = (_ROOT / "util_files" / "make_doc_transforms.py").read_text(encoding="utf-8")
-        import re
-        used = set(re.findall(r'"(moving_average|median_filter|exponential_smooth|savitzky_golay|gaussian_smooth|butterworth|every_n|block_average|decimate|resample_uniform|fft_spectrum|peaks)"', source))
-        self.assertEqual(len(used), 12)
-        self.assertTrue(used <= keys)
+    def test_the_script_runs_with_the_parameters_of_the_current_operations(self):
+        # Rendering the figures calls apply_operation with every operation they show, so a
+        # renamed operation or parameter makes this fail (into a temporary folder).
+        import importlib.util
+        import tempfile
+        spec = importlib.util.spec_from_file_location("make_doc_transforms", _ROOT / "util_files" / "make_doc_transforms.py")
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as folder:
+            module.OUT = Path(folder)
+            self.assertEqual(module.main([]), 0)
+            self.assertEqual(sorted(p.stem for p in Path(folder).glob("*.png")), sorted(module.GROUPS))
 
 
 class TestInterfaceFigures(unittest.TestCase):
