@@ -1220,6 +1220,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../digitize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Digitize Image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1631,6 +1659,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#digitize-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Digitize Image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1812,6 +1851,17 @@
     <span class="md-ellipsis">
       
         Python Code Runner
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#digitize-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Digitize Image
       
     </span>
   </a>
@@ -2067,6 +2117,45 @@
 <tr>
 <td>The <strong>Runtime Error</strong> panel</td>
 <td>It shows the traceback of your code; the last line is the error and the one above it the line that caused it. <strong>Copy</strong> puts it on the clipboard</td>
+</tr>
+</tbody>
+</table>
+<h2 id="digitize-image">Digitize Image<a class="headerlink" href="#digitize-image" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Message or problem</th>
+<th>Cause and what to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Set the X point 1.</strong> / <strong>Type the value of …</strong></td>
+<td>The calibration is not complete. Each axis needs two points marked on the image and their values typed; in the rotated mode, three points with both values</td>
+</tr>
+<tr>
+<td><strong>… the two reference points are at the same position</strong> / <strong>the two reference values are equal</strong></td>
+<td>The two points of an axis must be apart, with different values. Mark them near the two ends of the axis</td>
+</tr>
+<tr>
+<td><strong>a logarithmic axis needs positive reference values</strong></td>
+<td>Use values above zero for a logarithmic axis, or untick the option</td>
+</tr>
+<tr>
+<td><strong>the reference points are on one line</strong></td>
+<td>In the rotated mode the three points must not be on a straight line; spread them over the plot</td>
+</tr>
+<tr>
+<td><strong>No pixel of that colour was found</strong></td>
+<td>Raise the tolerance (±), or pick the colour again by clicking on the middle of the curve</td>
+</tr>
+<tr>
+<td>Trace adds points that are not on the curve</td>
+<td>The legend, the grid or another curve has a similar colour. Lower the tolerance, or remove the extra points with a right-click</td>
+</tr>
+<tr>
+<td>The values are a little off</td>
+<td>The picture is small: a point is read to a pixel. Use a larger version of the figure and zoom in before clicking</td>
 </tr>
 </tbody>
 </table>
