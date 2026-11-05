@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QDesktopServices, QFontDatabase, QTextCharFormat, QTextCursor, QTextFormat
+from PyQt6.QtGui import QDesktopServices, QFontDatabase, QImage, QTextCharFormat, QTextCursor, QTextFormat
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSplitter, QTextBrowser,
     QTreeWidget, QTreeWidgetItem, QVBoxLayout,
@@ -175,9 +175,12 @@ class HelpWindow(QDialog):
     def open_page(self, page: str, anchor: str = '', remember: bool = True):
         """Show *page* (a file of docs/), scrolled to the heading *anchor* when given."""
         if page != self._page:
+            if self._folder:
+                self.browser.setSearchPaths([str(self._folder)])      # images/… are relative to docs/
             self.browser.setMarkdown(prepare_markdown(self._read(page)) or f'*{page} is not available.*')
             self._page = page
             self._style_code()
+            self._size_images()
             item = self._items.get(page)
             if item:
                 self.index.setCurrentItem(item)
@@ -222,6 +225,30 @@ class HelpWindow(QDialog):
                 it += 1
             block = block.next()
         cursor.endEditBlock()
+
+    def _size_images(self, max_width: int = 520):
+        """Figures are shown at most *max_width* px wide (they are saved larger, for the site)."""
+        doc = self.browser.document()
+        if doc is None or not self._folder:
+            return
+        block = doc.begin()
+        while block.isValid():
+            it = block.begin()
+            while not it.atEnd():
+                frag = it.fragment()
+                fmt = frag.charFormat()
+                if frag.isValid() and fmt.isImageFormat():
+                    image = fmt.toImageFormat()
+                    picture = QImage(str(self._folder / image.name()))
+                    if not picture.isNull() and picture.width() > max_width:
+                        image.setWidth(max_width)
+                        image.setHeight(round(picture.height() * max_width / picture.width()))
+                        sel = QTextCursor(doc)
+                        sel.setPosition(frag.position())
+                        sel.setPosition(frag.position() + frag.length(), QTextCursor.MoveMode.KeepAnchor)
+                        sel.setCharFormat(image)
+                it += 1
+            block = block.next()
 
     def _scroll_to(self, anchor: str):
         doc = self.browser.document()

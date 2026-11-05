@@ -6,7 +6,7 @@
 
 ## Highlights
 
-- **22 chart types** — Line, Scatter, Bar, Histogram, Boxplot, Violin, Pie, Polar, Radar, Heatmap, Contour, 3D Surface, and more
+- **26 chart types** — Line, Scatter, Bar, Histogram, Boxplot, Violin, Pie, Polar, Radar, Heatmap, Contour, 3D Surface, and more
 - **Curve fitting** — 7 built-in models (Linear, Quadratic, Cubic, Exponential, Power Law, Logarithmic, Sigmoid) with confidence and prediction bands
 - **Multi-panel layouts** — 18 preset mosaic layouts plus a custom mosaic editor; each subplot is independently configured
 - **Full style control** — 10 built-in color schemes, 11 color palettes, per-curve style, grid, borders, fonts, and margins
@@ -52,7 +52,7 @@ See [Getting Started](getting-started.md) for full setup instructions.
 
 - :material-chart-line: **[Chart Types](chart-types.md)**
 
-    Reference for all 22 chart types and their options.
+    Reference for all 26 chart types and their options.
 
 - :material-palette: **[Style & Appearance](style.md)**
 

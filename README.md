@@ -8,7 +8,7 @@
 
 ## Features
 
-- **22 chart types** — line, scatter, bar, area, histogram, box, violin, heatmap, waterfall, bubble, and more, with per-series mixing in multi-panel layouts
+- **26 chart types** — line, scatter, bar, area, histogram, box, violin, heatmap, waterfall, bubble, and more, with per-series mixing in multi-panel layouts
 - **Seaborn Explorer** — dedicated dialog for statistical charts (KDE, regression, pairplot, joint, catplot, and more), fully isolated from the main canvas
 - **Python Code Runner** — write and run arbitrary matplotlib/seaborn code in a built-in editor with a live preview pane
 - **Python Export Bundle** — export any chart as a self-contained `.pvizx` ZIP with a standalone `plot.py` script and data CSVs; no plotviz dependency required to re-run
@@ -37,7 +37,7 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 |----------|----------|
 | [Getting Started](docs/getting-started.md) | Installation, first chart, interface overview |
 | [Data](docs/data.md) | Loading files, the series table, column types |
-| [Chart Types](docs/chart-types.md) | All 22 chart types and their options |
+| [Chart Types](docs/chart-types.md) | All 26 chart types and their options |
 | [Style & Appearance](docs/style.md) | Colors, fonts, grid, figure size, color schemes |
 | [Axes](docs/axes.md) | Labels, limits, scales, ticks, formatters |
 | [Legend and Notes](docs/annotations.md) | Legends, text, arrows, images |

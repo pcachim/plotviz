@@ -62,6 +62,46 @@ class TestDocsContent(unittest.TestCase):
 
 
 @unittest.skipUnless(_have_real_qt(), "real PyQt6 not available")
+class TestChartFigures(unittest.TestCase):
+    """Each chart type has a section in chart-types.md with its figure."""
+
+    def _types(self):
+        from ui.tab_builders import PLOT_MODE_GROUPS
+        return [t for types in PLOT_MODE_GROUPS.values() for t in types]
+
+    def test_every_image_in_the_docs_exists(self):
+        missing = []
+        for md in sorted(DOCS.glob("*.md")):
+            for target in re.findall(r"!\[[^\]]*\]\(([^)\s]+)\)", md.read_text(encoding="utf-8")):
+                if not target.startswith("http") and not (DOCS / target).is_file():
+                    missing.append(f"{md.name}: {target}")
+        self.assertEqual(missing, [])
+
+    def test_every_chart_type_has_a_section_and_a_figure(self):
+        text = (DOCS / "chart-types.md").read_text(encoding="utf-8")
+        for chart_type in self._types():
+            with self.subTest(chart_type=chart_type):
+                self.assertRegex(text, rf"(?m)^### {re.escape(chart_type)}\n\n!\[[^\]]*\]\(images/charts/[\w-]+\.png\)")
+
+    def test_the_image_script_covers_every_chart_type(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("make_doc_images", _ROOT / "util_files" / "make_doc_images.py")
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(sorted(module.CHART_SAMPLES), sorted(self._types()))
+        for sample in module.CHART_SAMPLES.values():
+            self.assertTrue((_ROOT / "data" / "plots" / sample).is_file(), sample)
+        for chart_type in self._types():
+            self.assertTrue((DOCS / "images" / "charts" / f"{module.slug(chart_type)}.png").is_file(), chart_type)
+
+    def test_the_count_in_the_text_is_the_number_of_types(self):
+        n = len(self._types())
+        for name in ("chart-types.md", "index.md"):
+            self.assertIn(f"{n} chart types", (DOCS / name).read_text(encoding="utf-8"), name)
+
+
+@unittest.skipUnless(_have_real_qt(), "real PyQt6 not available")
 class TestMarkdownPreparation(unittest.TestCase):
     def test_slugify_matches_mkdocs(self):
         from ui.help_window import slugify
@@ -106,6 +146,21 @@ class TestHelpWindow(unittest.TestCase):
                     self.assertGreater(len(self.h.browser.toPlainText()), 200, page)
                     self.assertNotIn(":material", self.h.browser.toPlainText())
                     self.assertNotIn("!!!", self.h.browser.toPlainText())
+
+    def test_the_figures_are_shown_and_not_wider_than_the_page(self):
+        self.h.open_page("chart-types.md")
+        doc = self.h.browser.document()
+        widths, block = [], doc.begin()
+        while block.isValid():
+            it = block.begin()
+            while not it.atEnd():
+                fmt = it.fragment().charFormat()
+                if fmt.isImageFormat():
+                    widths.append(fmt.toImageFormat().width())
+                it += 1
+            block = block.next()
+        self.assertEqual(len(widths), 26)
+        self.assertLessEqual(max(widths), 520)
 
     def test_a_link_to_a_heading_scrolls_to_it(self):
         from PyQt6.QtCore import QUrl
