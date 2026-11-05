@@ -16,6 +16,7 @@
 - **Seaborn Explorer** — dedicated dialog for statistical charts (KDE, regression, pairplot, joint, catplot, and more), fully isolated from the main canvas
 - **Python Code Runner** — write and run arbitrary matplotlib/seaborn code in a built-in editor with a live preview pane
 - **Digitize Image** — read the values of a chart that is only a picture: calibrate the axes (straight, rotated or tilted pictures), click on the curves or let plotviz follow their colour, and add them as columns
+- **Command line** — `plotviz render chart.pviz -o figure.pdf` draws saved charts to image files without opening the program, to redo every figure of a paper with one command
 - **Python Export Bundle** — export any chart as a self-contained `.pvizx` ZIP with a standalone `plot.py` script and data CSVs; no plotviz dependency required to re-run
 - **Subplots & mosaic layouts** — multi-panel figures with shared axes and custom grid arrangements
 - **Data tools** — generate series from expressions, summaries and correlations, and 36 Transform operations (smoothing, resampling, calculus, peaks, FFT) with a live preview
@@ -64,6 +65,7 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | [Digitize Image](docs/digitize.md) | Read values off a picture of a chart |
 | [Export Image](docs/export.md) | Formats, resolution, clipboard, one file per subplot |
 | [Python Export Bundle](docs/python-export.md) | Export charts as standalone Python projects |
+| [Command Line](docs/command-line.md) | Draw saved charts to image files from a script |
 | [File Formats](docs/file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |
 | [Licenses](docs/licenses.md) | The licence of plotviz and of what it contains |
 | [Troubleshooting](docs/troubleshooting.md) | The messages of the app and what to do |

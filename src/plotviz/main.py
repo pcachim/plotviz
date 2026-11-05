@@ -180,6 +180,10 @@ def _ensure_user_data(log_dir: 'Path') -> None:
 
 
 def main():
+    # `plotviz render chart.pviz -o figure.pdf`: draw charts without opening the program
+    if len(sys.argv) > 1 and sys.argv[1] == 'render':
+        from cli import render_main
+        sys.exit(render_main(sys.argv[2:]))
     _set_win_appusermodel_id()   # must be before QApplication on Windows
 
     # ── Logging ───────────────────────────────────────────────────────────────

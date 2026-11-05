@@ -1477,7 +1477,9 @@ class SerializationMixin(MixinBase):
     def _load_project_inner(self, fp: str, silent: bool = False):
         """Core logic for loading a .pviz archive.
         Pass silent=True to suppress all QMessageBox dialogs (e.g. on startup).
+        A failure is kept in self._last_load_error (None when the chart was loaded).
         """
+        self._last_load_error: str | None = None
         # ── Silent reset: clear all stale state before loading ──────────────────
         # Mirrors _reset_app but without prompts or default-settings application.
         # This ensures that opening a second .pviz (without clicking New Plot) is
@@ -1598,6 +1600,7 @@ class SerializationMixin(MixinBase):
             if not silent:
                 QMessageBox.information(self, 'Loaded', 'Chart loaded successfully.')
         except Exception as e:  # noqa: BLE001 - error boundary: the failure is reported to the user
+            self._last_load_error = str(e)
             if not silent:
                 QMessageBox.critical(self, 'Error', str(e))
 

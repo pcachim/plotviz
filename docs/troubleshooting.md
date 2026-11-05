@@ -73,6 +73,15 @@ The messages plotviz shows when something cannot be done, what usually causes th
 | **Code ran successfully but produced no figure.** | The code did not create a figure. Call `plt.subplots()` or `plt.figure()`, or a seaborn figure-level function |
 | The **Runtime Error** panel | It shows the traceback of your code; the last line is the error and the one above it the line that caused it. **Copy** puts it on the clipboard |
 
+## Command line
+
+| Message | Cause and what to do |
+|---------|----------------------|
+| **no such file** / **not a plotviz chart** | The path is wrong, or the file is not a `.pviz` chart. Other charts on the command line are still drawn; the status is 1 |
+| **the data files could not be read again** | `--reload` could not read a data file (moved, deleted, a column is gone). The chart is not drawn. Put the file back or run without `--reload` to draw the saved data |
+| **cannot tell the format** | The name after `-o` has an extension that is not an image format. Use `-f png`, `svg`, `pdf`, `jpeg`, `tiff` or `eps`, or one of those extensions |
+| Nothing is printed on Windows | The packaged program has no console. Use the pip or the source installation for scripts; see the [known limitations](command-line.md#known-limitations) |
+
 ## Digitize Image
 
 | Message or problem | Cause and what to do |

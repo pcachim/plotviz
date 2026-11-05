@@ -1,6 +1,6 @@
 # Export Image
 
-**File → Export Image…** (`Ctrl + E`, or **⬆ Export** in the top bar) writes the chart as a picture file. The file is made from the same figure as the preview, at the size you set in [Layout & Style](layout-style.md), so what you see is what you get. To keep the chart as a script instead, see [Python Export Bundle](python-export.md).
+**File → Export Image…** (`Ctrl + E`, or **⬆ Export** in the top bar) writes the chart as a picture file. The file is made from the same figure as the preview, at the size you set in [Layout & Style](layout-style.md), so what you see is what you get. To keep the chart as a script instead, see [Python Export Bundle](python-export.md). To draw saved charts from a script, without opening the program, see [Command Line](command-line.md).
 
 ![The Export Image dialog](images/ui/export.png)
 
