@@ -1504,6 +1504,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#automatic-copy-and-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic copy and recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#recent-files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1866,6 +1877,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#automatic-copy-and-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic copy and recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#recent-files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2071,8 +2093,11 @@
 </table>
 <h3 id="saving">Saving<a class="headerlink" href="#saving" title="Permanent link">&para;</a></h3>
 <p>Choose <strong>File → Save Chart</strong> (Ctrl+S). It rewrites the open file without asking; the first time, or with <strong>Save Chart As…</strong> (Ctrl+Shift+S), a dialog asks where to save. A dialog asks whether to save <strong>Used series only</strong> (keeps only the columns currently assigned in the series table) or <strong>All columns</strong> (preserves every loaded column for future reassignment). Used-only files are smaller; all-columns files are more portable. <strong>All columns</strong> is the default button (Enter) and sits on the right, with <strong>Cancel</strong> on the left. If every loaded column is already used, nothing is asked.</p>
+<p>When you close the window (or quit) with changes that are not saved, plotviz asks whether to <strong>Save</strong> them, <strong>Don't save</strong> them or <strong>Cancel</strong> and keep working. If the save is cancelled or fails, the window stays open.</p>
 <h3 id="loading">Loading<a class="headerlink" href="#loading" title="Permanent link">&para;</a></h3>
 <p>Choose <strong>File → Open Chart…</strong> (Ctrl+O), or double-click a <code>.pviz</code> file in Finder/Explorer. The chart, all datasets, and all settings are restored exactly.</p>
+<h3 id="automatic-copy-and-recovery">Automatic copy and recovery<a class="headerlink" href="#automatic-copy-and-recovery" title="Permanent link">&para;</a></h3>
+<p>While the chart has changes that are not saved, plotviz writes a copy of it, with all its columns, every minute and a half to the <code>recovery</code> folder inside the settings folder (see <a href="../getting-started/#settings-and-preferences">Settings and preferences</a>). The copy is removed when you save or close plotviz normally. If plotviz stops in any other way (a crash, a power failure, the process killed), the next start asks whether to restore the chart as it was at the last copy. <strong>Restore</strong> opens it with the changes still unsaved, so <strong>Save</strong> writes it to the file the chart came from; <strong>Discard</strong> deletes the copy. Only the most recent copy is offered. The copy is not your file and is never used instead of it.</p>
 <h3 id="recent-files">Recent files<a class="headerlink" href="#recent-files" title="Permanent link">&para;</a></h3>
 <p>The last 12 opened <code>.pviz</code> files appear in <strong>File → Open Recent</strong> for quick access.</p>
 <hr />

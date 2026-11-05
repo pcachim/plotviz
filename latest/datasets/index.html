@@ -695,6 +695,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#reloading-data-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reloading data files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#removing-datasets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1749,6 +1760,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#reloading-data-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reloading data files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#removing-datasets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1914,6 +1936,10 @@
 <li>Saved charts keep dates as dates, and so does the <a href="../python-export/">Python export</a>.</li>
 <li>The Seaborn Explorer and the Code Runner see date columns as numbers (days since 1970-01-01). In the Code Runner use <code>pd.to_datetime(x, unit='D')</code> to get datetimes back.</li>
 </ul>
+<h3 id="reloading-data-files">Reloading data files<a class="headerlink" href="#reloading-data-files" title="Permanent link">&para;</a></h3>
+<p>When the file that a dataset came from changes (the measurements were updated, the model was run again), you do not have to import it again: click <strong>⟳ Reload</strong> under the <strong>Datasets</strong> list, or choose <strong>File → Reload Data Files</strong> (<code>Ctrl + Shift + L</code>). plotviz reads the file again with the same import options (separator, decimal mark, sheet, header row, dates) and puts the new values in the columns of the same name. The series, the styles, the annotations and the layout stay as they are, so the chart simply shows the new data. The button reloads the selected columns, or every column that came from a file when none is selected.</p>
+<p>When you come back to the window after the file was changed by another program, plotviz notices and asks whether to read it again; it asks once for each change.</p>
+<p>The file and the options of each column are saved in the chart file, so the reload also works after you reopen the chart, as long as the data file is still where it was. Columns made by Generate or Transform, and charts saved by older versions, have no file to read and are left alone. A column that is no longer in the file keeps its values, and plotviz says so. Fits that were made on the old values are not recalculated: apply them again.</p>
 <h3 id="removing-datasets">Removing datasets<a class="headerlink" href="#removing-datasets" title="Permanent link">&para;</a></h3>
 <p>Select one or more entries in the <strong>Datasets</strong> list and click <strong>Remove selected</strong>. Any series that reference removed columns will show empty dropdowns but are not deleted from the table.</p>
 <h3 id="inspecting-columns">Inspecting columns<a class="headerlink" href="#inspecting-columns" title="Permanent link">&para;</a></h3>

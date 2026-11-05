@@ -2080,6 +2080,18 @@
 </thead>
 <tbody>
 <tr>
+<td><strong>None of the datasets comes from a file that can be read again</strong></td>
+<td>Reload needs the file and the options kept at import. Columns made by Generate or Transform, and charts saved by an older version, do not have them: import the file again once</td>
+</tr>
+<tr>
+<td><strong>Some columns could not be read again</strong></td>
+<td>The file was moved or deleted, or a column is no longer in it. The columns that failed keep the values they had; put the file back or import it again</td>
+</tr>
+<tr>
+<td><strong>plotviz did not close properly last time</strong></td>
+<td>An automatic copy of the chart was found at start-up. Restore opens it with its changes unsaved; see <a href="../file-formats/#automatic-copy-and-recovery">File Formats</a></td>
+</tr>
+<tr>
 <td><strong>No settings.json in archive.</strong></td>
 <td>The file is not a plotviz chart or template. Chart and template files are zip archives with a <code>settings.json</code> inside; see <a href="../file-formats/">File Formats</a></td>
 </tr>
