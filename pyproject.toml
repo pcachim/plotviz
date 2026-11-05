@@ -99,3 +99,14 @@ include = ["tests/**"]
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
 invalid-assignment = "ignore"
+
+# The scripts of util/ that make the pictures of the documentation drive the real window
+# like the tests do: Qt widgets the stubs type as Optional, QTest.qWait, and attributes
+# that the mixins give to PlotVizApp.
+[[tool.ty.overrides]]
+include = ["util/**"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+missing-argument = "ignore"
+invalid-argument-type = "ignore"

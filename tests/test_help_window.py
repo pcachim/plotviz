@@ -284,7 +284,7 @@ class TestInterfaceFigures(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         zones = json.loads(self.ZONES.read_text(encoding="utf-8"))
-        self.assertEqual(sorted(zones), sorted([*module.PAGES, "export"]))     # the pages and the export dialog
+        self.assertEqual(sorted(zones), sorted([*module.PAGES, "export", "preferences"]))     # the pages and two dialogs
 
 
 @unittest.skipUnless(_have_real_qt(), "real PyQt6 not available")

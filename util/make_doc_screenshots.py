@@ -231,8 +231,34 @@ def export_dialog(w, app):
     return [t for t, _ in shot["zones"]]
 
 
+def preferences_dialog(w, app):
+    """The Preferences dialog, numbered by its four sections (its folders are shown as on a Mac)."""
+    from PyQt6.QtCore import QTimer
+    from PyQt6.QtWidgets import QApplication, QGroupBox, QLineEdit
+    shot = {}
+    shown = ["~/Library/Application Support/plotviz/settings.json", "~/Library/Application Support/plotviz/",
+             "~/Library/Application Support/plotviz/schemes/", "~/Library/Application Support/plotviz/palettes/"]
+
+    def grab():
+        dialog = QApplication.activeModalWidget()
+        assert dialog is not None
+        for edit, text in zip(dialog.findChildren(QLineEdit), shown):
+            edit.setText(text)                      # not the temporary folder this run uses
+            edit.setCursorPosition(0)
+        shot["zones"] = [(box.title(), box.mapTo(dialog, box.rect().topLeft()).y() + 10)
+                         for box in dialog.findChildren(QGroupBox)]
+        shot["pixmap"] = dialog.grab()
+        dialog.reject()
+    QTimer.singleShot(700, grab)
+    w._open_app_settings_dialog()
+    pixmap = shot["pixmap"]
+    numbered(pixmap, shot["zones"], pixmap.height()).save(str(OUT / "preferences.png"))
+    print("preferences", [t for t, _ in shot["zones"]])
+    return [t for t, _ in shot["zones"]]
+
+
 def main(only: list[str]) -> int:
-    unknown = [k for k in only if k not in PAGES and k not in ("overview", "export")]
+    unknown = [k for k in only if k not in PAGES and k not in ("overview", "export", "preferences")]
     if unknown:
         print("unknown page(s):", ", ".join(unknown), "| known:", ", ".join(PAGES))
         return 2
@@ -283,6 +309,8 @@ def main(only: list[str]) -> int:
         print(f"{key:<16} {len(found)} zone(s): {', '.join(zones[key])}")
     if not only or "export" in only:
         zones["export"] = export_dialog(w, app)
+    if not only or "preferences" in only:
+        zones["preferences"] = preferences_dialog(w, app)
     if not only or "overview" in only:
         w.resize(1280, 820)
         w.tabs.setCurrentIndex(0)

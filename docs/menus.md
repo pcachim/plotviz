@@ -72,9 +72,9 @@ The samples are copies of the examples that come with plotviz, made the first ti
 
 **plotviz → Preferences…** (`Ctrl + ,`) on macOS, **Edit → Settings…** (`Ctrl + Alt + S`) on Windows and Linux.
 
-| Section | What it holds |
-|---------|---------------|
-| **Configuration files** | Where plotviz keeps the settings file, the config folder, and the folders of your colour schemes and palettes. A button next to each opens its folder |
-| **Appearance** | **Colour scheme**: System, Light or Dark. It is applied at once, and **Cancel** puts it back |
-| **Defaults** | **Show navigation toolbar** (the matplotlib toolbar above the chart) and **Max recent files** (1 to 30) |
-| **Maintenance** | **Clear recent files**, and **Reset all settings to defaults…**, which does not touch your charts or data |
+![The Preferences dialog](images/ui/preferences.png)
+
+1. **Configuration files** — Where plotviz keeps the settings file, the config folder, and the folders of your colour schemes and palettes. A button next to each opens its folder.
+2. **Appearance** — **Colour scheme**: System, Light or Dark. It is applied at once, and **Cancel** puts it back.
+3. **Defaults** — **Show navigation toolbar** (the matplotlib toolbar above the chart) and **Max recent files** (1 to 30).
+4. **Maintenance** — **Clear recent files**, and **Reset all settings to defaults…**, which does not touch your charts or data.
