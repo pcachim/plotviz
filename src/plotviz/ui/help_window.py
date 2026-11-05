@@ -25,7 +25,7 @@ ONLINE_URL = 'https://pcachim.github.io/plotviz/'
 
 # The page index: the same order as `nav` in mkdocs.yml (a test keeps them in step).
 NAV: list[tuple[str, list[tuple[str, str]]]] = [
-    ('', [('Home', 'index.md'), ('Getting Started', 'getting-started.md')]),
+    ('', [('Home', 'index.md'), ('Getting Started', 'getting-started.md'), ('Worked Examples', 'examples.md')]),
     ('Data', [
         ('Datasets and Import', 'datasets.md'),
         ('Generate', 'generate.md'),
@@ -49,12 +49,14 @@ NAV: list[tuple[str, list[tuple[str, str]]]] = [
     ('Tools', [
         ('Seaborn Explorer', 'seaborn-explorer.md'),
         ('Python Code Runner', 'code-runner.md'),
-        ('Python Export Bundle', 'python-export.md'),
     ]),
+    ('Export', [('Export Image', 'export.md'), ('Python Export Bundle', 'python-export.md')]),
     ('Reference', [
         ('File Formats', 'file-formats.md'),
         ('Menus', 'menus.md'),
         ('Keyboard Shortcuts', 'shortcuts.md'),
+        ('Troubleshooting', 'troubleshooting.md'),
+        ('Glossary', 'glossary.md'),
     ]),
 ]
 

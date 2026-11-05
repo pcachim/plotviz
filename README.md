@@ -2,7 +2,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/pcachim/plotviz?label=download&style=flat-square)](https://github.com/pcachim/plotviz/releases/latest)
 
-**plotviz** is a desktop chart editor for scientists, engineers, and analysts. Load tabular data, build publication-quality charts through a point-and-click interface, and export to PNG, SVG, PDF, or JPEG — no code required.
+**plotviz** is a desktop chart editor for scientists, engineers, and analysts. Load tabular data, build publication-quality charts through a point-and-click interface, and export to PNG, SVG, PDF, JPEG, TIFF or EPS — no code required.
 
 ---
 
@@ -38,6 +38,7 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | Document | Contents |
 |----------|----------|
 | [Getting Started](docs/getting-started.md) | Installation, first chart, interface overview |
+| [Worked Examples](docs/examples.md) | Three walks from the data to the chart |
 | [Datasets and Import](docs/datasets.md) | Loading files, import options, date columns |
 | [Generate](docs/generate.md) | Function generators and the manual data table |
 | [Statistics](docs/statistics.md) | Summary table and correlation matrix |
@@ -54,8 +55,11 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | [Legend and Notes](docs/legend-notes.md) | Legends, text, arrows, images |
 | [Seaborn Explorer](docs/seaborn-explorer.md) | Statistical charts via seaborn |
 | [Python Code Runner](docs/code-runner.md) | Built-in Python editor with live preview |
+| [Export Image](docs/export.md) | Formats, resolution, clipboard, one file per subplot |
 | [Python Export Bundle](docs/python-export.md) | Export charts as standalone Python projects |
 | [File Formats](docs/file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |
+| [Troubleshooting](docs/troubleshooting.md) | The messages of the app and what to do |
+| [Glossary](docs/glossary.md) | The terms used in the app |
 | [Menus](docs/menus.md) | Every menu item, the samples, the preferences |
 | [Keyboard Shortcuts](docs/shortcuts.md) | All keyboard shortcuts |
 | [Building & Packaging](BUILDING.md) | macOS .app and Windows .exe (for developers) |

@@ -112,7 +112,14 @@ The data table provides a manual spreadsheet-style entry grid for small datasets
 
 ![The Table page](images/ui/generate-table.png)
 
-The **Table** page: set the number of columns (**Cols**) and rows (**Rows**) and click **New**. Below the table, **+R**, **−R**, **+C** and **−C** add and remove rows and columns, the bin button clears it, the clipboard button pastes CSV text, **Load** opens a CSV or Excel file into the table and **CSV** copies the table to the clipboard as CSV. The sections below explain each one.
+The **Table** page has four zones:
+
+1. **New table** — set the number of columns (**Cols**) and rows (**Rows**) and click **New**.
+2. **Cells** — type or paste the values; double-click a column header to rename it.
+3. **Editing buttons** — the buttons below the table.
+4. **Load and CSV** — bring a file into the table, or copy the table out.
+
+The editing buttons: **+R**, **−R**, **+C** and **−C** add and remove rows and columns, the bin button clears it, the clipboard button pastes CSV text, **Load** opens a CSV or Excel file into the table and **CSV** copies the table to the clipboard as CSV. The sections below explain each one.
 
 ### Creating a table
 

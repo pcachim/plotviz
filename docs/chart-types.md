@@ -243,4 +243,10 @@ Streamlines of a vector field. X and Y must be the points of a regular grid (eve
 
 ## Chart-type options panel
 
-When a whole-chart type is active, a corresponding options panel appears in the **Data** tab below the series table. Per-series options (line style, marker, color) are set in the **Series** tab regardless of chart type.
+Under the series table of **Plots → Plot**, the options of the chart type appear: select a series (click its row) and the box for its type is shown. The picture shows a histogram; every type has its own box, as described in its section above. The line above the box names the selected series. Per-series options such as line style, marker and colour are on the **Curves** page, whatever the type.
+
+![The Plot page with the options of a histogram](images/ui/plot-options.png)
+
+1. **Plot mode** — the group of chart types of the subplot.
+2. **Series** — the series table; the selected row decides which options are shown below.
+3. **Histogram Options** — the options of the selected series' type (here the number of bins, density, cumulative, type and orientation).

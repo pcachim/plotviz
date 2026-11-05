@@ -119,13 +119,13 @@ In **Plots → Plot**, select a chart type from the dropdown — Line, Scatter, 
 
 ### 5. Export
 
-Click **⬆ Export** in the top bar (or **File → Export Image…**, Ctrl+E), pick a format (PNG, SVG, PDF, JPEG) and a DPI, then **Save…** to write a file or **Copy to clipboard** to paste the image into another app (raster formats only). The DPI and figure dimensions set in the Layout & Style tab are used for the exported file.
-
-With more than one subplot, tick **Also save each subplot as its own file** to get, besides the whole figure, one file per subplot (`name_1`, `name_2`, …). Each keeps its own proportions; raster files are scaled so the longer side matches the longer side of the figure, and vector files (SVG, PDF, EPS) keep the subplot's natural size. A subplot file includes its axis labels, twin axis, legend and colorbar, but not the figure title or a figure-wide legend. Existing files with those names are replaced after you confirm.
+Click **⬆ Export** in the top bar (or **File → Export Image…**, `Ctrl + E`), pick a format and a resolution, and **Save…** (or **Copy to clipboard**). The size is the figure size set in the Layout & Style tab. The formats, the resolution, copying to the clipboard and saving each subplot are explained in [Export Image](export.md).
 
 ### 6. Save your work
 
-Click **Save Chart (.pviz)** to save a `.pviz` project file. Reopening it restores your data, series assignments, and all style settings.
+Click the save button in the top bar (or **File → Save Chart**, `Ctrl + S`) to save a `.pviz` project file. Reopening it restores your data, series assignments, and all style settings.
+
+Made a mistake? **Edit → Undo** (`Ctrl + Z`) steps back through your last changes; see [Undo and redo](shortcuts.md#undo-and-redo).
 
 ---
 

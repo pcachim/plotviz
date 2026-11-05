@@ -20,7 +20,7 @@ Everything the menu bar does, with its shortcut. The shortcuts are also in [Keyb
 | **Save Template…** | | Saves the style and layout without the data |
 | **Save Palette…** | | Saves the current colour palette |
 | **Save Scheme…** | | Saves the current colour scheme |
-| **Export Image…** | `Ctrl + E` | Writes the chart as PNG, SVG, PDF or JPEG, or copies it to the clipboard |
+| **Export Image…** | `Ctrl + E` | Writes the chart as PNG, SVG, PDF, JPEG, TIFF or EPS, or copies it to the clipboard; see [Export Image](export.md) |
 | **Export Python Bundle…** | `Ctrl + Shift + E` | Writes a standalone Python script of the chart; see [Python Export Bundle](python-export.md) |
 
 The file types are described in [File Formats](file-formats.md).

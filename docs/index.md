@@ -1,6 +1,6 @@
 # plotviz
 
-**plotviz** is a desktop chart editor for scientists, engineers and analysts. Load tabular data, build publication-quality charts through a point-and-click interface, and export to PNG, SVG, PDF or JPEG — no code required.
+**plotviz** is a desktop chart editor for scientists, engineers and analysts. Load tabular data, build publication-quality charts through a point-and-click interface, and export to PNG, SVG, PDF, JPEG, TIFF or EPS — no code required.
 
 ---
 
@@ -12,7 +12,7 @@
 - **Multi-panel layouts** — 18 preset layouts plus a custom mosaic editor; each subplot is independently configured
 - **Full style control** — 13 built-in color schemes, 11 color palettes, per-curve style, grid, borders, fonts, and margins
 - **Annotations** — text labels, arrows, and image overlays with a drag-and-drop editor
-- **Export** — PNG, SVG, PDF, JPEG at any DPI and figure size, or a standalone Python script of the chart
+- **Export** — PNG, SVG, PDF, JPEG, TIFF or EPS at any DPI and figure size, or a standalone Python script of the chart
 - **Undo and redo** — up to 50 steps, for data and settings alike
 - **Tools** — a Seaborn Explorer for statistical charts and a Python Code Runner
 
@@ -48,6 +48,10 @@ See [Getting Started](getting-started.md) for full setup instructions.
 - :material-rocket-launch: **[Getting Started](getting-started.md)**
 
     Install plotviz and create your first chart in minutes.
+
+- :material-school: **[Worked Examples](examples.md)**
+
+    Find pulses in a signal, compare fits, smooth a daily series.
 
 - :material-table: **[Data](datasets.md)**
 
@@ -88,6 +92,14 @@ See [Getting Started](getting-started.md) for full setup instructions.
 - :material-file: **[File Formats](file-formats.md)**
 
     .pviz, .pvizt, .pvizc, .pvizp format reference.
+
+- :material-export: **[Export Image](export.md)**
+
+    Formats, resolution, clipboard, one file per subplot.
+
+- :material-help-circle: **[Troubleshooting](troubleshooting.md)**
+
+    The messages of the app and what to do.
 
 - :material-menu: **[Menus](menus.md)**
 

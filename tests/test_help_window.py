@@ -152,6 +152,68 @@ class TestTransformFigures(unittest.TestCase):
             self.assertEqual(sorted(p.stem for p in Path(folder).glob("*.png")), sorted(module.GROUPS))
 
 
+class TestTroubleshooting(unittest.TestCase):
+    """Every message the troubleshooting page quotes is one that the app really writes."""
+
+    MESSAGES = [
+        "Select at least one column to import.", "File no longer exists", "x_min must be less than x_max",
+        "geomspace requires start and stop > 0", "No source column selected", "Clipboard is empty",
+        "No y series selected", "points but y has", "this operation needs an x series",
+        "is longer than the series", "must be lower than the window",
+        "the series has NaN values; remove or interpolate them first", "x must be increasing",
+        "must be between 0 and", "choose the series whose x values to use",
+        "log return needs every value to be positive", "Live is paused for", "Changed: click Preview to update.",
+        "Add at least one series in the Data tab first.", "Could not fit", "no longer in the table",
+        "seaborn is not installed.", "No data loaded.", "Select X (category) and Y (numeric) columns for",
+        "Regression requires numeric X and Y columns.", "needs >= 2 numeric columns", "Render error (",
+        "produced no figure", "No settings.json in archive.",
+    ]
+
+    def test_each_message_is_in_the_page_and_in_the_code(self):
+        page = (DOCS / "troubleshooting.md").read_text(encoding="utf-8").replace("*", "")
+        code = "\n".join(p.read_text(encoding="utf-8") for p in (_ROOT / "src" / "plotviz").rglob("*.py"))
+        for message in self.MESSAGES:
+            with self.subTest(message=message):
+                self.assertIn(message.replace("Render error (", "Render error"), code.replace("Render error (", "Render error"))
+                self.assertIn(message.rstrip("("), page)
+
+
+class TestExamples(unittest.TestCase):
+    """The worked examples: the pictures exist and the numbers in the text are the real ones."""
+
+    def test_the_pictures_and_numbers_match_a_fresh_run(self):
+        import importlib.util
+        import tempfile
+        spec = importlib.util.spec_from_file_location("make_doc_examples", _ROOT / "util_files" / "make_doc_examples.py")
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        text = (DOCS / "examples.md").read_text(encoding="utf-8")
+        for name in ("pulse", "fits", "fits-table", "daily"):
+            self.assertTrue((DOCS / "images" / "examples" / f"{name}.png").is_file(), name)
+            self.assertIn(f"(images/examples/{name}.png)", text)
+        from PyQt6.QtWidgets import QApplication
+        from ui.main_window import PlotVizApp
+        app = QApplication.instance() or QApplication([])
+        original = PlotVizApp._load_on_startup
+        PlotVizApp._load_on_startup = lambda self: None
+        try:
+            with tempfile.TemporaryDirectory() as folder:
+                module.OUT = Path(folder)
+                px, py = module.pulse(app)
+                rows = module.fits(app)
+                module.daily(app)
+        finally:
+            PlotVizApp._load_on_startup = original
+        self.assertEqual([round(float(v), 3) for v in px], [0.302, 0.721])
+        self.assertIn("0.302 s", text)
+        self.assertIn("0.721 s", text)
+        self.assertEqual({row[1]: (row[3], row[5]) for row in rows},
+                         {"Linear": ("0.6752", "411.1"), "Quadratic": ("0.9686", "226.2")})
+        for number in ("0.675", "0.969", "226.2", "411.1"):
+            self.assertIn(number, text)
+
+
 class TestInterfaceFigures(unittest.TestCase):
     """The numbered screenshots of the pages: every zone of a picture is explained, in order."""
 
@@ -222,7 +284,7 @@ class TestInterfaceFigures(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         zones = json.loads(self.ZONES.read_text(encoding="utf-8"))
-        self.assertEqual(sorted(module.PAGES), sorted(zones))
+        self.assertEqual(sorted(zones), sorted([*module.PAGES, "export"]))     # the pages and the export dialog
 
 
 @unittest.skipUnless(_have_real_qt(), "real PyQt6 not available")
@@ -283,7 +345,7 @@ class TestHelpWindow(unittest.TestCase):
                     widths.append(fmt.toImageFormat().width())
                 it += 1
             block = block.next()
-        self.assertEqual(len(widths), 26)
+        self.assertEqual(len(widths), (DOCS / "chart-types.md").read_text(encoding="utf-8").count("](images/"))
         self.assertLessEqual(max(widths), 760)
 
     def test_a_link_to_a_heading_scrolls_to_it(self):
