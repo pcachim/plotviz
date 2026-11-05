@@ -909,10 +909,24 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._code_runner.load_pvizx(fp)
 
     def _open_documentation(self):
+        """Show the documentation in its own window; when it is not on disk (a pip install
+        does not carry it) open the online version in the browser instead."""
+        from ui.help_window import HelpWindow, docs_dir
+        if docs_dir() is None:
+            self._open_documentation_online()
+            return
+        if getattr(self, '_help_window', None) is None:
+            self._help_window = HelpWindow(self)
+        self._help_window.show()
+        self._help_window.raise_()
+        self._help_window.activateWindow()
+
+    def _open_documentation_online(self):
         """Open the plotviz online documentation in the default browser."""
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
-        QDesktopServices.openUrl(QUrl('https://pcachim.github.io/plotviz/'))
+        from ui.help_window import ONLINE_URL
+        QDesktopServices.openUrl(QUrl(ONLINE_URL))
 
     def _open_sample_chart(self):
         """Pick a sample chart in an Open dialog that starts in the samples folder."""
@@ -1195,9 +1209,15 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         help_menu = menubar.addMenu('Help')
 
         docs_action = QAction('Documentation', self)
-        docs_action.setStatusTip('Open the plotviz online documentation')
+        docs_action.setShortcut('F1')
+        docs_action.setStatusTip('Open the plotviz documentation in a window')
         docs_action.triggered.connect(self._open_documentation)
         help_menu.addAction(docs_action)
+
+        docs_online_action = QAction('Documentation Online', self)
+        docs_online_action.setStatusTip('Open the plotviz documentation in the browser')
+        docs_online_action.triggered.connect(self._open_documentation_online)
+        help_menu.addAction(docs_online_action)
 
         help_menu.addSeparator()
 

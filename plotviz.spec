@@ -96,6 +96,11 @@ _source_note = ROOT_DIR / 'SOURCE.md'
 if _source_note.exists():
     datas += [(str(_source_note), '.')]
 
+# Bundle the documentation (Markdown pages) for the in-app Help window.
+_docs_dir = ROOT_DIR / 'docs'
+if _docs_dir.exists():
+    datas += [(str(_docs_dir), 'docs')]
+
 # Bundle the bundled data folder (sample plots + datasets) so the app can
 # seed the user data directory on first run.
 _data_dir = ROOT_DIR / 'data'

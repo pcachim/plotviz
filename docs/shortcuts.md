@@ -18,6 +18,7 @@
 | `Ctrl + Shift + B` | Seaborn Explorer |
 | `Ctrl + Shift + P` | Python Code Runner |
 | `Ctrl + Shift + R` | Code Runner from the current chart |
+| `F1` | Documentation (opens in its own window; **Help → Documentation Online** opens the website) |
 
 ## Tab navigation (View menu)
 
