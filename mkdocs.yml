@@ -89,6 +89,7 @@ nav:
     - Python Export Bundle: python-export.md
   - Reference:
     - File Formats: file-formats.md
+    - Menus: menus.md
     - Keyboard Shortcuts: shortcuts.md
 
 extra:

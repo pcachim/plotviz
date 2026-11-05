@@ -51,7 +51,11 @@ NAV: list[tuple[str, list[tuple[str, str]]]] = [
         ('Python Code Runner', 'code-runner.md'),
         ('Python Export Bundle', 'python-export.md'),
     ]),
-    ('Reference', [('File Formats', 'file-formats.md'), ('Keyboard Shortcuts', 'shortcuts.md')]),
+    ('Reference', [
+        ('File Formats', 'file-formats.md'),
+        ('Menus', 'menus.md'),
+        ('Keyboard Shortcuts', 'shortcuts.md'),
+    ]),
 ]
 
 

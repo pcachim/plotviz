@@ -13,9 +13,11 @@
 - **Python Code Runner** — write and run arbitrary matplotlib/seaborn code in a built-in editor with a live preview pane
 - **Python Export Bundle** — export any chart as a self-contained `.pvizx` ZIP with a standalone `plot.py` script and data CSVs; no plotviz dependency required to re-run
 - **Subplots & mosaic layouts** — multi-panel figures with shared axes and custom grid arrangements
-- **Curve fitting** — per-series polynomial, exponential, and custom fits via scipy
+- **Data tools** — generate series from expressions, summaries and correlations, and 36 Transform operations (smoothing, resampling, calculus, peaks, FFT) with a live preview
+- **Curve fitting** — linear, polynomial, exponential, Gaussian, sinusoid, custom expressions and LOWESS, with confidence and prediction bands and a comparison by AIC
 - **Annotations** — text, arrows, images, legends, and subplot titles
-- **Custom color palettes** — built-in schemes plus user-defined palettes
+- **Color schemes and palettes** — 13 built-in schemes and 11 palettes, plus your own
+- **Undo and redo** — up to 50 steps
 - **Cross-platform** — macOS 11+, Windows 10+, and Linux (X11/Wayland)
 
 ---
@@ -54,6 +56,7 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | [Python Code Runner](docs/code-runner.md) | Built-in Python editor with live preview |
 | [Python Export Bundle](docs/python-export.md) | Export charts as standalone Python projects |
 | [File Formats](docs/file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |
+| [Menus](docs/menus.md) | Every menu item, the samples, the preferences |
 | [Keyboard Shortcuts](docs/shortcuts.md) | All keyboard shortcuts |
 | [Building & Packaging](BUILDING.md) | macOS .app and Windows .exe (for developers) |
 
@@ -88,4 +91,4 @@ GPL-3.0-or-later — see [LICENSE.md](LICENSE.md).
 
 ## Version
 
-Current release: **2026.06.2**
+The latest release is on the [Releases page](https://github.com/pcachim/plotviz/releases/latest).

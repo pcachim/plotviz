@@ -43,6 +43,19 @@ When the text is empty the axis is titled with the names of the data series; fit
 
 X and Y label fonts and colors are global — they apply to all subplots. Per-subplot overrides are not available for axis labels.
 
+### Math in labels
+
+Titles, axis labels, legend entries and annotation text accept matplotlib's math text: put the formula between dollar signs.
+
+| Type this | You get |
+|-----------|---------|
+| `time $t$ (s)` | time *t* (s) |
+| `$\sigma$ (MPa)` | σ (MPa) |
+| `Decay: $y = A\,e^{-t/\tau}$` | Decay: *y* = *A* e<sup>−*t*/τ</sup> |
+| `$\sin(\omega t)$` | sin(ω*t*) |
+
+It is drawn by matplotlib itself, so nothing has to be installed. Full LaTeX typesetting is not used: commands such as `\begin{align}` do not work.
+
 ---
 
 ## Axis limits
@@ -104,6 +117,19 @@ The dropdown is editable, so you can type any format. Date formats only make sen
 Enable the secondary Y axis by ticking the **Y2** checkbox on one or more series rows in **Plots → Plot**. The Y2 axis appears on the right side of the plot.
 
 In the Axes tab, the Y2 section provides the same controls as the primary Y axis: label text/font/size/color, limits (auto or manual).
+
+---
+
+## Z / color axis and 3D viewpoint
+
+The **Z / Color Axis** section appears when the subplot is a **3D Surface**, **Heatmap**, **Contour** or **Tricontour** chart. For a 3D surface it labels the vertical axis; for the other three it labels the colour bar. The other axes are folded in this picture:
+
+![The Axes page for a 3D surface](images/ui/axes-3d.png)
+
+1. **X axis** — folded here; see above.
+2. **Y axis (left)** — folded here; see above.
+3. **Y axis (right / secondary)** — folded here; see above.
+4. **Z / color axis** — **Show Z label**, the label text and its font, size, colour, rotation and distance (**Pad**). For a 3D surface the **3D Viewpoint** box below sets the **Elevation** (−90° to 90°) and the **Azimuth** (−180° to 180°) with a slider or a number; **Reset View** returns to 30° and −60°. In the preview you can also rotate the chart by dragging it.
 
 ---
 

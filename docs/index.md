@@ -7,11 +7,14 @@
 ## Highlights
 
 - **26 chart types** — Line, Scatter, Bar, Histogram, Boxplot, Violin, Pie, Polar, Radar, Heatmap, Contour, 3D Surface, and more
-- **Curve fitting** — 7 built-in models (Linear, Quadratic, Cubic, Exponential, Power Law, Logarithmic, Sigmoid) with confidence and prediction bands
-- **Multi-panel layouts** — 18 preset mosaic layouts plus a custom mosaic editor; each subplot is independently configured
-- **Full style control** — 10 built-in color schemes, 11 color palettes, per-curve style, grid, borders, fonts, and margins
+- **Data tools** — load CSV, Excel, JSON or text files (dates included), generate series from expressions, summarise them with **Statistics**, and derive new ones with 36 **Transform** operations (smoothing, resampling, calculus, baselines, peaks, FFT), each with a live preview
+- **Curve fitting** — linear, polynomial, exponential, power, logarithmic, sigmoid, Gaussian, sinusoid, your own expression, and LOWESS smoothing; fit only part of the data, weight by errors, ignore outliers, compare fits by R² and AIC, and draw confidence and prediction bands
+- **Multi-panel layouts** — 18 preset layouts plus a custom mosaic editor; each subplot is independently configured
+- **Full style control** — 13 built-in color schemes, 11 color palettes, per-curve style, grid, borders, fonts, and margins
 - **Annotations** — text labels, arrows, and image overlays with a drag-and-drop editor
-- **Export** — PNG, SVG, PDF, JPEG at any DPI and figure size
+- **Export** — PNG, SVG, PDF, JPEG at any DPI and figure size, or a standalone Python script of the chart
+- **Undo and redo** — up to 50 steps, for data and settings alike
+- **Tools** — a Seaborn Explorer for statistical charts and a Python Code Runner
 
 ---
 
@@ -86,6 +89,10 @@ See [Getting Started](getting-started.md) for full setup instructions.
 
     .pviz, .pvizt, .pvizc, .pvizp format reference.
 
+- :material-menu: **[Menus](menus.md)**
+
+    Every menu item, the samples and the preferences.
+
 - :material-keyboard: **[Keyboard Shortcuts](shortcuts.md)**
 
     All keyboard shortcuts and canvas controls.
@@ -107,5 +114,5 @@ See [Getting Started](getting-started.md) for full setup instructions.
 
 ## Version
 
-Current release: **2.7.0**  
+The latest release is on the [Releases page](https://github.com/pcachim/plotviz/releases/latest); **Help → About plotviz** shows the version you are running.  
 Requires Python **3.10+**

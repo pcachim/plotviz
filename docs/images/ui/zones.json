@@ -64,5 +64,11 @@
     "PLACE ANNOTATION",
     "Style for new annotations",
     "Annotations — double-click to edit"
+  ],
+  "axes-3d": [
+    "X AXIS",
+    "Y AXIS (LEFT)",
+    "Y AXIS (RIGHT / SECONDARY)",
+    "Z / COLOR AXIS"
   ]
 }

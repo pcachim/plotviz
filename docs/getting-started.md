@@ -100,7 +100,7 @@ The live chart preview updates as you change settings. Use the matplotlib toolba
 
 ### 1. Load data
 
-Click the **Data** tab → **Browse Files** and open a CSV, Excel, JSON or TXT file. plotviz reads all numeric and categorical columns and lists them in the dataset panel.
+Click the **Data** tab → **Browse Files** and open a CSV, Excel, JSON or TXT file. (No data of your own yet? **Help → Sample Datasets…** loads one of the samples, and **Help → Sample Charts…** opens ready-made charts; see [Menus](menus.md).) plotviz reads all numeric and categorical columns and lists them in the dataset panel.
 
 ### 2. Assign columns to series
 

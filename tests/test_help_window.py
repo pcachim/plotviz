@@ -95,6 +95,27 @@ class TestChartFigures(unittest.TestCase):
         for chart_type in self._types():
             self.assertTrue((DOCS / "images" / "charts" / f"{module.slug(chart_type)}.png").is_file(), chart_type)
 
+    def test_the_counts_quoted_in_the_docs_match_the_app(self):
+        # index.md and README.md quote counts; they must follow the app when it grows.
+        from data.transforms import OPERATIONS
+        from ui.color_schemes import ColorSchemeMixin
+        from ui.tab_constants import COLOR_PALETTES
+        index = (DOCS / "index.md").read_text(encoding="utf-8")
+        readme = (_ROOT / "README.md").read_text(encoding="utf-8")
+        subplots = (DOCS / "subplots.md").read_text(encoding="utf-8")
+        for text, name in ((index, "index.md"), (readme, "README.md")):
+            text = text.replace("*", "")                      # the bold marks of the Markdown
+            self.assertIn(f"{len(OPERATIONS)} Transform operations", text, name)
+            self.assertIn(f"{len(ColorSchemeMixin._BUILTIN_COLOR_SCHEMES)} built-in", text, name)
+            self.assertIn(f"{len(COLOR_PALETTES)} ", text, name)
+        self.assertIn("gallery of 18 built-in layouts", subplots)
+        self.assertEqual(subplots.count("\n| Single |") + subplots.count("\n| 1 × 2 |") + 16, 18)
+
+    def test_no_page_quotes_a_release_number(self):
+        import re
+        for md in list(DOCS.glob("*.md")) + [_ROOT / "README.md"]:
+            self.assertIsNone(re.search(r"Current release", md.read_text(encoding="utf-8")), md.name)
+
     def test_the_count_in_the_text_is_the_number_of_types(self):
         n = len(self._types())
         for name in ("chart-types.md", "index.md"):
