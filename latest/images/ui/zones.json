@@ -21,7 +21,12 @@
     "V SERIES",
     "PREVIEW"
   ],
-  "generate-table": [],
+  "generate-table": [
+    "New table",
+    "Cells",
+    "Editing buttons",
+    "Load and CSV"
+  ],
   "statistics": [
     "SUMMARY",
     "CORRELATION"
@@ -64,5 +69,23 @@
     "PLACE ANNOTATION",
     "Style for new annotations",
     "Annotations — double-click to edit"
+  ],
+  "axes-3d": [
+    "X AXIS",
+    "Y AXIS (LEFT)",
+    "Y AXIS (RIGHT / SECONDARY)",
+    "Z / COLOR AXIS"
+  ],
+  "plot-options": [
+    "PLOT MODE",
+    "SERIES",
+    "Histogram Options"
+  ],
+  "export": [
+    "Format",
+    "Resolution",
+    "Size in pixels",
+    "Each subplot",
+    "Buttons"
   ]
 }

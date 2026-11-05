@@ -33,6 +33,14 @@
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
+         <loc>https://pcachim.github.io/plotviz/latest/examples/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
+         <loc>https://pcachim.github.io/plotviz/latest/export/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
          <loc>https://pcachim.github.io/plotviz/latest/file-formats/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
@@ -45,11 +53,19 @@
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
+         <loc>https://pcachim.github.io/plotviz/latest/glossary/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
          <loc>https://pcachim.github.io/plotviz/latest/layout-style/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/legend-notes/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
+         <loc>https://pcachim.github.io/plotviz/latest/menus/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
     <url>
@@ -82,6 +98,10 @@
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/transform/</loc>
+         <lastmod>2026-11-05</lastmod>
+    </url>
+    <url>
+         <loc>https://pcachim.github.io/plotviz/latest/troubleshooting/</loc>
          <lastmod>2026-11-05</lastmod>
     </url>
 </urlset>
