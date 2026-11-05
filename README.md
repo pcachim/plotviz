@@ -15,6 +15,7 @@
 - **26 chart types** — line, scatter, bar, area, histogram, box, violin, heatmap, waterfall, bubble, and more, with per-series mixing in multi-panel layouts
 - **Seaborn Explorer** — dedicated dialog for statistical charts (KDE, regression, pairplot, joint, catplot, and more), fully isolated from the main canvas
 - **Python Code Runner** — write and run arbitrary matplotlib/seaborn code in a built-in editor with a live preview pane
+- **Digitize Image** — read the values of a chart that is only a picture: calibrate the axes (straight, rotated or tilted pictures), click on the curves or let plotviz follow their colour, and add them as columns
 - **Python Export Bundle** — export any chart as a self-contained `.pvizx` ZIP with a standalone `plot.py` script and data CSVs; no plotviz dependency required to re-run
 - **Subplots & mosaic layouts** — multi-panel figures with shared axes and custom grid arrangements
 - **Data tools** — generate series from expressions, summaries and correlations, and 36 Transform operations (smoothing, resampling, calculus, peaks, FFT) with a live preview
@@ -22,6 +23,7 @@
 - **Annotations** — text, arrows, images, legends, and subplot titles
 - **Color schemes and palettes** — 13 built-in schemes and 11 palettes, plus your own
 - **Undo and redo** — up to 50 steps
+- **Reload and recover** — read again the data files that changed on disk, and restore an unsaved chart after a crash
 - **Cross-platform** — macOS 11+, Windows 10+, and Linux (X11/Wayland)
 
 ---
@@ -59,6 +61,7 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | [Legend and Notes](docs/legend-notes.md) | Legends, text, arrows, images |
 | [Seaborn Explorer](docs/seaborn-explorer.md) | Statistical charts via seaborn |
 | [Python Code Runner](docs/code-runner.md) | Built-in Python editor with live preview |
+| [Digitize Image](docs/digitize.md) | Read values off a picture of a chart |
 | [Export Image](docs/export.md) | Formats, resolution, clipboard, one file per subplot |
 | [Python Export Bundle](docs/python-export.md) | Export charts as standalone Python projects |
 | [File Formats](docs/file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |

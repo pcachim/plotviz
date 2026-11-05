@@ -73,6 +73,18 @@ The messages plotviz shows when something cannot be done, what usually causes th
 | **Code ran successfully but produced no figure.** | The code did not create a figure. Call `plt.subplots()` or `plt.figure()`, or a seaborn figure-level function |
 | The **Runtime Error** panel | It shows the traceback of your code; the last line is the error and the one above it the line that caused it. **Copy** puts it on the clipboard |
 
+## Digitize Image
+
+| Message or problem | Cause and what to do |
+|--------------------|----------------------|
+| **Set the X point 1.** / **Type the value of …** | The calibration is not complete. Each axis needs two points marked on the image and their values typed; in the rotated mode, three points with both values |
+| **… the two reference points are at the same position** / **the two reference values are equal** | The two points of an axis must be apart, with different values. Mark them near the two ends of the axis |
+| **a logarithmic axis needs positive reference values** | Use values above zero for a logarithmic axis, or untick the option |
+| **the reference points are on one line** | In the rotated mode the three points must not be on a straight line; spread them over the plot |
+| **No pixel of that colour was found** | Raise the tolerance (±), or pick the colour again by clicking on the middle of the curve |
+| Trace adds points that are not on the curve | The legend, the grid or another curve has a similar colour. Lower the tolerance, or remove the extra points with a right-click |
+| The values are a little off | The picture is small: a point is read to a pixel. Use a larger version of the figure and zoom in before clicking |
+
 ## Files
 
 | Message or problem | Cause and what to do |

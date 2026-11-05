@@ -18,7 +18,8 @@
 - **Annotations** — text labels, arrows, and image overlays with a drag-and-drop editor
 - **Export** — PNG, SVG, PDF, JPEG, TIFF or EPS at any DPI and figure size, or a standalone Python script of the chart
 - **Undo and redo** — up to 50 steps, for data and settings alike
-- **Tools** — a Seaborn Explorer for statistical charts and a Python Code Runner
+- **Tools** — a Seaborn Explorer for statistical charts, a Python Code Runner, and Digitize Image to read the values of a chart that is only a picture
+- **Reload and recover** — read again the data files that changed on disk, and restore an unsaved chart after a crash
 
 ---
 

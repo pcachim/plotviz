@@ -4,6 +4,7 @@
 |------|---------|
 | **Dataset** | A column of values with a name, loaded from a file or created by Generate, Transform or a fit. The **Datasets** list holds all of them |
 | **Series** | One row of the series table: an X column, a Y column, a label and a chart type. One series is one curve, set of points or bars |
+| **Digitize** | Read the values of a chart that exists only as a picture, by marking points on it. See [Digitize Image](digitize.md) |
 | **Subplot** | One panel of the figure. A chart has one or several; each has its own axes, grid and legend |
 | **Plot mode** | The group of chart types that a subplot uses: Standard, Histogram, Statistical, Heatmap & Contour, Polar & Radar, Pie or Quiver |
 | **Chart type** | The kind of picture a series draws: Line, Scatter, Bar, Histogram, and so on |

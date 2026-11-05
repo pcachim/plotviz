@@ -9,6 +9,7 @@
 | `Ctrl + S` | Save chart (rewrites the open file; asks where the first time) |
 | `Ctrl + Shift + S` | Save chart as… |
 | `Ctrl + L` | Load data |
+| `Ctrl + Shift + L` | Reload the data files |
 | `Ctrl + E` | Export image |
 | `Ctrl + Shift + E` | Export Python bundle |
 | `Ctrl + Z` | Undo |
@@ -18,6 +19,7 @@
 | `Ctrl + Shift + B` | Seaborn Explorer |
 | `Ctrl + Shift + P` | Python Code Runner |
 | `Ctrl + Shift + R` | Code Runner from the current chart |
+| `Ctrl + Shift + D` | Digitize Image |
 | `F1` | Documentation (opens in its own window; **Help → Documentation Online** opens the website) |
 
 ## Tab navigation (View menu)
