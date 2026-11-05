@@ -28,6 +28,7 @@ The same information, with a short explanation of the Qt and PyInstaller licence
 | PyQt6-Qt6 | 6.11.2 | LGPL-3.0 (the Qt libraries) | https://www.riverbankcomputing.com/software/pyqt/ |
 | PyQt6_sip | 13.11.1 | BSD-2-Clause | https://github.com/Python-SIP/sip |
 | python-dateutil | 2.9.0.post0 | Apache-2.0 OR BSD-3-Clause | https://github.com/dateutil/dateutil |
+| pytz | — | MIT | https://pythonhosted.org/pytz/ |
 | scipy | 1.17.1 | BSD-3-Clause | https://scipy.org/ |
 | seaborn | 0.13.2 | BSD-3-Clause | https://github.com/mwaskom/seaborn |
 | six | 1.17.0 | MIT | https://github.com/benjaminp/six |
@@ -6954,6 +6955,14 @@ The above BSD License Applies to all code, even that also covered by Apache 2.0.
 
 ---
 
+## pytz
+
+Licence: MIT
+Project: https://pythonhosted.org/pytz/
+Needed by some versions of pandas only. The licence text is in the package and at the address above.
+
+---
+
 ## scipy 1.17.1
 
 Licence: BSD-3-Clause
@@ -8019,7 +8028,7 @@ DAMAGE.
 
 Licence: Apache-2.0
 Project: https://github.com/python/tzdata
-Windows builds only. The licence text is in the package and at the address above.
+Needed by pandas 2 and later (always on Windows). The licence text is in the package and at the address above.
 
 ---
 

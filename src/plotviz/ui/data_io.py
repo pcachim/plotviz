@@ -313,11 +313,15 @@ class DataMixin(MixinBase):
                         self.dataset_list.item(i).setSelected(True)
         finally:
             self._applying_settings = False
+        # The undo steps stay suspended while the chart is redrawn: update_preview() lets the
+        # event loop run, and on a slow machine a snapshot timer could fire inside it and push
+        # a near-duplicate of the state just restored, wiping the redo stack.
+        try:
+            self.update_preview()
+        finally:
             self._undo_suspended = False
-        self.update_preview()
-        # Cancel any pending snapshot timer.  update_preview() just scheduled one,
-        # but the restored state is already at the top of the undo stack — letting
-        # the timer fire would push a near-duplicate snapshot and wipe the redo stack.
+        # Cancel any snapshot timer that is still pending: the restored state is already at the
+        # top of the undo stack.
         if hasattr(self, '_snapshot_timer'):
             self._snapshot_timer.stop()
         self._pending_undo_label = ''

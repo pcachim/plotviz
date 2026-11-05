@@ -32,6 +32,7 @@ The macOS and Windows programs contain, besides plotviz, the Python runtime and 
 | PyQt6-Qt6 | LGPL-3.0 (the Qt libraries) |
 | PyQt6_sip | BSD-2-Clause |
 | python-dateutil | Apache-2.0 OR BSD-3-Clause |
+| pytz | MIT |
 | scipy | BSD-3-Clause |
 | seaborn | BSD-3-Clause |
 | six | MIT |

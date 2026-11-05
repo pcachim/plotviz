@@ -32,12 +32,15 @@ LICENCE_NAMES = {
     "packaging": "Apache-2.0 OR BSD-2-Clause", "pandas": "BSD", "patsy": "BSD", "pillow": "MIT-CMU (HPND)",
     "platformdirs": "MIT", "pyparsing": "MIT", "pyqt6": "GPL-3.0-only (or a commercial licence from Riverbank)",
     "pyqt6-qt6": "LGPL-3.0 (the Qt libraries)", "pyqt6-sip": "BSD", "python-dateutil": "Apache-2.0 OR BSD-3-Clause",
+    "pytz": "MIT", "tzdata": "Apache-2.0",
     "scipy": "BSD", "seaborn": "BSD", "six": "MIT", "statsmodels": "BSD", "pyinstaller": "GPL-2.0-or-later, with a bootloader exception (run-time hooks: Apache-2.0)",
 }
 # Packages that only some platforms need, so they may not be installed where this runs.
 NOT_ALWAYS_INSTALLED = {
     "tzdata": ("Apache-2.0", "https://github.com/python/tzdata",
-               "Windows builds only. The licence text is in the package and at the address above."),
+               "Needed by pandas 2 and later (always on Windows). The licence text is in the package and at the address above."),
+    "pytz": ("MIT", "https://pythonhosted.org/pytz/",
+             "Needed by some versions of pandas only. The licence text is in the package and at the address above."),
 }
 # Licence files outside the .dist-info folder that belong to a package (fonts bundled with matplotlib).
 EXTRA_FILES = {"matplotlib": ["matplotlib/mpl-data/fonts/ttf/LICENSE_DEJAVU", "matplotlib/mpl-data/fonts/ttf/LICENSE_STIX"]}
@@ -70,6 +73,9 @@ def dependency_closure() -> list[str]:
             walk(parsed.name)
     for requirement in direct_dependencies():
         walk(Requirement(requirement).name)
+    for key in NOT_ALWAYS_INSTALLED:                        # listed whichever pandas or platform builds the release
+        if key not in seen:
+            seen.append(key)
     return sorted(seen)
 
 
