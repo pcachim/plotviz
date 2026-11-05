@@ -1692,6 +1692,17 @@
 <p>Open it from the menu bar: <strong>Tools → Python Code Runner…</strong></p>
 <hr />
 <h2 id="interface">Interface<a class="headerlink" href="#interface" title="Permanent link">&para;</a></h2>
+<p><img alt="The Python Code Runner window" src="../images/tools/code-runner.png" /></p>
+<p>The window:</p>
+<ol>
+<li><strong>Editor toolbar</strong> — <strong>Open…</strong> a <code>.py</code> file, <strong>Load .pvizx…</strong> a Python bundle, <strong>Save…</strong>, <strong>Clear</strong> and <strong>Sample</strong>.</li>
+<li><strong>Editor</strong> — The code, with syntax highlighting.</li>
+<li><strong>Status line</strong> — The line and column of the cursor, and the number of characters.</li>
+<li><strong>Run Code</strong> — Runs the code (<code>Ctrl + Enter</code>).</li>
+<li><strong>Canvas toolbar</strong> — The matplotlib tools for the preview.</li>
+<li><strong>Preview</strong> — The figure that the code made.</li>
+<li><strong>Export bar</strong> — The <strong>DPI</strong>, <strong>Export…</strong> and <strong>Close</strong>.</li>
+</ol>
 <p>The window is split into two panels:</p>
 <table>
 <thead>
@@ -1832,6 +1843,8 @@
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Pressure (Pa)&#39;</span><span class="p">)</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
+<p>With the <code>tips</code> sample dataset loaded, a scatter plot with a fitted line:</p>
+<p><img alt="A chart made from a loaded dataset" src="../images/tools/code-runner-example.png" /></p>
 <h3 id="figure-requirements">Figure requirements<a class="headerlink" href="#figure-requirements" title="Permanent link">&para;</a></h3>
 <p>Your code must create at least one matplotlib figure (<code>plt.figure()</code>, <code>plt.subplots()</code>, or a seaborn figure-level function). If it runs without producing a figure, a message is shown in the preview canvas.</p>
 <p>If your code creates multiple figures, the <strong>last</strong> one is displayed in the preview.</p>
@@ -1841,7 +1854,12 @@
 <p>All matplotlib figures from a previous run are closed before each new run, so stale figures never accumulate.</p>
 <hr />
 <h2 id="error-panel">Error panel<a class="headerlink" href="#error-panel" title="Permanent link">&para;</a></h2>
-<p>If your code raises an exception, a collapsible error panel appears below the editor showing the full Python traceback. The canvas shows a brief error notice on the right.</p>
+<p>If your code raises an exception, an error panel appears below the editor with the traceback of your code (only your own lines). The canvas shows a brief error notice on the right.</p>
+<p><img alt="The error panel" src="../images/tools/code-runner-error.png" /></p>
+<ol>
+<li><strong>Runtime Error</strong> — the exception and the line of your code that raised it; here a column name with a typo, <code>total_bil</code>.</li>
+</ol>
+<p>The panel has two buttons:</p>
 <table>
 <thead>
 <tr>

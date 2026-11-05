@@ -679,6 +679,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#the-transform-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Transform page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1525,6 +1536,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#the-transform-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Transform page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1689,7 +1711,7 @@
 
 <h1 id="transform">Transform<a class="headerlink" href="#transform" title="Permanent link">&para;</a></h1>
 <p>The <strong>Data → Transform</strong> page creates new series from existing ones: smoothing, decimation, calculus, scaling, cleaning, resampling and signal analysis. To summarise series instead, see <a href="../statistics/">Statistics</a>.</p>
-<hr />
+<h2 id="the-transform-page">The Transform page<a class="headerlink" href="#the-transform-page" title="Permanent link">&para;</a></h2>
 <p>The Transform page applies an operation (smoothing, decimation, calculus, scaling, cleaning, resampling…) to a series and stores the result as a <strong>new series</strong>. The original is never changed, so you can plot both together.</p>
 <p><img alt="The Transform page" src="../images/ui/transform.png" /></p>
 <p>The <strong>Transform</strong> page:</p>
@@ -1745,6 +1767,8 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </ul>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">&para;</a></h2>
 <h3 id="smoothing">Smoothing<a class="headerlink" href="#smoothing" title="Permanent link">&para;</a></h3>
+<p><img alt="Six smoothing operations on the same signal" src="../images/transform/smoothing.png" /></p>
+<p>The same signal — a slow wave, a narrow bump at t = 7 s, a two-point spike and noise — smoothed six ways (grey: the original; orange: the result). The moving median ignores the spike, which the other filters turn into a bump. The moving average and Savitzky-Golay keep the height of the narrow bump best in this example; the Gaussian and the Butterworth filter round it off more.</p>
 <table>
 <thead>
 <tr>
@@ -1787,6 +1811,8 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tbody>
 </table>
 <h3 id="reduce-and-resample">Reduce and resample<a class="headerlink" href="#reduce-and-resample" title="Permanent link">&para;</a></h3>
+<p><img alt="Reducing a signal, and resampling uneven samples" src="../images/transform/resample.png" /></p>
+<p>A 0.4 Hz wave plus a 7.3 Hz one, sampled at 50 Hz, reduced to a tenth of the points. <strong>Every N points</strong> just keeps one point in ten, so the fast component is folded into a false slow wave (aliasing). <strong>Block average</strong> averages each block and lowers the amplitude. <strong>Decimate</strong> filters first, so only the real slow wave is left. The last panel shows unevenly spaced samples put on a uniform x grid with <strong>Resample</strong>.</p>
 <table>
 <thead>
 <tr>
@@ -1829,6 +1855,8 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tbody>
 </table>
 <h3 id="calculus">Calculus<a class="headerlink" href="#calculus" title="Permanent link">&para;</a></h3>
+<p><img alt="A series and five calculus operations" src="../images/transform/calculus.png" /></p>
+<p>One smooth series (top left) and five operations on it. The <strong>derivative</strong> and the <strong>second derivative</strong> are its slope and curvature (the second derivative of 2 + sin t + 0.2t is −sin t). The <strong>cumulative integral</strong> is the area so far, starting at 0. <strong>Difference</strong> is the change from one point to the next, and <strong>Percent change</strong> the same relative to the previous value; the first point of both is NaN.</p>
 <table>
 <thead>
 <tr>
@@ -1847,7 +1875,7 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tr>
 <tr>
 <td>Integral (cumulative)</td>
-<td>Starts at</td>
+<td>Trapezoid rule; the running total starts at the value you give in <strong>Starts at</strong> (the constant of integration, 0 by default)</td>
 </tr>
 <tr>
 <td>Difference</td>
@@ -1868,6 +1896,8 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tbody>
 </table>
 <h3 id="scale-and-baseline">Scale and baseline<a class="headerlink" href="#scale-and-baseline" title="Permanent link">&para;</a></h3>
+<p><img alt="Scaling and baseline operations on a series with an offset, a drift and a peak" src="../images/transform/scale-baseline.png" /></p>
+<p>A series with an offset, a drift and a peak. <strong>Normalize</strong> rescales it to 0–1 (<em>min-max</em>) or to mean 0 and standard deviation 1 (<em>z-score</em>). <strong>Subtract baseline</strong> with <em>mean of range</em> takes a quiet stretch (x from 0 to 2) as the zero, which removes the offset but not the drift. <strong>Remove trend</strong> fits a straight line only on x from 0 to 4, before the peak, so that the peak does not tilt it, and subtracts it from the whole series. <strong>Scale and shift</strong> applies a·y + b.</p>
 <table>
 <thead>
 <tr>
@@ -1905,6 +1935,8 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tbody>
 </table>
 <h3 id="cleaning">Cleaning<a class="headerlink" href="#cleaning" title="Permanent link">&para;</a></h3>
+<p><img alt="Cleaning a series with gaps and outliers" src="../images/transform/cleaning.png" /></p>
+<p>A series with two gaps (NaN) and three outliers; grey is the original. <strong>Remove NaN</strong> drops the missing points, so the line jumps across each gap, while <strong>Interpolate NaN</strong> keeps every point and fills the gaps linearly. <strong>Limit to a range</strong> clips the outliers to the limits. The <strong>Hampel filter</strong> replaces them by the local median and leaves the other points as they were. The last panel shows points that arrive out of order, and <strong>Sort by x</strong> putting them right.</p>
 <table>
 <thead>
 <tr>
@@ -1942,6 +1974,8 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tbody>
 </table>
 <h3 id="rolling-statistics">Rolling statistics<a class="headerlink" href="#rolling-statistics" title="Permanent link">&para;</a></h3>
+<p><img alt="Rolling and running statistics of a noisy signal" src="../images/transform/rolling.png" /></p>
+<p>A noisy signal. The <strong>rolling standard deviation</strong> shows where it varies most. The <strong>rolling minimum and maximum</strong> draw an envelope that follows the signal. The <strong>running</strong> minimum and maximum never go back: they are the smallest and largest values so far.</p>
 <table>
 <thead>
 <tr>
@@ -1969,6 +2003,8 @@ It uses the same calculation as Apply, so what you see is what you get.</p>
 </tbody>
 </table>
 <h3 id="signal-analysis">Signal analysis<a class="headerlink" href="#signal-analysis" title="Permanent link">&para;</a></h3>
+<p><img alt="The FFT spectrum and Find peaks" src="../images/transform/signal-analysis.png" /></p>
+<p>Left: the spectrum of the 0.4 Hz plus 7.3 Hz signal above, with one line at each frequency and the amplitudes 1 and 0.5. Right: <strong>Find peaks</strong> on the <code>pulse_signal.csv</code> sample, with the threshold set to 5 times the noise, finds the two pulses and nothing in the noise.</p>
 <table>
 <thead>
 <tr>

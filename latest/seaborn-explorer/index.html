@@ -1189,6 +1189,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Chart types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-type-draws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each type draws
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1588,6 +1605,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Chart types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-type-draws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each type draws
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1784,6 +1818,17 @@
 </div>
 <hr />
 <h2 id="interface">Interface<a class="headerlink" href="#interface" title="Permanent link">&para;</a></h2>
+<p><img alt="The Seaborn Explorer window" src="../images/tools/seaborn-explorer.png" /></p>
+<p>The window, from left to right and top to bottom:</p>
+<ol>
+<li><strong>Chart type</strong> — One of the eight types below; a line under the box describes it.</li>
+<li><strong>Color theme</strong> — The palette: <strong>plotviz</strong> uses the palette of the current chart, the others are seaborn palettes.</li>
+<li><strong>Data columns</strong> — The columns for X, Y and, for some types, <strong>Hue</strong>, <strong>Size</strong> and <strong>Style</strong>. Heatmap and Pairplot show a list of columns to pick instead.</li>
+<li><strong>Chart options</strong> — The options of the chosen type. This box changes with the type (see below).</li>
+<li><strong>Canvas toolbar</strong> — The matplotlib tools: home, back and forward, pan, zoom, subplot settings, axis editor and save.</li>
+<li><strong>Preview</strong> — The chart. Changes to the controls are drawn when you click <strong>Redraw</strong>.</li>
+<li><strong>Bottom bar</strong> — <strong>Redraw</strong>, the export <strong>DPI</strong>, <strong>Export…</strong>, <strong>Generate Python Code</strong>, <strong>Open in Code Runner</strong> and <strong>Close</strong>.</li>
+</ol>
 <p>The window has two panels:</p>
 <table>
 <thead>
@@ -1848,6 +1893,24 @@
 </tr>
 </tbody>
 </table>
+<h3 id="what-each-type-draws">What each type draws<a class="headerlink" href="#what-each-type-draws" title="Permanent link">&para;</a></h3>
+<p>The pictures use the <code>tips</code> and <code>penguins</code> sample datasets of the seaborn collection (in the <code>seaborn</code> folder of the sample datasets).</p>
+<p><img alt="KDE" src="../images/tools/seaborn-kde.png" /></p>
+<p><strong>KDE</strong> — the smoothed distribution of one column (here <code>total_bill</code>).</p>
+<p><img alt="Regression" src="../images/tools/seaborn-regression.png" /></p>
+<p><strong>Regression</strong> — <code>tip</code> against <code>total_bill</code>, with the fitted line and its 95 % confidence band.</p>
+<p><img alt="Strip" src="../images/tools/seaborn-strip.png" /></p>
+<p><strong>Strip</strong> — <code>total_bill</code> for each <code>day</code>, one dot per bill, spread sideways (jitter) so they do not hide each other.</p>
+<p><img alt="Swarm" src="../images/tools/seaborn-swarm.png" /></p>
+<p><strong>Swarm</strong> — <code>tip</code> for each <code>day</code>, with the dots moved aside so that none overlaps.</p>
+<p><img alt="Heatmap" src="../images/tools/seaborn-heatmap.png" /></p>
+<p><strong>Heatmap</strong> — the correlation between the numeric columns of the penguins sample, with the values written in the cells (<strong>Annotate</strong>).</p>
+<p><img alt="Pairplot" src="../images/tools/seaborn-pairplot.png" /></p>
+<p><strong>Pairplot</strong> — every pair of the numeric columns, coloured by <code>species</code> (<strong>Hue</strong>).</p>
+<p><img alt="Joint" src="../images/tools/seaborn-joint.png" /></p>
+<p><strong>Joint</strong> — <code>flipper_length_mm</code> against <code>bill_length_mm</code>, with the distribution of each at the sides.</p>
+<p><img alt="Catplot" src="../images/tools/seaborn-catplot.png" /></p>
+<p><strong>Catplot</strong> — a box plot of <code>total_bill</code> by <code>day</code> (<strong>Kind</strong>: box; the other kinds are boxen, violin, bar, point, count, strip and swarm).</p>
 <hr />
 <h2 id="data-columns">Data columns<a class="headerlink" href="#data-columns" title="Permanent link">&para;</a></h2>
 <p>For chart types that use X/Y axes (KDE, Regression, Strip, Swarm, Joint, Catplot), select columns from the dropdowns:</p>

@@ -1,0 +1,23 @@
+{
+  "seaborn-explorer": [
+    "Chart type",
+    "Color theme",
+    "Data columns",
+    "Chart options",
+    "Canvas toolbar",
+    "Preview",
+    "Bottom bar"
+  ],
+  "code-runner": [
+    "Editor toolbar",
+    "Editor",
+    "Status line",
+    "Run Code",
+    "Canvas toolbar",
+    "Preview",
+    "Export bar"
+  ],
+  "code-runner-error": [
+    "Runtime Error"
+  ]
+}
