@@ -87,5 +87,11 @@
     "Size in pixels",
     "Each subplot",
     "Buttons"
+  ],
+  "preferences": [
+    "Configuration files",
+    "Appearance",
+    "Defaults",
+    "Maintenance"
   ]
 }

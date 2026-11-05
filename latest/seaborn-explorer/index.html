@@ -1328,6 +1328,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Regression options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regression-here-and-in-curves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regression here and in Curves
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -1917,6 +1934,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Regression options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regression-here-and-in-curves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regression here and in Curves
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -2268,6 +2302,71 @@
 <p class="admonition-title">Note</p>
 <p>Robust fit and LOWESS are mutually exclusive with each other and with polynomial order &gt; 1.</p>
 </div>
+<h4 id="regression-here-and-in-curves">Regression here and in Curves<a class="headerlink" href="#regression-here-and-in-curves" title="Permanent link">&para;</a></h4>
+<p>The Explorer draws a <strong>trend line over the points</strong>, to look at them. The curve fit of <strong>Plots → Curves</strong> (see <a href="../curves/">Curves and Fitting</a>) <strong>fits a model</strong> that you can read numbers from, compare and keep with the chart. They are not two versions of the same tool:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>Explorer → Regression</strong></th>
+<th><strong>Plots → Curves → Curve fit</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>A picture for exploring the data</td>
+<td>A fit that is stored in the chart</td>
+</tr>
+<tr>
+<td><strong>Models</strong></td>
+<td>A line or a polynomial (order 1 to 6), a robust line, or LOWESS</td>
+<td>Linear, polynomial up to degree 10, exponential (with or without an offset), power, logarithmic, sigmoid, Gaussian, sinusoid, your own expression, and LOWESS</td>
+</tr>
+<tr>
+<td><strong>Band</strong></td>
+<td><strong>CI %</strong> (95 by default), found by resampling the data at random; it is not drawn for a robust fit or for LOWESS</td>
+<td><strong>Confidence limits</strong> and <strong>Prediction band</strong>, at 1, 2 or 3 sigma, calculated from the uncertainty of the parameters</td>
+</tr>
+<tr>
+<td><strong>Numbers</strong></td>
+<td>None</td>
+<td>The equation, the parameters with their errors, R², adjusted R², RMSE, AIC, BIC and, for the models where it applies, an F-test; they can be exported to a text file</td>
+</tr>
+<tr>
+<td><strong>Outliers</strong></td>
+<td><em>Robust fit</em> lessens their weight</td>
+<td><em>Robust</em> lessens their weight and <strong>marks</strong> the points that stand out, counting them in the results</td>
+</tr>
+<tr>
+<td><strong>Part of the data</strong></td>
+<td>All the points</td>
+<td><strong>Fit only x from … to …</strong> fits one stretch</td>
+</tr>
+<tr>
+<td><strong>Weights</strong></td>
+<td>No</td>
+<td><strong>Weight by the error column</strong></td>
+</tr>
+<tr>
+<td><strong>Comparing</strong></td>
+<td>No: <strong>Redraw</strong> replaces the chart</td>
+<td>The <strong>Fits</strong> list keeps several fits of a series, with R² and AIC side by side</td>
+</tr>
+<tr>
+<td><strong>Where it lives</strong></td>
+<td>In the Explorer window; it leaves as an image or as a script</td>
+<td>On the main chart, saved in the <code>.pviz</code> and in the exported script</td>
+</tr>
+<tr>
+<td><strong>New data</strong></td>
+<td>None</td>
+<td>New series with the curve and the bands, which can be drawn or transformed</td>
+</tr>
+</tbody>
+</table>
+<p>When to use which: the Explorer to see quickly whether there is a trend, or for a fast figure with the seaborn look; Curves when you need a value (the slope and its uncertainty), want to compare models, fit only part of the data, or keep the fit with the chart.</p>
+<p>Two details. The straight line is the same in both (a least-squares line), but the Explorer's band comes from random resampling, so it changes a little each time the chart is redrawn, whereas the band of Curves is calculated and always the same. And <strong>LOWESS</strong> is in both only to <em>show</em> a trend, with no equation: in the Explorer it is drawn over the points, in Curves it joins the <strong>Fits</strong> list and is saved with the chart.</p>
 <h3 id="strip-options">Strip options<a class="headerlink" href="#strip-options" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
