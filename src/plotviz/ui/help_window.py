@@ -52,6 +52,7 @@ NAV: list[tuple[str, list[tuple[str, str]]]] = [
     ('Tools', [
         ('Seaborn Explorer', 'seaborn-explorer.md'),
         ('Python Code Runner', 'code-runner.md'),
+        ('Digitize Image', 'digitize.md'),
     ]),
     ('Export', [('Export Image', 'export.md'), ('Python Export Bundle', 'python-export.md')]),
     ('Reference', [

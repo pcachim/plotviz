@@ -57,6 +57,7 @@ from ui.palettes import PaletteColorMixin
 from ui.annotations import AnnotationUIMixin
 from ui.seaborn_explorer import SeabornExplorer
 from ui.code_runner import CodeRunnerDialog
+from ui.digitizer import DigitizerDialog
 
 
 import config.settings as settings
@@ -921,6 +922,34 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
         self._code_runner.raise_()
         self._code_runner.activateWindow()
 
+    # ── Digitize Image ────────────────────────────────────────────────────────
+    def _open_digitizer(self):
+        """Open (or restore) the Digitize Image window."""
+        if self._digitizer is None:
+            self._digitizer = DigitizerDialog(parent=self)
+            self._digitizer.setWindowModality(Qt.WindowModality.NonModal)
+            self._digitizer.columns_ready.connect(self._add_digitized_columns)
+        self._digitizer.show()
+        self._digitizer.raise_()
+        self._digitizer.activateWindow()
+
+    def _add_digitized_columns(self, columns: dict):
+        """The points read from an image become datasets (a name already in use gets a number)."""
+        import numpy as np
+        added = []
+        for name, values in columns.items():
+            base, count = name, 1
+            while name in self.datasets:
+                name = f'{base}_{count}'
+                count += 1
+            self.datasets[name] = np.asarray(values, dtype=float)
+            added.append(name)
+        self.update_lists()
+        self._schedule_undo_snapshot('Digitize image')
+        self._is_dirty = True
+        self._notify_sns_explorer()
+        self.statusBar().showMessage(f'Added {" and ".join(added)} from the image', 6000)
+
     def _open_pvizx_in_code_runner(self, fp: str):
         """Open the Code Runner, load fp (.pvizx) into it, and run it."""
         self._open_code_runner()
@@ -1263,9 +1292,17 @@ class PlotVizApp(TabBuildersMixin, PlotEngineMixin, SerializationMixin, PythonEx
             self._export_to_code_runner)
         tools_menu.addAction(cr_from_chart_action)
 
+        tools_menu.addSeparator()
+        digitize_action = QAction('Digitize Image…', self)
+        digitize_action.setShortcut('Ctrl+Shift+D')
+        digitize_action.setStatusTip('Read the values of a chart that is only a picture')
+        digitize_action.triggered.connect(self._open_digitizer)
+        tools_menu.addAction(digitize_action)
+
         self._tools_menu = tools_menu
         self._sns_explorer  = None   # lazily created
         self._code_runner   = None   # lazily created
+        self._digitizer     = None   # lazily created
 
         # ── Help menu ─────────────────────────────────────────────────────────
         help_menu = menubar.addMenu('Help')

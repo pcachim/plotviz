@@ -52,6 +52,7 @@ The file types are described in [File Formats](file-formats.md).
 | **Seaborn Explorer…** | `Ctrl + Shift + B` | The window for statistical charts; see [Seaborn Explorer](seaborn-explorer.md) |
 | **Python Code Runner…** | `Ctrl + Shift + P` | The editor for your own matplotlib code; see [Python Code Runner](code-runner.md) |
 | **Code Runner from chart** | `Ctrl + Shift + R` | Opens the Code Runner with the script of the current chart, already run |
+| **Digitize Image…** | `Ctrl + Shift + D` | Reads the values of a chart that is only a picture and adds them as columns; see [Digitize Image](digitize.md) |
 
 ---
 
