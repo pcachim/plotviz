@@ -11,6 +11,18 @@ Open it from the menu bar: **Tools → Seaborn Explorer…**
 
 ## Interface
 
+![The Seaborn Explorer window](images/tools/seaborn-explorer.png)
+
+The window, from left to right and top to bottom:
+
+1. **Chart type** — One of the eight types below; a line under the box describes it.
+2. **Color theme** — The palette: **plotviz** uses the palette of the current chart, the others are seaborn palettes.
+3. **Data columns** — The columns for X, Y and, for some types, **Hue**, **Size** and **Style**. Heatmap and Pairplot show a list of columns to pick instead.
+4. **Chart options** — The options of the chosen type. This box changes with the type (see below).
+5. **Canvas toolbar** — The matplotlib tools: home, back and forward, pan, zoom, subplot settings, axis editor and save.
+6. **Preview** — The chart. Changes to the controls are drawn when you click **Redraw**.
+7. **Bottom bar** — **Redraw**, the export **DPI**, **Export…**, **Generate Python Code**, **Open in Code Runner** and **Close**.
+
 The window has two panels:
 
 | Panel | Contents |
@@ -34,6 +46,42 @@ Changes to the controls do **not** redraw automatically — click **Redraw** to 
 | **Pairplot** | All-vs-all scatter grid (uses column picker) |
 | **Joint** | Bivariate joint distribution with marginals |
 | **Catplot** | Figure-level categorical chart (box, violin, bar, strip, and more) |
+
+### What each type draws
+
+The pictures use the `tips` and `penguins` sample datasets of the seaborn collection (in the `seaborn` folder of the sample datasets).
+
+![KDE](images/tools/seaborn-kde.png)
+
+**KDE** — the smoothed distribution of one column (here `total_bill`).
+
+![Regression](images/tools/seaborn-regression.png)
+
+**Regression** — `tip` against `total_bill`, with the fitted line and its 95 % confidence band.
+
+![Strip](images/tools/seaborn-strip.png)
+
+**Strip** — `total_bill` for each `day`, one dot per bill, spread sideways (jitter) so they do not hide each other.
+
+![Swarm](images/tools/seaborn-swarm.png)
+
+**Swarm** — `tip` for each `day`, with the dots moved aside so that none overlaps.
+
+![Heatmap](images/tools/seaborn-heatmap.png)
+
+**Heatmap** — the correlation between the numeric columns of the penguins sample, with the values written in the cells (**Annotate**).
+
+![Pairplot](images/tools/seaborn-pairplot.png)
+
+**Pairplot** — every pair of the numeric columns, coloured by `species` (**Hue**).
+
+![Joint](images/tools/seaborn-joint.png)
+
+**Joint** — `flipper_length_mm` against `bill_length_mm`, with the distribution of each at the sides.
+
+![Catplot](images/tools/seaborn-catplot.png)
+
+**Catplot** — a box plot of `total_bill` by `day` (**Kind**: box; the other kinds are boxen, violin, bar, point, count, strip and swarm).
 
 ---
 

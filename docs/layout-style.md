@@ -2,6 +2,8 @@
 
 The **Layout & Style** tab controls the figure as a whole: size, margins, title, subplot layout, colour scheme and palette. The plot area, borders and grid of each subplot are on the **Plots → Canvas & Grid** page.
 
+## The Layout & Style tab
+
 ![The Layout & Style tab](images/ui/layout.png)
 
 From top to bottom:

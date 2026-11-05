@@ -2,6 +2,8 @@
 
 The **Axes** tab controls per-subplot axis configuration: the subplot title, axis labels, limits, scale, ticks, and the secondary Y axis. When the chart has more than one subplot, a **Subplot** selector at the top lets you switch between panels. Changing the selector in the Axes tab automatically syncs with the selectors in the other Plots pages.
 
+## The Axes page
+
 ![The Axes page](images/ui/axes.png)
 
 From top to bottom (**Equal scale** is at the very top):

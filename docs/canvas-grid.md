@@ -2,6 +2,8 @@
 
 The **Plots → Canvas & Grid** page sets the look of the plot area of one subplot: its colour, which borders are drawn, and the grid. With several subplots, the **Editing** selector at the top of the Plots tab chooses which one. The figure background and the colours of text and axes belong to the whole figure and are in [Color Schemes](color-schemes.md).
 
+## The Canvas & Grid page
+
 ![The Canvas & Grid page](images/ui/canvas-grid.png)
 
 From top to bottom:

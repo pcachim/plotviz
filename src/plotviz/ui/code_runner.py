@@ -586,9 +586,10 @@ class CodeRunnerDialog(QDialog):
             with matplotlib.rc_context({'text.usetex': False}):
                 try:
                     exec(compile(code, '<code_runner>', 'exec'), sandbox)   # noqa: S102
-                except Exception:  # noqa: BLE001 - runs arbitrary user code; show the traceback
-                    tb = traceback.format_exc()
-                    self._show_error(tb)
+                except Exception as exc:  # noqa: BLE001 - runs arbitrary user code; show the traceback
+                    # Without plotviz's own frame (the exec call): only the user's lines matter.
+                    inner = exc.__traceback__.tb_next if exc.__traceback__ else None
+                    self._show_error(''.join(traceback.format_exception(type(exc), exc, inner)))
                     return
         finally:
             plt.show = _orig_show

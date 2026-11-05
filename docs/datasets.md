@@ -2,6 +2,8 @@
 
 The **Data → Datasets** page loads your files and lists every column the chart can use.
 
+## Loading files
+
 ![The Datasets page](images/ui/datasets.png)
 
 The **Datasets** page of the Data tab:

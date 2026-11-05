@@ -140,11 +140,11 @@ class TestInterfaceFigures(unittest.TestCase):
     def _norm(text):
         return re.sub(r"\s+", " ", text.strip().rstrip(":")).lower()
 
-    def _explained(self, key):
-        """The bold titles of the numbered list that follows the picture images/ui/<key>.png."""
+    def _explained(self, key, folder="ui"):
+        """The bold titles of the numbered list that follows the picture images/<folder>/<key>.png."""
         for md in DOCS.glob("*.md"):
             text = md.read_text(encoding="utf-8")
-            marker = f"(images/ui/{key}.png)"
+            marker = f"(images/{folder}/{key}.png)"
             if marker in text:
                 rest = text.split(marker, 1)[1]
                 titles = []
@@ -170,6 +170,24 @@ class TestInterfaceFigures(unittest.TestCase):
                 if titles:
                     self.assertEqual([t for _, t in explained], [self._norm(t) for t in titles])
                     self.assertEqual([n for n, _ in explained], list(range(1, len(titles) + 1)))
+
+    def test_the_numbered_pictures_of_the_tools_are_explained_too(self):
+        import json
+        zones = json.loads((DOCS / "images" / "tools" / "zones.json").read_text(encoding="utf-8"))
+        for key, titles in zones.items():
+            with self.subTest(picture=key):
+                self.assertTrue((DOCS / "images" / "tools" / f"{key}.png").is_file())
+                explained = self._explained(key, "tools")
+                self.assertIsNotNone(explained, f"images/tools/{key}.png is not used in the guide")
+                self.assertEqual([t for _, t in explained], [self._norm(t) for t in titles])
+
+    def test_every_chart_type_of_the_explorer_has_a_picture_in_its_page(self):
+        from ui.seaborn_explorer import _CHART_NAMES
+        text = (DOCS / "seaborn-explorer.md").read_text(encoding="utf-8")
+        for name in _CHART_NAMES:
+            with self.subTest(chart=name):
+                self.assertTrue((DOCS / "images" / "tools" / f"seaborn-{name.lower()}.png").is_file())
+                self.assertIn(f"(images/tools/seaborn-{name.lower()}.png)", text)
 
     def test_the_overview_has_its_five_zones(self):
         self.assertTrue((DOCS / "images" / "ui" / "overview.png").is_file())

@@ -2,7 +2,7 @@
 
 The **Data → Transform** page creates new series from existing ones: smoothing, decimation, calculus, scaling, cleaning, resampling and signal analysis. To summarise series instead, see [Statistics](statistics.md).
 
----
+## The Transform page
 
 The Transform page applies an operation (smoothing, decimation, calculus, scaling, cleaning, resampling…) to a series and stores the result as a **new series**. The original is never changed, so you can plot both together.
 

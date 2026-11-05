@@ -925,9 +925,12 @@ class SeabornExplorer(QDialog):
                    ('ci', 99) if ci_str == '99' else \
                    'sd' if ci_str == 'sd' else None
         _pal_name = self._sns_palette_name()  # str if named palette, None if plotviz
-        kw = dict(data=df, x='x', y='y', kind=kind,
-                  alpha=self._cat_alpha.value(),
-                  saturation=self._cat_sat.value())
+        alpha = self._cat_alpha.value()
+        kw = dict(data=df, x='x', y='y', kind=kind, saturation=self._cat_sat.value())
+        if kind != 'box':                    # matplotlib's boxplot has no alpha: set on the boxes below
+            kw['alpha'] = alpha
+        if kind == 'count':                  # a count has one axis: the categories
+            del kw['y']
         # palette and color are mutually exclusive in seaborn catplot
         if _pal_name is not None:
             kw['palette'] = _pal_name
@@ -936,7 +939,11 @@ class SeabornExplorer(QDialog):
         if kind in ('bar', 'point') and errorbar is not None:
             kw['errorbar'] = errorbar
         fg = sns.catplot(**kw)
-        fg.set_axis_labels(xn, yn)
+        if kind == 'box':
+            for ax in fg.axes.flat:
+                for box in ax.patches:
+                    box.set_alpha(alpha)
+        fg.set_axis_labels(xn, 'count' if kind == 'count' else yn)
         self._swap_figure(fg.figure)
 
     # ── Export ────────────────────────────────────────────────────────────────

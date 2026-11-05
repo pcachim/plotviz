@@ -4,6 +4,8 @@ The **Legend & Notes** tab manages what is drawn on and around the data: the leg
 
 When the chart has more than one subplot, the **Subplot** selector at the top of the tab switches context. All controls — legend, annotation visibility — apply to the currently selected subplot.
 
+## The Legend & Notes page
+
 ![The Legend & Notes page](images/ui/legend-notes.png)
 
 The page, from top to bottom:

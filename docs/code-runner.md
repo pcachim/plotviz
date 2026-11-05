@@ -8,6 +8,18 @@ Open it from the menu bar: **Tools → Python Code Runner…**
 
 ## Interface
 
+![The Python Code Runner window](images/tools/code-runner.png)
+
+The window:
+
+1. **Editor toolbar** — **Open…** a `.py` file, **Load .pvizx…** a Python bundle, **Save…**, **Clear** and **Sample**.
+2. **Editor** — The code, with syntax highlighting.
+3. **Status line** — The line and column of the cursor, and the number of characters.
+4. **Run Code** — Runs the code (`Ctrl + Enter`).
+5. **Canvas toolbar** — The matplotlib tools for the preview.
+6. **Preview** — The figure that the code made.
+7. **Export bar** — The **DPI**, **Export…** and **Close**.
+
 The window is split into two panels:
 
 | Panel | Contents |
@@ -75,6 +87,10 @@ ax.set_ylabel('Pressure (Pa)')
 plt.tight_layout()
 ```
 
+With the `tips` sample dataset loaded, a scatter plot with a fitted line:
+
+![A chart made from a loaded dataset](images/tools/code-runner-example.png)
+
 ### Figure requirements
 
 Your code must create at least one matplotlib figure (`plt.figure()`, `plt.subplots()`, or a seaborn figure-level function). If it runs without producing a figure, a message is shown in the preview canvas.
@@ -93,7 +109,13 @@ All matplotlib figures from a previous run are closed before each new run, so st
 
 ## Error panel
 
-If your code raises an exception, a collapsible error panel appears below the editor showing the full Python traceback. The canvas shows a brief error notice on the right.
+If your code raises an exception, an error panel appears below the editor with the traceback of your code (only your own lines). The canvas shows a brief error notice on the right.
+
+![The error panel](images/tools/code-runner-error.png)
+
+1. **Runtime Error** — the exception and the line of your code that raised it; here a column name with a typo, `total_bil`.
+
+The panel has two buttons:
 
 | Button | Action |
 |--------|--------|

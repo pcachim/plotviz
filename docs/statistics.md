@@ -2,7 +2,7 @@
 
 The **Data → Statistics** page summarises the loaded series. To create new series from them, see [Transform](transform.md).
 
----
+## The Statistics page
 
 The Statistics page summarises the loaded series. It works on the series **selected in the Datasets list**, or on all of them when none is selected. It refreshes when you open the page; click **↻ Refresh** after changing the selection or the data.
 
