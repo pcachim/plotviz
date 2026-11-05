@@ -54,6 +54,7 @@ def main() -> int:
     dialog.pick_color_at(*pixel(3, 10 * np.exp(-3 / 4) * np.cos(3) + 12))
     dialog.step.setValue(14)
     dialog.trace_curve()
+    dialog._on_move(*pixel(5.0, 10 * np.exp(-5 / 4) * np.cos(5) + 12))      # the magnifier shows near the curve
     app.processEvents()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     dialog.grab().save(str(OUT))

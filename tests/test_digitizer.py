@@ -14,7 +14,9 @@ if _SRC not in sys.path:
 import numpy as np  # noqa: E402
 
 import _bootstrap  # noqa: F401,E402
-from data.digitize import AxisCalibration, Calibration, CalibrationError, trace_by_color  # noqa: E402
+from data.digitize import (  # noqa: E402
+    AxisCalibration, Calibration, CalibrationError, PointCalibration, trace_by_color,
+)
 
 
 class TestCalibration(unittest.TestCase):
@@ -52,6 +54,57 @@ class TestCalibration(unittest.TestCase):
         px, py = cal.to_pixel(0.5, 5.0)
         self.assertAlmostEqual(float(px), 50.0)
         self.assertAlmostEqual(float(py), 50.0)
+
+
+class TestPointCalibration(unittest.TestCase):
+    def rotated(self, angle, scale=(30.0, 20.0), shift=(100.0, 200.0)):
+        """Pixel positions of data points when the chart is turned by *angle* (radians) and y grows downwards."""
+        c, s = np.cos(angle), np.sin(angle)
+
+        def pixels(x, y):
+            px, py = scale[0] * x, -scale[1] * y
+            return shift[0] + c * px - s * py, shift[1] + s * px + c * py
+        return pixels
+
+    def test_three_points_recover_a_rotated_chart(self):
+        pixels = self.rotated(np.radians(12))
+        refs = [(0, 0), (10, 0), (0, 5)]
+        cal = PointCalibration([pixels(*r) for r in refs], refs)
+        px, py = pixels(4.0, 3.0)
+        x, y = cal.to_data(px, py)
+        self.assertAlmostEqual(float(x), 4.0, places=6)
+        self.assertAlmostEqual(float(y), 3.0, places=6)
+        bx, by = cal.to_pixel(4.0, 3.0)
+        self.assertAlmostEqual(float(bx), float(px), places=6)
+
+    def test_four_points_recover_a_perspective_view(self):
+        def view(x, y):                                   # a projective map, as a photograph at an angle gives
+            w = 1 + 0.002 * x + 0.001 * y
+            return (120 + 28 * x + 3 * y) / w, (260 - 18 * y + 2 * x) / w
+        refs = [(0, 0), (10, 0), (10, 8), (0, 8)]
+        cal = PointCalibration([view(*r) for r in refs], refs)
+        for x0, y0 in [(3.0, 2.0), (7.5, 6.0), (1.0, 7.0)]:
+            x, y = cal.to_data(*view(x0, y0))
+            self.assertAlmostEqual(float(x), x0, places=6)
+            self.assertAlmostEqual(float(y), y0, places=6)
+
+    def test_arrays_and_log_axes(self):
+        refs = [(1, 0), (1000, 0), (1, 50)]
+        pixels = [(0, 300), (300, 300), (0, 100)]
+        cal = PointCalibration(pixels, refs, log_x=True)
+        x, y = cal.to_data(np.array([100, 200]), np.array([300, 200]))
+        np.testing.assert_allclose(x, [10, 100], rtol=1e-9)
+        np.testing.assert_allclose(y, [0, 25], atol=1e-9)
+
+    def test_points_on_one_line_or_a_wrong_number_are_refused(self):
+        with self.assertRaises(CalibrationError):
+            PointCalibration([(0, 0), (10, 10), (20, 20)], [(0, 0), (1, 1), (2, 2)])
+        with self.assertRaises(CalibrationError):
+            PointCalibration([(0, 0), (10, 0)], [(0, 0), (1, 0)])
+        with self.assertRaises(CalibrationError):
+            PointCalibration([(0, 0), (10, 0), (0, 10)], [(0, 0), (-1, 0), (0, 1)], log_x=True)
+        with self.assertRaises(CalibrationError):
+            PointCalibration([(0, 0), (10, 0), (20, 0), (30, 5)], [(0, 0), (1, 0), (2, 0), (3, 1)])
 
 
 class TestTrace(unittest.TestCase):
@@ -201,6 +254,109 @@ class TestWindow(unittest.TestCase):
             self.d.add_to_chart()
         warn.assert_called_once()
         self.assertEqual(seen, [])
+
+    def reference_mode(self, n_points=3):
+        """Reference points for a picture whose axes are rotated: pixel = (100 + 20x + 5y, 250 - 2x - 15y)."""
+        d = self.d
+        d.cal_mode.setCurrentIndex(1)
+        refs = [(0, 0), (10, 0), (0, 10), (10, 10)][:n_points]
+        for i, (x, y) in enumerate(refs, start=1):
+            d.set_calibration_point(f"p{i}", 100 + 20 * x + 5 * y, 250 - 2 * x - 15 * y)
+            d.cal_values[f"p{i}x"].setText(str(x))
+            d.cal_values[f"p{i}y"].setText(str(y))
+
+    def test_three_reference_points_read_a_rotated_picture(self):
+        self.reference_mode(3)
+        self.assertIsNotNone(self.d.calibration())
+        self.d.add_point(100 + 20 * 4 + 5 * 6, 250 - 2 * 4 - 15 * 6)
+        x, y = self.d.points_data()
+        np.testing.assert_allclose([x[0], y[0]], [4, 6], atol=1e-9)
+
+    def test_a_fourth_reference_point_is_used_when_it_is_complete(self):
+        self.reference_mode(4)
+        self.assertEqual(len(self.d.calibration().pixels), 4)
+
+    def test_a_half_set_fourth_point_is_reported_not_ignored(self):
+        self.reference_mode(3)
+        self.d.cal_values["p4x"].setText("10")
+        self.assertIsNone(self.d.calibration())
+        self.assertIn("point 4", self.d._calibration_or_reason()[1])
+
+    def test_the_status_says_which_reference_point_is_missing(self):
+        self.d.cal_mode.setCurrentIndex(1)
+        self.assertIn("Set point 1", self.d._calibration_or_reason()[1])
+        self.d.set_calibration_point("p1", 10, 10)
+        self.assertIn("Type the x and y of point 1", self.d._calibration_or_reason()[1])
+
+    def test_each_mode_keeps_its_own_markers_and_the_other_ones_are_hidden(self):
+        self.calibrate()
+        self.d.cal_mode.setCurrentIndex(1)
+        self.assertFalse(self.d._cal_items["x1"].isVisible())
+        self.d.cal_mode.setCurrentIndex(0)
+        self.assertTrue(self.d._cal_items["x1"].isVisible())
+        self.assertIsNotNone(self.d.calibration())
+
+    def test_a_reference_calibration_limits_the_trace_to_the_points(self):
+        self.reference_mode(3)
+        self.d.pick_color_at(200, 150)
+        self.d.step.setValue(20)
+        self.assertGreater(self.d.trace_curve(), 0)
+
+    def test_the_magnifier_follows_the_pointer_and_hides_for_the_pan_tool(self):
+        self.d._on_move(200.0, 150.0)
+        self.assertTrue(self.d.magnifier.isVisible())
+        self.assertFalse(self.d.magnifier.pixmap().isNull())
+        self.d._on_move(-5.0, 10.0)                              # outside the picture
+        self.assertFalse(self.d.magnifier.isVisible())
+        self.d._on_move(200.0, 150.0)
+        self.d.tool_combo.setCurrentIndex(1)
+        self.d._on_move(210.0, 150.0)
+        self.assertFalse(self.d.magnifier.isVisible())
+
+    def test_the_magnifier_works_at_the_edge_of_the_picture(self):
+        self.d._on_move(0.5, 0.5)
+        self.assertTrue(self.d.magnifier.isVisible())
+        self.d._on_move(399.5, 299.5)
+        self.assertTrue(self.d.magnifier.isVisible())
+
+    def test_a_marked_point_is_taken_and_carried_by_the_pointer(self):
+        self.d.add_point(100, 100)
+        self.d.add_point(300, 200)
+        self.assertTrue(self.d._grab_at(102, 101))
+        self.d._on_drag(150, 160)
+        self.d._on_drag_end()
+        self.assertEqual(self.d._points[0], (150, 160))
+        self.assertEqual(self.d._points[1], (300, 200))
+        self.assertFalse(self.d._grab_at(10, 10))             # nothing there
+
+    def test_a_point_cannot_be_dragged_out_of_the_picture(self):
+        self.d.add_point(100, 100)
+        self.d._grab_at(100, 100)
+        self.d._on_drag(-50, 900)
+        self.d._on_drag_end()
+        x, y = self.d._points[0]
+        self.assertTrue(0 <= x < 400 and 0 <= y < 300)
+
+    def test_a_reference_marker_can_be_dragged_and_the_values_follow(self):
+        self.calibrate()
+        self.d.add_point(200, 150)
+        before = self.d.points_data()[0][0]
+        self.assertTrue(self.d._grab_at(350, 150))            # x2
+        self.d._on_drag(250, 150)
+        self.d._on_drag_end()
+        self.assertEqual(self.d._cal_points["x2"], (250, 150))
+        self.assertGreater(self.d.points_data()[0][0], before)
+
+    def test_nothing_is_taken_while_a_calibration_click_is_awaited(self):
+        self.d.add_point(100, 100)
+        self.d._await("x1")
+        self.assertFalse(self.d._grab_at(100, 100))
+
+    def test_move_point_helper_and_the_table_follow(self):
+        self.calibrate()
+        self.d.add_point(100, 100)
+        self.d.move_point(0, 200, 150)
+        self.assertEqual(self.d.table.item(0, 0).text(), "5")
 
     def test_a_new_image_starts_over(self):
         from PyQt6.QtGui import QImage
