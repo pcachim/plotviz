@@ -2,118 +2,122 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/axes/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/canvas-grid/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/chart-types/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
+    </url>
+    <url>
+         <loc>https://pcachim.github.io/plotviz/latest/citing/</loc>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/code-runner/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/color-schemes/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/command-line/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/curves/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/datasets/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/digitize/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/examples/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/export/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/file-formats/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/generate/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/getting-started/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/glossary/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/layout-style/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/legend-notes/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/licenses/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/menus/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/palettes/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/plot/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/python-export/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/seaborn-explorer/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/shortcuts/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/statistics/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/subplots/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/transform/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
     <url>
          <loc>https://pcachim.github.io/plotviz/latest/troubleshooting/</loc>
-         <lastmod>2026-11-05</lastmod>
+         <lastmod>2026-11-09</lastmod>
     </url>
 </urlset>
