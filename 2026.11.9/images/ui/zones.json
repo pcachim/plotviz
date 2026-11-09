@@ -1,0 +1,98 @@
+{
+  "datasets": [
+    "DATASETS"
+  ],
+  "generate-fx": [
+    "FUNCTION GENERATOR",
+    "PREVIEW"
+  ],
+  "generate-fxy": [
+    "Z = F(X, Y)  GENERATOR",
+    "X SERIES",
+    "Y SERIES",
+    "Z SERIES",
+    "PREVIEW"
+  ],
+  "generate-fuv": [
+    "(U, V) = F(X, Y)  GENERATOR",
+    "X SERIES",
+    "Y SERIES",
+    "U SERIES",
+    "V SERIES",
+    "PREVIEW"
+  ],
+  "generate-table": [
+    "New table",
+    "Cells",
+    "Editing buttons",
+    "Load and CSV"
+  ],
+  "statistics": [
+    "SUMMARY",
+    "CORRELATION"
+  ],
+  "transform": [
+    "SERIES",
+    "OPERATION",
+    "PREVIEW",
+    "RESULT"
+  ],
+  "layout": [
+    "FIGURE",
+    "MARGINS",
+    "SUBPLOTS",
+    "TITLE",
+    "POSITION & ROTATION",
+    "COLORS",
+    "COLOR SCHEMES",
+    "COLOUR PALETTE"
+  ],
+  "plot": [
+    "PLOT MODE",
+    "SERIES"
+  ],
+  "curves": [
+    "PER-CURVE",
+    "CURVE FIT (LINE / SCATTER)",
+    "RESULTS"
+  ],
+  "axes": [
+    "X AXIS",
+    "Y AXIS (LEFT)",
+    "Y AXIS (RIGHT / SECONDARY)"
+  ],
+  "canvas-grid": [
+    "CHART CANVAS",
+    "GRID"
+  ],
+  "legend-notes": [
+    "LEGEND",
+    "PLACE ANNOTATION",
+    "Style for new annotations",
+    "Annotations — double-click to edit"
+  ],
+  "axes-3d": [
+    "X AXIS",
+    "Y AXIS (LEFT)",
+    "Y AXIS (RIGHT / SECONDARY)",
+    "Z / COLOR AXIS"
+  ],
+  "plot-options": [
+    "PLOT MODE",
+    "SERIES",
+    "Histogram Options"
+  ],
+  "export": [
+    "Format",
+    "Resolution",
+    "Size in pixels",
+    "Each subplot",
+    "Buttons"
+  ],
+  "preferences": [
+    "Configuration files",
+    "Appearance",
+    "Defaults",
+    "Maintenance"
+  ]
+}
