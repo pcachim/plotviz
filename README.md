@@ -116,4 +116,4 @@ It contains open-source packages under their own licences (BSD, MIT, Apache, and
 
 ## Version
 
-The latest release is on the [Releases page](https://github.com/pcachim/plotviz/releases/latest).
+The latest release is on the [Releases page](https://github.com/pcachim/plotviz/releases/latest). What changed in each version is in the [Changelog](CHANGELOG.md).
