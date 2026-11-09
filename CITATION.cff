@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use plotviz in your work, please cite it as below."
+type: software
+title: "pcachim/plotviz: desktop chart editor for scientists, engineers, and analysts"
+authors:
+  - family-names: Cachim
+    given-names: P.
+date-released: 2026-11-09
+license: GPL-3.0-or-later
+repository-code: "https://github.com/pcachim/plotviz"
+doi: 10.5281/zenodo.23378412
+publisher:
+  name: Zenodo
+preferred-citation:
+  type: software
+  title: "pcachim/plotviz: desktop chart editor for scientists, engineers, and analysts"
+  authors:
+    - family-names: Cachim
+      given-names: P.
+  year: 2026
+  doi: 10.5281/zenodo.23378412
+  publisher:
+    name: Zenodo

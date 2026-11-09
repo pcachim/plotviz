@@ -99,6 +99,7 @@ nav:
     - Troubleshooting: troubleshooting.md
     - Glossary: glossary.md
     - Licenses: licenses.md
+    - Citing plotviz: citing.md
 
 extra:
   version:

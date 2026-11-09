@@ -68,6 +68,7 @@ Full documentation is available at **https://pcachim.github.io/plotviz/**
 | [Command Line](docs/command-line.md) | Draw saved charts to image files from a script |
 | [File Formats](docs/file-formats.md) | .pviz, .pvizt, .pvizc, .pvizp, .pvizx |
 | [Licenses](docs/licenses.md) | The licence of plotviz and of what it contains |
+| [Citing plotviz](docs/citing.md) | How to cite plotviz in your work |
 | [Troubleshooting](docs/troubleshooting.md) | The messages of the app and what to do |
 | [Glossary](docs/glossary.md) | The terms used in the app |
 | [Menus](docs/menus.md) | Every menu item, the samples, the preferences |
@@ -94,6 +95,14 @@ Dependencies are installed automatically via pip:
 | statsmodels | ≥ 0.14 | Regression and LOWESS |
 | openpyxl | ≥ 3.1 | Excel file support |
 | platformdirs | ≥ 3.0 | Settings directory |
+
+---
+
+## Referencing
+
+If you use plotviz in your work, please cite it:
+
+> Cachim, P. (2026). *pcachim/plotviz: desktop chart editor for scientists, engineers, and analysts* [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23378412
 
 ---
 
